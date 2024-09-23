@@ -12,6 +12,7 @@ import { DataProvider } from "./contexts/DataContext"; // Import DataProvider
 import IngredientsInventory from "./scenes/IngredientInventory";
 
 function App() {
+  //set theme
   const [theme, colorMode] = useMode();
 
   return (
