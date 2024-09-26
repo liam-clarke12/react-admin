@@ -7,11 +7,11 @@ import { useData } from "../../contexts/DataContext";
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { rows, setRows } = useData(); // Make sure setRows is included here
+  const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
 
   const columns = [
-    { field: "date", headerName: "Date", flex: 1 },
-    { field: "ingredient", headerName: "Ingredient", flex: 1 },
+    { field: "date", headerName: "Date", flex: 1, editable: true },
+    { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
     {
       field: "stockReceived",
       headerName: "Stock Received (g)",
@@ -19,18 +19,49 @@ const GoodsIn = () => {
       flex: 1,
       headerAlign: "left",
       align: "left",
+      editable: true,
     },
     {
       field: "barCode",
       headerName: "Bar Code",
       flex: 1,
       cellClassName: "barCode-column--cell",
+      editable: true,
     },
   ];
 
+  // Handle row update
+  const processRowUpdate = (newRow) => {
+    const updatedRows = goodsInRows.map((row) => (row.id === newRow.id ? newRow : row));
+    setGoodsInRows(updatedRows);
+    updateIngredientInventory(updatedRows);
+    return newRow;
+  };
+
+  const updateIngredientInventory = (updatedRows) => {
+    const updatedInventory = [];
+
+    updatedRows.forEach((row) => {
+      const existingIngredient = updatedInventory.find(item => item.ingredient === row.ingredient);
+
+      if (existingIngredient) {
+        existingIngredient.amount += row.stockReceived; // Accumulate stock for the same ingredient
+      } else {
+        updatedInventory.push({
+          ingredient: row.ingredient,
+          amount: row.stockReceived,
+          barcode: row.barCode,
+        });
+      }
+    });
+
+    setIngredientInventory(updatedInventory);
+  };
+
+  // Clear the localStorage for Goods In data
   const handleClearStorage = () => {
-    localStorage.removeItem('rows');
-    setRows([]); // Reset rows
+    localStorage.removeItem("goodsInRows");
+    setGoodsInRows([]); // Reset rows
   };
 
   return (
@@ -52,7 +83,16 @@ const GoodsIn = () => {
           "& .MuiCheckbox-root": { color: `${colors.greenAccent[200]} !important` },
         }}
       >
-        <DataGrid checkboxSelection rows={rows} columns={columns} />
+        <DataGrid
+          checkboxSelection
+          rows={goodsInRows.map((row, index) => ({
+            ...row,
+            id: row.barCode || index, // Use barCode as id, or index as a fallback
+          }))}
+          columns={columns}
+          processRowUpdate={processRowUpdate} // Enable cell edits to trigger updates
+          getRowId={(row) => row.barCode} // Set the unique id for the row
+        />
       </Box>
     </Box>
   );

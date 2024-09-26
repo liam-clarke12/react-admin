@@ -7,10 +7,11 @@ import { useData } from '../../../contexts/DataContext'; // Import the DataConte
 
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
-  const { addRow } = useData(); // Get the addRow function from context
+  const { addGoodsInRow } = useData(); // Get the addGoodsInRow function from context
 
   const handleFormSubmit = (values, { resetForm }) => {
-    addRow(values); // Call the function to add row
+    console.log("Submitting Values:", values); // Debugging log
+    addGoodsInRow(values); // Call the function to add row
     resetForm(); // Reset the form after submission
   };
 
@@ -120,4 +121,3 @@ const initialValues = {
 };
 
 export default GoodsInForm;
-//commit
