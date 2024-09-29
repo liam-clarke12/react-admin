@@ -3,9 +3,11 @@ import { Sidebar as ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
+import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
+import OutdoorGrillOutlinedIcon from '@mui/icons-material/OutdoorGrillOutlined';
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
 import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
@@ -139,6 +141,13 @@ const Sidebar = () => {
               setSelected={setSelected}
             />
             <Item
+              title="Ingredients Inventory"
+              to="/IngredientsInventory"
+              icon={<BakeryDiningOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
               title="Recipes"
               to="/recipes"
               icon={<DescriptionOutlinedIcon />}
@@ -146,13 +155,19 @@ const Sidebar = () => {
               setSelected={setSelected}
             />
             <Item
-              title="Ingredients Inventory"
-              to="/IngredientsInventory"
-              icon={<BakeryDiningOutlinedIcon />}
+              title="Recipe Inventory"
+              to="/recipe_inventory"
+              icon={<WarehouseOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
-            />
-
+            />         
+            <Item
+              title="Production Log"
+              to="/production_log"
+              icon={<AddOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />            
             <Typography
               variant="h6"
               color={colors.grey[300]}
@@ -175,9 +190,9 @@ const Sidebar = () => {
               setSelected={setSelected}
             />
             <Item
-              title="FAQ Page"
-              to="/faq"
-              icon={<HelpOutlineOutlinedIcon />}
+              title="Recipe Production"
+              to="/recipe_production"
+              icon={<OutdoorGrillOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
