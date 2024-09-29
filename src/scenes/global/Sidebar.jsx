@@ -131,6 +131,35 @@ const Sidebar = () => {
               color={colors.grey[300]}
               sx={{ m: "15px 0 5px 20px" }}
             >
+              Forms
+            </Typography>
+            <Item
+              title="Goods In Form"
+              to="/GoodsInForm"
+              icon={<DeliveryDiningOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipe Form"
+              to="/recipeform"
+              icon={<ReceiptLongOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipe Production"
+              to="/recipe_production"
+              icon={<OutdoorGrillOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Typography
+              variant="h6"
+              color={colors.grey[300]}
+              sx={{ m: "15px 0 5px 20px" }}
+            >
               Data
             </Typography>
             <Item
@@ -168,34 +197,6 @@ const Sidebar = () => {
               selected={selected}
               setSelected={setSelected}
             />            
-            <Typography
-              variant="h6"
-              color={colors.grey[300]}
-              sx={{ m: "15px 0 5px 20px" }}
-            >
-              Forms
-            </Typography>
-            <Item
-              title="Goods In Form"
-              to="/GoodsInForm"
-              icon={<DeliveryDiningOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Recipe Form"
-              to="/recipeform"
-              icon={<ReceiptLongOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Recipe Production"
-              to="/recipe_production"
-              icon={<OutdoorGrillOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
 
             <Typography
               variant="h6"
