@@ -28,9 +28,9 @@ export const DataProvider = ({ children }) => {
     return savedInventory ? JSON.parse(savedInventory) : [];
   });
 
-  const [recipes, setRecipes] = useState(() => {
-    const savedRecipes = localStorage.getItem('recipes');
-    return savedRecipes ? JSON.parse(savedRecipes) : [];
+  const [stockUsage, setStockUsage] = useState(() => {
+    const savedStockUsage = localStorage.getItem('stockUsage');
+    return savedStockUsage ? JSON.parse(savedStockUsage) : [];
   });
 
   // Sync state with localStorage
@@ -55,8 +55,8 @@ export const DataProvider = ({ children }) => {
   }, [recipeInventory]);
 
   useEffect(() => {
-    localStorage.setItem('recipes', JSON.stringify(recipes));
-  }, [recipes]);
+    localStorage.setItem('stockUsage', JSON.stringify(stockUsage));
+  }, [stockUsage]);
 
   // Function to add a new row to the Goods In table
   const addGoodsInRow = (row) => {
@@ -99,7 +99,10 @@ export const DataProvider = ({ children }) => {
       quantities: row.quantities,
     };
 
-    setRows(prevRows => [...prevRows, newRow]);
+    setRows(prevRows => {
+      const updatedRows = [...prevRows, newRow];
+      return updatedRows;
+    });
   };
 
   // Function to add a new row to the Production Logs and update Recipe Inventory
@@ -127,28 +130,34 @@ export const DataProvider = ({ children }) => {
         { recipe: log.recipe, quantity: log.batchesProduced, date: log.date, batchCode: log.batchCode }
       ]);
     }
+
+    // Update Stock Usage with actual ingredients and quantities from the recipe
+    const ingredientsForUsage = getIngredientsByRecipeName(log.recipe); // Get ingredients by recipe name
+    const quantitiesForUsage = getQuantitiesByRecipeName(log.recipe); // Get quantities by recipe name
+
+    // Create an array of objects with ingredient and corresponding quantity
+    const stockUsageData = ingredientsForUsage.map((ingredient, index) => ({
+      ingredient,
+      quantity: quantitiesForUsage[index] * log.batchesProduced || 0 // Default to 0 if no quantity found
+    }));
+
+    addStockUsageRow({
+      recipeName: log.recipe,
+      date: log.date,
+      ingredients: stockUsageData, // Use the array of objects
+      batchCode: log.batchCode,
+    });
   };
 
-  // Function to update an existing production log
-  const updateProductionLog = (updatedLog) => {
-    setProductionLogs((prevLogs) =>
-      prevLogs.map((log) => (log.id === updatedLog.id ? updatedLog : log))
-    );
+  // Function to add a new row to the Stock Usage table
+  const addStockUsageRow = (row) => {
+    setStockUsage(prevStockUsage => [...prevStockUsage, { ...row, id: `${row.recipeName}-${Date.now()}` }]);
+  };
 
-    // Update recipeInventory based on the change in batchesProduced
-    const existingRecipe = recipeInventory.find(item => item.recipe === updatedLog.recipe);
-    if (existingRecipe) {
-      const previousLog = productionLogs.find(log => log.id === updatedLog.id);
-      if (previousLog) {
-        const quantityChange = updatedLog.batchesProduced - (previousLog.batchesProduced || 0);
-        const updatedInventory = recipeInventory.map(item =>
-          item.recipe === updatedLog.recipe
-            ? { ...item, quantity: item.quantity + quantityChange }
-            : item
-        );
-        setRecipeInventory(updatedInventory);
-      }
-    }
+  // Function to clear stock usage
+  const clearStockUsage = () => {
+    setStockUsage([]);
+    localStorage.removeItem('stockUsage');
   };
 
   // Function to clear production logs
@@ -163,6 +172,18 @@ export const DataProvider = ({ children }) => {
     localStorage.removeItem('recipeInventory');
   };
 
+  // Function to get quantities by recipe name
+  const getQuantitiesByRecipeName = (recipeName) => {
+    const recipeRow = rows.find(row => row.recipe === recipeName);
+    return recipeRow ? recipeRow.quantities : []; // Return quantities if the recipe is found
+  };
+
+  // Function to get ingredients by recipe name
+  const getIngredientsByRecipeName = (recipeName) => {
+    const recipeRow = rows.find(row => row.recipe === recipeName);
+    return recipeRow ? recipeRow.ingredients : []; // Return ingredients if the recipe is found
+  };
+
   return (
     <DataContext.Provider value={{
       goodsInRows,
@@ -175,13 +196,15 @@ export const DataProvider = ({ children }) => {
       setRows,
       productionLogs,
       addProductionLogRow,
-      updateProductionLog, // Expose the update function
       clearProductionLogs,
-      clearRecipeInventory,  // New function for clearing recipe inventory
       recipeInventory,
       setRecipeInventory,
-      recipes,
-      setRecipes,
+      clearRecipeInventory,
+      stockUsage, // Expose stock usage state
+      addStockUsageRow, // Expose function to add stock usage
+      clearStockUsage,
+      getQuantitiesByRecipeName, // Expose the function
+      getIngredientsByRecipeName, // Expose the new function
     }}>
       {children}
     </DataContext.Provider>

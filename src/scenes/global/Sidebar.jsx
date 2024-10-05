@@ -3,6 +3,7 @@ import { Sidebar as ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
+import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
@@ -197,7 +198,13 @@ const Sidebar = () => {
               selected={selected}
               setSelected={setSelected}
             />            
-
+            <Item
+              title="Stock Usage"
+              to="/stock_usage"
+              icon={<InventoryOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />            
             <Typography
               variant="h6"
               color={colors.grey[300]}

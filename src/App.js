@@ -5,6 +5,7 @@ import Sidebar from "./scenes/global/Sidebar";
 import Dashboard from "./scenes/dashboard";
 import GoodsIn from "./scenes/GoodsIn";
 import ProductionLog from "./scenes/ProductionLog";
+import StockUsage from "./scenes/StockUsage";
 import Recipes from "./scenes/Recipes";
 import RecipeInventory from "./scenes/RecipeInventory";
 import GoodsInForm from "./scenes/form/GoodsIn";
@@ -37,6 +38,7 @@ function App() {
                 <Route path="/production_log" element={<ProductionLog />} />
                 <Route path="/recipe_production" element={<ProductionLogForm />} />
                 <Route path="/recipe_inventory" element={<RecipeInventory />} />
+                <Route path="/stock_usage" element={<StockUsage />} />
                 {/* Add additional routes here as needed */}
               </Routes>
             </main>
