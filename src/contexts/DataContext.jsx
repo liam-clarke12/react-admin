@@ -152,6 +152,17 @@ export const DataProvider = ({ children }) => {
   // Function to add a new row to the Stock Usage table
   const addStockUsageRow = (row) => {
     setStockUsage(prevStockUsage => [...prevStockUsage, { ...row, id: `${row.recipeName}-${Date.now()}` }]);
+
+    // New process to reduce ingredient inventory based on stock usage
+    const updatedInventory = ingredientInventory.map(item => {
+      const ingredientUsed = row.ingredients.find(ing => ing.ingredient === item.ingredient);
+      if (ingredientUsed) {
+        return { ...item, amount: item.amount - ingredientUsed.quantity };
+      }
+      return item;
+    }).filter(item => item.amount > 0); // Remove items that have zero or negative stock
+
+    setIngredientInventory(updatedInventory);
   };
 
   // Function to clear stock usage
