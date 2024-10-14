@@ -5,9 +5,8 @@ import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import BarChart from "../../components/BarChart"; // Use BarChart instead of PieChart
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined"; // Import Menu Icon
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-
 
 const IngredientsInventory = () => {
   const theme = useTheme();
@@ -16,8 +15,8 @@ const IngredientsInventory = () => {
   const [drawerOpen, setDrawerOpen] = useState(false); // State to handle drawer visibility
 
   const columns = [
-    { field: "ingredient", headerName: "Ingredient Name", flex: 1 },
-    { field: "amount", headerName: "Stock on Hand", flex: 1 },
+    { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
+    { field: "amount", headerName: "Stock on Hand", flex: 1, editable: true },
     {
       field: "barcode",
       headerName: "Barcode",
@@ -25,12 +24,34 @@ const IngredientsInventory = () => {
       headerAlign: "left",
       align: "left",
       cellClassName: "barCode-column--cell", // Style barcode column
+      editable: true,
     },
   ];
+
+  // Load from localStorage on initial render
+  useEffect(() => {
+    const storedData = localStorage.getItem("ingredientInventory");
+    if (storedData) {
+      setIngredientInventory(JSON.parse(storedData));
+    }
+  }, [setIngredientInventory]);
 
   const handleClearStorage = () => {
     localStorage.removeItem("ingredientInventory"); // Remove specific item
     setIngredientInventory([]); // Reset the state
+  };
+
+  const handleRowEdit = (newRow, oldRow) => {
+    const updatedRows = ingredientInventory.map((row) =>
+      row.ingredient === oldRow.ingredient ? newRow : row
+    );
+
+    setIngredientInventory(updatedRows); // Update context
+
+    // Also store updated data in localStorage
+    localStorage.setItem("ingredientInventory", JSON.stringify(updatedRows));
+
+    return newRow; // Return the new row for display
   };
 
   // Prepare the data for the bar chart
@@ -96,6 +117,8 @@ const IngredientsInventory = () => {
           checkboxSelection
           rows={ingredientInventory}
           columns={columns}
+          processRowUpdate={handleRowEdit}
+          experimentalFeatures={{ newEditingApi: true }}
           getRowId={(row) => row.ingredient} // Use ingredient name as the unique identifier for the rows
         />
       </Box>

@@ -22,6 +22,15 @@ const GoodsIn = () => {
       editable: true,
     },
     {
+      field: "stockRemaining",
+      headerName: "Stock Remaining (g)",
+      type: "number",
+      flex: 1,
+      headerAlign: "left",
+      align: "left",
+      editable: true,
+    },
+    {
       field: "barCode",
       headerName: "Bar Code",
       flex: 1,
