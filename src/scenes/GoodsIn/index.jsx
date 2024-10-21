@@ -3,6 +3,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
+import { useEffect } from "react";
 
 const GoodsIn = () => {
   const theme = useTheme();
@@ -37,33 +38,65 @@ const GoodsIn = () => {
       cellClassName: "barCode-column--cell",
       editable: true,
     },
+    {
+      field: "processed",
+      headerName: "Processed",
+      flex: 1,
+      editable: false, // Making this non-editable
+    },
   ];
 
   // Handle row update
   const processRowUpdate = (newRow) => {
     const updatedRows = goodsInRows.map((row) => (row.id === newRow.id ? newRow : row));
     setGoodsInRows(updatedRows);
+    
+    // Update inventory whenever rows are updated
     updateIngredientInventory(updatedRows);
+    
     return newRow;
   };
 
   const updateIngredientInventory = (updatedRows) => {
     const updatedInventory = [];
 
+    // Create a map to store the next unprocessed barcode for each ingredient
+    const nextBarcodeMap = {};
+
+    // First pass: Track barcodes of unprocessed ingredients
+    updatedRows.forEach((row) => {
+      if (row.processed === "No") {
+        if (!nextBarcodeMap[row.ingredient]) {
+          nextBarcodeMap[row.ingredient] = row.barCode; // Set the first unprocessed barcode
+        }
+      }
+    });
+
+    // Second pass: Update inventory and adjust barcodes as needed
     updatedRows.forEach((row) => {
       const existingIngredient = updatedInventory.find(item => item.ingredient === row.ingredient);
 
+      // If the ingredient is already in the inventory
       if (existingIngredient) {
-        existingIngredient.amount += row.stockReceived; // Accumulate stock for the same ingredient
+        existingIngredient.amount += row.stockReceived; // Accumulate stock
+        // Check if the row is processed
+        if (row.processed === "Yes") {
+          // No barcode updates to existing ingredients
+          // Remove this barcode from the map so it isn't reused
+          delete nextBarcodeMap[row.ingredient];
+        }
       } else {
+        // If it's a new ingredient, add it to the inventory
         updatedInventory.push({
           ingredient: row.ingredient,
           amount: row.stockReceived,
-          barcode: row.barCode,
+          // Do not add/update barcode in inventory
+          barcode: nextBarcodeMap[row.ingredient] || row.barCode, // Use the tracked barcode or current barcode
         });
       }
     });
 
+    // Update the ingredient inventory in context
     setIngredientInventory(updatedInventory);
   };
 
@@ -72,6 +105,15 @@ const GoodsIn = () => {
     localStorage.removeItem("goodsInRows");
     setGoodsInRows([]); // Reset rows
   };
+
+  // Automatically update processed status based on stock remaining
+  useEffect(() => {
+    const updatedRows = goodsInRows.map((row) => ({
+      ...row,
+      processed: row.stockRemaining === 0 ? "Yes" : "No",
+    }));
+    setGoodsInRows(updatedRows);
+  }, [goodsInRows, setGoodsInRows]); // Runs whenever goodsInRows changes
 
   return (
     <Box m="20px">
@@ -97,6 +139,7 @@ const GoodsIn = () => {
           rows={goodsInRows.map((row, index) => ({
             ...row,
             id: row.barCode || index, // Use barCode as id, or index as a fallback
+            processed: row.processed || "No", // Default to "No" if processed is not set
           }))}
           columns={columns}
           processRowUpdate={processRowUpdate} // Enable cell edits to trigger updates
