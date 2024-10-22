@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const DataContext = createContext();
 
@@ -203,6 +203,62 @@ export const DataProvider = ({ children }) => {
     setIngredientInventory(updatedInventory);
     setGoodsInRows(updatedGoodsInRows);
   };
+
+  const updateBarcodesAfterProcessing = useCallback(() => {
+    console.log('Starting barcode update process...');
+    let updatedInventory = [...ingredientInventory];
+    let updatedGoodsInRows = [...goodsInRows];
+
+    // Iterate over each ingredient in the inventory
+    updatedInventory.forEach((inventoryItem) => {
+      const matchingGoodsInRows = updatedGoodsInRows.filter(
+        (row) => row.ingredient === inventoryItem.ingredient
+      );
+
+      // Find the first matching GoodsIn row with processed status "Yes"
+      const currentRow = matchingGoodsInRows.find((row) => row.barCode === inventoryItem.barcode && row.processed === 'Yes');
+
+      if (currentRow) {
+        console.log(`Processing ingredient: ${inventoryItem.ingredient}, barcode: ${currentRow.barCode}`);
+
+        // Find the next GoodsIn row with the same ingredient and processed as "No"
+        const nextUnprocessedRow = matchingGoodsInRows.find((row) => row.processed === 'No');
+
+        if (nextUnprocessedRow) {
+          console.log(`Found next unprocessed row for ${inventoryItem.ingredient}, updating barcode to ${nextUnprocessedRow.barCode}`);
+
+          // Update the barcode in the Ingredient Inventory
+          updatedInventory = updatedInventory.map((item) =>
+            item.ingredient === inventoryItem.ingredient
+              ? { ...item, barcode: nextUnprocessedRow.barCode }
+              : item
+          );
+
+          // Mark the next unprocessed row as processed
+          updatedGoodsInRows = updatedGoodsInRows.map((row) =>
+            row.id === nextUnprocessedRow.id
+              ? { ...row, processed: 'Yes' }
+              : row
+          );
+        }
+      }
+    });
+
+    setIngredientInventory(updatedInventory);
+    setGoodsInRows(updatedGoodsInRows);
+
+    console.log('Barcode update process completed.');
+  }, [ingredientInventory, goodsInRows]);
+
+  useEffect(() => {
+    if (stockUsage.length > 0) {
+      const timeoutId = setTimeout(() => {
+        updateBarcodesAfterProcessing();
+      }, 2000);
+  
+      return () => clearTimeout(timeoutId); // Cleanup timeout on component unmount
+    }
+  }, [stockUsage,updateBarcodesAfterProcessing]);
   
   // Function to clear stock usage
   const clearStockUsage = () => {
@@ -255,6 +311,7 @@ export const DataProvider = ({ children }) => {
       clearStockUsage,
       getQuantitiesByRecipeName, // Expose the function
       getIngredientsByRecipeName, // Expose the new function
+      updateBarcodesAfterProcessing,
     }}>
       {children}
     </DataContext.Provider>

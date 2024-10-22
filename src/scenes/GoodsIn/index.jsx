@@ -48,9 +48,9 @@ const GoodsIn = () => {
 
   // Handle row update
   const processRowUpdate = (newRow) => {
-    const updatedRows = goodsInRows.map((row) => (row.id === newRow.id ? newRow : row));
+    const updatedRows = goodsInRows.map((row) => (row.barCode === newRow.barCode ? newRow : row));
     setGoodsInRows(updatedRows);
-    
+
     // Update inventory whenever rows are updated
     updateIngredientInventory(updatedRows);
     
@@ -59,8 +59,6 @@ const GoodsIn = () => {
 
   const updateIngredientInventory = (updatedRows) => {
     const updatedInventory = [];
-
-    // Create a map to store the next unprocessed barcode for each ingredient
     const nextBarcodeMap = {};
 
     // First pass: Track barcodes of unprocessed ingredients
@@ -76,27 +74,20 @@ const GoodsIn = () => {
     updatedRows.forEach((row) => {
       const existingIngredient = updatedInventory.find(item => item.ingredient === row.ingredient);
 
-      // If the ingredient is already in the inventory
       if (existingIngredient) {
         existingIngredient.amount += row.stockReceived; // Accumulate stock
-        // Check if the row is processed
         if (row.processed === "Yes") {
-          // No barcode updates to existing ingredients
-          // Remove this barcode from the map so it isn't reused
-          delete nextBarcodeMap[row.ingredient];
+          delete nextBarcodeMap[row.ingredient]; // Remove processed ingredient from map
         }
       } else {
-        // If it's a new ingredient, add it to the inventory
         updatedInventory.push({
           ingredient: row.ingredient,
           amount: row.stockReceived,
-          // Do not add/update barcode in inventory
-          barcode: nextBarcodeMap[row.ingredient] || row.barCode, // Use the tracked barcode or current barcode
+          barcode: nextBarcodeMap[row.ingredient] || row.barCode,
         });
       }
     });
 
-    // Update the ingredient inventory in context
     setIngredientInventory(updatedInventory);
   };
 
@@ -112,7 +103,11 @@ const GoodsIn = () => {
       ...row,
       processed: row.stockRemaining === 0 ? "Yes" : "No",
     }));
-    setGoodsInRows(updatedRows);
+
+    // Update the state only if there are changes
+    if (JSON.stringify(updatedRows) !== JSON.stringify(goodsInRows)) {
+      setGoodsInRows(updatedRows);
+    }
   }, [goodsInRows, setGoodsInRows]); // Runs whenever goodsInRows changes
 
   return (
@@ -136,9 +131,9 @@ const GoodsIn = () => {
       >
         <DataGrid
           checkboxSelection
-          rows={goodsInRows.map((row, index) => ({
+          rows={goodsInRows.map((row) => ({
             ...row,
-            id: row.barCode || index, // Use barCode as id, or index as a fallback
+            id: row.barCode, // Use barCode as id
             processed: row.processed || "No", // Default to "No" if processed is not set
           }))}
           columns={columns}
