@@ -118,141 +118,128 @@ const Sidebar = () => {
           )}
 
           <Box paddingLeft={isCollapsed ? undefined : "10%"}>
-          <Item
-    title="Dashboard"
-    to="/"
-    icon={<HomeOutlinedIcon />}
-    selected={selected}
-    setSelected={setSelected}
-  />
+            <Item
+              title="Dashboard"
+              to="/"
+              icon={<HomeOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
 
-  <Typography
-    variant="h6"
-    color={colors.grey[300]}
-    sx={{ m: "15px 0 5px 20px" }}
-  >
-    Forms
-  </Typography>
-  <Link to="/GoodsInForm">
-    <Item
-      title="Goods In Form"
-      icon={<DeliveryDiningOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/recipeform">
-    <Item
-      title="Recipe Form"
-      icon={<ReceiptLongOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/recipe_production">
-    <Item
-      title="Recipe Production"
-      icon={<OutdoorGrillOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
+            <Typography
+              variant="h6"
+              color={colors.grey[300]}
+              sx={{ m: "15px 0 5px 20px" }}
+            >
+              Forms
+            </Typography>
+            <Item
+              title="Goods In Form"
+              to="/GoodsInForm"
+              icon={<DeliveryDiningOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipe Form"
+              to="/recipeform"
+              icon={<ReceiptLongOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipe Production"
+              to="/recipe_production"
+              icon={<OutdoorGrillOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
 
-  <Typography
-    variant="h6"
-    color={colors.grey[300]}
-    sx={{ m: "15px 0 5px 20px" }}
-  >
-    Data
-  </Typography>
-  <Link to="/GoodsIn">
-    <Item
-      title="Goods In"
-      icon={<LocalShippingOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/IngredientsInventory">
-    <Item
-      title="Ingredients Inventory"
-      icon={<BakeryDiningOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/recipes">
-    <Item
-      title="Recipes"
-      icon={<DescriptionOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/recipe_inventory">
-    <Item
-      title="Recipe Inventory"
-      icon={<WarehouseOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/production_log">
-    <Item
-      title="Production Log"
-      icon={<AddOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/stock_usage">
-    <Item
-      title="Stock Usage"
-      icon={<InventoryOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  
-  <Typography
-    variant="h6"
-    color={colors.grey[300]}
-    sx={{ m: "15px 0 5px 20px" }}
-  >
-    Charts
-  </Typography>
-  <Link to="/bar">
-    <Item
-      title="Bar Chart"
-      icon={<BarChartOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/pie">
-    <Item
-      title="Pie Chart"
-      icon={<PieChartOutlineOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/line">
-    <Item
-      title="Line Chart"
-      icon={<TimelineOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
-  <Link to="/geography">
-    <Item
-      title="Geography Chart"
-      icon={<MapOutlinedIcon />}
-      selected={selected}
-      setSelected={setSelected}
-    />
-  </Link>
+            <Typography
+              variant="h6"
+              color={colors.grey[300]}
+              sx={{ m: "15px 0 5px 20px" }}
+            >
+              Data
+            </Typography>
+            <Item
+              title="Goods In"
+              to="/GoodsIn"
+              icon={<LocalShippingOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Ingredients Inventory"
+              to="/IngredientsInventory"
+              icon={<BakeryDiningOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipes"
+              to="/recipes"
+              icon={<DescriptionOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Recipe Inventory"
+              to="/recipe_inventory"
+              icon={<WarehouseOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Production Log"
+              to="/production_log"
+              icon={<AddOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Stock Usage"
+              to="/stock_usage"
+              icon={<InventoryOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Typography
+              variant="h6"
+              color={colors.grey[300]}
+              sx={{ m: "15px 0 5px 20px" }}
+            >
+              Charts
+            </Typography>
+            <Item
+              title="Bar Chart"
+              to="/bar"
+              icon={<BarChartOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Pie Chart"
+              to="/pie"
+              icon={<PieChartOutlineOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Line Chart"
+              to="/line"
+              icon={<TimelineOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Geography Chart"
+              to="/geography"
+              icon={<MapOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
           </Box>
         </Menu>
       </ProSidebar>
