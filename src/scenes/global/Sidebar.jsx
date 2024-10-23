@@ -133,13 +133,15 @@ const Sidebar = () => {
             >
               Forms
             </Typography>
-            <Item
-              title="Goods In Form"
-              to="/GoodsInForm"
-              icon={<DeliveryDiningOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
+            <Link to="/GoodsInForm">
+              <Item
+                title="Goods In Form"
+                to="/GoodsInForm"
+                icon={<DeliveryDiningOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
             <Item
               title="Recipe Form"
               to="/recipeform"
