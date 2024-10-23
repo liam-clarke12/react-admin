@@ -69,7 +69,8 @@ const StockUsage = () => {
         Clear Stock Usage
       </Button>
 
-      <Box m="40px 0 0 0" height="50vh" sx={{
+      <Box m="40px 0 0 0"
+        height="75vh" sx={{
         "& .MuiDataGrid-root": { border: "none" },
         "& .MuiDataGrid-cell": { borderBottom: "none" },
         "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },

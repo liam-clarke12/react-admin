@@ -42,18 +42,19 @@ const GoodsIn = () => {
       field: "processed",
       headerName: "Processed",
       flex: 1,
-      editable: false, // Making this non-editable
+      editable: false, // Non-editable
     },
   ];
 
   // Handle row update
   const processRowUpdate = (newRow) => {
-    const updatedRows = goodsInRows.map((row) => (row.barCode === newRow.barCode ? newRow : row));
+    const updatedRows = goodsInRows.map((row) =>
+      row.barCode === newRow.barCode && row.ingredient === newRow.ingredient
+        ? newRow
+        : row
+    );
     setGoodsInRows(updatedRows);
-
-    // Update inventory whenever rows are updated
     updateIngredientInventory(updatedRows);
-    
     return newRow;
   };
 
@@ -61,23 +62,23 @@ const GoodsIn = () => {
     const updatedInventory = [];
     const nextBarcodeMap = {};
 
-    // First pass: Track barcodes of unprocessed ingredients
     updatedRows.forEach((row) => {
       if (row.processed === "No") {
         if (!nextBarcodeMap[row.ingredient]) {
-          nextBarcodeMap[row.ingredient] = row.barCode; // Set the first unprocessed barcode
+          nextBarcodeMap[row.ingredient] = row.barCode;
         }
       }
     });
 
-    // Second pass: Update inventory and adjust barcodes as needed
     updatedRows.forEach((row) => {
-      const existingIngredient = updatedInventory.find(item => item.ingredient === row.ingredient);
+      const existingIngredient = updatedInventory.find(
+        (item) => item.ingredient === row.ingredient
+      );
 
       if (existingIngredient) {
-        existingIngredient.amount += row.stockReceived; // Accumulate stock
+        existingIngredient.amount += row.stockReceived;
         if (row.processed === "Yes") {
-          delete nextBarcodeMap[row.ingredient]; // Remove processed ingredient from map
+          delete nextBarcodeMap[row.ingredient];
         }
       } else {
         updatedInventory.push({
@@ -94,21 +95,19 @@ const GoodsIn = () => {
   // Clear the localStorage for Goods In data
   const handleClearStorage = () => {
     localStorage.removeItem("goodsInRows");
-    setGoodsInRows([]); // Reset rows
+    setGoodsInRows([]);
   };
 
-  // Automatically update processed status based on stock remaining
   useEffect(() => {
     const updatedRows = goodsInRows.map((row) => ({
       ...row,
       processed: row.stockRemaining === 0 ? "Yes" : "No",
     }));
 
-    // Update the state only if there are changes
     if (JSON.stringify(updatedRows) !== JSON.stringify(goodsInRows)) {
       setGoodsInRows(updatedRows);
     }
-  }, [goodsInRows, setGoodsInRows]); // Runs whenever goodsInRows changes
+  }, [goodsInRows, setGoodsInRows]);
 
   return (
     <Box m="20px">
@@ -123,22 +122,30 @@ const GoodsIn = () => {
           "& .MuiDataGrid-root": { border: "none" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
           "& .barCode-column--cell": { color: colors.greenAccent[300] },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
+          "& .MuiDataGrid-columnHeaders": {
+            backgroundColor: colors.blueAccent[700],
+            borderBottom: "none",
+          },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
-          "& .MuiCheckbox-root": { color: `${colors.greenAccent[200]} !important` },
+          "& .MuiDataGrid-footerContainer": {
+            borderTop: "none",
+            backgroundColor: colors.blueAccent[700],
+          },
+          "& .MuiCheckbox-root": {
+            color: `${colors.greenAccent[200]} !important`,
+          },
         }}
       >
         <DataGrid
           checkboxSelection
           rows={goodsInRows.map((row) => ({
             ...row,
-            id: row.barCode, // Use barCode as id
-            processed: row.processed || "No", // Default to "No" if processed is not set
+            id: `${row.barCode}-${row.ingredient}`, // Combine barcode and ingredient for unique ID
+            processed: row.processed || "No",
           }))}
           columns={columns}
-          processRowUpdate={processRowUpdate} // Enable cell edits to trigger updates
-          getRowId={(row) => row.barCode} // Set the unique id for the row
+          processRowUpdate={processRowUpdate}
+          getRowId={(row) => `${row.barCode}-${row.ingredient}`} // Combine barcode and ingredient for unique row ID
         />
       </Box>
     </Box>

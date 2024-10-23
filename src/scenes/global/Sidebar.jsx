@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Sidebar as ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
+import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
+import "react-pro-sidebar/dist/css/styles.css";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
@@ -27,6 +28,7 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
       active={selected === title}
       style={{
         color: colors.grey[100],
+        listStyleType: 'none', // Ensure no bullet points
       }}
       onClick={() => setSelected(title)}
       icon={icon}
@@ -78,12 +80,9 @@ const Sidebar = () => {
               <Box
                 display="flex"
                 justifyContent="space-between"
-                alignItems="center"
+                alignItems="right"
                 ml="15px"
               >
-                <Typography variant="h3" color={colors.grey[100]}>
-                  ADMIN
-                </Typography>
                 <IconButton onClick={() => setIsCollapsed(!isCollapsed)}>
                   <MenuOutlinedIcon />
                 </IconButton>
@@ -190,21 +189,21 @@ const Sidebar = () => {
               icon={<WarehouseOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
-            />         
+            />
             <Item
               title="Production Log"
               to="/production_log"
               icon={<AddOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
-            />            
+            />
             <Item
               title="Stock Usage"
               to="/stock_usage"
               icon={<InventoryOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
-            />            
+            />
             <Typography
               variant="h6"
               color={colors.grey[300]}
