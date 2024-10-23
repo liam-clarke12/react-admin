@@ -32,9 +32,10 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
       }}
       onClick={() => setSelected(title)}
       icon={icon}
-      component={<Link to={to} />} // This ensures the link behavior works inside the MenuItem
     >
-      <Typography>{title}</Typography>
+      <Link to={to} style={{ textDecoration: 'none', color: colors.grey[100], width: '100%' }}>
+        <Typography>{title}</Typography>
+      </Link>
     </MenuItem>
   );
 };
