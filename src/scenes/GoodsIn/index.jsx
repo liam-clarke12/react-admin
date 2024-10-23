@@ -119,7 +119,8 @@ const GoodsIn = () => {
         m="40px 0 0 0"
         height="75vh"
         sx={{
-          "& .MuiDataGrid-root": { border: "none" },
+          overflowX: 'auto',
+          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
           "& .barCode-column--cell": { color: colors.greenAccent[300] },
           "& .MuiDataGrid-columnHeaders": {
