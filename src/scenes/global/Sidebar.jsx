@@ -142,20 +142,24 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
             </Link>
-            <Item
-              title="Recipe Form"
-              to="/recipeform"
-              icon={<ReceiptLongOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Recipe Production"
-              to="/recipe_production"
-              icon={<OutdoorGrillOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
+            <Link to="/recipeform">
+              <Item
+                title="Recipe Form"
+                to="/recipeform"
+                icon={<ReceiptLongOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/recipe_production">
+              <Item
+                title="Recipe Production"
+                to="/recipe_production"
+                icon={<OutdoorGrillOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
 
             <Typography
               variant="h6"
@@ -164,48 +168,60 @@ const Sidebar = () => {
             >
               Data
             </Typography>
-            <Item
-              title="Goods In"
-              to="/GoodsIn"
-              icon={<LocalShippingOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Ingredients Inventory"
-              to="/IngredientsInventory"
-              icon={<BakeryDiningOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Recipes"
-              to="/recipes"
-              icon={<DescriptionOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Recipe Inventory"
-              to="/recipe_inventory"
-              icon={<WarehouseOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Production Log"
-              to="/production_log"
-              icon={<AddOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
-            <Item
-              title="Stock Usage"
-              to="/stock_usage"
-              icon={<InventoryOutlinedIcon />}
-              selected={selected}
-              setSelected={setSelected}
-            />
+            <Link to="/GoodsIn">
+              <Item
+                title="Goods In"
+                to="/GoodsIn"
+                icon={<LocalShippingOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/IngredientsInventory">
+              <Item
+                title="Ingredients Inventory"
+                to="/IngredientsInventory"
+                icon={<BakeryDiningOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/recipes">
+              <Item
+                title="Recipes"
+                to="/recipes"
+                icon={<DescriptionOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/recipe_inventory">
+              <Item
+                title="Recipe Inventory"
+                to="/recipe_inventory"
+                icon={<WarehouseOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/production_log">
+              <Item
+                title="Production Log"
+                to="/production_log"
+                icon={<AddOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
+            <Link to="/stock_usage">
+              <Item
+                title="Stock Usage"
+                to="/stock_usage"
+                icon={<InventoryOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+            </Link>
             <Typography
               variant="h6"
               color={colors.grey[300]}
