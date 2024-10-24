@@ -85,7 +85,7 @@ const RecipeForm = () => {
                                 fullWidth
                                 variant="filled"
                                 type="number"
-                                label="Quantity per Batch"
+                                label="Quantity per Batch (kg)"
                                 name={`ingredients.${index}.quantity`}
                                 onBlur={handleBlur}
                                 onChange={handleChange}

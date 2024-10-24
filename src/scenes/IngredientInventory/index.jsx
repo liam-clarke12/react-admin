@@ -16,7 +16,7 @@ const IngredientsInventory = () => {
 
   const columns = [
     { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
-    { field: "amount", headerName: "Stock on Hand", flex: 1, editable: true },
+    { field: "amount", headerName: "Stock on Hand (kg)", flex: 1, editable: true },
     {
       field: "barcode",
       headerName: "Barcode",
@@ -112,15 +112,26 @@ const IngredientsInventory = () => {
           "& .MuiCheckbox-root": {
             color: `${colors.greenAccent[200]} !important`,
           },
+          "& .even-row": {
+            backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)
+          },
+          "& .odd-row": {
+            backgroundColor: colors.primary[400], // Color for odd rows (adjust per mode)
+          },
         }}
       >
         <DataGrid
           checkboxSelection
-          rows={ingredientInventory}
+          rows={ingredientInventory.map((row, index) => ({
+            ...row,
+            id: row.ingredient, // Use ingredient as unique ID
+            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
+          }))}
           columns={columns}
           processRowUpdate={handleRowEdit}
-          experimentalFeatures={{ newEditingApi: true }}
-          getRowId={(row) => row.ingredient} // Use ingredient name as the unique identifier for the rows
+          getRowClassName={(params) => 
+            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
+          }
         />
       </Box>
 

@@ -15,7 +15,7 @@ const GoodsIn = () => {
     { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
     {
       field: "stockReceived",
-      headerName: "Stock Received (g)",
+      headerName: "Stock Received (kg)",
       type: "number",
       flex: 1,
       headerAlign: "left",
@@ -24,7 +24,7 @@ const GoodsIn = () => {
     },
     {
       field: "stockRemaining",
-      headerName: "Stock Remaining (g)",
+      headerName: "Stock Remaining (kg)",
       type: "number",
       flex: 1,
       headerAlign: "left",
@@ -135,18 +135,26 @@ const GoodsIn = () => {
           "& .MuiCheckbox-root": {
             color: `${colors.greenAccent[200]} !important`,
           },
+          "& .even-row": {
+            backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)
+          },
+          "& .odd-row": {
+            backgroundColor: colors.primary[400], // Color for odd rows (adjust per mode)
+          },
         }}
       >
         <DataGrid
           checkboxSelection
-          rows={goodsInRows.map((row) => ({
+          rows={goodsInRows.map((row, index) => ({
             ...row,
             id: `${row.barCode}-${row.ingredient}`, // Combine barcode and ingredient for unique ID
             processed: row.processed || "No",
+            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
           }))}
           columns={columns}
           processRowUpdate={processRowUpdate}
           getRowId={(row) => `${row.barCode}-${row.ingredient}`} // Combine barcode and ingredient for unique row ID
+          getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row')}
         />
       </Box>
     </Box>

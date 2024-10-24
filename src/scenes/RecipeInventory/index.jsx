@@ -20,7 +20,7 @@ const RecipeInventory = () => {
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
     { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    { field: "quantity", headerName: "Quantity", headerAlign: "left", align: "left",type: "number", flex: 1 },
+    { field: "quantity", headerName: "Quantity", headerAlign: "left", align: "left", type: "number", flex: 1 },
     { field: "batchCode", headerName: "Batch Code", flex: 1 },
   ];
 
@@ -75,13 +75,24 @@ const RecipeInventory = () => {
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
           "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
           "& .MuiCheckbox-root": { color: `${colors.greenAccent[200]} !important` },
+
+          // Alternating row colors
+          "& .even-row": {
+            backgroundColor: colors.primary[450], // Color for even rows
+          },
+          "& .odd-row": {
+            backgroundColor: colors.primary[400], // Color for odd rows
+          },
         }}
       >
         <DataGrid
-          rows={rows.map((row, index) => ({ ...row, id: index }))} // Add id to rows
+          rows={rows.map((row, index) => ({ ...row, id: row.batchCode, rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row' }))} // Add id to rows and class name
           columns={columns}
           pageSize={10}
           rowsPerPageOptions={[10, 25, 50]}
+          getRowClassName={(params) => 
+            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row' // Apply alternating row classes
+          }
         />
       </Box>
 

@@ -71,7 +71,7 @@ const GoodsInForm = () => {
                 fullWidth
                 variant="filled"
                 type="number"
-                label="Stock Received (g)"
+                label="Stock Received (kg)"
                 onBlur={handleBlur}
                 onChange={handleChange}
                 value={values.stockReceived}

@@ -30,7 +30,7 @@ const ProductionLog = () => {
 
   const processRowUpdate = (newRow) => {
     // Call the function to update the production log
-    updateProductionLog(newRow); 
+    updateProductionLog(newRow);
     return newRow; // Return the updated row for DataGrid
   };
 
@@ -39,7 +39,7 @@ const ProductionLog = () => {
   return (
     <Box m="20px">
       <Header title="PRODUCTION LOG" subtitle="Track the Recipes you have Produced" />
-      
+
       <Button 
         variant="contained" 
         color="secondary" 
@@ -54,19 +54,32 @@ const ProductionLog = () => {
         height="75vh"
         sx={{
           overflowX: 'auto',
-          "& .MuiDataGrid-root": {border: "none", minWidth: "650px"},
+          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
           "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
           "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
+          "& .even-row": {
+            backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)
+          },
+          "& .odd-row": {
+            backgroundColor: colors.primary[400], // Color for odd rows (adjust per mode)
+          },
         }}
       >
         <DataGrid
-          rows={productionLogs} // Ensure you're using the correct state
+          rows={productionLogs.map((row, index) => ({
+            ...row,
+            id: row.batchCode, // Ensure a unique ID for each row
+            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
+          }))}
           columns={columns}
           processRowUpdate={processRowUpdate}
-          getRowId={(row) => row.id}
+          getRowId={(row) => row.batchCode} // Ensure a unique ID for rows
           disableSelectionOnClick
+          getRowClassName={(params) =>
+            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
+          }
         />
       </Box>
     </Box>
