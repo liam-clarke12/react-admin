@@ -20,7 +20,7 @@ const RecipeInventory = () => {
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
     { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    { field: "quantity", headerName: "Quantity", type: "number", flex: 1 },
+    { field: "quantity", headerName: "Quantity", headerAlign: "left", align: "left",type: "number", flex: 1 },
     { field: "batchCode", headerName: "Batch Code", flex: 1 },
   ];
 
