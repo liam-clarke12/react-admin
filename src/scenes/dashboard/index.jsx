@@ -1,7 +1,7 @@
 import React from 'react'; // Import React
 import { Box, Button, IconButton, Typography, useTheme } from "@mui/material";
 import { tokens } from "../../themes";
-import { mockTransactions } from "../../data/mockData";
+import { mockTransactions } from "../../data/MockData";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
