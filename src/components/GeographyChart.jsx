@@ -1,7 +1,7 @@
 
 import { useTheme } from "@mui/material";
 import { ResponsiveChoropleth } from "@nivo/geo";
-import { geoFeatures } from "../data/mockGeoFeatures";
+import { geoFeatures } from "../data/MockGeoFeatures";
 import { tokens } from "../themes";
 import { mockGeographyData as data } from "../data/MockData";
 
