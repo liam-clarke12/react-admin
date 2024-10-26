@@ -158,51 +158,49 @@ export const DataProvider = ({ children }) => {
   const addStockUsageRow = (row) => {
     setStockUsage(prevStockUsage => [...prevStockUsage, { ...row, id: `${row.recipeName}-${Date.now()}` }]);
   
-    // New process to reduce ingredient inventory based on stock usage
-    let updatedInventory = [...ingredientInventory]; // Clone the inventory for safe updates
-    let updatedGoodsInRows = [...goodsInRows]; // Clone goodsInRows for safe updates
+    // Clone the inventory and goodsInRows for safe updates
+    let updatedInventory = [...ingredientInventory];
+    let updatedGoodsInRows = [...goodsInRows];
   
-    // Loop through each ingredient used in the stock usage row
+    // Process each ingredient in the stock usage row
     row.ingredients.forEach((ingredientUsed) => {
       let quantityToSubtract = ingredientUsed.quantity;
   
-      // Loop through the goodsInRows to find matching rows for the ingredient
+      // Deduct stock from matching rows in goodsInRows
       for (let i = 0; i < updatedGoodsInRows.length && quantityToSubtract > 0; i++) {
         let goodRow = updatedGoodsInRows[i];
   
-        // Check if the ingredient in goodsInRows matches the ingredient used
         if (goodRow.ingredient === ingredientUsed.ingredient) {
           const stockRemaining = goodRow.stockRemaining;
   
-          // If stock remaining is greater than or equal to the amount to subtract
           if (stockRemaining >= quantityToSubtract) {
             updatedGoodsInRows[i] = {
               ...goodRow,
-              stockRemaining: stockRemaining - quantityToSubtract, // Subtract the required quantity
+              stockRemaining: stockRemaining - quantityToSubtract,
             };
-            quantityToSubtract = 0; // Reset the quantity to subtract as it's fully subtracted
+            quantityToSubtract = 0;
           } else {
-            // If stock remaining is less than the amount to subtract, use all available stock and continue
             updatedGoodsInRows[i] = {
               ...goodRow,
-              stockRemaining: 0, // Set stockRemaining to zero
+              stockRemaining: 0,
             };
-            quantityToSubtract -= stockRemaining; // Reduce the amount to subtract for the next matching row
+            quantityToSubtract -= stockRemaining;
           }
         }
       }
   
-      // Update the inventory by subtracting from corresponding ingredients
+      // Update the inventory and ensure amount doesn't go below zero
       updatedInventory = updatedInventory.map(item =>
         item.ingredient === ingredientUsed.ingredient
-          ? { ...item, amount: item.amount - ingredientUsed.quantity }
+          ? { ...item, amount: Math.max(0, item.amount - ingredientUsed.quantity) }
           : item
-      ).filter(item => item.amount > 0); // Remove items with zero or negative stock
+      );
     });
   
     setIngredientInventory(updatedInventory);
     setGoodsInRows(updatedGoodsInRows);
   };
+  
 
   const updateBarcodesAfterProcessing = useCallback(() => {
     console.log('Starting barcode update process...');

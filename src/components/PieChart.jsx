@@ -1,14 +1,14 @@
 import { ResponsivePie } from "@nivo/pie";
-import { tokens } from "../themes";
+import { tokens } from "../theme";
 import { useTheme } from "@mui/material";
+import { mockPieData as data } from "../data/mockData";
 
-const PieChart = ({ data }) => {  // Accept data as a prop
+const PieChart = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-
   return (
     <ResponsivePie
-      data={data}  // Use the data prop
+      data={data}
       theme={{
         axis: {
           domain: {
