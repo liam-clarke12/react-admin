@@ -19,7 +19,7 @@ const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   
-  const { ingredientInventory, recipes } = useData(); // Use useData to access context
+  const { ingredientInventory, rows } = useData(); // Use useData to access context
 
   // Count the number of ingredients with amount equal to 0
   const zeroStockCount = ingredientInventory.filter(item => item.amount === 0).length;
@@ -29,7 +29,7 @@ const Dashboard = () => {
   const zeroStockPercentage = totalIngredients > 0 ? ((zeroStockCount / totalIngredients) * 100).toFixed(2) : 0; // Avoid division by zero
 
   // Count the number of rows in the recipe table
-  const recipeCount = recipes.length;
+  const recipeCount = rows.length;
 
   return (
     <Box m="20px">
@@ -127,7 +127,7 @@ const Dashboard = () => {
         >
           <StatBox
             title={`${recipeCount}`} // Use the recipe count
-            subtitle="Recipe Count"
+            subtitle="Number of Recipes"
             progress="0"
             icon={
               <TextSnippetIcon
