@@ -6,7 +6,7 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import TrafficIcon from "@mui/icons-material/Traffic";
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import Header from "../../components/Header";
 import LineChart from "../../components/LineChart";
 import GeographyChart from "../../components/GeographyChart";
@@ -19,7 +19,7 @@ const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   
-  const { ingredientInventory } = useData(); // Use useData to access context
+  const { ingredientInventory, recipes } = useData(); // Use useData to access context
 
   // Count the number of ingredients with amount equal to 0
   const zeroStockCount = ingredientInventory.filter(item => item.amount === 0).length;
@@ -27,6 +27,9 @@ const Dashboard = () => {
   const totalIngredients = ingredientInventory.length;
   // Calculate the percentage of ingredients with 0 stock
   const zeroStockPercentage = totalIngredients > 0 ? ((zeroStockCount / totalIngredients) * 100).toFixed(2) : 0; // Avoid division by zero
+
+  // Count the number of rows in the recipe table
+  const recipeCount = recipes.length;
 
   return (
     <Box m="20px">
@@ -67,7 +70,7 @@ const Dashboard = () => {
         >
           <StatBox
             title={`${zeroStockCount}`} // Updated title
-            subtitle = "0 Stock Ingredients"
+            subtitle="0 Stock Ingredients"
             progress={`${zeroStockPercentage/100}`} 
             increase={`${zeroStockPercentage}%`} // Display percentage of zero stock
             icon={
@@ -123,12 +126,11 @@ const Dashboard = () => {
           justifyContent="center"
         >
           <StatBox
-            title="1,325,134"
-            subtitle="Traffic Received"
-            progress="0.80"
-            increase="+43%"
+            title={`${recipeCount}`} // Use the recipe count
+            subtitle="Recipe Count"
+            progress="0"
             icon={
-              <TrafficIcon
+              <TextSnippetIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
               />
             }
@@ -144,7 +146,7 @@ const Dashboard = () => {
           <Box
             mt="25px"
             p="0 30px"
-            display="flex "
+            display="flex"
             justifyContent="space-between"
             alignItems="center"
           >
@@ -154,26 +156,12 @@ const Dashboard = () => {
                 fontWeight="600"
                 color={colors.grey[100]}
               >
-                Revenue Generated
+                Goods In Tracker
               </Typography>
-              <Typography
-                variant="h3"
-                fontWeight="bold"
-                color={colors.greenAccent[500]}
-              >
-                $59,342.32
-              </Typography>
-            </Box>
-            <Box>
-              <IconButton>
-                <DownloadOutlinedIcon
-                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                />
-              </IconButton>
             </Box>
           </Box>
           <Box height="250px" m="-20px 0 0 0">
-            <LineChart isDashboard={true} />
+            <BarChart isDashboard={true} />
           </Box>
         </Box>
         <Box
@@ -259,15 +247,30 @@ const Dashboard = () => {
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
         >
-          <Typography
-            variant="h5"
-            fontWeight="600"
-            sx={{ padding: "30px 30px 0 30px" }}
+          <Box
+            mt="25px"
+            p="0 30px"
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
           >
-            Sales Quantity
-          </Typography>
-          <Box height="250px" mt="-20px">
-            <BarChart isDashboard={true} />
+            <Typography
+              variant="h5"
+              fontWeight="600"
+              color={colors.grey[100]}
+            >
+              Revenue Generated
+            </Typography>
+            <Box>
+              <IconButton>
+                <DownloadOutlinedIcon
+                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                />
+              </IconButton>
+            </Box>
+          </Box>
+          <Box height="250px" m="-20px 0 0 0">
+            <LineChart isDashboard={true} />
           </Box>
         </Box>
         <Box
@@ -284,7 +287,7 @@ const Dashboard = () => {
             Geography Based Traffic
           </Typography>
           <Box height="200px">
-            <GeographyChart isDashboard={true} />
+            <GeographyChart />
           </Box>
         </Box>
       </Box>

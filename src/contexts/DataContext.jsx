@@ -13,7 +13,7 @@ export const DataProvider = ({ children }) => {
     return savedInventory ? JSON.parse(savedInventory) : [];
   });
 
-  const [rows, setRows] = useState(() => {
+  const [recipes, setRows] = useState(() => {
     const savedRecipeRows = localStorage.getItem('recipeRows');
     return savedRecipeRows ? JSON.parse(savedRecipeRows) : [];
   });
@@ -43,8 +43,8 @@ export const DataProvider = ({ children }) => {
   }, [ingredientInventory]);
 
   useEffect(() => {
-    localStorage.setItem('recipeRows', JSON.stringify(rows));
-  }, [rows]);
+    localStorage.setItem('recipeRows', JSON.stringify(recipes));
+  }, [recipes]);
 
   useEffect(() => {
     localStorage.setItem('productionLogs', JSON.stringify(productionLogs));
@@ -278,13 +278,13 @@ export const DataProvider = ({ children }) => {
 
   // Function to get quantities by recipe name
   const getQuantitiesByRecipeName = (recipeName) => {
-    const recipeRow = rows.find(row => row.recipe === recipeName);
+    const recipeRow = recipes.find(row => row.recipe === recipeName);
     return recipeRow ? recipeRow.quantities : []; // Return quantities if the recipe is found
   };
 
   // Function to get ingredients by recipe name
   const getIngredientsByRecipeName = (recipeName) => {
-    const recipeRow = rows.find(row => row.recipe === recipeName);
+    const recipeRow = recipes.find(row => row.recipe === recipeName);
     return recipeRow ? recipeRow.ingredients : []; // Return ingredients if the recipe is found
   };
 
@@ -295,7 +295,7 @@ export const DataProvider = ({ children }) => {
       setGoodsInRows,
       ingredientInventory,
       setIngredientInventory,
-      rows,
+      recipes,
       addRow,
       setRows,
       productionLogs,
