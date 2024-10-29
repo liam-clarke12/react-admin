@@ -1,14 +1,38 @@
 import { ResponsivePie } from "@nivo/pie";
-import { tokens } from "../theme";
+import { tokens } from "../themes";
 import { useTheme } from "@mui/material";
-import { mockPieData as data } from "../data/mockData";
+import { useData } from "../contexts/DataContext"; // Adjust the import according to your file structure
 
 const PieChart = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+
+  // Get recipe data from the context
+  const { rows } = useData(); // Assuming 'rows' contains the recipe data
+  
+  console.log("rows data:", rows); // Check if data is loading correctly
+
+  // Group recipes by name and sum their quantities
+  const groupedData = rows.reduce((acc, recipe) => {
+    const existing = acc.find(item => item.id === recipe.name);
+    const quantity = recipe.quantity || 0; // Fallback to 0 if quantity is null or undefined
+    if (existing) {
+      existing.value += quantity;
+    } else {
+      acc.push({ id: recipe.name, value: quantity });
+    }
+    return acc;
+  }, []);
+  
+  console.log("groupedData:", groupedData); // Check if groupedData is being created as expected
+
+  if (!groupedData || groupedData.length === 0) {
+    return <div>No data available</div>;
+  }
+
   return (
     <ResponsivePie
-      data={data}
+      data={groupedData}
       theme={{
         axis: {
           domain: {
@@ -37,9 +61,9 @@ const PieChart = () => {
           },
         },
       }}
-      margin={{ top: 40, right: 80, bottom: 80, left: 80 }}
-      innerRadius={0.5}
-      padAngle={0.7}
+      margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+      innerRadius={0.2}
+      padAngle={1}
       cornerRadius={3}
       activeOuterRadiusOffset={8}
       borderColor={{

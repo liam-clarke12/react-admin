@@ -1,63 +1,46 @@
-import React from 'react'; // Import React
-import { Box, Button, IconButton, Typography, useTheme } from "@mui/material";
+import React from 'react';
+import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { tokens } from "../../themes";
-import { mockTransactions } from "../../data/MockData";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import Header from "../../components/Header";
 import LineChart from "../../components/LineChart";
-import GeographyChart from "../../components/GeographyChart";
-import BarChart from "../../components/MockBarChart";
+import BarChart from "../../components/BarChart"; // Use the BarChart component from the ingredients inventory
 import StatBox from "../../components/StatBox";
 import ProgressCircle from "../../components/ProgressCircle";
-import { useData } from '../../contexts/DataContext'; // Import the useData hook
+import { useData } from '../../contexts/DataContext';
+import PieChart from "../../components/PieChart"; // Import the PieChart component
 
 const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   
-  const { ingredientInventory, rows } = useData(); // Use useData to access context
+  const { ingredientInventory, rows } = useData();
 
-  // Count the number of ingredients with amount equal to 0
   const zeroStockCount = ingredientInventory.filter(item => item.amount === 0).length;
-  // Calculate total number of ingredients
   const totalIngredients = ingredientInventory.length;
-  // Calculate the percentage of ingredients with 0 stock
-  const zeroStockPercentage = totalIngredients > 0 ? ((zeroStockCount / totalIngredients) * 100).toFixed(2) : 0; // Avoid division by zero
-
-  // Count the number of rows in the recipe table
+  const zeroStockPercentage = totalIngredients > 0 ? ((zeroStockCount / totalIngredients) * 100).toFixed(2) : 0;
   const recipeCount = rows.length;
+
+  // Prepare data for the bar chart
+  const barChartData = ingredientInventory.map(item => ({
+    ingredient: item.ingredient, // Use ingredient name as the index
+    amount: item.amount, // The amount of each ingredient
+  }));
 
   return (
     <Box m="20px">
       {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Header title="DASHBOARD" subtitle="Welcome to your Dashboard" />
-
-        <Box>
-          <Button
-            sx={{
-              backgroundColor: colors.blueAccent[700],
-              color: colors.grey[100],
-              fontSize: "14px",
-              fontWeight: "bold",
-              padding: "10px 20px",
-            }}
-          >
-            <DownloadOutlinedIcon sx={{ mr: "10px" }} />
-            Download Reports
-          </Button>
-        </Box>
       </Box>
 
       {/* GRID & CHARTS */}
       <Box
         display="grid"
         gridTemplateColumns="repeat(12, 1fr)"
-        gridAutoRows="140px"
+        gridAutoRows="minmax(140px, auto)"
         gap="20px"
       >
         {/* ROW 1 */}
@@ -69,10 +52,10 @@ const Dashboard = () => {
           justifyContent="center"
         >
           <StatBox
-            title={`${zeroStockCount}`} // Updated title
+            title={`${zeroStockCount}`}
             subtitle="0 Stock Ingredients"
-            progress={`${zeroStockPercentage/100}`} 
-            increase={`${zeroStockPercentage}%`} // Display percentage of zero stock
+            progress={`${zeroStockPercentage / 100}`}
+            increase={`${zeroStockPercentage}%`}
             icon={
               <EggAltIcon
                 sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
@@ -126,7 +109,7 @@ const Dashboard = () => {
           justifyContent="center"
         >
           <StatBox
-            title={`${recipeCount}`} // Use the recipe count
+            title={`${recipeCount}`}
             subtitle="Number of Recipes"
             progress="0"
             icon={
@@ -142,6 +125,8 @@ const Dashboard = () => {
           gridColumn="span 8"
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
+          height="100%"
+          overflow="auto"
         >
           <Box
             mt="25px"
@@ -156,12 +141,25 @@ const Dashboard = () => {
                 fontWeight="600"
                 color={colors.grey[100]}
               >
-                Goods In Tracker
+                Ingredient Inventory
               </Typography>
+            </Box>
+            <Box>
+              <IconButton>
+                <DownloadOutlinedIcon
+                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                />
+              </IconButton>
             </Box>
           </Box>
           <Box height="250px" m="-20px 0 0 0">
-            <BarChart isDashboard={true} />
+            <BarChart
+              data={barChartData}
+              keys={["amount"]}
+              indexBy="ingredient"
+              height="250px" // Adjust height for the chart
+              width="90%" // Adjust width for a better fit
+            />
           </Box>
         </Box>
         <Box
@@ -174,53 +172,49 @@ const Dashboard = () => {
             display="flex"
             justifyContent="space-between"
             alignItems="center"
-            borderBottom={`4px solid ${colors.primary[500]}`}
-            colors={colors.grey[100]}
+            borderBottom={`4px solid ${colors.primary[400]}`}
             p="15px"
           >
             <Typography color={colors.grey[100]} variant="h5" fontWeight="600">
-              Recent Transactions
+              Ingredient Inventory
             </Typography>
           </Box>
-          {mockTransactions.map((transaction, i) => (
-            <Box
-              key={`${transaction.txId}-${i}`}
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              borderBottom={`4px solid ${colors.primary[500]}`}
-              p="15px"
-            >
-              <Box>
-                <Typography
-                  color={colors.greenAccent[500]}
-                  variant="h5"
-                  fontWeight="600"
-                >
-                  {transaction.txId}
-                </Typography>
-                <Typography color={colors.grey[100]}>
-                  {transaction.user}
-                </Typography>
-              </Box>
-              <Box color={colors.grey[100]}>{transaction.date}</Box>
+          <Box height="280px" overflow="auto">
+            {ingredientInventory.map((ingredient, i) => (
               <Box
-                backgroundColor={colors.greenAccent[500]}
-                p="5px 10px"
-                borderRadius="4px"
+                key={`${ingredient.name}-${i}`}
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                borderBottom={`4px solid ${colors.primary[400]}`}
+                p="15px"
               >
-                ${transaction.cost}
+                <Box color={colors.grey[100]}>
+                  {ingredient.ingredient}
+                </Box>
+                <Box>
+                  <Typography
+                    color={colors.greenAccent[500]}
+                    variant="h5"
+                    fontWeight="600"
+                  >
+                    {ingredient.name}
+                  </Typography>
+                  <Typography color={colors.grey[100]}>
+                    Amount: {ingredient.amount}kg
+                  </Typography>
+                </Box>
               </Box>
-            </Box>
-          ))}
+            ))}
+          </Box>
         </Box>
-
         {/* ROW 3 */}
         <Box
           gridColumn="span 4"
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
           p="30px"
+          overflow="auto"
         >
           <Typography variant="h5" fontWeight="600">
             Campaign
@@ -246,6 +240,7 @@ const Dashboard = () => {
           gridColumn="span 4"
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
+          overflow="auto"
         >
           <Box
             mt="25px"
@@ -259,18 +254,11 @@ const Dashboard = () => {
               fontWeight="600"
               color={colors.grey[100]}
             >
-              Revenue Generated
+              Recipe Distribution
             </Typography>
-            <Box>
-              <IconButton>
-                <DownloadOutlinedIcon
-                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
-                />
-              </IconButton>
-            </Box>
           </Box>
-          <Box height="250px" m="-20px 0 0 0">
-            <LineChart isDashboard={true} />
+          <Box height="250px" m="-20px 0 0 0" overflow="auto">
+            <LineChart isDashboard={true} /> {/* Retained Line Chart */}
           </Box>
         </Box>
         <Box
@@ -278,16 +266,17 @@ const Dashboard = () => {
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
           padding="30px"
+          overflow="auto"
         >
           <Typography
             variant="h5"
             fontWeight="600"
             sx={{ marginBottom: "15px" }}
           >
-            Geography Based Traffic
+            Recipe Pie Chart
           </Typography>
           <Box height="200px">
-            <GeographyChart />
+            <PieChart /> {/* Added Pie Chart */}
           </Box>
         </Box>
       </Box>

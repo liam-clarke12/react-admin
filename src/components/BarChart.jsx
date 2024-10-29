@@ -1,20 +1,22 @@
 import { ResponsiveBar } from "@nivo/bar";
+import { useTheme } from "@mui/material";
+import { tokens } from "../themes"; // Ensure this imports your color tokens
 
 const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => {
-  // Hardcode the color you want to use for all bars and axis labels
-  const hardcodedColor = "#3da58a"; // Replace with the drawer header color you want
+  const theme = useTheme();
+  const colors = tokens(theme.palette.mode); // Get colors based on the current theme mode
 
   // Define the theme to change the axis label and tick colors
   const customTheme = {
     axis: {
       ticks: {
         text: {
-          fill: hardcodedColor, // Axis tick label color
+          fill: theme.palette.mode === 'dark' ? colors.grey[100] : '#000000', // Set to black in light mode
         },
       },
       legend: {
         text: {
-          fill: hardcodedColor, // Axis legend (Stock on Hand and Ingredient) color
+          fill: theme.palette.mode === 'dark' ? colors.grey[100] : '#000000', // Set to black in light mode
         },
       },
     },
@@ -30,8 +32,7 @@ const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => 
         padding={0.3}
         valueScale={{ type: "linear" }}
         indexScale={{ type: "band", round: true }}
-        // Hardcoded color for all bars
-        colors={hardcodedColor}
+        colors={["#3da58a"]} // You can still keep a hardcoded color if desired
         borderColor={{
           from: "color",
           modifiers: [["darker", 1.6]],
@@ -45,6 +46,7 @@ const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => 
           legend: indexBy, // Use index field as legend (Ingredient)
           legendPosition: "middle",
           legendOffset: 40,
+          tickTextColor: theme.palette.mode === 'dark' ? colors.grey[100] : '#000000', // Set to black in light mode
         }}
         axisLeft={{
           tickSize: 5,
@@ -53,6 +55,7 @@ const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => 
           legend: "Stock on Hand",
           legendPosition: "middle",
           legendOffset: -40,
+          tickTextColor: theme.palette.mode === 'dark' ? colors.grey[100] : '#000000', // Set to black in light mode
         }}
         labelSkipWidth={12}
         labelSkipHeight={12}
@@ -61,9 +64,7 @@ const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => 
         legends={[]}
         role="application"
         ariaLabel="Nivo bar chart"
-        barAriaLabel={function (e) {
-          return e.id + ": " + e.value + " in " + e.indexValue;
-        }}
+        barAriaLabel={(e) => `${e.id}: ${e.value} in ${e.indexValue}`} // Keep it simple
         // Apply the custom theme to change axis labels and legends color
         theme={customTheme}
       />
