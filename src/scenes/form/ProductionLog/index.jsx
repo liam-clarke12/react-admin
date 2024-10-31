@@ -77,7 +77,7 @@ const ProductionLogForm = () => {
                     </MenuItem>
                   ))
                 ) : (
-                  <MenuItem disabled>No recipes available</MenuItem>
+                  <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
                 )}
               </TextField>
               <TextField

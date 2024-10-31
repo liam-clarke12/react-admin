@@ -45,6 +45,7 @@ const Sidebar = () => {
   const colors = tokens(theme.palette.mode);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selected, setSelected] = useState("Dashboard");
+  
 
   return (
     <Box
@@ -54,6 +55,7 @@ const Sidebar = () => {
     >
       <Box
         sx={{
+          width: isCollapsed ? '80px' : '150px',
           position: 'fixed', // Fixed position for the sidebar
           height: '100%', // Full height
           zIndex: 1000, // Make sure it stays above other content
@@ -258,7 +260,7 @@ const Sidebar = () => {
       <Box
         sx={{
           marginLeft: isCollapsed ? '80px' : '250px', // Adjust based on sidebar width
-          padding: '20px',
+          padding: isCollapsed ? '0px' : '12px',
           width: 'calc(100% - (isCollapsed ? 80px : 250px))', // Adjust width to account for sidebar
           height: '100vh',
           overflowY: 'auto',

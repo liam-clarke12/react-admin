@@ -23,9 +23,10 @@ const PieChart = () => {
     }
     return acc;
   }, []);
-  
+//test  
   console.log("groupedData:", groupedData); // Check if groupedData is being created as expected
 
+  
   if (!groupedData || groupedData.length === 0) {
     return <div>No data available</div>;
   }

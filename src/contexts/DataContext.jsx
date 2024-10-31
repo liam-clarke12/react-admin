@@ -13,6 +13,8 @@ export const DataProvider = ({ children }) => {
     return savedInventory ? JSON.parse(savedInventory) : [];
   });
 
+  const [shouldUpdateBarcodes, setShouldUpdateBarcodes] = useState(false);
+
   const [rows, setRows] = useState(() => {
     const savedRecipeRows = localStorage.getItem('recipeRows');
     return savedRecipeRows ? JSON.parse(savedRecipeRows) : [];
@@ -152,6 +154,7 @@ export const DataProvider = ({ children }) => {
       ingredients: stockUsageData, // Use the array of objects
       batchCode: log.batchCode,
     });
+    setShouldUpdateBarcodes(true);
   };
 
   // Function to add a new row to the Stock Usage table
@@ -200,7 +203,6 @@ export const DataProvider = ({ children }) => {
     setIngredientInventory(updatedInventory);
     setGoodsInRows(updatedGoodsInRows);
   };
-  
 
   const updateBarcodesAfterProcessing = useCallback(() => {
     console.log('Starting barcode update process...');
@@ -244,19 +246,20 @@ export const DataProvider = ({ children }) => {
 
     setIngredientInventory(updatedInventory);
     setGoodsInRows(updatedGoodsInRows);
+    setShouldUpdateBarcodes(false); // Reset the flag
 
     console.log('Barcode update process completed.');
   }, [ingredientInventory, goodsInRows]);
 
   useEffect(() => {
-    if (stockUsage.length > 0) {
+    if (shouldUpdateBarcodes) { // Only call if the flag is set
       const timeoutId = setTimeout(() => {
         updateBarcodesAfterProcessing();
       }, 2000);
   
       return () => clearTimeout(timeoutId); // Cleanup timeout on component unmount
     }
-  }, [stockUsage,updateBarcodesAfterProcessing]);
+  }, [shouldUpdateBarcodes, updateBarcodesAfterProcessing]);
   
   // Function to clear stock usage
   const clearStockUsage = () => {

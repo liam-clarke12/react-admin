@@ -6,12 +6,9 @@ import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import LineChart from "../../components/LineChart";
 import BarChart from "../../components/BarChart"; // Use the BarChart component from the ingredients inventory
 import StatBox from "../../components/StatBox";
-import ProgressCircle from "../../components/ProgressCircle";
 import { useData } from '../../contexts/DataContext';
-import PieChart from "../../components/PieChart"; // Import the PieChart component
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -125,7 +122,7 @@ const Dashboard = () => {
           gridColumn="span 8"
           gridRow="span 2"
           backgroundColor={colors.primary[400]}
-          height="100%"
+          height="94%"
           overflow="auto"
         >
           <Box
@@ -165,6 +162,7 @@ const Dashboard = () => {
         <Box
           gridColumn="span 4"
           gridRow="span 2"
+          height ="94%"
           backgroundColor={colors.primary[400]}
           overflow="auto"
         >
@@ -206,77 +204,6 @@ const Dashboard = () => {
                 </Box>
               </Box>
             ))}
-          </Box>
-        </Box>
-        {/* ROW 3 */}
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-          p="30px"
-          overflow="auto"
-        >
-          <Typography variant="h5" fontWeight="600">
-            Campaign
-          </Typography>
-          <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            mt="25px"
-          >
-            <ProgressCircle size="125" />
-            <Typography
-              variant="h5"
-              color={colors.greenAccent[500]}
-              sx={{ mt: "15px" }}
-            >
-              $48,352 revenue generated
-            </Typography>
-            <Typography>Includes extra misc expenditures and costs</Typography>
-          </Box>
-        </Box>
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-          overflow="auto"
-        >
-          <Box
-            mt="25px"
-            p="0 30px"
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Typography
-              variant="h5"
-              fontWeight="600"
-              color={colors.grey[100]}
-            >
-              Recipe Distribution
-            </Typography>
-          </Box>
-          <Box height="250px" m="-20px 0 0 0" overflow="auto">
-            <LineChart isDashboard={true} /> {/* Retained Line Chart */}
-          </Box>
-        </Box>
-        <Box
-          gridColumn="span 4"
-          gridRow="span 2"
-          backgroundColor={colors.primary[400]}
-          padding="30px"
-          overflow="auto"
-        >
-          <Typography
-            variant="h5"
-            fontWeight="600"
-            sx={{ marginBottom: "15px" }}
-          >
-            Recipe Pie Chart
-          </Typography>
-          <Box height="200px">
-            <PieChart /> {/* Added Pie Chart */}
           </Box>
         </Box>
       </Box>
