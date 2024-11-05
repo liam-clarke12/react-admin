@@ -8,7 +8,7 @@ import { useEffect } from "react";
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
+  const { goodsInRows, setGoodsInRows, setIngredientInventory, updateNotifications } = useData();
 
   const columns = [
     { field: "date", headerName: "Date", flex: 1, editable: true },
@@ -127,7 +127,13 @@ const GoodsIn = () => {
       console.log("Detected change in processed status, updating goodsInRows");
       setGoodsInRows(updatedRows);
     }
-  }, [goodsInRows, setGoodsInRows]);
+
+    // Check for expired items and update notifications
+    const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < new Date());
+    const notifications = expiredItems.map((item) => `Expired: ${item.ingredient} | Barcode: ${item.barCode}`);
+    updateNotifications(notifications);
+    
+  }, [goodsInRows, setGoodsInRows, updateNotifications]);
 
   return (
     <Box m="20px">

@@ -13,6 +13,8 @@ export const DataProvider = ({ children }) => {
     return savedInventory ? JSON.parse(savedInventory) : [];
   });
 
+  const [notifications, setNotifications] = useState([]);
+
   const [shouldUpdateBarcodes, setShouldUpdateBarcodes] = useState(false);
 
   const [rows, setRows] = useState(() => {
@@ -59,6 +61,10 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('stockUsage', JSON.stringify(stockUsage));
   }, [stockUsage]);
+
+  const updateNotifications = (newNotifications) => {
+    setNotifications(newNotifications);
+  };
 
   // Function to add a new row to the Goods In table
   const addGoodsInRow = (row) => {
@@ -318,6 +324,8 @@ export const DataProvider = ({ children }) => {
       getQuantitiesByRecipeName, // Expose the function
       getIngredientsByRecipeName, // Expose the new function
       updateBarcodesAfterProcessing,
+      updateNotifications,
+      notifications,
     }}>
       {children}
     </DataContext.Provider>
