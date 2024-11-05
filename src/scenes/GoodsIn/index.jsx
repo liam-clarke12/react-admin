@@ -130,7 +130,7 @@ const GoodsIn = () => {
 
     // Check for expired items and update notifications
     const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < new Date());
-    const notifications = expiredItems.map((item) => `Expired: ${item.ingredient} | Barcode: ${item.barCode}`);
+    const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
     updateNotifications(notifications);
     
   }, [goodsInRows, setGoodsInRows, updateNotifications]);

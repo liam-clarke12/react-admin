@@ -1,4 +1,4 @@
-import { Box, IconButton, useTheme, Popover, Typography } from "@mui/material";
+import { Box, IconButton, useTheme, Popover, Typography, Grid } from "@mui/material";
 import { useContext, useState } from "react"; 
 import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
@@ -8,16 +8,17 @@ import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
 import { useData } from "../../contexts/DataContext"; 
-import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
+import { useNavigate } from "react-router-dom"; 
 
 const Topbar = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
-    const { notifications } = useData(); // Get notifications from context
+    const { notifications } = useData();
     const [anchorEl, setAnchorEl] = useState(null);
-    const navigate = useNavigate(); // Initialize useNavigate
+    const navigate = useNavigate();
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -28,12 +29,11 @@ const Topbar = () => {
     };
 
     const handleNotificationClick = () => {
-        navigate("/GoodsIn"); // Redirect to the Goods In page
-        handleClose(); // Close the notification dropdown
+        navigate("/GoodsIn");
+        handleClose();
     };
 
     const open = Boolean(anchorEl);
-
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
             {/* Search Bar */}
@@ -96,18 +96,42 @@ const Topbar = () => {
                     horizontal: 'center',
                 }}
             >
-                <Box p={2} minWidth={200}>
+                <Box p={2} minWidth={300}>
                     {notifications.length > 0 ? (
-                        notifications.map((notification, index) => (
-                            <Typography 
-                                key={index} 
-                                variant="body2" 
-                                onClick={handleNotificationClick} // Handle click to navigate
-                                style={{ cursor: 'pointer' }} // Change cursor to pointer
-                            >
-                                {notification}
-                            </Typography>
-                        ))
+                        <Box>
+                            {/* Table Header */}
+                            <Grid container sx={{ borderBottom: `1px solid ${colors.primary[300]}`, paddingBottom: '8px', marginBottom: '8px' }}>
+                                <Grid item xs={12}>
+                                    <Typography variant="body2" fontWeight="bold">Notification</Typography>
+                                </Grid>
+                            </Grid>
+                            {/* Notification Rows */}
+                            {notifications.map((notification, index) => (
+                                <Grid 
+                                    container 
+                                    key={index} 
+                                    sx={{
+                                        borderBottom: `1px solid ${colors.primary[300]}`,
+                                        paddingY: '8px',
+                                    }}
+                                >
+                                    <Grid item xs={12}>
+                                        <Box display="flex" alignItems="center" justifyContent="space-between">
+                                            <Typography variant="body2">{notification}</Typography>
+                                            <IconButton 
+                                                onClick={handleNotificationClick}
+                                                sx={{
+                                                    color: colors.greenAccent[500], // Set icon color to match subtitle color
+                                                    padding: 0
+                                                }}
+                                            >
+                                                <ArrowCircleRightOutlinedIcon />
+                                            </IconButton>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            ))}
+                        </Box>
                     ) : (
                         <Typography variant="body2">No notifications</Typography>
                     )}
