@@ -96,45 +96,47 @@ const Topbar = () => {
                     horizontal: 'center',
                 }}
             >
-                <Box p={2} minWidth={300}>
-                    {notifications.length > 0 ? (
-                        <Box>
-                            {/* Table Header */}
-                            <Grid container sx={{ borderBottom: `1px solid ${colors.primary[300]}`, paddingBottom: '8px', marginBottom: '8px' }}>
-                                <Grid item xs={12}>
-                                    <Typography variant="body2" fontWeight="bold">Notification</Typography>
-                                </Grid>
-                            </Grid>
-                            {/* Notification Rows */}
-                            {notifications.map((notification, index) => (
-                                <Grid 
-                                    container 
-                                    key={index} 
-                                    sx={{
-                                        borderBottom: `1px solid ${colors.primary[300]}`,
-                                        paddingY: '8px',
-                                    }}
-                                >
-                                    <Grid item xs={12}>
-                                        <Box display="flex" alignItems="center" justifyContent="space-between">
-                                            <Typography variant="body2">{notification}</Typography>
-                                            <IconButton 
-                                                onClick={handleNotificationClick}
-                                                sx={{
-                                                    color: colors.greenAccent[500], // Set icon color to match subtitle color
-                                                    padding: 0
-                                                }}
-                                            >
-                                                <ArrowCircleRightOutlinedIcon />
-                                            </IconButton>
-                                        </Box>
-                                    </Grid>
-                                </Grid>
-                            ))}
-                        </Box>
-                    ) : (
-                        <Typography variant="body2">No notifications</Typography>
-                    )}
+                <Box minWidth={300}>
+                    {/* Header Section with full-width green background */}
+                    <Box sx={{ backgroundColor: colors.greenAccent[500], px: 2, py: 1 }}>
+                        <Typography variant="body2" fontWeight="bold">Notification</Typography>
+                    </Box>
+
+                    <Box p={2}>
+                        {notifications.length > 0 ? (
+                            <Box>
+                                {/* Notification Rows */}
+                                {notifications.map((notification, index) => (
+                                    <Box 
+                                        key={index} 
+                                        sx={{
+                                            borderBottom: index < notifications.length - 1 ? `1px solid ${colors.primary[300]}` : 'none',
+                                            paddingY: '8px',
+                                        }}
+                                    >
+                                        <Grid container alignItems="center" justifyContent="space-between">
+                                            <Grid item>
+                                                <Typography variant="body2">{notification}</Typography>
+                                            </Grid>
+                                            <Grid item>
+                                                <IconButton 
+                                                    onClick={handleNotificationClick}
+                                                    sx={{
+                                                        color: colors.greenAccent[500],
+                                                        padding: 0
+                                                    }}
+                                                >
+                                                    <ArrowCircleRightOutlinedIcon />
+                                                </IconButton>
+                                            </Grid>
+                                        </Grid>
+                                    </Box>
+                                ))}
+                            </Box>
+                        ) : (
+                            <Typography variant="body2">You have no notifications</Typography>
+                        )}
+                    </Box>
                 </Box>
             </Popover>
         </Box>
