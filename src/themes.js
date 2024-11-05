@@ -1,7 +1,7 @@
 import { createContext, useState, useMemo } from "react";
 import { createTheme } from "@mui/material/styles";
 
-// color design tokens export
+// Color design tokens export
 export const tokens = (mode) => ({
   ...(mode === "dark"
     ? {
@@ -39,7 +39,7 @@ export const tokens = (mode) => ({
           800: "#1e5245",
           900: "#0f2922",
         },
-        redAccent: {
+        red: {
           100: "#f8dcdb",
           200: "#f1b9b7",
           300: "#e99592",
@@ -78,7 +78,7 @@ export const tokens = (mode) => ({
           100: "#040509",
           200: "#080b12",
           300: "#0c101b",
-          400: "#f2f0f0", // manually changed
+          400: "#f2f0f0",
           450: "#e7e7e7",
           500: "#141b2d",
           600: "#1F2A40",
@@ -97,7 +97,7 @@ export const tokens = (mode) => ({
           800: "#b7ebde",
           900: "#dbf5ee",
         },
-        redAccent: {
+        red: {
           100: "#2c100f",
           200: "#58201e",
           300: "#832f2c",
@@ -122,7 +122,7 @@ export const tokens = (mode) => ({
       }),
 });
 
-// mui theme settings
+// MUI theme settings
 export const themeSettings = (mode) => {
   const colors = tokens(mode);
   return {
@@ -130,7 +130,6 @@ export const themeSettings = (mode) => {
       mode: mode,
       ...(mode === "dark"
         ? {
-            // palette values for dark mode
             primary: {
               main: colors.primary[500],
             },
@@ -142,17 +141,22 @@ export const themeSettings = (mode) => {
               main: colors.grey[500],
               light: colors.grey[100],
             },
+            red: {
+              500: colors.red[500], // Now correctly accesses the red token
+            },
             background: {
               default: colors.primary[500],
             },
           }
         : {
-            // palette values for light mode
             primary: {
               main: colors.primary[100],
             },
             secondary: {
               main: colors.greenAccent[500],
+            },
+            red: {
+              500: colors.red[500], // Now correctly accesses the red token
             },
             neutral: {
               dark: colors.grey[700],
@@ -195,7 +199,7 @@ export const themeSettings = (mode) => {
   };
 };
 
-// context for color mode
+// Context for color mode
 export const ColorModeContext = createContext({
   toggleColorMode: () => {},
 });

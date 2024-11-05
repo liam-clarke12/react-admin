@@ -56,7 +56,7 @@ const GoodsIn = () => {
     console.log("Processing row update:", newRow);
 
     const updatedRow = {
-      ...newRow,// Ensure this is a Date object
+      ...newRow,
     };
 
     const updatedRows = goodsInRows.map((row) =>
@@ -161,20 +161,28 @@ const GoodsIn = () => {
           "& .odd-row": {
             backgroundColor: colors.primary[400],
           },
+          "& .expired-row": {
+            backgroundColor: colors.red[500], // Red background for expired items
+          },
         }}
       >
         <DataGrid
           checkboxSelection
-          rows={goodsInRows.map((row, index) => ({
+          rows={goodsInRows.map((row) => ({
             ...row,
             id: `${row.barCode}-${row.ingredient}`,
             processed: row.processed || "No",
-            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row',
+            rowClassName: new Date(row.expiryDate) < new Date() ? 'expired-row' : (row.id % 2 === 0 ? 'even-row' : 'odd-row'),
           }))}
           columns={columns}
           processRowUpdate={processRowUpdate}
           getRowId={(row) => `${row.barCode}-${row.ingredient}`}
-          getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row')}
+          getRowClassName={(params) => {
+            if (new Date(params.row.expiryDate) < new Date()) {
+              return 'expired-row';
+            }
+            return params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row';
+          }}
         />
       </Box>
     </Box>
