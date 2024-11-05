@@ -66,14 +66,18 @@ export const DataProvider = ({ children }) => {
       console.warn("Invalid row data:", row);
       return;
     }
-
+  
     const newRow = { 
       ...row, 
       id: row.barCode, 
-      stockRemaining: row.stockReceived // Set stockRemaining to the value of stockReceived
+      stockRemaining: row.stockReceived,
+      expiryDate: row.expiryDate, // Ensure expiryDate is converted to a Date object
     };
-
+  
+    console.log("Formatted Row:", newRow); // Log the formatted row
+  
     setGoodsInRows(prevRows => [...prevRows, newRow]);
+    // Further code to update inventory
 
     // Update ingredient inventory
     const existingIngredient = ingredientInventory.find(item => item.ingredient === row.ingredient);
@@ -90,6 +94,7 @@ export const DataProvider = ({ children }) => {
         { ingredient: row.ingredient, amount: row.stockReceived, barcode: row.barCode }
       ]);
     }
+    console.log(goodsInRows);
   };
 
   // Function to add a new row to the Recipe table

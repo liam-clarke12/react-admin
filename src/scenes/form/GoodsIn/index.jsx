@@ -93,6 +93,19 @@ const GoodsInForm = () => {
                 helperText={touched.barCode && errors.barCode}
                 sx={{ gridColumn: "span 2" }}
               />
+              <TextField
+                fullWidth
+                variant="filled"
+                type="date"
+                label="Expiry Date"
+                onBlur={handleBlur}
+                onChange={handleChange}
+                value={values.expiryDate}
+                name="expiryDate"
+                error={!!touched.expiryDate && !!errors.expiryDate}
+                helperText={touched.expiryDate && errors.expiryDate}
+                sx={{ gridColumn: "span 2" }}
+              />
             </Box>
             <Box display="flex" justifyContent="end" mt="20px">
               <Button type="submit" color="secondary" variant="contained">
@@ -111,6 +124,7 @@ const goodsInSchema = yup.object().shape({
   ingredient: yup.string().required("Ingredient is required"),
   stockReceived: yup.number().required("Stock amount is required").positive("Must be positive"),
   barCode: yup.string().required("Bar Code is required"),
+  expiryDate: yup.string().required("Expiry Date is required"),
 });
 
 const initialValues = {
@@ -118,6 +132,7 @@ const initialValues = {
   ingredient: "",
   stockReceived: "",
   barCode: "",
+  expiryDate: "", // New field for Expiry Date
 };
 
 export default GoodsInForm;

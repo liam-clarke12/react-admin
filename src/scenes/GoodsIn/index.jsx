@@ -32,6 +32,12 @@ const GoodsIn = () => {
       editable: true,
     },
     {
+      field: "expiryDate",
+      headerName: "Expiry Date",
+      flex: 1,
+      editable: true,
+    },
+    {
       field: "barCode",
       headerName: "Bar Code",
       flex: 1,
@@ -42,23 +48,32 @@ const GoodsIn = () => {
       field: "processed",
       headerName: "Processed",
       flex: 1,
-      editable: false, // Non-editable
+      editable: false,
     },
   ];
 
-  // Handle row update
   const processRowUpdate = (newRow) => {
+    console.log("Processing row update:", newRow);
+
+    const updatedRow = {
+      ...newRow,// Ensure this is a Date object
+    };
+
     const updatedRows = goodsInRows.map((row) =>
-      row.barCode === newRow.barCode && row.ingredient === newRow.ingredient
-        ? newRow
+      row.barCode === updatedRow.barCode && row.ingredient === updatedRow.ingredient
+        ? updatedRow
         : row
     );
+
+    console.log("Updated rows after processing:", updatedRows);
     setGoodsInRows(updatedRows);
     updateIngredientInventory(updatedRows);
-    return newRow;
+    return updatedRow;
   };
 
   const updateIngredientInventory = (updatedRows) => {
+    console.log("Updating ingredient inventory with rows:", updatedRows);
+
     const updatedInventory = [];
     const nextBarcodeMap = {};
 
@@ -92,19 +107,24 @@ const GoodsIn = () => {
     setIngredientInventory(updatedInventory);
   };
 
-  // Clear the localStorage for Goods In data
   const handleClearStorage = () => {
+    console.log("Clearing localStorage data for goodsInRows");
     localStorage.removeItem("goodsInRows");
     setGoodsInRows([]);
   };
 
   useEffect(() => {
+    console.log("Running useEffect to check and update processed status");
+
     const updatedRows = goodsInRows.map((row) => ({
       ...row,
       processed: row.stockRemaining === 0 ? "Yes" : "No",
     }));
 
+    console.log("Checking expiryDates in goodsInRows:", goodsInRows.map(row => row.expiryDate)); // Log expiryDates
+
     if (JSON.stringify(updatedRows) !== JSON.stringify(goodsInRows)) {
+      console.log("Detected change in processed status, updating goodsInRows");
       setGoodsInRows(updatedRows);
     }
   }, [goodsInRows, setGoodsInRows]);
@@ -136,10 +156,10 @@ const GoodsIn = () => {
             color: `${colors.greenAccent[200]} !important`,
           },
           "& .even-row": {
-            backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)
+            backgroundColor: colors.primary[450],
           },
           "& .odd-row": {
-            backgroundColor: colors.primary[400], // Color for odd rows (adjust per mode)
+            backgroundColor: colors.primary[400],
           },
         }}
       >
@@ -147,13 +167,13 @@ const GoodsIn = () => {
           checkboxSelection
           rows={goodsInRows.map((row, index) => ({
             ...row,
-            id: `${row.barCode}-${row.ingredient}`, // Combine barcode and ingredient for unique ID
+            id: `${row.barCode}-${row.ingredient}`,
             processed: row.processed || "No",
-            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
+            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row',
           }))}
           columns={columns}
           processRowUpdate={processRowUpdate}
-          getRowId={(row) => `${row.barCode}-${row.ingredient}`} // Combine barcode and ingredient for unique row ID
+          getRowId={(row) => `${row.barCode}-${row.ingredient}`}
           getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row')}
         />
       </Box>
