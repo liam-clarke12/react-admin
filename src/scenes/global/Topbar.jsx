@@ -1,5 +1,5 @@
 import { Box, IconButton, useTheme, Popover, Typography, Grid } from "@mui/material";
-import { useContext, useState, useEffect } from "react"; 
+import { useContext, useState, useEffect } from "react";
 import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -16,10 +16,13 @@ const Topbar = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
-    const { notifications, setNotifications, goodsInRows } = useData();
+    const { goodsInRows } = useData(); // Access goodsInRows from the context
+    const [notifications, setNotifications] = useState(() => {
+        const savedNotifications = localStorage.getItem('notifications');
+        return savedNotifications ? JSON.parse(savedNotifications) : [];
+    });
     const [anchorEl, setAnchorEl] = useState(null);
     const navigate = useNavigate();
-    const [notifiedBarcodes, setNotifiedBarcodes] = useState(new Set()); // Keep track of notified barcodes
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -39,23 +42,26 @@ const Topbar = () => {
 
     // Polling for notifications every 5 seconds
     useEffect(() => {
+        const notifiedBarcodes = new Set(notifications.map(notification => notification.barcode));  // Track barcodes that have already been notified
+
         const checkNotifications = () => {
             const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
+            console.log('Expired rows:', expiredRows); // Log expired rows to check if they are correctly identified
 
             // Create an array of new notifications for expired rows that are not already in notifications
             const newNotifications = expiredRows
                 .filter(row => !notifiedBarcodes.has(row.barCode))  // Only add if not notified yet
                 .map(row => {
-                    // Update the notifiedBarcodes set
-                    setNotifiedBarcodes(prevSet => new Set(prevSet).add(row.barCode));
-                    return `Your ${row.ingredient} (${row.barCode}) has expired!`; // Create notification for expired item
+                    notifiedBarcodes.add(row.barCode);  // Mark this barcode as notified
+                    return { message: `Your ${row.ingredient} (${row.barCode}) has expired!`, barcode: row.barCode }; // Create notification for expired item
                 });
 
             if (newNotifications.length > 0) {
-                setNotifications(prevNotifications => [
-                    ...prevNotifications,
-                    ...newNotifications
-                ]);
+                setNotifications(prevNotifications => {
+                    const updatedNotifications = [...prevNotifications, ...newNotifications];
+                    localStorage.setItem('notifications', JSON.stringify(updatedNotifications)); // Save to localStorage
+                    return updatedNotifications;
+                });
             }
         };
 
@@ -63,7 +69,7 @@ const Topbar = () => {
 
         // Cleanup interval on unmount
         return () => clearInterval(interval);
-    }, [goodsInRows, notifications, setNotifications, notifiedBarcodes]); // Re-run if goodsInRows, notifications, or notifiedBarcodes change
+    }, [goodsInRows, notifications]); // Re-run if goodsInRows or notifications change
 
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
@@ -147,7 +153,7 @@ const Topbar = () => {
                                     >
                                         <Grid container alignItems="center" justifyContent="space-between">
                                             <Grid item>
-                                                <Typography variant="body2">{notification}</Typography>
+                                                <Typography variant="body2">{notification.message}</Typography>
                                             </Grid>
                                             <Grid item>
                                                 <IconButton 
