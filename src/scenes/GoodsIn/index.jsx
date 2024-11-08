@@ -3,12 +3,14 @@ import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { goodsInRows, setGoodsInRows, setIngredientInventory, updateNotifications } = useData();
+
+  const prevGoodsInRowsRef = useRef([]); // Store previous state for comparison
 
   const columns = [
     { field: "date", headerName: "Date", flex: 1, editable: true },
@@ -114,25 +116,47 @@ const GoodsIn = () => {
   };
 
   useEffect(() => {
-    console.log("Running useEffect to check and update processed status");
+    const interval = setInterval(() => {
+      console.log("Running periodic check to update processed status and expired items");
 
-    const updatedRows = goodsInRows.map((row) => ({
-      ...row,
-      processed: row.stockRemaining === 0 ? "Yes" : "No",
-    }));
+      let updated = false;
 
-    console.log("Checking expiryDates in goodsInRows:", goodsInRows.map(row => row.expiryDate)); // Log expiryDates
+      const updatedRows = goodsInRows.map((row) => {
+        const updatedRow = {
+          ...row,
+          processed: row.stockRemaining === 0 ? "Yes" : "No",
+        };
 
-    if (JSON.stringify(updatedRows) !== JSON.stringify(goodsInRows)) {
-      console.log("Detected change in processed status, updating goodsInRows");
-      setGoodsInRows(updatedRows);
-    }
+        // Check if processed status changed
+        if (updatedRow.processed !== prevGoodsInRowsRef.current.find(r => r.barCode === row.barCode && r.ingredient === row.ingredient)?.processed) {
+          updated = true;
+        }
 
-    // Check for expired items and update notifications
-    const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < new Date());
-    const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
-    updateNotifications(notifications);
-    
+        return updatedRow;
+      });
+
+      // If there was a change in processed status, update the state
+      if (updated) {
+        console.log("Detected change in processed status, updating goodsInRows");
+        setGoodsInRows(updatedRows);
+      }
+
+      // Update expired items notifications only if necessary
+      const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < new Date());
+      const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
+      
+      // Only update notifications if there are any new expired items
+      if (notifications.length > 0) {
+        updateNotifications(notifications);
+      }
+
+      // Store the current rows in the ref for next comparison
+      prevGoodsInRowsRef.current = updatedRows;
+    }, 5000); // Run every 5 seconds
+
+    // Cleanup function to clear interval when the component unmounts
+    return () => clearInterval(interval);
+
   }, [goodsInRows, setGoodsInRows, updateNotifications]);
 
   return (

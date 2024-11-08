@@ -62,9 +62,37 @@ export const DataProvider = ({ children }) => {
     localStorage.setItem('stockUsage', JSON.stringify(stockUsage));
   }, [stockUsage]);
 
+  useEffect(() => {
+    const checkNotifications = () => {
+      const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
+      console.log('Expired rows:', expiredRows);  // Log expired rows to check if they are correctly identified
+      
+      if (expiredRows.length > 0) {
+        // Create a set of new notifications from expired rows
+        const newNotifications = expiredRows.map(row => `Your ${row.ingredient} (${row.barCode}) has expired!`);
+        
+        // Filter out notifications that already exist in the state
+        setNotifications(prevNotifications => {
+          const uniqueNotifications = newNotifications.filter(notification => 
+            !prevNotifications.includes(notification)
+          );
+          
+          // Return the previous notifications plus the new unique ones
+          return [...prevNotifications, ...uniqueNotifications];
+        });
+      }
+    };
+  
+    const interval = setInterval(checkNotifications, 5000);
+  
+    return () => clearInterval(interval); // Clear interval on unmount
+  }, [goodsInRows]);  // Depend on goodsInRows to track when rows change
+  
+
   const updateNotifications = (newNotifications) => {
     setNotifications(newNotifications);
   };
+
 
   // Function to add a new row to the Goods In table
   const addGoodsInRow = (row) => {
@@ -326,6 +354,7 @@ export const DataProvider = ({ children }) => {
       updateBarcodesAfterProcessing,
       updateNotifications,
       notifications,
+      setNotifications,
     }}>
       {children}
     </DataContext.Provider>

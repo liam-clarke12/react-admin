@@ -1,5 +1,5 @@
 import { Box, IconButton, useTheme, Popover, Typography, Grid } from "@mui/material";
-import { useContext, useState } from "react"; 
+import { useContext, useState, useEffect } from "react"; 
 import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -9,16 +9,17 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
-import { useData } from "../../contexts/DataContext"; 
+import { useData } from "../../contexts/DataContext"; // Assuming this hook gives you both notifications and setNotifications
 import { useNavigate } from "react-router-dom"; 
 
 const Topbar = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
-    const { notifications } = useData();
+    const { notifications, setNotifications, goodsInRows } = useData();
     const [anchorEl, setAnchorEl] = useState(null);
     const navigate = useNavigate();
+    const [notifiedBarcodes, setNotifiedBarcodes] = useState(new Set()); // Keep track of notified barcodes
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -30,10 +31,40 @@ const Topbar = () => {
 
     const handleNotificationClick = () => {
         navigate("/GoodsIn");
+        setNotifications([]);  // Clear notifications after clicking
         handleClose();
     };
 
     const open = Boolean(anchorEl);
+
+    // Polling for notifications every 5 seconds
+    useEffect(() => {
+        const checkNotifications = () => {
+            const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
+
+            // Create an array of new notifications for expired rows that are not already in notifications
+            const newNotifications = expiredRows
+                .filter(row => !notifiedBarcodes.has(row.barCode))  // Only add if not notified yet
+                .map(row => {
+                    // Update the notifiedBarcodes set
+                    setNotifiedBarcodes(prevSet => new Set(prevSet).add(row.barCode));
+                    return `Your ${row.ingredient} (${row.barCode}) has expired!`; // Create notification for expired item
+                });
+
+            if (newNotifications.length > 0) {
+                setNotifications(prevNotifications => [
+                    ...prevNotifications,
+                    ...newNotifications
+                ]);
+            }
+        };
+
+        const interval = setInterval(checkNotifications, 5000);
+
+        // Cleanup interval on unmount
+        return () => clearInterval(interval);
+    }, [goodsInRows, notifications, setNotifications, notifiedBarcodes]); // Re-run if goodsInRows, notifications, or notifiedBarcodes change
+
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
             {/* Search Bar */}
@@ -99,7 +130,7 @@ const Topbar = () => {
                 <Box minWidth={300}>
                     {/* Header Section with full-width green background */}
                     <Box sx={{ backgroundColor: colors.greenAccent[500], px: 2, py: 1 }}>
-                        <Typography variant="body2" fontWeight="bold">Notification</Typography>
+                        <Typography variant="body2" fontWeight="bold">Notifications</Typography>
                     </Box>
 
                     <Box p={2}>
