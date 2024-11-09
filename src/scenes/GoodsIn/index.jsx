@@ -3,16 +3,32 @@ import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
-import { useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { goodsInRows, setGoodsInRows, setIngredientInventory, updateNotifications } = useData();
 
-  const prevGoodsInRowsRef = useRef([]); // Store previous state for comparison
+  const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
+  const prevGoodsInRowsRef = useRef(goodsInRows); // To track previous goodsInRows for comparison
 
   const columns = [
+    {
+      field: "select",
+      headerName: "Select",
+      renderCell: (params) => {
+        const isSelected = selectedRows.includes(params.row.id); // Check if the row is selected
+        return (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => handleRowSelection(params.row)}
+          />
+        );
+      },
+      width: 100,
+    },
     { field: "date", headerName: "Date", flex: 1, editable: true },
     { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
     {
@@ -115,6 +131,35 @@ const GoodsIn = () => {
     setGoodsInRows([]);
   };
 
+  // Manually select or unselect rows
+  const handleRowSelection = (row) => {
+    console.log("Toggling row selection for:", row);
+
+    setSelectedRows((prevSelectedRows) => {
+      if (prevSelectedRows.includes(row.id)) {
+        // If already selected, unselect it
+        return prevSelectedRows.filter((id) => id !== row.id);
+      } else {
+        // If not selected, add it
+        return [...prevSelectedRows, row.id];
+      }
+    });
+  };
+
+  // Delete selected rows
+  const handleDeleteSelectedRows = () => {
+    console.log("Deleting selected rows:", selectedRows);
+
+    const remainingRows = goodsInRows.filter(
+      (row) => !selectedRows.includes(row.id)
+    );
+
+    console.log("Remaining rows after deletion:", remainingRows);
+    setGoodsInRows(remainingRows);
+    setSelectedRows([]); // Clear selection after deletion
+    console.log("Selection cleared after deletion.");
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       console.log("Running periodic check to update processed status and expired items");
@@ -141,8 +186,18 @@ const GoodsIn = () => {
         setGoodsInRows(updatedRows);
       }
 
+      // Check for expired items and remove them
+      const currentDate = new Date();
+      const nonExpiredRows = updatedRows.filter((row) => new Date(row.expiryDate) >= currentDate);
+
+      // Update goodsInRows by removing expired rows
+      if (updatedRows.length !== nonExpiredRows.length) {
+        console.log("Expired items detected and removed.");
+        setGoodsInRows(nonExpiredRows); // Only keep non-expired rows
+      }
+
       // Update expired items notifications only if necessary
-      const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < new Date());
+      const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < currentDate);
       const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
       
       // Only update notifications if there are any new expired items
@@ -164,6 +219,15 @@ const GoodsIn = () => {
       <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
       <Button onClick={handleClearStorage} color="error" variant="contained" sx={{ mb: 2 }}>
         Clear Data
+      </Button>
+      <Button
+        onClick={handleDeleteSelectedRows}
+        color="error"
+        variant="contained"
+        sx={{ mb: 2 }}
+        disabled={selectedRows.length === 0} // Disable the button if no rows are selected
+      >
+        Delete Selected Rows
       </Button>
       <Box
         m="40px 0 0 0"
@@ -197,7 +261,6 @@ const GoodsIn = () => {
         }}
       >
         <DataGrid
-          checkboxSelection
           rows={goodsInRows.map((row) => ({
             ...row,
             id: `${row.barCode}-${row.ingredient}`,
