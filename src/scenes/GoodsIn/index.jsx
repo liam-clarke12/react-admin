@@ -1,8 +1,8 @@
-import { Box, useTheme, Button } from "@mui/material";
+import { Box, useTheme, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
-import { useData } from "../../contexts/DataContext";
+import { useData } from "../../contexts/DataContext"; 
 import { useEffect, useState, useRef } from "react";
 
 const GoodsIn = () => {
@@ -11,6 +11,7 @@ const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory, updateNotifications } = useData();
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
   const prevGoodsInRowsRef = useRef(goodsInRows); // To track previous goodsInRows for comparison
 
   const columns = [
@@ -160,6 +161,22 @@ const GoodsIn = () => {
     console.log("Selection cleared after deletion.");
   };
 
+  // Open the confirmation dialog
+  const handleOpenConfirmDialog = () => {
+    setOpenConfirmDialog(true);
+  };
+
+  // Close the confirmation dialog
+  const handleCloseConfirmDialog = () => {
+    setOpenConfirmDialog(false);
+  };
+
+  // Confirm deletion of selected rows
+  const handleConfirmDelete = () => {
+    handleDeleteSelectedRows();
+    handleCloseConfirmDialog();
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       console.log("Running periodic check to update processed status and expired items");
@@ -221,7 +238,7 @@ const GoodsIn = () => {
         Clear Data
       </Button>
       <Button
-        onClick={handleDeleteSelectedRows}
+        onClick={handleOpenConfirmDialog}
         color="error"
         variant="contained"
         sx={{ mb: 2 }}
@@ -229,6 +246,22 @@ const GoodsIn = () => {
       >
         Delete Selected Rows
       </Button>
+      
+      {/* Confirmation Dialog */}
+      <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog}>
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>Are you sure you want to delete the selected row(s)?</DialogContent>
+        <DialogContent>Deleting this row(s) will remove "Stock Remaining" from the Ingredients Inventory</DialogContent>
+        <DialogActions>
+        <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.greenAccent[500] }}>            
+          Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error">
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box
         m="40px 0 0 0"
         height="75vh"
