@@ -1,9 +1,10 @@
-import { Box, useTheme, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { Box, useTheme, IconButton, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext"; 
 import { useEffect, useState, useRef } from "react";
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const GoodsIn = () => {
   const theme = useTheme();
@@ -126,12 +127,6 @@ const GoodsIn = () => {
     setIngredientInventory(updatedInventory);
   };
 
-  const handleClearStorage = () => {
-    console.log("Clearing localStorage data for goodsInRows");
-    localStorage.removeItem("goodsInRows");
-    setGoodsInRows([]);
-  };
-
   // Manually select or unselect rows
   const handleRowSelection = (row) => {
     console.log("Toggling row selection for:", row);
@@ -232,86 +227,93 @@ const GoodsIn = () => {
   }, [goodsInRows, setGoodsInRows, updateNotifications]);
 
   return (
-    <Box m="20px">
-      <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
-      <Button onClick={handleClearStorage} color="error" variant="contained" sx={{ mb: 2 }}>
-        Clear Data
-      </Button>
-      <Button
-        onClick={handleOpenConfirmDialog}
-        color="error"
-        variant="contained"
-        sx={{ mb: 2 }}
-        disabled={selectedRows.length === 0} // Disable the button if no rows are selected
-      >
-        Delete Selected Rows
-      </Button>
-      
-      {/* Confirmation Dialog */}
-      <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>Are you sure you want to delete the selected row(s)?</DialogContent>
-        <DialogContent>Deleting this row(s) will remove "Stock Remaining" from the Ingredients Inventory</DialogContent>
-        <DialogActions>
-        <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.greenAccent[500] }}>            
-          Cancel
-          </Button>
-          <Button onClick={handleConfirmDelete} color="error">
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
+<Box m="20px">
+  <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
+  
+  {/* Trash Icon Button */}
+  <Box sx={{ position: "relative", mb: 2,height: 2  }}>
+    <IconButton
+      onClick={handleOpenConfirmDialog}
+      color="error"
+      sx={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        color: colors.greenAccent[500],
+        ...(selectedRows.length === 0 && { opacity: 0.5 }), // Disable button when no rows are selected
+      }}
+      disabled={selectedRows.length === 0}
+    >
+      <DeleteIcon />
+    </IconButton>
+  </Box>
 
-      <Box
-        m="40px 0 0 0"
-        height="75vh"
-        sx={{
-          overflowX: 'auto',
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .barCode-column--cell": { color: colors.greenAccent[300] },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-          },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700],
-          },
-          "& .MuiCheckbox-root": {
-            color: `${colors.greenAccent[200]} !important`,
-          },
-          "& .even-row": {
-            backgroundColor: colors.primary[450],
-          },
-          "& .odd-row": {
-            backgroundColor: colors.primary[400],
-          },
-          "& .expired-row": {
-            backgroundColor: colors.red[500], // Red background for expired items
-          },
-        }}
-      >
-        <DataGrid
-          rows={goodsInRows.map((row) => ({
-            ...row,
-            id: `${row.barCode}-${row.ingredient}`,
-            processed: row.processed || "No",
-            rowClassName: new Date(row.expiryDate) < new Date() ? 'expired-row' : (row.id % 2 === 0 ? 'even-row' : 'odd-row'),
-          }))}
-          columns={columns}
-          processRowUpdate={processRowUpdate}
-          getRowId={(row) => `${row.barCode}-${row.ingredient}`}
-          getRowClassName={(params) => {
-            if (new Date(params.row.expiryDate) < new Date()) {
-              return 'expired-row';
-            }
-            return params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row';
-          }}
-        />
-      </Box>
-    </Box>
+  {/* Confirmation Dialog */}
+  <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog}>
+    <DialogTitle>Confirm Deletion</DialogTitle>
+    <DialogContent>Are you sure you want to delete the selected row(s)?</DialogContent>
+    <DialogContent>Deleting this row(s) will remove "Stock Remaining" from the Ingredients Inventory!</DialogContent>
+    <DialogActions>
+      <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.greenAccent[500] }}>            
+        Cancel
+      </Button>
+      <Button onClick={handleConfirmDelete} color="error">
+        Confirm
+      </Button>
+    </DialogActions>
+  </Dialog>
+
+  {/* DataGrid Section */}
+  <Box
+    m="40px 0 0 0"
+    height="75vh"
+    sx={{
+      overflowX: 'auto',
+      "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+      "& .MuiDataGrid-cell": { borderBottom: "none" },
+      "& .barCode-column--cell": { color: colors.greenAccent[300] },
+      "& .MuiDataGrid-columnHeaders": {
+        backgroundColor: colors.blueAccent[700],
+        borderBottom: "none",
+      },
+      "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
+      "& .MuiDataGrid-footerContainer": {
+        borderTop: "none",
+        backgroundColor: colors.blueAccent[700],
+      },
+      "& .MuiCheckbox-root": {
+        color: `${colors.greenAccent[200]} !important`,
+      },
+      "& .even-row": {
+        backgroundColor: colors.primary[450],
+      },
+      "& .odd-row": {
+        backgroundColor: colors.primary[400],
+      },
+      "& .expired-row": {
+        backgroundColor: colors.red[500], // Red background for expired items
+      },
+    }}
+  >
+    <DataGrid
+      rows={goodsInRows.map((row) => ({
+        ...row,
+        id: `${row.barCode}-${row.ingredient}`,
+        processed: row.processed || "No",
+        rowClassName: new Date(row.expiryDate) < new Date() ? 'expired-row' : (row.id % 2 === 0 ? 'even-row' : 'odd-row'),
+      }))}
+      columns={columns}
+      processRowUpdate={processRowUpdate}
+      getRowId={(row) => `${row.barCode}-${row.ingredient}`}
+      getRowClassName={(params) => {
+        if (new Date(params.row.expiryDate) < new Date()) {
+          return 'expired-row';
+        }
+        return params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row';
+      }}
+    />
+  </Box>
+</Box>
   );
 };
 
