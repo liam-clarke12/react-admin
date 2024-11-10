@@ -128,30 +128,29 @@ const GoodsIn = () => {
   };
 
   // Manually select or unselect rows
-  const handleRowSelection = (row) => {
-    console.log("Toggling row selection for:", row);
 
-    setSelectedRows((prevSelectedRows) => {
-      if (prevSelectedRows.includes(row.id)) {
-        // If already selected, unselect it
-        return prevSelectedRows.filter((id) => id !== row.id);
-      } else {
-        // If not selected, add it
-        return [...prevSelectedRows, row.id];
-      }
-    });
-  };
+const handleRowSelection = (row) => {
+  const rowId = `${row.barCode}-${row.ingredient}`; // Use the same format as the row id
 
-  // Delete selected rows
-  const handleDeleteSelectedRows = () => {
-    const remainingRows = goodsInRows.filter(
-      (row) => !selectedRows.includes(row.id) // Filter out only the selected rows
-    );
-    setGoodsInRows(remainingRows);  // Update the state with the remaining rows
-    setSelectedRows([]);  // Clear selection
-  };
-  
+  setSelectedRows((prevSelectedRows) => {
+    if (prevSelectedRows.includes(rowId)) {
+      // If already selected, unselect it
+      return prevSelectedRows.filter((id) => id !== rowId);
+    } else {
+      // If not selected, add it
+      return [...prevSelectedRows, rowId];
+    }
+  });
+};
 
+// Delete selected rows
+const handleDeleteSelectedRows = () => {
+  const remainingRows = goodsInRows.filter(
+    (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`) // Match the row id format
+  );
+  setGoodsInRows(remainingRows);  // Update the state with the remaining rows
+  setSelectedRows([]);  // Clear selection
+};
   // Open the confirmation dialog
   const handleOpenConfirmDialog = () => {
     setOpenConfirmDialog(true);

@@ -41,7 +41,7 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('goodsInRows', JSON.stringify(goodsInRows));
   }, [goodsInRows]);
-
+  
   useEffect(() => {
     localStorage.setItem('ingredientInventory', JSON.stringify(ingredientInventory));
   }, [ingredientInventory]);
