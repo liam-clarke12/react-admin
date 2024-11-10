@@ -144,17 +144,13 @@ const GoodsIn = () => {
 
   // Delete selected rows
   const handleDeleteSelectedRows = () => {
-    console.log("Deleting selected rows:", selectedRows);
-
     const remainingRows = goodsInRows.filter(
-      (row) => !selectedRows.includes(row.id)
+      (row) => !selectedRows.includes(row.id) // Filter out only the selected rows
     );
-
-    console.log("Remaining rows after deletion:", remainingRows);
-    setGoodsInRows(remainingRows);
-    setSelectedRows([]); // Clear selection after deletion
-    console.log("Selection cleared after deletion.");
+    setGoodsInRows(remainingRows);  // Update the state with the remaining rows
+    setSelectedRows([]);  // Clear selection
   };
+  
 
   // Open the confirmation dialog
   const handleOpenConfirmDialog = () => {
@@ -173,59 +169,58 @@ const GoodsIn = () => {
   };
 
   useEffect(() => {
+    const storedData = JSON.parse(localStorage.getItem('goodsInRows'));
+    if (storedData) {
+      setGoodsInRows(storedData);
+    }
+  }, [setGoodsInRows]); // Runs once when the component mounts
+
+  useEffect(() => {
+    localStorage.setItem('goodsInRows', JSON.stringify(goodsInRows));
+  }, [goodsInRows]); // Runs when goodsInRows changes
+  
+  useEffect(() => {
     const interval = setInterval(() => {
       console.log("Running periodic check to update processed status and expired items");
-
+  
       let updated = false;
-
       const updatedRows = goodsInRows.map((row) => {
         const updatedRow = {
           ...row,
           processed: row.stockRemaining === 0 ? "Yes" : "No",
         };
-
+  
         // Check if processed status changed
         if (updatedRow.processed !== prevGoodsInRowsRef.current.find(r => r.barCode === row.barCode && r.ingredient === row.ingredient)?.processed) {
           updated = true;
         }
-
+  
         return updatedRow;
       });
-
+  
       // If there was a change in processed status, update the state
       if (updated) {
         console.log("Detected change in processed status, updating goodsInRows");
         setGoodsInRows(updatedRows);
       }
-
-      // Check for expired items and remove them
+  
+      // For expired items, just notify (don't remove them unless selected)
       const currentDate = new Date();
-      const nonExpiredRows = updatedRows.filter((row) => new Date(row.expiryDate) >= currentDate);
-
-      // Update goodsInRows by removing expired rows
-      if (updatedRows.length !== nonExpiredRows.length) {
-        console.log("Expired items detected and removed.");
-        setGoodsInRows(nonExpiredRows); // Only keep non-expired rows
-      }
-
-      // Update expired items notifications only if necessary
       const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < currentDate);
+  
+      // Update expired items notifications
       const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
-      
-      // Only update notifications if there are any new expired items
       if (notifications.length > 0) {
         updateNotifications(notifications);
       }
-
-      // Store the current rows in the ref for next comparison
+  
       prevGoodsInRowsRef.current = updatedRows;
+  
     }, 5000); // Run every 5 seconds
-
+  
     // Cleanup function to clear interval when the component unmounts
     return () => clearInterval(interval);
-
-  }, [goodsInRows, setGoodsInRows, updateNotifications]);
-
+  }, [goodsInRows, setGoodsInRows, updateNotifications]);  
   return (
 <Box m="20px">
   <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
