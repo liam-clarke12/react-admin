@@ -9,7 +9,7 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
-import { useData } from "../../contexts/DataContext"; // Assuming this hook gives you both notifications and setNotifications
+import { useData } from "../../contexts/DataContext"; 
 import { useNavigate } from "react-router-dom"; 
 
 const Topbar = () => {
@@ -35,41 +35,43 @@ const Topbar = () => {
     const handleNotificationClick = () => {
         navigate("/GoodsIn");
         setNotifications([]);  // Clear notifications after clicking
+        localStorage.setItem('notifications', JSON.stringify([])); // Update localStorage
         handleClose();
     };
 
     const open = Boolean(anchorEl);
 
-    // Polling for notifications every 5 seconds
     useEffect(() => {
-        const notifiedBarcodes = new Set(notifications.map(notification => notification.barcode));  // Track barcodes that have already been notified
+        const notifiedBarcodes = new Set(notifications.map(notification => notification.barcode));
 
         const checkNotifications = () => {
-            const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
-            console.log('Expired rows:', expiredRows); // Log expired rows to check if they are correctly identified
+            const currentDate = new Date();
+            const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < currentDate);
 
-            // Create an array of new notifications for expired rows that are not already in notifications
+            // Filter out notifications that no longer have expired items in goodsInRows
+            const activeNotifications = notifications.filter(notification => 
+                expiredRows.some(row => row.barCode === notification.barcode)
+            );
+
+            // Add new notifications for items not yet notified
             const newNotifications = expiredRows
-                .filter(row => !notifiedBarcodes.has(row.barCode))  // Only add if not notified yet
-                .map(row => {
-                    notifiedBarcodes.add(row.barCode);  // Mark this barcode as notified
-                    return { message: `Your ${row.ingredient} (${row.barCode}) has expired!`, barcode: row.barCode }; // Create notification for expired item
-                });
+                .filter(row => !notifiedBarcodes.has(row.barCode))
+                .map(row => ({
+                    message: `Your ${row.ingredient} (${row.barCode}) has expired!`,
+                    barcode: row.barCode
+                }));
 
-            if (newNotifications.length > 0) {
-                setNotifications(prevNotifications => {
-                    const updatedNotifications = [...prevNotifications, ...newNotifications];
-                    localStorage.setItem('notifications', JSON.stringify(updatedNotifications)); // Save to localStorage
-                    return updatedNotifications;
-                });
+            if (newNotifications.length > 0 || activeNotifications.length !== notifications.length) {
+                const updatedNotifications = [...activeNotifications, ...newNotifications];
+                setNotifications(updatedNotifications);
+                localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
             }
         };
 
         const interval = setInterval(checkNotifications, 5000);
-
-        // Cleanup interval on unmount
         return () => clearInterval(interval);
-    }, [goodsInRows, notifications]); // Re-run if goodsInRows or notifications change
+
+    }, [goodsInRows, notifications]);
 
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
