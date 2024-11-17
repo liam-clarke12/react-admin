@@ -3,17 +3,16 @@ import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext"; 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState} from "react";
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { goodsInRows, setGoodsInRows, setIngredientInventory, updateNotifications } = useData();
+  const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory, updateNotifications } = useData();
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
-  const prevGoodsInRowsRef = useRef(goodsInRows); // To track previous goodsInRows for comparison
 
   const columns = [
     {
@@ -74,29 +73,29 @@ const GoodsIn = () => {
 
   const processRowUpdate = (newRow) => {
     console.log("Processing row update:", newRow);
-
+  
     const updatedRow = {
       ...newRow,
+      processed: newRow.stockRemaining === 0 ? "Yes" : "No",
     };
-
+  
     const updatedRows = goodsInRows.map((row) =>
-      row.barCode === updatedRow.barCode && row.ingredient === updatedRow.ingredient
-        ? updatedRow
-        : row
+      row.id === updatedRow.id ? updatedRow : row
     );
-
+  
     console.log("Updated rows after processing:", updatedRows);
-    setGoodsInRows(updatedRows);
-    updateIngredientInventory(updatedRows);
+    setGoodsInRows(updatedRows); // Ensure that the state is updated with new row data
+    updateIngredientInventory(updatedRows); // Update inventory based on new data
+  
     return updatedRow;
   };
-
+  
   const updateIngredientInventory = (updatedRows) => {
     console.log("Updating ingredient inventory with rows:", updatedRows);
-
+  
     const updatedInventory = [];
     const nextBarcodeMap = {};
-
+  
     updatedRows.forEach((row) => {
       if (row.processed === "No") {
         if (!nextBarcodeMap[row.ingredient]) {
@@ -104,12 +103,12 @@ const GoodsIn = () => {
         }
       }
     });
-
+  
     updatedRows.forEach((row) => {
       const existingIngredient = updatedInventory.find(
         (item) => item.ingredient === row.ingredient
       );
-
+  
       if (existingIngredient) {
         existingIngredient.amount += row.stockReceived;
         if (row.processed === "Yes") {
@@ -123,34 +122,55 @@ const GoodsIn = () => {
         });
       }
     });
-
+  
     setIngredientInventory(updatedInventory);
   };
-
-  // Manually select or unselect rows
-
-const handleRowSelection = (row) => {
-  const rowId = `${row.barCode}-${row.ingredient}`; // Use the same format as the row id
-
-  setSelectedRows((prevSelectedRows) => {
-    if (prevSelectedRows.includes(rowId)) {
-      // If already selected, unselect it
-      return prevSelectedRows.filter((id) => id !== rowId);
-    } else {
-      // If not selected, add it
-      return [...prevSelectedRows, rowId];
-    }
-  });
-};
+  
+  const handleRowSelection = (row) => {
+    const rowId = `${row.barCode}-${row.ingredient}`; // Use a combination of barcode and ingredient to uniquely identify rows
+  
+    setSelectedRows((prevSelectedRows) => {
+      if (prevSelectedRows.includes(rowId)) {
+        // If the row is already selected, unselect it
+        return prevSelectedRows.filter((id) => id !== rowId);
+      } else {
+        // If not selected, add it to the selected rows
+        return [...prevSelectedRows, rowId];
+      }
+    });
+  };
+  
 
 // Delete selected rows
 const handleDeleteSelectedRows = () => {
+  // Update ingredient inventory to subtract stockRemaining from the corresponding ingredient
+  selectedRows.forEach((rowId) => {
+    const row = goodsInRows.find((row) => `${row.barCode}-${row.ingredient}` === rowId);
+    if (row) {
+      const { ingredient, stockRemaining } = row;
+
+      // Update ingredient inventory by subtracting stockRemaining from stock on hand
+      const updatedInventory = ingredientInventory.map((item) =>
+        item.ingredient === ingredient
+          ? { ...item, amount: Math.max(0, item.amount - stockRemaining) }
+          : item
+      );
+
+      // Update the inventory state
+      setIngredientInventory(updatedInventory);
+    }
+  });
+
+  // Remove the selected rows from goodsInRows
   const remainingRows = goodsInRows.filter(
     (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`) // Match the row id format
   );
+
   setGoodsInRows(remainingRows);  // Update the state with the remaining rows
   setSelectedRows([]);  // Clear selection
 };
+
+
   // Open the confirmation dialog
   const handleOpenConfirmDialog = () => {
     setOpenConfirmDialog(true);
@@ -177,35 +197,11 @@ const handleDeleteSelectedRows = () => {
   useEffect(() => {
     localStorage.setItem('goodsInRows', JSON.stringify(goodsInRows));
   }, [goodsInRows]); // Runs when goodsInRows changes
-  
+
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("Running periodic check to update processed status and expired items");
-  
-      let updated = false;
-      const updatedRows = goodsInRows.map((row) => {
-        const updatedRow = {
-          ...row,
-          processed: row.stockRemaining === 0 ? "Yes" : "No",
-        };
-  
-        // Check if processed status changed
-        if (updatedRow.processed !== prevGoodsInRowsRef.current.find(r => r.barCode === row.barCode && r.ingredient === row.ingredient)?.processed) {
-          updated = true;
-        }
-  
-        return updatedRow;
-      });
-  
-      // If there was a change in processed status, update the state
-      if (updated) {
-        console.log("Detected change in processed status, updating goodsInRows");
-        setGoodsInRows(updatedRows);
-      }
-  
-      // For expired items, just notify (don't remove them unless selected)
       const currentDate = new Date();
-      const expiredItems = updatedRows.filter((row) => new Date(row.expiryDate) < currentDate);
+      const expiredItems = goodsInRows.filter((row) => new Date(row.expiryDate) < currentDate);
   
       // Update expired items notifications
       const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
@@ -213,13 +209,12 @@ const handleDeleteSelectedRows = () => {
         updateNotifications(notifications);
       }
   
-      prevGoodsInRowsRef.current = updatedRows;
-  
-    }, 5000); // Run every 5 seconds
+    }, 5000); // Check every 5 seconds for expired items
   
     // Cleanup function to clear interval when the component unmounts
     return () => clearInterval(interval);
-  }, [goodsInRows, setGoodsInRows, updateNotifications]);  
+  }, [goodsInRows, updateNotifications]);
+  
   return (
 <Box m="20px">
   <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />

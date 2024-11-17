@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 const DataContext = createContext();
 
@@ -27,6 +27,8 @@ export const DataProvider = ({ children }) => {
     return savedLogs ? JSON.parse(savedLogs) : [];
   });
 
+  const prevExpiryDatesRef = useRef([]); // Define useRef outside the callback function
+
   const [recipeInventory, setRecipeInventory] = useState(() => {
     const savedInventory = localStorage.getItem('recipeInventory');
     return savedInventory ? JSON.parse(savedInventory) : [];
@@ -41,6 +43,7 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('goodsInRows', JSON.stringify(goodsInRows));
   }, [goodsInRows]);
+
   
   useEffect(() => {
     localStorage.setItem('ingredientInventory', JSON.stringify(ingredientInventory));
@@ -62,37 +65,93 @@ export const DataProvider = ({ children }) => {
     localStorage.setItem('stockUsage', JSON.stringify(stockUsage));
   }, [stockUsage]);
 
-  useEffect(() => {
+  useEffect(() => {    
     const checkNotifications = () => {
-      const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
-      console.log('Expired rows:', expiredRows);  // Log expired rows to check if they are correctly identified
-      
-      if (expiredRows.length > 0) {
-        // Create a set of new notifications from expired rows
-        const newNotifications = expiredRows.map(row => `Your ${row.ingredient} (${row.barCode}) has expired!`);
-        
-        // Filter out notifications that already exist in the state
-        setNotifications(prevNotifications => {
-          const uniqueNotifications = newNotifications.filter(notification => 
-            !prevNotifications.includes(notification)
-          );
-          
-          // Return the previous notifications plus the new unique ones
-          return [...prevNotifications, ...uniqueNotifications];
-        });
+      let hasNewNotifications = false;
+  
+      // Get the current expiry dates
+      const currentExpiryDates = goodsInRows.map(row => row.expiryDate);
+  
+      // Compare previous and current expiry dates
+      const isExpiryChanged = !currentExpiryDates.every((date, index) => date === prevExpiryDatesRef.current[index]);
+  
+      if (isExpiryChanged) {
+        // If expiry dates have changed, check for expired rows
+        const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < new Date());
+        console.log('Expired rows:', expiredRows);  // Log expired rows to check if they are correctly identified
+  
+        if (expiredRows.length > 0) {
+          // Create a set of new notifications from expired rows
+          const newNotifications = expiredRows.map(row => `Your ${row.ingredient} (${row.barCode}) has expired!`);
+  
+          // Only add new notifications if they are unique
+          setNotifications(prevNotifications => {
+            const uniqueNotifications = newNotifications.filter(notification => 
+              !prevNotifications.includes(notification)
+            );
+  
+            if (uniqueNotifications.length > 0) {
+              hasNewNotifications = true;  // Mark that there are new notifications
+              // Return previous notifications plus new unique ones
+              return [...prevNotifications, ...uniqueNotifications];
+            }
+  
+            return prevNotifications;  // Return existing notifications if no new ones
+          });
+        }
       }
+  
+      // Optionally, log the result
+      if (hasNewNotifications) {
+        console.log('New notifications added.');
+      }
+  
+      // Update the ref with the current expiry dates
+      prevExpiryDatesRef.current = currentExpiryDates;
     };
   
+    // Set the interval to check notifications every 5 seconds
     const interval = setInterval(checkNotifications, 5000);
   
-    return () => clearInterval(interval); // Clear interval on unmount
-  }, [goodsInRows]);  // Depend on goodsInRows to track when rows change
+    return () => clearInterval(interval);  // Clean up interval on unmount
+  }, [goodsInRows]);  // Depend on goodsInRows to track when rows change  
   
-
   const updateNotifications = (newNotifications) => {
     setNotifications(newNotifications);
   };
 
+  const [shouldCheckProcessed, setShouldCheckProcessed] = useState(false);
+
+  useEffect(() => {
+    const checkAndUpdateProcessedStatus = () => {
+      setGoodsInRows((prevRows) =>
+        prevRows.map((row) => {
+          // Only update rows where stockRemaining is 0
+          if (row.stockRemaining === 0) {
+            const newProcessedStatus = "Yes"; // Mark as processed if stockRemaining is 0
+            // Only update if the processed status is not already "Yes"
+            if (row.processed !== newProcessedStatus) {
+              return {
+                ...row,
+                processed: newProcessedStatus,
+              };
+            }
+          } else {
+            // Leave rows with stockRemaining > 0 unchanged
+            return row;
+          }
+          return row; // For rows where no change is needed, return them as is
+        })
+      );
+    };
+  
+    // Trigger status checks periodically or based on flag
+    if (shouldCheckProcessed) {
+      checkAndUpdateProcessedStatus();
+      setShouldCheckProcessed(false); // Reset the trigger after processing
+    }
+  }, [goodsInRows, shouldCheckProcessed]);
+  
 
   // Function to add a new row to the Goods In table
   const addGoodsInRow = (row) => {
@@ -198,8 +257,10 @@ export const DataProvider = ({ children }) => {
 
   // Function to add a new row to the Stock Usage table
   const addStockUsageRow = (row) => {
-    setStockUsage(prevStockUsage => [...prevStockUsage, { ...row, id: `${row.recipeName}-${Date.now()}` }]);
+    console.log('addStockUsageRow called with:', row); // Add this log to check the row data
   
+    setStockUsage(prevStockUsage => [...prevStockUsage, { ...row, id: `${row.recipeName}-${Date.now()}` }]);
+    
     // Clone the inventory and goodsInRows for safe updates
     let updatedInventory = [...ingredientInventory];
     let updatedGoodsInRows = [...goodsInRows];
@@ -207,6 +268,7 @@ export const DataProvider = ({ children }) => {
     // Process each ingredient in the stock usage row
     row.ingredients.forEach((ingredientUsed) => {
       let quantityToSubtract = ingredientUsed.quantity;
+      console.log(`Processing ingredient: ${ingredientUsed.ingredient}, Quantity to subtract: ${quantityToSubtract}`); // Add this log to see the ingredient and quantity
   
       // Deduct stock from matching rows in goodsInRows
       for (let i = 0; i < updatedGoodsInRows.length && quantityToSubtract > 0; i++) {
@@ -215,18 +277,22 @@ export const DataProvider = ({ children }) => {
         if (goodRow.ingredient === ingredientUsed.ingredient) {
           const stockRemaining = goodRow.stockRemaining;
   
+          console.log(`Found matching stock row: ${goodRow.ingredient}, Stock remaining: ${stockRemaining}`); // Add this log to track the stock remaining
+  
           if (stockRemaining >= quantityToSubtract) {
             updatedGoodsInRows[i] = {
               ...goodRow,
               stockRemaining: stockRemaining - quantityToSubtract,
             };
             quantityToSubtract = 0;
+            console.log(`Stock remaining after deduction: ${updatedGoodsInRows[i].stockRemaining}`); // Log the updated stock
           } else {
             updatedGoodsInRows[i] = {
               ...goodRow,
               stockRemaining: 0,
             };
             quantityToSubtract -= stockRemaining;
+            console.log(`Stock deducted fully, remaining quantity to subtract: ${quantityToSubtract}`); // Log when stock is exhausted
           }
         }
       }
@@ -241,63 +307,97 @@ export const DataProvider = ({ children }) => {
   
     setIngredientInventory(updatedInventory);
     setGoodsInRows(updatedGoodsInRows);
+    setShouldCheckProcessed(true);
   };
-
+  
   const updateBarcodesAfterProcessing = useCallback(() => {
     console.log('Starting barcode update process...');
-    let updatedInventory = [...ingredientInventory];
-    let updatedGoodsInRows = [...goodsInRows];
-
-    // Iterate over each ingredient in the inventory
-    updatedInventory.forEach((inventoryItem) => {
+    let updatedInventory = [...ingredientInventory];   
+    let updatedGoodsInRows = [...goodsInRows];         
+    
+    let hasChanges = false;  
+  
+    updatedInventory.forEach((inventoryItem) => {     
+      console.log(`Checking inventory item: ${inventoryItem.ingredient}`);
+      
+      // Filter rows in goodsInRows that match the current inventory item
       const matchingGoodsInRows = updatedGoodsInRows.filter(
         (row) => row.ingredient === inventoryItem.ingredient
       );
-
-      // Find the first matching GoodsIn row with processed status "Yes"
-      const currentRow = matchingGoodsInRows.find((row) => row.barCode === inventoryItem.barcode && row.processed === 'Yes');
-
-      if (currentRow) {
-        console.log(`Processing ingredient: ${inventoryItem.ingredient}, barcode: ${currentRow.barCode}`);
-
-        // Find the next GoodsIn row with the same ingredient and processed as "No"
-        const nextUnprocessedRow = matchingGoodsInRows.find((row) => row.processed === 'No');
-
-        if (nextUnprocessedRow) {
-          console.log(`Found next unprocessed row for ${inventoryItem.ingredient}, updating barcode to ${nextUnprocessedRow.barCode}`);
-
-          // Update the barcode in the Ingredient Inventory
+  
+      console.log(`Matching goods in rows for ${inventoryItem.ingredient}:`, matchingGoodsInRows);
+  
+      // Find a matching row that is processed and has 0 stock remaining
+      const currentRow = matchingGoodsInRows.find(
+        (row) => row.processed === 'Yes' && row.stockRemaining === 0
+      );
+  
+      console.log(`Current row (processed = 'Yes' and stockRemaining = 0) for ${inventoryItem.ingredient}:`, currentRow);
+  
+      if (currentRow) {   
+        console.log(`Found processed row for ${inventoryItem.ingredient}, barcode: ${currentRow.barCode}`);
+  
+        // Log each row to check the 'processed' value
+        matchingGoodsInRows.forEach(row => {
+          const processedStatus = row.processed || 'No'; // Default to 'No' if processed is undefined
+          console.log(`Row barcode: ${row.barCode}, processed: ${processedStatus}`);
+        });
+  
+        // Find the next unprocessed row with the same ingredient, handling undefined processed values
+        const nextRow = matchingGoodsInRows.find((row) => (row.processed || 'No') === 'No');
+        console.log(`Next unprocessed row for ${inventoryItem.ingredient}:`, nextRow);
+  
+        if (nextRow) {   
+          console.log(`Updating barcode for ${inventoryItem.ingredient} to ${nextRow.barCode}`);
+          
+          // Update the barcode in the ingredient inventory to the barcode of the next unprocessed row
           updatedInventory = updatedInventory.map((item) =>
             item.ingredient === inventoryItem.ingredient
-              ? { ...item, barcode: nextUnprocessedRow.barCode }
+              ? { ...item, barcode: nextRow.barCode }  
               : item
           );
-
-          // Mark the next unprocessed row as processed
-          updatedGoodsInRows = updatedGoodsInRows.map((row) =>
-            row.id === nextUnprocessedRow.id
-              ? { ...row, processed: 'Yes' }
-              : row
-          );
+  
+          console.log(`Updated inventory after barcode change:`, updatedInventory);
+          hasChanges = true;   
+        } else {
+          console.log(`No unprocessed row found for ${inventoryItem.ingredient}`);
         }
+      } else {
+        console.log(`No processed row found for ${inventoryItem.ingredient}`);
       }
     });
-
-    setIngredientInventory(updatedInventory);
-    setGoodsInRows(updatedGoodsInRows);
-    setShouldUpdateBarcodes(false); // Reset the flag
-
+  
+    // If any changes were made, update the state with the modified inventory
+    if (hasChanges) {
+      console.log("Updated Inventory before state change:", updatedInventory);
+      setIngredientInventory(updatedInventory);  
+      setShouldUpdateBarcodes(false);             
+    } else {
+      console.log("No changes made to inventory.");
+    }
+  
     console.log('Barcode update process completed.');
   }, [ingredientInventory, goodsInRows]);
-
+  
+  
   useEffect(() => {
-    if (shouldUpdateBarcodes) { // Only call if the flag is set
+    if (shouldUpdateBarcodes) {
       const timeoutId = setTimeout(() => {
         updateBarcodesAfterProcessing();
       }, 2000);
   
-      return () => clearTimeout(timeoutId); // Cleanup timeout on component unmount
+      return () => clearTimeout(timeoutId);
     }
+  }, [shouldUpdateBarcodes, updateBarcodesAfterProcessing]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (shouldUpdateBarcodes) {
+        updateBarcodesAfterProcessing();
+      }
+    }, 5000);
+  
+    return () => clearInterval(interval);
   }, [shouldUpdateBarcodes, updateBarcodesAfterProcessing]);
   
   // Function to clear stock usage
