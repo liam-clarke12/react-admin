@@ -157,9 +157,10 @@ export const DataProvider = ({ children }) => {
       return;
     }
   
+    // Ensure the row has a unique ID (e.g., combining barcode and timestamp)
     const newRow = {
       ...row,
-      id: row.barCode,
+      id: `${row.barCode}-${Date.now()}`, // Ensure uniqueness with barcode and timestamp
       stockRemaining: row.stockReceived,
       expiryDate: row.expiryDate, // Ensure expiryDate is converted to a Date object
     };
@@ -167,15 +168,18 @@ export const DataProvider = ({ children }) => {
     console.log("Formatted Row:", newRow); // Log the formatted row
   
     // Update goods in rows state
-    setGoodsInRows(prevRows => {
-      console.log("Previous Goods In Rows:", prevRows); // Log previous state
+    setGoodsInRows((prevRows) => {
       const updatedRows = [...prevRows, newRow];
       console.log("Updated Goods In Rows:", updatedRows); // Log the updated state
+  
+      // Persist the updated rows to localStorage
+      localStorage.setItem('goodsInRows', JSON.stringify(updatedRows));
+  
       return updatedRows;
     });
   
     // Update ingredient inventory using function-based state update
-    setIngredientInventory(prevInventory => {
+    setIngredientInventory((prevInventory) => {
       // Check if the ingredient exists in the inventory
       const existingIngredient = prevInventory.find(item => item.ingredient === row.ingredient);
       
@@ -196,6 +200,7 @@ export const DataProvider = ({ children }) => {
       }
     });
   };
+  
 
   // Function to add a new row to the Recipe table
   const addRow = (row) => {
