@@ -9,10 +9,58 @@ import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 const StockUsage = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { stockUsage, clearStockUsage, ingredientInventory } = useData(); // Access ingredientInventory here
+  const { stockUsage, clearStockUsage } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]);
+
+  const handleDrawerOpen = (header, content) => {
+    let formattedContent;
+  
+    // If header is "Barcodes", we need to show both the previous and current barcodes (if different)
+    if (header === "Barcodes") {
+      formattedContent = content.length
+        ? content.map((item, index) => {
+            const prevBarcode = item.prevBarcode || "No previous barcode";
+            const currentBarcode = item.currentBarcode || "No current barcode";
+  
+            // If the previous and current barcodes are the same, only display ingredient: currentBarcode
+            if (prevBarcode === currentBarcode) {
+              return (
+                <div key={index}>
+                  {item.ingredient}: {currentBarcode}
+                </div>
+              );
+            }
+  
+            // Otherwise, show both the previous and current barcodes
+            return (
+              <div key={index}>
+                {item.ingredient}: {prevBarcode}, {currentBarcode}
+              </div>
+            );
+          })
+        : ["No data available"];
+    } 
+    // If header is "Ingredients", show the ingredient details as usual
+    else if (header === "Ingredients") {
+      formattedContent = content.length
+        ? content.map((ingredient, index) => (
+            <div key={index}>
+              {ingredient.ingredient}: {ingredient.quantity}
+            </div>
+          ))
+        : ["No ingredients available"];
+    }
+  
+    setDrawerHeader(header);
+    setDrawerContent(formattedContent);
+    setDrawerOpen(true);
+  };
+  
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+  };
 
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
@@ -36,16 +84,27 @@ const StockUsage = () => {
       headerName: "Barcodes",
       flex: 1,
       renderCell: (params) => {
-        const barcodes = (params.row.ingredients || []).map((ingredient) => {
-          const found = ingredientInventory.find(
-            (item) => item.name === ingredient.ingredient
-          );
+        // Initialize empty objects for barcode tracking
+        let previousBarcodes = {};
+        let barcodesAfterRemoval = {};
+    
+        // Assuming you have the logic to extract the previous and current barcodes
+        params.row.ingredients.forEach((ingredient) => {
+          const normalizedIngredient = ingredient.ingredient.toLowerCase().trim();
+          previousBarcodes[normalizedIngredient] = ingredient.prevBarcode || "No previous barcode";
+          barcodesAfterRemoval[normalizedIngredient] = ingredient.currentBarcode || "No current barcode";
+        });
+    
+        // Create the barcode display for each ingredient
+        const barcodes = params.row.ingredients.map((ingredient) => {
+          const normalizedIngredient = ingredient.ingredient.toLowerCase().trim();
           return {
-            ingredient: ingredient.ingredient,
-            barcode: found ? found.barcode : "No barcode found",
+            ingredient: ingredient.ingredient || "Unknown ingredient",
+            prevBarcode: previousBarcodes[normalizedIngredient] || "No previous barcode",
+            currentBarcode: barcodesAfterRemoval[normalizedIngredient] || "No current barcode"
           };
         });
-  
+    
         return (
           <span
             style={{ cursor: "pointer", color: colors.greenAccent[500] }}
@@ -57,79 +116,6 @@ const StockUsage = () => {
       },
     },
   ];
-  
-
-  const handleDrawerOpen = (header, content) => {
-    console.log("Opening drawer with header:", header);
-    console.log("Original content passed:", content);
-  
-    if (header === "Barcodes") {
-      console.log("Retrieving barcodes for ingredients...");
-      console.log("Ingredient Inventory:", ingredientInventory);
-  
-      const formattedContent = Array.isArray(content) && content.length
-        ? content.map(item => {
-            console.log(`Processing ingredient: ${item.ingredient}`);
-  
-            // Look up barcode for the ingredient in the ingredientInventory
-            const ingredientBarcode = ingredientInventory.find(
-              inventoryItem => {
-                console.log(`Looking for barcode for ingredient "${item.ingredient}"`);
-                console.log(`Checking against inventory item:`, inventoryItem);
-  
-                // Check for matching names
-                const normalizedIngredient = item.ingredient.trim().toLowerCase();
-                const normalizedInventoryItemName = inventoryItem.ingredient.trim().toLowerCase();
-  
-                if (normalizedInventoryItemName === normalizedIngredient) {
-                  console.log(`Found barcode for ${item.ingredient}: ${inventoryItem.barcode}`);
-                  return true;
-                } else {
-                  console.log(`No match for ingredient "${item.ingredient}" in inventory item "${inventoryItem.name}"`);
-                  return false;
-                }
-              }
-            );
-  
-            if (ingredientBarcode) {
-              console.log(`Found barcode for ingredient "${item.ingredient}": ${ingredientBarcode.barcode}`);
-              return `${item.ingredient}: ${ingredientBarcode.barcode}`;
-            } else {
-              console.log(`No barcode found for ingredient "${item.ingredient}"`);
-              return `${item.ingredient}: No barcode found`;
-            }
-          })
-        : ["No data available"];
-  
-      console.log("Final formatted content for Barcodes Drawer:", formattedContent);
-      setDrawerHeader(header);
-      setDrawerContent(formattedContent);
-  
-      // Set drawer state to true to open it
-      setDrawerOpen(true);
-  
-    } else if (header === "Ingredients") {
-      console.log("Showing ingredients list...");
-  
-      // For Ingredients, display both the ingredient name and quantity
-      const formattedContent = content && content.length
-        ? content.map((ingredient, index) => {
-            return `${ingredient.ingredient}: ${ingredient.quantity}`; // Assuming you have a `quantity` and an optional `unit` field
-          })
-        : ["No ingredients available"];
-  
-      console.log("Final formatted content for Ingredients Drawer:", formattedContent);
-      setDrawerHeader(header);
-      setDrawerContent(formattedContent);
-  
-      // Set drawer state to true to open it
-      setDrawerOpen(true);
-    }
-  };
-  
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-  };
 
   return (
     <Box m="20px">
@@ -141,18 +127,22 @@ const StockUsage = () => {
         Clear Stock Usage
       </Button>
 
-      <Box m="40px 0 0 0"
-        height="75vh" sx={{
-        overflowX: 'auto',
-        "& .MuiDataGrid-root": { border: "none", minWidth: "650px"},
-        "& .MuiDataGrid-cell": { borderBottom: "none" },
-        "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
-        "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-        "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
-      }}>
+      <Box
+        m="40px 0 0 0"
+        height="75vh"
+        sx={{
+          overflowX: "auto",
+          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+          "& .MuiDataGrid-cell": { borderBottom: "none" },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
+          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
+          "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
+        }}
+      >
         <DataGrid
           rows={stockUsage}
           columns={columns}
+          getRowId={(row) => `${row.recipeName}-${row.date}-${row.batchCode}`} // Create unique ID for each row
         />
       </Box>
 
