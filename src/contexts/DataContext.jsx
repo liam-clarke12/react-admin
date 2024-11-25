@@ -125,6 +125,11 @@ export const DataProvider = ({ children }) => {
     const checkAndUpdateProcessedStatus = () => {
       setGoodsInRows((prevRows) =>
         prevRows.map((row) => {
+          // Ensure the processed field is initialized if not present
+          if (row.processed === undefined) {
+            row.processed = "No"; // Initialize "processed" if it is not set
+          }
+  
           // Only update rows where stockRemaining is 0
           if (row.stockRemaining === 0) {
             const newProcessedStatus = "Yes"; // Mark as processed if stockRemaining is 0
@@ -137,8 +142,14 @@ export const DataProvider = ({ children }) => {
             }
           } else {
             // Leave rows with stockRemaining > 0 unchanged
-            return row;
+            if (row.processed !== "No") {
+              return {
+                ...row,
+                processed: "No", // Set to "No" if stockRemaining is not 0
+              };
+            }
           }
+  
           return row; // For rows where no change is needed, return them as is
         })
       );
