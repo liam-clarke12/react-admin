@@ -161,7 +161,12 @@ export const DataProvider = ({ children }) => {
       setShouldCheckProcessed(false); // Reset the trigger after processing
     }
   }, [goodsInRows, shouldCheckProcessed]);
-
+  
+  // Trigger the check on row updates (e.g., when goodsInRows change or after user edits)
+  const handleRowUpdate = () => {
+    setShouldCheckProcessed(true); // Set the flag to trigger the useEffect
+  };
+  
   const addGoodsInRow = (row) => {
     if (!row.ingredient || !row.stockReceived) {
       console.warn("Invalid row data:", row);
@@ -530,6 +535,7 @@ export const DataProvider = ({ children }) => {
       updateNotifications,
       notifications,
       setNotifications,
+      handleRowUpdate,
     }}>
       {children}
     </DataContext.Provider>
