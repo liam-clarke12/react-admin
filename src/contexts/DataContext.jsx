@@ -130,27 +130,23 @@ export const DataProvider = ({ children }) => {
             row.processed = "No"; // Initialize "processed" if it is not set
           }
   
-          // Only update rows where stockRemaining is 0
-          if (row.stockRemaining === 0) {
-            const newProcessedStatus = "Yes"; // Mark as processed if stockRemaining is 0
-            // Only update if the processed status is not already "Yes"
-            if (row.processed !== newProcessedStatus) {
-              return {
-                ...row,
-                processed: newProcessedStatus,
-              };
-            }
-          } else {
-            // Leave rows with stockRemaining > 0 unchanged
-            if (row.processed !== "No") {
-              return {
-                ...row,
-                processed: "No", // Set to "No" if stockRemaining is not 0
-              };
-            }
+          // Only update rows where stockRemaining is 0 and the processed status is not already "Yes"
+          if (row.stockRemaining === 0 && row.processed !== "Yes") {
+            return {
+              ...row,
+              processed: "Yes", // Mark as processed if stockRemaining is 0 and not already marked
+            };
+          }
+          
+          // If stockRemaining > 0, set processed to "No" unless already "No"
+          if (row.stockRemaining > 0 && row.processed !== "No") {
+            return {
+              ...row,
+              processed: "No", // Mark as unprocessed if stockRemaining > 0
+            };
           }
   
-          return row; // For rows where no change is needed, return them as is
+          return row; // Return the row unchanged if no condition is met
         })
       );
     };
@@ -165,7 +161,7 @@ export const DataProvider = ({ children }) => {
   // Trigger the check on row updates (e.g., when goodsInRows change or after user edits)
   const handleRowUpdate = () => {
     setShouldCheckProcessed(true); // Set the flag to trigger the useEffect
-  };
+  };  
   
   const addGoodsInRow = (row) => {
     if (!row.ingredient || !row.stockReceived) {
