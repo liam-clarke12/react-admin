@@ -84,11 +84,16 @@ const GoodsIn = () => {
     );
   
     console.log("Updated rows after processing:", updatedRows);
-    setGoodsInRows(updatedRows); // Ensure that the state is updated with new row data
-    updateIngredientInventory(updatedRows); // Update inventory based on new data
+    setGoodsInRows(updatedRows);
   
-    return updatedRow;
-  };
+    // Persist to localStorage immediately after state update
+    localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
+  
+    // Update inventory based on the new data
+    updateIngredientInventory(updatedRows);
+  
+    return updatedRow; // Return the updated row for DataGrid
+  };  
   
   const updateIngredientInventory = (updatedRows) => {
     console.log("Updating ingredient inventory with rows:", updatedRows);
