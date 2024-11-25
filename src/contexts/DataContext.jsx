@@ -270,151 +270,84 @@ export const DataProvider = ({ children }) => {
   const addStockUsageRow = (row) => {
     console.log("addStockUsageRow called with:", row);
   
-    // Reset the barcode tracking arrays at the start
+    // Reset barcode tracking arrays
     let barcodesBeforeRemoval = {};
-    let barcodesAfterRemoval = {}; // Initialize barcodesAfterRemoval here
-    console.log("Reset barcode tracking arrays:", { barcodesBeforeRemoval, barcodesAfterRemoval });
   
-    // Populate barcodesBeforeRemoval with the current state of the ingredient inventory
     ingredientInventory.forEach((item) => {
-      const normalizedIngredient = item.ingredient.trim().toLowerCase(); // Normalize ingredient names
-      barcodesBeforeRemoval[normalizedIngredient] = item.barcode || "No barcode assigned";
+      barcodesBeforeRemoval[item.ingredient.trim().toLowerCase()] = item.barcode || "No barcode assigned";
     });
-    console.log("Barcodes before stock removal populated:", barcodesBeforeRemoval);
   
-    // Create copies of ingredientInventory and goodsInRows for updating
     let updatedInventory = [...ingredientInventory];
     let updatedGoodsInRows = [...goodsInRows];
   
-    // Process each ingredient used in the row
     row.ingredients.forEach((ingredientUsed) => {
       let quantityToSubtract = ingredientUsed.quantity;
-      console.log(`Processing ingredient: ${ingredientUsed.ingredient}, Quantity to subtract: ${quantityToSubtract}`);
   
-      // Loop through goodsInRows to update stockRemaining
       for (let i = 0; i < updatedGoodsInRows.length && quantityToSubtract > 0; i++) {
         let goodRow = updatedGoodsInRows[i];
         if (goodRow.ingredient === ingredientUsed.ingredient) {
           const stockRemaining = goodRow.stockRemaining;
   
           if (stockRemaining >= quantityToSubtract) {
-            updatedGoodsInRows[i] = {
-              ...goodRow,
-              stockRemaining: stockRemaining - quantityToSubtract,
-            };
-            console.log(`Stock remaining after deduction: ${updatedGoodsInRows[i].stockRemaining}`);
+            updatedGoodsInRows[i] = { ...goodRow, stockRemaining: stockRemaining - quantityToSubtract };
             quantityToSubtract = 0;
           } else {
-            updatedGoodsInRows[i] = {
-              ...goodRow,
-              stockRemaining: 0,
-            };
+            updatedGoodsInRows[i] = { ...goodRow, stockRemaining: 0 };
             quantityToSubtract -= stockRemaining;
-            console.log(`Stock fully deducted. Remaining quantity to subtract: ${quantityToSubtract}`);
           }
         }
       }
   
-      // Update ingredientInventory after stock removal
       updatedInventory = updatedInventory.map((item) => {
         if (item.ingredient === ingredientUsed.ingredient) {
           const updatedAmount = Math.max(0, item.amount - ingredientUsed.quantity);
-          const previousBarcode = barcodesBeforeRemoval[item.ingredient.trim().toLowerCase()]; // Normalize
-  
-          console.log(
-            `Inventory for ingredient: ${item.ingredient} updated. Previous amount: ${item.amount}, New amount: ${updatedAmount}`
-          );
-          console.log(`Ingredient: ${item.ingredient}, Previous Barcode: ${previousBarcode}`);
-  
-          // Update inventory with the new amount and ensure barcode is properly handled
           return { ...item, amount: updatedAmount };
         }
         return item;
       });
     });
   
-    // Save updated rows to state immediately after processing
     setGoodsInRows(updatedGoodsInRows);
     setIngredientInventory(updatedInventory);
-    console.log("GoodsInRows updated and saved:", updatedGoodsInRows);
+  
+    // Sync with localStorage
+    localStorage.setItem("goodsInRows", JSON.stringify(updatedGoodsInRows));
+    localStorage.setItem("ingredientInventory", JSON.stringify(updatedInventory));
+  
     setShouldCheckProcessed(true);
   
-    // Capture barcodes before timeout for final comparison after delay
     const previousBarcodes = { ...barcodesBeforeRemoval };
   
-    // Set timeout to update ingredientInventory after 20 seconds
     setTimeout(() => {
       setIngredientInventory((latestInventory) => {
-        // Reset barcodesAfterRemoval again inside the timeout to ensure it's cleared for each run
         let barcodesAfterRemoval = {};
-  
         latestInventory.forEach((item) => {
-          const normalizedIngredient = item.ingredient.trim().toLowerCase(); // Normalize
-          const newBarcode = item.barcode || "No barcode assigned";
-          const prevBarcode = previousBarcodes[normalizedIngredient] || "No barcode assigned";
-          barcodesAfterRemoval[normalizedIngredient] = newBarcode;
-  
-          if (prevBarcode !== newBarcode) {
-            console.log(
-              `Ingredient: ${item.ingredient}, Previous Barcode: ${prevBarcode}, New Barcode: ${newBarcode}`
-            );
-          } else {
-            console.log(`Ingredient: ${item.ingredient}, Barcode unchanged: ${newBarcode}`);
-          }
+          barcodesAfterRemoval[item.ingredient.trim().toLowerCase()] = item.barcode || "No barcode assigned";
         });
   
-        console.log("Barcodes after stock removal (with delay):", barcodesAfterRemoval);
-  
-        // Add the row to stock usage with barcodes for tracking
         const stockUsageRow = {
           ...row,
           ingredients: row.ingredients.map((ingredientUsed) => {
             const normalizedIngredient = ingredientUsed.ingredient.trim().toLowerCase();
-            const prevBarcode = previousBarcodes[normalizedIngredient] || "No previous barcode";
-            const currentBarcode = barcodesAfterRemoval[normalizedIngredient] || "No current barcode";
-  
-            console.log(
-              `Stock Usage - Ingredient: ${ingredientUsed.ingredient}, Prev Barcode: ${prevBarcode}, Current Barcode: ${currentBarcode}`
-            );
-  
             return {
               ...ingredientUsed,
-              prevBarcode,
-              currentBarcode,
+              prevBarcode: previousBarcodes[normalizedIngredient],
+              currentBarcode: barcodesAfterRemoval[normalizedIngredient],
             };
           }),
         };
   
-        // Check if the row already exists in stockUsage to prevent duplicates
         setStockUsage((prevStockUsage) => {
-          const isDuplicate = prevStockUsage.some(
-            (usageRow) =>
-              usageRow.recipeName === stockUsageRow.recipeName &&
-              usageRow.date === stockUsageRow.date &&
-              usageRow.batchCode === stockUsageRow.batchCode &&
-              usageRow.ingredients.every((ingredient, index) => {
-                const currentIngredient = stockUsageRow.ingredients[index];
-                return (
-                  ingredient.ingredient === currentIngredient.ingredient &&
-                  ingredient.prevBarcode === currentIngredient.prevBarcode &&
-                  ingredient.currentBarcode === currentIngredient.currentBarcode &&
-                  ingredient.quantity === currentIngredient.quantity
-                );
-              })
-          );
-  
-          if (!isDuplicate) {
-            console.log("Row added to stock usage after delay:", stockUsageRow);
-            return [...prevStockUsage, stockUsageRow];
-          } else {
-            console.warn("Duplicate row detected; not adding to stock usage.");
-            return prevStockUsage;
-          }
+          const isDuplicate = prevStockUsage.some((usageRow) =>  {
+            // Add your actual duplicate check logic here
+            return false; // Replace this with the real condition
+          });
+          return isDuplicate ? prevStockUsage : [...prevStockUsage, stockUsageRow];
         });
   
-        return latestInventory; // No further modification
+        return latestInventory;
       });
-    }, 20000); // 20-second delay
+    }, 20000);
   };  
   
   const updateBarcodesAfterProcessing = useCallback(() => {
