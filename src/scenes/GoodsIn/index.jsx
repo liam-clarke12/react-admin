@@ -72,8 +72,6 @@ const GoodsIn = () => {
   ];
 
   const processRowUpdate = (newRow) => {
-    console.log("Processing row update:", newRow);
-  
     const updatedRow = {
       ...newRow,
       processed: newRow.stockRemaining === 0 ? "Yes" : "No",
@@ -83,16 +81,15 @@ const GoodsIn = () => {
       row.id === updatedRow.id ? updatedRow : row
     );
   
-    console.log("Updated rows after processing:", updatedRows);
     setGoodsInRows(updatedRows);
   
-    // Persist to localStorage immediately after state update
+    // Persist updated rows to localStorage
     localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
   
-    // Update inventory based on the new data
+    // Update ingredient inventory
     updateIngredientInventory(updatedRows);
   
-    return updatedRow; // Return the updated row for DataGrid
+    return updatedRow;
   };  
   
   const updateIngredientInventory = (updatedRows) => {
@@ -198,11 +195,14 @@ const handleDeleteSelectedRows = () => {
   };
 
   useEffect(() => {
-    const storedData = JSON.parse(localStorage.getItem('goodsInRows'));
-    if (storedData) {
-      setGoodsInRows(storedData);
-    }
-  }, [setGoodsInRows]); // Runs once when the component mounts
+    const storedData = JSON.parse(localStorage.getItem('goodsInRows')) || [];
+    const initializedData = storedData.map(row => ({
+      ...row,
+      processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
+    }));
+    setGoodsInRows(initializedData);
+  }, [setGoodsInRows]);
+  
 
   useEffect(() => {
     localStorage.setItem('goodsInRows', JSON.stringify(goodsInRows));
