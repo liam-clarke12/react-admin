@@ -38,6 +38,7 @@ const IngredientsInventory = () => {
 
   const handleClearStorage = () => {
     localStorage.removeItem("ingredientInventory"); // Remove specific item
+    localStorage.clear("ingredientInventory"); // Remove specific item
     setIngredientInventory([]); // Reset the state
   };
 

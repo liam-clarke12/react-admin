@@ -532,18 +532,21 @@ export const DataProvider = ({ children }) => {
   const clearStockUsage = () => {
     setStockUsage([]);
     localStorage.removeItem('stockUsage');
+    localStorage.clear('stockUsage');
   };
 
   // Function to clear production logs
   const clearProductionLogs = () => {
     setProductionLogs([]);
     localStorage.removeItem('productionLogs');
+    localStorage.clear('productionLogs');
   };
 
   // Function to clear recipe inventory
   const clearRecipeInventory = () => {
     setRecipeInventory([]);
     localStorage.removeItem('recipeInventory');
+    localStorage.clear('recipeInventory');
   };
 
   // Function to get quantities by recipe name

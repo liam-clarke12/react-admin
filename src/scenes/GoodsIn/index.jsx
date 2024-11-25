@@ -166,10 +166,15 @@ const handleDeleteSelectedRows = () => {
     (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`) // Match the row id format
   );
 
-  setGoodsInRows(remainingRows);  // Update the state with the remaining rows
-  setSelectedRows([]);  // Clear selection
-};
+  // Update the goodsInRows state
+  setGoodsInRows(remainingRows);
 
+  // Update localStorage with the remaining rows
+  localStorage.setItem('goodsInRows', JSON.stringify(remainingRows));
+
+  // Clear selection
+  setSelectedRows([]);
+};
 
   // Open the confirmation dialog
   const handleOpenConfirmDialog = () => {
