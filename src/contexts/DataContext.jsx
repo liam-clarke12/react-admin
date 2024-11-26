@@ -31,9 +31,13 @@ export const DataProvider = ({ children }) => {
   });
 
   const [goodsInRows, setGoodsInRows] = useState(() => {
-    const savedRows = localStorage.getItem('goodsInRows');
-    return savedRows ? JSON.parse(savedRows) : [];
+    const savedRows = JSON.parse(localStorage.getItem("goodsInRows") || "[]");
+    return savedRows.map(row => ({
+      ...row,
+      processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
+    }));
   });
+  
   
   const [ingredientInventory, setIngredientInventory] = useState(() => {
     const savedInventory = localStorage.getItem('ingredientInventory');
