@@ -125,38 +125,27 @@ export const DataProvider = ({ children }) => {
     const checkAndUpdateProcessedStatus = () => {
       setGoodsInRows((prevRows) =>
         prevRows.map((row) => {
-          // Ensure the processed field is initialized if not present
-          if (row.processed === undefined) {
-            row.processed = "No"; // Initialize "processed" if it is not set
-          }
-  
-          // Only update rows where stockRemaining is 0 and the processed status is not already "Yes"
           if (row.stockRemaining === 0 && row.processed !== "Yes") {
-            return {
-              ...row,
-              processed: "Yes", // Mark as processed if stockRemaining is 0 and not already marked
-            };
+            // Only mark as "Yes" if not already processed
+            return { ...row, processed: "Yes" };
           }
           
-          // If stockRemaining > 0, set processed to "No" unless already "No"
           if (row.stockRemaining > 0 && row.processed !== "No") {
-            return {
-              ...row,
-              processed: "No", // Mark as unprocessed if stockRemaining > 0
-            };
+            // Only mark as "No" if not already unprocessed
+            return { ...row, processed: "No" };
           }
-  
-          return row; // Return the row unchanged if no condition is met
+    
+          return row; // Return row unchanged if no updates are needed
         })
       );
     };
-  
-    // Trigger status checks periodically or based on flag
-    if (shouldCheckProcessed) {
-      checkAndUpdateProcessedStatus();
-      setShouldCheckProcessed(false); // Reset the trigger after processing
-    }
-  }, [goodsInRows, shouldCheckProcessed]);
+
+      if (shouldCheckProcessed) {
+        checkAndUpdateProcessedStatus();
+        setShouldCheckProcessed(false); // Reset the flag after processing
+      }
+    }, [shouldCheckProcessed]); // Only runs when the flag changes
+    
   
   // Trigger the check on row updates (e.g., when goodsInRows change or after user edits)
   const handleRowUpdate = () => {
@@ -186,6 +175,7 @@ export const DataProvider = ({ children }) => {
   
       // Persist the updated rows to localStorage
       localStorage.setItem('goodsInRows', JSON.stringify(updatedRows));
+      setShouldCheckProcessed(true);
   
       return updatedRows;
     });
