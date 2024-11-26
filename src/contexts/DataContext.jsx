@@ -31,13 +31,9 @@ export const DataProvider = ({ children }) => {
   });
 
   const [goodsInRows, setGoodsInRows] = useState(() => {
-    const savedRows = JSON.parse(localStorage.getItem("goodsInRows") || "[]");
-    return savedRows.map(row => ({
-      ...row,
-      processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
-    }));
+    const savedRows = localStorage.getItem('goodsInRows');
+    return savedRows ? JSON.parse(savedRows) : [];
   });
-  
   
   const [ingredientInventory, setIngredientInventory] = useState(() => {
     const savedInventory = localStorage.getItem('ingredientInventory');
@@ -124,32 +120,28 @@ export const DataProvider = ({ children }) => {
   };
 
   const [shouldCheckProcessed, setShouldCheckProcessed] = useState(false);
-
   useEffect(() => {
     const checkAndUpdateProcessedStatus = () => {
-      setGoodsInRows((prevRows) =>
-        prevRows.map((row) => {
-          if (row.stockRemaining === 0 && row.processed !== "Yes") {
-            // Only mark as "Yes" if not already processed
-            return { ...row, processed: "Yes" };
-          }
-          
-          if (row.stockRemaining > 0 && row.processed !== "No") {
-            // Only mark as "No" if not already unprocessed
-            return { ...row, processed: "No" };
-          }
-    
-          return row; // Return row unchanged if no updates are needed
-        })
-      );
+      const updatedRows = goodsInRows.map((row) => {
+        if (row.stockRemaining === 0 && row.processed !== "Yes") {
+          return { ...row, processed: "Yes" }; // Mark as "Yes" if stock is zero
+        }
+        if (row.stockRemaining > 0 && row.processed !== "No") {
+          return { ...row, processed: "No" }; // Mark as "No" if stock is > 0
+        }
+        return row; // No changes
+      });
+  
+      setGoodsInRows(updatedRows); // Update state
+      localStorage.setItem("goodsInRows", JSON.stringify(updatedRows)); // Persist changes
     };
-
-      if (shouldCheckProcessed) {
-        checkAndUpdateProcessedStatus();
-        setShouldCheckProcessed(false); // Reset the flag after processing
-      }
-    }, [shouldCheckProcessed]); // Only runs when the flag changes
-    
+  
+    if (shouldCheckProcessed) {
+      checkAndUpdateProcessedStatus();
+      setShouldCheckProcessed(false); // Reset flag
+    }
+  }, [shouldCheckProcessed, goodsInRows]);
+  
   
   // Trigger the check on row updates (e.g., when goodsInRows change or after user edits)
   const handleRowUpdate = () => {
