@@ -302,9 +302,10 @@ export const DataProvider = ({ children }) => {
           return { ...item, amount: updatedAmount };
         }
         return item;
+
       });
     });
-  
+    updateBarcodesAfterProcessing();
     setGoodsInRows(updatedGoodsInRows);
     setIngredientInventory(updatedInventory);
   
