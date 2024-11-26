@@ -350,84 +350,74 @@ export const DataProvider = ({ children }) => {
   
   const updateBarcodesAfterProcessing = useCallback(() => {
     console.log('Starting barcode update process...');
-    
-    // Create a copy of the ingredient inventory and goods in rows to ensure immutability
-    let updatedInventory = [...ingredientInventory];   
-    let updatedGoodsInRows = [...goodsInRows];         
-    
-    let hasChanges = false;  
-    
-    // Log initial state of ingredient inventory to check for existing barcodes
-    console.log('Initial Ingredient Inventory:', updatedInventory);
-    
-    updatedInventory.forEach((inventoryItem) => {     
-      console.log(`Checking inventory item: ${inventoryItem.ingredient}`);
-      
-      // Ensure that each inventory item has a barcode (even if it is undefined or null initially)
-      if (!inventoryItem.barcode) {
-        console.log(`No barcode found for ingredient ${inventoryItem.ingredient}. It will be updated.`);
-      } else {
-        console.log(`Barcode for ingredient ${inventoryItem.ingredient}: ${inventoryItem.barcode}`);
-      }
-      
-      // Filter rows in goodsInRows that match the current inventory item
-      const matchingGoodsInRows = updatedGoodsInRows.filter(
-        (row) => row.ingredient === inventoryItem.ingredient
-      );
-      
-      console.log(`Matching goods in rows for ${inventoryItem.ingredient}:`, matchingGoodsInRows);
-    
-      // Find a matching row that is processed and has 0 stock remaining
-      const currentRow = matchingGoodsInRows.find(
-        (row) => row.processed === 'Yes' && row.stockRemaining === 0
-      );
-    
-      console.log(`Current row (processed = 'Yes' and stockRemaining = 0) for ${inventoryItem.ingredient}:`, currentRow);
-    
-      if (currentRow) {   
-        console.log(`Found processed row for ${inventoryItem.ingredient}, barcode: ${currentRow.barCode}`);
-    
-        // Log each row to check the 'processed' value
-        matchingGoodsInRows.forEach(row => {
-          const processedStatus = row.processed || 'No'; // Default to 'No' if processed is undefined
-          console.log(`Row barcode: ${row.barCode}, processed: ${processedStatus}`);
-        });
-    
-        // Find the next unprocessed row with the same ingredient, handling undefined processed values
-        const nextRow = matchingGoodsInRows.find((row) => (row.processed || 'No') === 'No');
-        console.log(`Next unprocessed row for ${inventoryItem.ingredient}:`, nextRow);
-    
-        if (nextRow) {   
-          console.log(`Updating barcode for ${inventoryItem.ingredient} to ${nextRow.barCode}`);
-          
-          // Update the barcode in the ingredient inventory to the barcode of the next unprocessed row
-          updatedInventory = updatedInventory.map((item) =>
-            item.ingredient === inventoryItem.ingredient
-              ? { ...item, barcode: nextRow.barCode }  
-              : item
+  
+    // Use a functional state update to ensure the latest state is used
+    setIngredientInventory((prevInventory) => {
+      let hasChanges = false; // Tracks if updates were made to the inventory
+  
+      // Create a copy of the current inventory to apply updates
+      const updatedInventory = prevInventory.map((inventoryItem) => {
+        console.log(`Checking inventory item: ${inventoryItem.ingredient}`);
+        
+        // Filter rows in goodsInRows that match the current inventory item
+        const matchingGoodsInRows = goodsInRows.filter(
+          (row) => row.ingredient === inventoryItem.ingredient
+        );
+  
+        console.log(`Matching goods in rows for ${inventoryItem.ingredient}:`, matchingGoodsInRows);
+  
+        // Find the current processed row with stock remaining = 0
+        const currentRow = matchingGoodsInRows.find(
+          (row) => row.processed === 'Yes' && row.stockRemaining === 0
+        );
+  
+        console.log(
+          `Current row (processed = 'Yes' and stockRemaining = 0) for ${inventoryItem.ingredient}:`,
+          currentRow
+        );
+  
+        if (currentRow) {
+          // Find the next unprocessed row
+          const nextRow = matchingGoodsInRows.find(
+            (row) => row.processed === 'No' || row.processed === undefined
           );
-    
-          console.log(`Updated inventory after barcode change:`, updatedInventory);
-          hasChanges = true;   
+  
+          if (nextRow) {
+            console.log(
+              `Updating barcode for ${inventoryItem.ingredient} to ${nextRow.barCode}`
+            );
+  
+            // Update the barcode in the inventory
+            hasChanges = true;
+            return {
+              ...inventoryItem,
+              barcode: nextRow.barCode, // Update barcode to the next unprocessed row's barcode
+            };
+          } else {
+            console.log(`No unprocessed row found for ${inventoryItem.ingredient}`);
+          }
         } else {
-          console.log(`No unprocessed row found for ${inventoryItem.ingredient}`);
+          console.log(`No processed row found for ${inventoryItem.ingredient}`);
         }
-      } else {
-        console.log(`No processed row found for ${inventoryItem.ingredient}`);
+  
+        // Return the item unchanged if no updates are needed
+        return inventoryItem;
+      });
+  
+      if (!hasChanges) {
+        console.log('No changes made to inventory.');
+        return prevInventory; // Avoid unnecessary state updates
       }
+  
+      console.log('Updated Inventory before state change:', updatedInventory);
+      return updatedInventory; // Return the updated inventory
     });
-    
-    // If any changes were made, update the state with the modified inventory
-    if (hasChanges) {
-      console.log("Updated Inventory before state change:", updatedInventory);
-      setIngredientInventory(updatedInventory);  
-      setShouldUpdateBarcodes(false);             
-    } else {
-      console.log("No changes made to inventory.");
-    }
-    
+  
+    // Ensure the `shouldUpdateBarcodes` flag is reset after updates
+    setShouldUpdateBarcodes(false);
+  
     console.log('Barcode update process completed.');
-  }, [ingredientInventory, goodsInRows]);
+  }, [goodsInRows]);  
   
   useEffect(() => {
     console.log('useEffect for shouldUpdateBarcodes triggered');
