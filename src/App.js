@@ -35,9 +35,9 @@ function App() {
                 <Route path="/recipeform" element={<RecipeForm />} />
                 <Route path="/recipes" element={<Recipes />} />
                 <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
-                <Route path="/production_log" element={<ProductionLog />} />
+                <Route path="/daily_production" element={<ProductionLog />} />
                 <Route path="/recipe_production" element={<ProductionLogForm />} />
-                <Route path="/recipe_inventory" element={<RecipeInventory />} />
+                <Route path="/stock_inventory" element={<RecipeInventory />} />
                 <Route path="/stock_usage" element={<StockUsage />} />
                 {/* Add additional routes here as needed */}
               </Routes>

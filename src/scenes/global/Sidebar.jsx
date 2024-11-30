@@ -195,15 +195,15 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
               <Item
-                title="Recipe Inventory"
-                to="/recipe_inventory"
+                title="Stock Inventory"
+                to="/stock_inventory"
                 icon={<WarehouseOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
               />
               <Item
-                title="Production Log"
-                to="/production_log"
+                title="Daily Production"
+                to="/daily_production"
                 icon={<AddOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
