@@ -38,7 +38,7 @@ const ProductionLog = () => {
 
   return (
     <Box m="20px">
-      <Header title="PRODUCTION LOG" subtitle="Track the Recipes you have Produced" />
+      <Header title="DAILY PRODUCTION" subtitle="Track daily stock produced" />
 
       <Button 
         variant="contained" 

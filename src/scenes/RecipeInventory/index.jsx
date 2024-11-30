@@ -37,7 +37,7 @@ const RecipeInventory = () => {
 
   return (
     <Box m="20px">
-      <Header title="RECIPE INVENTORY" subtitle="Track Your Recipe Stock Based on Production" />
+      <Header title="STOCK INVENTORY" subtitle="Track Your Stock Based on Production" />
       <Button 
         variant="contained" 
         color="error" 
