@@ -150,27 +150,35 @@ const GoodsIn = () => {
   };
 
   const handleDeleteSelectedRows = () => {
-    selectedRows.forEach((rowId) => {
-      const row = goodsInRows.find((row) => row.id === rowId);
-      if (row) {
-        const { ingredient, stockRemaining } = row;
-
-        // Update ingredient inventory
-        const updatedInventory = ingredientInventory.map((item) =>
-          item.ingredient === ingredient
-            ? { ...item, amount: Math.max(0, item.amount - stockRemaining) }
-            : item
-        );
-
-        setIngredientInventory(updatedInventory);
-      }
-    });
-
+    // Debugging: Log the current state of rows and selected IDs
+    console.log("Selected Rows for Deletion:", selectedRows);
+    console.log("Current Goods In Rows:", goodsInRows);
+  
     // Remove selected rows
-    const remainingRows = goodsInRows.filter((row) => !selectedRows.includes(row.id));
+    const remainingRows = goodsInRows.filter(
+      (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`)
+    );
+  
+    // Debugging: Log the remaining rows after filtering
+    console.log("Remaining Rows After Deletion:", remainingRows);
+  
     setGoodsInRows(remainingRows);
     localStorage.setItem("goodsInRows", JSON.stringify(remainingRows));
-    setSelectedRows([]);
+    setSelectedRows([]); // Clear selected rows
+  
+    // Update ingredient inventory
+    const updatedInventory = ingredientInventory.map((item) => {
+      const matchingRow = goodsInRows.find(
+        (row) =>
+          selectedRows.includes(`${row.barCode}-${row.ingredient}`) &&
+          row.ingredient === item.ingredient
+      );
+      return matchingRow
+        ? { ...item, amount: Math.max(0, item.amount - matchingRow.stockRemaining) }
+        : item;
+    });
+  
+    setIngredientInventory(updatedInventory);
   };
 
   const handleOpenConfirmDialog = () => {
