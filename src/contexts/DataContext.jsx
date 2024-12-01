@@ -357,6 +357,7 @@ export const DataProvider = ({ children }) => {
           (row) => row.ingredient === inventoryItem.ingredient
         );
   
+        // Find rows with processed status and zero stockRemaining
         const currentRow = matchingGoodsInRows.find(
           (row) => row.processed === "Yes" && row.stockRemaining === 0
         );
@@ -376,6 +377,15 @@ export const DataProvider = ({ children }) => {
               barcode: nextRow.barCode, // Update barcode to next unprocessed row
             };
           }
+        }
+  
+        // If stockRemaining is 0, set barcode to "-"
+        if (matchingGoodsInRows.some((row) => row.stockRemaining === 0)) {
+          console.log("Stock is 0 for:", inventoryItem.ingredient);
+          return {
+            ...inventoryItem,
+            barcode: "-", // Set barcode to "-"
+          };
         }
   
         return inventoryItem; // Return unchanged if no updates are needed
