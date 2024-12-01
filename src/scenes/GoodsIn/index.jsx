@@ -84,26 +84,24 @@ const GoodsIn = () => {
     const updatedRow = {
       ...newRow,
       processed: newRow.stockRemaining === 0 ? "Yes" : "No",
-      barCode: newRow.stockRemaining === 0 ? "-" : newRow.barCode, // Set barCode to "-" if stockRemaining is 0
     };
-  
+
     setGoodsInRows((prevRows) => {
       const updatedRows = prevRows.map((row) =>
         row.id === updatedRow.id ? updatedRow : row
       );
-  
+
       // Persist updated rows to localStorage
       localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
-  
+
       // Update ingredient inventory
       updateIngredientInventory(updatedRows);
-  
+
       return updatedRows;
     });
-  
+
     return updatedRow;
   };
-  
 
   const updateIngredientInventory = (updatedRows) => {
     const updatedInventory = [];
@@ -182,7 +180,7 @@ const GoodsIn = () => {
   
     setIngredientInventory(updatedInventory);
   };
-
+  
   const handleOpenConfirmDialog = () => {
     setOpenConfirmDialog(true);
   };
