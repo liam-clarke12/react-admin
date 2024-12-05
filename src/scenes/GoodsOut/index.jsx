@@ -7,7 +7,7 @@ import { useData } from "../../contexts/DataContext";
 const GoodsOut = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { GoodsOut, clearGoodsOut, loading, updateProductionLog } = useData();
+  const { GoodsOut, clearGoodsOut, loading, addGoodsOutRow } = useData();
 
   const columns = [
     { field: "date", headerName: "Date", flex: 1, editable: false },
@@ -31,16 +31,11 @@ const GoodsOut = () => {
         headerName: "Recipient",
         flex: 1,
       },
-    {
-        field: "processed",
-        headerName: "Processed",
-        flex: 1,
-      },
   ];
 
   const processRowUpdate = (newRow) => {
     // Call the function to update the production log
-    updateProductionLog(newRow);
+    addGoodsOutRow(newRow);
     return newRow; // Return the updated row for DataGrid
   };
 
@@ -78,18 +73,18 @@ const GoodsOut = () => {
         }}
       >
         <DataGrid
-          rows={GoodsOut.map((row, index) => ({
+        rows={Array.isArray(GoodsOut) ? GoodsOut.map((row, index) => ({
             ...row,
-            id: row.batchCode, // Ensure a unique ID for each row
-            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
-          }))}
-          columns={columns}
-          processRowUpdate={processRowUpdate}
-          getRowId={(row) => row.batchCode} // Ensure a unique ID for rows
-          disableSelectionOnClick
-          getRowClassName={(params) =>
-            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
-          }
+            id: row.batchCode || `${row.recipe}-${index}`, // Ensure unique ID
+            rowClassName: index % 2 === 0 ? "even-row" : "odd-row",
+        })) : []}
+        columns={columns}
+        processRowUpdate={processRowUpdate}
+        getRowId={(row) => row.batchCode || row.id} // Unique ID fallback
+        disableSelectionOnClick
+        getRowClassName={(params) =>
+            params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row"
+        }
         />
       </Box>
     </Box>

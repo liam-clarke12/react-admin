@@ -19,9 +19,14 @@ export const DataProvider = ({ children }) => {
   });
 
   const [GoodsOut, setGoodsOut] = useState(() => {
-    const savedLogs = localStorage.getItem('GoodsOut');
-    return savedLogs ? JSON.parse(savedLogs) : [];
-  });
+    try {
+      const stored = localStorage.getItem("GoodsOut");
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error("Failed to parse localStorage GoodsOut:", error);
+      return []; // Default to an empty array on failure
+    }
+  });  
 
   const prevExpiryDatesRef = useRef([]); // Define useRef outside the callback function
 
@@ -148,7 +153,6 @@ export const DataProvider = ({ children }) => {
     }
   }, [shouldCheckProcessed, goodsInRows]);
   
-  
   // Trigger the check on row updates (e.g., when goodsInRows change or after user edits)
   const handleRowUpdate = () => {
     setShouldCheckProcessed(true); // Set the flag to trigger the useEffect
@@ -205,7 +209,6 @@ export const DataProvider = ({ children }) => {
     });
   };
   
-
   // Function to add a new row to the Recipe table
   const addRow = (row) => {
     if (!row.recipe || !row.ingredients.length) {
@@ -270,6 +273,15 @@ export const DataProvider = ({ children }) => {
     });
     setShouldUpdateBarcodes(true);
   };
+
+  const addGoodsOutRow = (log) => {
+    const newLog = { id: `${log.recipe}-${Date.now()}`, amount: log.stockAmount, ...log };
+    setGoodsOut((prevLogs) => {
+      const updatedLogs = Array.isArray(prevLogs) ? [...prevLogs, newLog] : [newLog];
+      localStorage.setItem("GoodsOut", JSON.stringify(updatedLogs));
+      return updatedLogs;
+    });
+  };   
 
   const addStockUsageRow = (row) => {
     console.log("addStockUsageRow called with:", row);
@@ -497,6 +509,7 @@ export const DataProvider = ({ children }) => {
       GoodsOut,
       setGoodsOut,
       clearGoodsOut,
+      addGoodsOutRow,
       stockUsage, // Expose stock usage state
       addStockUsageRow, // Expose function to add stock usage
       clearStockUsage,

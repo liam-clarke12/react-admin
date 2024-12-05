@@ -7,12 +7,12 @@ import { useData } from '../../../contexts/DataContext'; // Import the DataConte
 
 const GoodsOutForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
-  const { addGoodsInRow, rows } = useData(); // Get the addGoodsInRow function from context
+  const { addGoodsOutRow, rows } = useData(); // Get the addGoodsInRow function from context
   const uniqueRecipes = [...new Set(rows.map(row => row.recipe))];
 
   const handleFormSubmit = (values, { resetForm }) => {
     console.log("Submitting Values:", values); // Debugging log
-    addGoodsInRow(values); // Call the function to add row
+    addGoodsOutRow(values); // Call the function to add row
     resetForm(); // Reset the form after submission
   };
 
