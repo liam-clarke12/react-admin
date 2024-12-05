@@ -9,6 +9,7 @@ import StockUsage from "./scenes/StockUsage";
 import Recipes from "./scenes/Recipes";
 import RecipeInventory from "./scenes/RecipeInventory";
 import GoodsInForm from "./scenes/form/GoodsIn";
+import GoodsOutForm from "./scenes/form/GoodsOut";
 import RecipeForm from "./scenes/form/Recipes";
 import ProductionLogForm from "./scenes/form/ProductionLog";
 import { Routes, Route } from "react-router-dom";
@@ -39,6 +40,7 @@ function App() {
                 <Route path="/recipe_production" element={<ProductionLogForm />} />
                 <Route path="/stock_inventory" element={<RecipeInventory />} />
                 <Route path="/stock_usage" element={<StockUsage />} />
+                <Route path="/goods_out_form" element={<GoodsOutForm />} />
                 {/* Add additional routes here as needed */}
               </Routes>
             </main>

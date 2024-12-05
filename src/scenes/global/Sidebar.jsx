@@ -4,6 +4,7 @@ import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -162,6 +163,13 @@ const Sidebar = () => {
                 title="Recipe Production"
                 to="/recipe_production"
                 icon={<OutdoorGrillOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Goods Out Form"
+                to="/goods_out_form"
+                icon={<Inventory2OutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
               />
