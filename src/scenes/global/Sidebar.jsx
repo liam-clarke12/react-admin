@@ -4,6 +4,7 @@ import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
+import NoCrashOutlinedIcon from '@mui/icons-material/NoCrashOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
@@ -223,7 +224,13 @@ const Sidebar = () => {
                 selected={selected}
                 setSelected={setSelected}
               />
-
+              <Item
+                title="Goods Out"
+                to="/goods_out"
+                icon={<NoCrashOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
               <Typography
                 variant="h6"
                 color={colors.grey[300]}

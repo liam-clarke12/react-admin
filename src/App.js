@@ -4,6 +4,7 @@ import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
 import Dashboard from "./scenes/dashboard";
 import GoodsIn from "./scenes/GoodsIn";
+import GoodsOut from "./scenes/GoodsOut";
 import ProductionLog from "./scenes/ProductionLog";
 import StockUsage from "./scenes/StockUsage";
 import Recipes from "./scenes/Recipes";
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/stock_inventory" element={<RecipeInventory />} />
                 <Route path="/stock_usage" element={<StockUsage />} />
                 <Route path="/goods_out_form" element={<GoodsOutForm />} />
+                <Route path="/goods_out" element={<GoodsOut />} />
                 {/* Add additional routes here as needed */}
               </Routes>
             </main>

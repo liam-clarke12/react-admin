@@ -18,6 +18,11 @@ export const DataProvider = ({ children }) => {
     return savedLogs ? JSON.parse(savedLogs) : [];
   });
 
+  const [GoodsOut, setGoodsOut] = useState(() => {
+    const savedLogs = localStorage.getItem('GoodsOut');
+    return savedLogs ? JSON.parse(savedLogs) : [];
+  });
+
   const prevExpiryDatesRef = useRef([]); // Define useRef outside the callback function
 
   const [recipeInventory, setRecipeInventory] = useState(() => {
@@ -446,6 +451,13 @@ export const DataProvider = ({ children }) => {
     localStorage.removeItem('productionLogs');
     localStorage.clear('productionLogs');
   };
+ 
+  // Function to clear production logs
+  const clearGoodsOut = () => {
+    setGoodsOut([]);
+    localStorage.removeItem('GoodsOut');
+    localStorage.clear('GoodsOut');
+  };
 
   // Function to clear recipe inventory
   const clearRecipeInventory = () => {
@@ -482,6 +494,9 @@ export const DataProvider = ({ children }) => {
       recipeInventory,
       setRecipeInventory,
       clearRecipeInventory,
+      GoodsOut,
+      setGoodsOut,
+      clearGoodsOut,
       stockUsage, // Expose stock usage state
       addStockUsageRow, // Expose function to add stock usage
       clearStockUsage,
