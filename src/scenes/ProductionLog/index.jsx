@@ -22,6 +22,15 @@ const ProductionLog = () => {
       editable: true,
     },
     {
+      field: "batchremaining",
+      headerName: "Batches Remaining",
+      type: "number",
+      flex: 1,
+      headerAlign: "left",
+      align: "left",
+      editable: true,
+    },
+    {
       field: "batchCode",
       headerName: "Batch Code",
       flex: 1,

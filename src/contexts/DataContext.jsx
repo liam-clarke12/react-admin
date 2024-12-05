@@ -236,7 +236,7 @@ export const DataProvider = ({ children }) => {
       return;
     }
 
-    const newLog = { id: `${log.recipe}-${Date.now()}`, ...log };
+    const newLog = { id: `${log.recipe}-${Date.now()}`, batchremaining: log.batchesProduced, ...log };
     setProductionLogs(prevLogs => [...prevLogs, newLog]);
 
     // Update recipeInventory
@@ -276,13 +276,51 @@ export const DataProvider = ({ children }) => {
 
   const addGoodsOutRow = (log) => {
     const newLog = { id: `${log.recipe}-${Date.now()}`, amount: log.stockAmount, ...log };
+  
+    // Update GoodsOut state
     setGoodsOut((prevLogs) => {
       const updatedLogs = Array.isArray(prevLogs) ? [...prevLogs, newLog] : [newLog];
       localStorage.setItem("GoodsOut", JSON.stringify(updatedLogs));
       return updatedLogs;
     });
-  };   
-
+  
+    // Update recipeInventory state
+    setRecipeInventory((prevInventory) => {
+      let remainingAmount = log.stockAmount; // Amount to deduct
+      const updatedInventory = prevInventory.map((item) => {
+        if (item.recipe === log.recipe && remainingAmount > 0) {
+          const deductedQuantity = Math.max(item.quantity - remainingAmount, 0); // Deduct quantity
+          remainingAmount -= item.quantity; // Reduce remainingAmount by current item's quantity
+          remainingAmount = Math.max(remainingAmount, 0); // Ensure no negative remaining amount
+          return { ...item, quantity: deductedQuantity }; // Update quantity
+        }
+        return item; // Return unchanged row for other recipes
+      });
+  
+      // Persist changes in localStorage
+      localStorage.setItem("recipeInventory", JSON.stringify(updatedInventory));
+      return updatedInventory;
+    });
+  
+    // Update productionLog state
+    setProductionLogs((prevLog) => {
+      let remainingAmount = log.stockAmount; // Amount to deduct
+      const updatedLog = prevLog.map((batch) => {
+        if (batch.recipe === log.recipe && remainingAmount > 0) {
+          const deductedBatches = Math.max(batch.batchremaining - remainingAmount, 0); // Deduct remaining amount
+          remainingAmount -= batch.batchremaining; // Reduce remaining amount
+          remainingAmount = Math.max(remainingAmount, 0); // Ensure no negative remaining amount
+          return { ...batch, batchremaining: deductedBatches }; // Update batchesRemaining
+        }
+        return batch; // Return unchanged row for other recipes
+      });
+  
+      // Persist changes in localStorage
+      localStorage.setItem("productionLog", JSON.stringify(updatedLog));
+      return updatedLog;
+    });
+  };
+  
   const addStockUsageRow = (row) => {
     console.log("addStockUsageRow called with:", row);
   
