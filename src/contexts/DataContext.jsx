@@ -291,30 +291,49 @@ export const DataProvider = ({ children }) => {
   };
 
   const deductFromProductionLogs = (recipe, amount) => {
+    console.log("Starting Deduction from Production Logs...");
+    console.log("Recipe:", recipe);
+    console.log("Amount to Deduct:", amount);
+    console.log("Initial Production Logs:", productionLogs);
+  
     let remainingAmount = amount;
   
     const updatedLogs = productionLogs.map((logItem) => {
       if (logItem.recipe === recipe && remainingAmount > 0 && logItem.batchremaining > 0) {
+        console.log(`Processing Batch: ${logItem.batchCode}`);
+        console.log("Initial Batch Remaining:", logItem.batchremaining);
+  
         const deduction = Math.min(logItem.batchremaining, remainingAmount);
         remainingAmount -= deduction;
   
-        console.log(`Deducting ${deduction} from batch ${logItem.id}. New Batches Remaining: ${logItem.batchremaining - deduction}`);
-        return {
+        console.log(`Deducting ${deduction} from Batch ${logItem.batchCode}.`);
+        console.log("Remaining Amount to Deduct:", remainingAmount);
+  
+        const updatedBatch = {
           ...logItem,
           batchremaining: logItem.batchremaining - deduction,
         };
+  
+        console.log("Updated Batch:", updatedBatch);
+        return updatedBatch;
       }
+  
+      console.log(`Skipping Batch: ${logItem.batchCode} (No Deduction Applied)`);
       return logItem;
     });
   
+    console.log("Final Updated Production Logs:", updatedLogs);
+    console.log("Final Remaining Amount after Deduction:", remainingAmount);
+  
     return [updatedLogs, remainingAmount];
-  };
+  };   
   
   const addGoodsOutRow = (log) => {
-    console.log("Adding Goods Out Row:", log);
+    console.log("=== Adding Goods Out Row ===");
+    console.log("Input Log:", log);
   
     const newLog = { id: `${log.recipe}-${Date.now()}`, amount: log.stockAmount, ...log };
-    console.log("New Goods Out Log:", newLog);
+    console.log("Generated Goods Out Log:", newLog);
   
     // Update GoodsOut logs
     setGoodsOut((prevLogs) => {
@@ -324,19 +343,41 @@ export const DataProvider = ({ children }) => {
       return updatedLogs;
     });
   
-    // Deduct from production logs
+    // Deduct stock from production logs
+    console.log("=== Deducting from Production Logs ===");
     const [updatedLogs, remainingAmount] = deductFromProductionLogs(log.recipe, log.stockAmount);
+    console.log("Updated Production Logs after Deduction:", updatedLogs);
+    console.log("Remaining Stock to Deduct (if any):", remainingAmount);
     setProductionLogs(updatedLogs);
   
-    // Update recipe inventory
+    // Update recipe inventory to reflect the correct batchCode
+    console.log("=== Updating Recipe Inventory ===");
     setRecipeInventory((prevInventory) => {
       const updatedInventory = prevInventory.map((item) => {
+        console.log("Processing Recipe Inventory Item:", item);
+  
         if (item.recipe === log.recipe) {
-          return {
-            ...item,
-            quantity: item.quantity - (log.stockAmount - remainingAmount),
-          };
+          // Find the next valid production log entry for the recipe
+          const nextBatch = updatedLogs.find(
+            (batch) => batch.recipe === log.recipe && batch.batchremaining > 0
+          );
+  
+          if (nextBatch) {
+            // Log the batch code change
+            console.log(`Changing batch code in Recipe Inventory from ${item.batchCode} to ${nextBatch.batchCode}`);
+  
+            return {
+              ...item,
+              quantity: item.quantity - (log.stockAmount - remainingAmount), // Update quantity
+              batchCode: nextBatch.batchCode, // Update batch code from production log
+            };
+          }
+  
+          console.log("No valid batch code found, batch code not updated.");
+          return item;
         }
+  
+        console.log("No Changes for Recipe Inventory Item:", item);
         return item;
       });
   
@@ -344,7 +385,9 @@ export const DataProvider = ({ children }) => {
       localStorage.setItem("recipeInventory", JSON.stringify(updatedInventory));
       return updatedInventory;
     });
-  };
+  
+    console.log("=== Goods Out Process Complete ===");
+  };  
 
   const addStockUsageRow = (row) => {
     console.log("addStockUsageRow called with:", row);
