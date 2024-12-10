@@ -76,20 +76,20 @@ const ProductionLog = () => {
           },
         }}
       >
-        <DataGrid
-          rows={productionLogs.map((row, index) => ({
-            ...row,
-            id: row.batchCode, // Ensure a unique ID for each row
-            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
-          }))}
-          columns={columns}
-          processRowUpdate={processRowUpdate}
-          getRowId={(row) => row.batchCode} // Ensure a unique ID for rows
-          disableSelectionOnClick
-          getRowClassName={(params) =>
-            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
-          }
-        />
+      <DataGrid
+        rows={productionLogs.map((row, index) => ({
+          ...row,
+          id: row.batchCode || `generated-${index}-${Date.now()}`, // Generate fallback ID if batchCode is null
+          rowClassName: index % 2 === 0 ? "even-row" : "odd-row",
+        }))}
+        columns={columns}
+        processRowUpdate={processRowUpdate}
+        getRowId={(row) => row.id} // Ensure each row has a valid ID
+        disableSelectionOnClick
+        getRowClassName={(params) =>
+          params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row"
+        }
+      />
       </Box>
     </Box>
   );
