@@ -371,8 +371,14 @@ export const DataProvider = ({ children }) => {
           currentBatchcode: batchcodesAfterRemoval[recipe],
         }));
   
-        // Now, add the new Goods Out row
-        const newLog = { id: `${log.recipe}-${Date.now()}`, amount: log.stockAmount, recipient: log.recipient, ...log };
+        // Add the new Goods Out row
+        const newLog = {
+          id: `${log.recipe}-${Date.now()}`,
+          amount: log.stockAmount,
+          recipients: Array.isArray(log.recipient) ? log.recipient : [log.recipient], // Ensure recipients is always an array
+          ...log,
+          batchcodeChanges,
+        };
         console.log("Generated Goods Out Log:", newLog);
   
         // Update GoodsOut logs after everything is processed
@@ -380,26 +386,13 @@ export const DataProvider = ({ children }) => {
           const updatedLogs = Array.isArray(prevLogs) ? [...prevLogs, newLog] : [newLog];
           console.log("Updated GoodsOut Logs:", updatedLogs);
           localStorage.setItem("GoodsOut", JSON.stringify(updatedLogs));
-  
-          // Optionally update the GoodsOut logs with the tracked batchcode changes
-          const updatedGoodsOut = updatedLogs.map((entry) => {
-            if (entry.recipe === log.recipe) {
-              return {
-                ...entry,
-                batchcodeChanges,
-              };
-            }
-            return entry;
-          });
-  
-          console.log("Updated GoodsOut Logs with Batchcode Changes:", updatedGoodsOut);
-          return updatedGoodsOut;
+          return updatedLogs;
         });
   
         return updatedInventory;
       });
     }, 20000);
-  };  
+  };    
 
   const addStockUsageRow = (row) => {
     console.log("addStockUsageRow called with:", row);

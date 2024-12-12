@@ -100,8 +100,18 @@ const GoodsOut = () => {
         );
       },
     },    
-    { field: "recipient", headerName: "Recipient", flex: 1 },
-  ];
+    {
+      field: "recipients",
+      headerName: "Recipients",
+      flex: 1,
+      renderCell: (params) => {
+        // Check if recipients is an array and join them as a string
+        return Array.isArray(params.value)
+          ? params.value.join(", ") // Display recipients as a comma-separated list
+          : "No Recipients";
+      },
+    },
+      ];
 
   const processRowUpdate = (newRow) => {
     addGoodsOutRow(newRow);
