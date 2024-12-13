@@ -91,37 +91,26 @@ const GoodsOutForm = () => {
                 />
               </Grid>
 
-              {/* Recipients */}
-              <Grid item xs={12}>
+             {/* Recipients */}
+             <Grid item xs={12}>
                 <FieldArray name="recipients">
                   {({ push, remove }) => (
                     <>
                       {values.recipients.map((recipient, index) => (
                         <Grid container spacing={2} key={index} alignItems="center">
                           <Grid item xs={10}>
-                          <TextField
-                            fullWidth
-                            variant="filled"
-                            select
-                            label="Recipe"
-                            onBlur={handleBlur}
-                            onChange={handleChange}
-                            value={values.recipe}
-                            name="recipe"
-                            error={!!touched.recipe && !!errors.recipe}
-                            helperText={touched.recipe && errors.recipe}
-                          >
-                            {uniqueRecipes.length > 0 ? (
-                              uniqueRecipes.map((recipe, index) => (
-                                <MenuItem key={index} value={recipe}>
-                                  {recipe}
-                                </MenuItem>
-                              ))
-                            ) : (
-                              <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
-                            )}
-                          </TextField>
-
+                            <TextField
+                              fullWidth
+                              variant="filled"
+                              type="text"
+                              label={`Recipient ${index + 1}`}
+                              name={`recipients.${index}`}
+                              onBlur={handleBlur}
+                              onChange={handleChange}
+                              value={recipient}
+                              error={!!touched.recipients?.[index] && !!errors.recipients?.[index]}
+                              helperText={touched.recipients?.[index] && errors.recipients?.[index]}
+                            />
                           </Grid>
                           <Grid item xs={2}>
                             <Button
