@@ -50,28 +50,29 @@ const GoodsOutForm = () => {
 
               {/* Recipe */}
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  variant="filled"
-                  select
-                  label="Recipe"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.recipe}
-                  name="recipe"
-                  error={!!touched.recipe && !!errors.recipe}
-                  helperText={touched.recipe && errors.recipe}
-                >
-                  {uniqueRecipes.length > 0 ? (
-                    uniqueRecipes.map((recipe, index) => (
-                      <option key={index} value={recipe}>
-                        {recipe}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>Please add recipes in the "Recipe Form"</option>
-                  )}
-                </TextField>
+              <TextField
+                fullWidth
+                variant="filled"
+                select
+                label="Recipe"
+                onBlur={handleBlur}
+                onChange={handleChange}
+                value={values.recipe}
+                name="recipe"
+                error={!!touched.recipe && !!errors.recipe}
+                helperText={touched.recipe && errors.recipe}
+                sx={{ gridColumn: "span 2" }}
+              >
+                {uniqueRecipes.length > 0 ? ( // Ensure unique recipes are available
+                  uniqueRecipes.map((recipe, index) => (
+                    <MenuItem key={index} value={recipe}>
+                      {recipe}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
+                )}
+              </TextField>
               </Grid>
 
               {/* Stock Amount */}
