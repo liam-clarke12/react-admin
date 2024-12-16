@@ -391,7 +391,7 @@ export const DataProvider = ({ children }) => {
   
         return updatedInventory;
       });
-    }, 20000);
+    }, 5000);
   };    
 
   const addStockUsageRow = (row) => {
@@ -475,7 +475,7 @@ export const DataProvider = ({ children }) => {
   
         return latestInventory;
       });
-    }, 20000);
+    }, 5000);
   };  
   
   const updateBarcodesAfterProcessing = useCallback(() => {
