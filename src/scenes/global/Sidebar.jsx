@@ -119,7 +119,7 @@ const Sidebar = () => {
                   >
                     Hupes
                   </Typography>
-                  <Typography variant="h5" color={colors.greenAccent[500]}>
+                  <Typography variant="h5" color={colors.blueAccent[500]}>
                     Admin
                   </Typography>
                 </Box>

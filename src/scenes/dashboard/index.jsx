@@ -79,7 +79,7 @@ const Dashboard = () => {
             increase={`${zeroStockPercentage}%`}
             icon={
               <EggAltIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.blueAccent[600], fontSize: "26px" }}
               />
             }
           />
@@ -103,7 +103,7 @@ const Dashboard = () => {
             increase="+21%"
             icon={
               <PointOfSaleIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.blueAccent[600], fontSize: "26px" }}
               />
             }
           />
@@ -127,7 +127,7 @@ const Dashboard = () => {
             increase="+5%"
             icon={
               <PersonAddIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.blueAccent[600], fontSize: "26px" }}
               />
             }
           />
@@ -150,7 +150,7 @@ const Dashboard = () => {
             progress="0"
             icon={
               <TextSnippetIcon
-                sx={{ color: colors.greenAccent[600], fontSize: "26px" }}
+                sx={{ color: colors.blueAccent[600], fontSize: "26px" }}
               />
             }
           />
@@ -188,7 +188,7 @@ const Dashboard = () => {
             <Box>
               <IconButton>
                 <DownloadOutlinedIcon
-                  sx={{ fontSize: "26px", color: colors.greenAccent[500] }}
+                  sx={{ fontSize: "26px", color: colors.blueAccent[500] }}
                 />
               </IconButton>
             </Box>
@@ -241,7 +241,7 @@ const Dashboard = () => {
                 </Box>
                 <Box>
                   <Typography
-                    color={colors.greenAccent[500]}
+                    color={colors.blueAccent[500]}
                     variant="h5"
                     fontWeight="600"
                   >

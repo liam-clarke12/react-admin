@@ -1,0 +1,216 @@
+/* Importing Google Fonts - Montserrat */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,0.100..900;1,100..900&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Montserrat", sans-serif;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #5F41E4; /* Light purple background */
+}
+
+#root {
+  width: 100%;
+  padding: 0.6rem;
+}
+
+.login-container {
+  margin: 0 auto;
+  max-width: 410px;
+  padding: 2rem 1.5rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.login-container .form-title {
+  text-align: center;
+  font-size: 1.37rem;
+  font-weight: 600;
+  margin-bottom: 1.87rem;
+  color: #000;
+  font-family: "Montserrat", sans-serif;
+}
+
+.login-container .social-login {
+  display: flex;
+  gap: 1.31rem;
+}
+
+.social-login .social-button {
+  display: flex;
+  gap: 0.81rem;
+  width: 100%;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.75rem 0;
+  border-radius: 0.31rem;
+  align-items: center;
+  justify-content: center;
+  background: #E6F1FF; /* Light blue background */
+  border: 1px solid #A3C8FF; /* Light blue border */
+  transition: 0.3s ease;
+  color: #000;
+}
+
+.social-login .social-button:hover {
+  border-color: #5F41E4; /* Blue hover border */
+  background: #D8E6FF; /* Lighter blue hover background */
+}
+
+.social-login .social-button .social-icon {
+  width: 23px;
+}
+
+.login-container .separator {
+  position: relative;
+  margin: 1.5rem 0;
+  text-align: center;
+  background: #fff;
+}
+
+.login-container .separator span {
+  z-index: 1;
+  font-weight: 500;
+  color: #3B73D1; /* Blue separator text */
+  position: relative;
+  background: #fff;
+  font-size: 1.06rem;
+  padding: 0 0.9rem;
+}
+
+.login-container .separator::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1px;
+  width: 100%;
+  background: #A3C8FF; /* Light blue separator line */
+}
+
+.login-form .input-wrapper {
+  height: 54px;
+  width: 100%;
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.login-form .input-field {
+  width: 100%;
+  height: 100%;
+  outline: none;
+  font-size: 1.06rem;
+  border-radius: 0.31rem;
+  border: 1px solid #A3C8FF; /* Light blue border */
+  padding: 0px 1.25rem 0 3.12rem;
+  transition: 0.2s ease;
+}
+
+.login-form .input-field:focus {
+  border-color: #5F41E4; /* Focused blue border */
+}
+
+.login-form .input-field::placeholder {
+  color: #A3B8D9; /* Lighter blue placeholder */
+}
+
+.login-form .input-wrapper i {
+  position: absolute;
+  top: 50%;
+  height: 100%;
+  display: flex;
+  color: #5D88C4; /* Medium blue icon color */
+  align-items: center;
+  transform: translateY(-50%);
+  transition: 0.2s ease;
+}
+
+.login-form .input-wrapper i:not(.eye-icon) {
+  left: 0.93rem;
+  pointer-events: none;
+}
+
+.login-form .input-field:focus ~ i:not(.eye-icon) {
+  color: #5F41E4; /* Focused icon color */
+}
+
+.login-form .input-wrapper i.eye-icon {
+  display: none;
+  right: 0.93rem;
+  color: #5D88C4; /* Medium blue eye icon color */
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+
+.login-form .input-wrapper .input-field:valid ~ .eye-icon {
+  display: flex;
+}
+
+.login-form .forgot-password-link {
+  display: block;
+  margin-top: 0.8rem;
+  text-align: left;
+  font-size: 1rem;
+  color: #5F41E4; /* Blue forgot password link */
+  cursor: pointer;
+}
+
+.login-form .login-button {
+  border: none;
+  outline: none;
+  width: 100%;
+  height: 54px;
+  color: #fff;
+  font-size: 1.125rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 2.19rem;
+  border-radius: 0.31rem;
+  background: #868dfb; /* Lighter blue login button */
+  transition: 0.3s ease;
+}
+
+.login-form .login-button:hover {
+  background: #5F41E4; /* Darker blue on hover */
+}
+
+/* Ensure the Signup prompt text is visible and well-spaced */
+.login-container .signup-prompt {
+    text-align: center;
+    font-size: 1.06rem;
+    font-weight: 500;
+    margin: 1.75rem 0 0.31rem;
+    color: #3B73D1; /* Blue signup prompt */
+  }
+  
+  /* Signup link styling */
+  .login-container .signup-link {
+    color: #5F41E4; /* Blue signup link */
+    font-weight: 500;
+    cursor: pointer;
+  }
+  
+  .login-container .signup-prompt {
+    display: block;
+    margin-top: 1.75rem; /* Adjust spacing to ensure the prompt is visible */
+    color: #000;
+  }
+  
+  .login-container a {
+    color: #5F41E4; /* Blue links */
+    font-weight: 500;
+    text-decoration: none;
+  }
+  
+  .login-container a:hover {
+    text-decoration: underline;
+  }
