@@ -14,7 +14,7 @@ import GoodsInForm from "./scenes/form/GoodsIn";
 import GoodsOutForm from "./scenes/form/GoodsOut";
 import RecipeForm from "./scenes/form/Recipes";
 import ProductionLogForm from "./scenes/form/ProductionLog";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "./contexts/DataContext";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import LoginPage from "./login-signup/LoginPage";
