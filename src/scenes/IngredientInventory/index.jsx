@@ -1,4 +1,4 @@
-import { Box, useTheme, Button, Drawer, Typography, IconButton } from "@mui/material";
+import { Box, useTheme, Button, Drawer, Typography, IconButton, Snackbar, useMediaQuery } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
@@ -13,6 +13,27 @@ const IngredientsInventory = () => {
   const colors = tokens(theme.palette.mode);
   const { ingredientInventory, setIngredientInventory } = useData(); // Use setIngredientInventory from context
   const [drawerOpen, setDrawerOpen] = useState(false); // State to handle drawer visibility
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Load from localStorage on initial render
+  useEffect(() => {
+    try {
+      const storedData = localStorage.getItem("ingredientInventory");
+      if (storedData) {
+        setIngredientInventory(JSON.parse(storedData));
+      }
+    } catch (error) {
+      console.error("Error reading localStorage:", error);
+    }
+  }, [setIngredientInventory]);
+
+  // Sync state with localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("ingredientInventory", JSON.stringify(ingredientInventory));
+  }, [ingredientInventory]);
 
   const columns = [
     { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
@@ -28,18 +49,11 @@ const IngredientsInventory = () => {
     },
   ];
 
-  // Load from localStorage on initial render
-  useEffect(() => {
-    const storedData = localStorage.getItem("ingredientInventory");
-    if (storedData) {
-      setIngredientInventory(JSON.parse(storedData));
-    }
-  }, [setIngredientInventory]);
-
   const handleClearStorage = () => {
-    localStorage.removeItem("ingredientInventory"); // Remove specific item
-    localStorage.clear("ingredientInventory"); // Remove specific item
+    localStorage.removeItem("ingredientInventory");
     setIngredientInventory([]); // Reset the state
+    setSnackbarMessage("Data cleared successfully!");
+    setOpenSnackbar(true); // Show Snackbar confirmation
   };
 
   const handleRowEdit = (newRow, oldRow) => {
@@ -72,6 +86,7 @@ const IngredientsInventory = () => {
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <IconButton
           onClick={() => setDrawerOpen(true)}
+          aria-label="Open Bar Chart"
           sx={{
             color: colors.greenAccent[300], // No background, only color change
             "&:hover": {
@@ -122,6 +137,7 @@ const IngredientsInventory = () => {
         }}
       >
         <DataGrid
+          autoHeight
           checkboxSelection
           rows={ingredientInventory.map((row, index) => ({
             ...row,
@@ -129,6 +145,8 @@ const IngredientsInventory = () => {
             rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
           }))}
           columns={columns}
+          pageSize={10}  // Enable pagination
+          rowsPerPageOptions={[5, 10, 20]}  // Allow users to select page size
           processRowUpdate={handleRowEdit}
           getRowClassName={(params) => 
             params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
@@ -138,14 +156,14 @@ const IngredientsInventory = () => {
 
       {/* Drawer for Bar Chart */}
       <Drawer
-        anchor="right"
+        anchor={isMobile ? "bottom" : "right"} // Adjust position on mobile
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
           sx: {
-            width: "90%", // Increased width of the drawer
-            borderRadius: "20px 0 0 20px", // Rounded top-left and bottom-left corners
-            overflow: "hidden", // Ensure content fits inside the curved drawer
+            width: isMobile ? "100%" : "90%",
+            borderRadius: "20px 0 0 20px",
+            overflow: "hidden",
           },
         }}
       >
@@ -202,6 +220,14 @@ const IngredientsInventory = () => {
           </Box>
         </Box>
       </Drawer>
+
+      {/* Snackbar for Clear Storage */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setOpenSnackbar(false)}
+        message={snackbarMessage}
+      />
     </Box>
   );
 };

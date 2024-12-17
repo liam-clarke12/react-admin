@@ -1,18 +1,28 @@
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Button, TextField, Snackbar, Alert } from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from '../../../components/Header';
 import { useData } from '../../../contexts/DataContext'; // Import the DataContext
+import { useState } from "react"; // Import useState to manage Snackbar state
 
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
-  const { addGoodsInRow } = useData(); // Get the addGoodsInRow function from context
-
+  const { addGoodsInRow } = useData();
+  
+  // Snackbar state to show success message
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  
   const handleFormSubmit = (values, { resetForm }) => {
-    console.log("Submitting Values:", values); // Debugging log
-    addGoodsInRow(values); // Call the function to add row
-    resetForm(); // Reset the form after submission
+    console.log("Submitting Values:", values);
+    addGoodsInRow(values);
+    resetForm();
+    setOpenSnackbar(true); // Open Snackbar on successful submit
+  };
+
+  // Close Snackbar
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -71,7 +81,7 @@ const GoodsInForm = () => {
                 fullWidth
                 variant="filled"
                 type="number"
-                label="Stock Received (kg)"
+                label="Stock Received"
                 onBlur={handleBlur}
                 onChange={handleChange}
                 value={values.stockReceived}
@@ -115,6 +125,18 @@ const GoodsInForm = () => {
           </form>
         )}
       </Formik>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success">
+          Stock has been successfully recorded!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
@@ -122,7 +144,10 @@ const GoodsInForm = () => {
 const goodsInSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   ingredient: yup.string().required("Ingredient is required"),
-  stockReceived: yup.number().required("Stock amount is required").positive("Must be positive"),
+  stockReceived: yup
+    .number()
+    .required("Stock amount is required")
+    .positive("Must be positive"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
 });
@@ -132,7 +157,7 @@ const initialValues = {
   ingredient: "",
   stockReceived: "",
   barCode: "",
-  expiryDate: "", // New field for Expiry Date
+  expiryDate: "",
 };
 
 export default GoodsInForm;

@@ -1,11 +1,13 @@
-import { Box, Button, TextField, Grid } from "@mui/material";
+import { Box, Button, TextField, Grid, Snackbar, Alert } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
 import Header from '../../../components/Header';
 import { useData } from '../../../contexts/DataContext'; // Import useData hook
+import { useState } from 'react'; // Import useState to manage Snackbar state
 
 const RecipeForm = () => {
   const { addRow } = useData(); // Get addRow function from context
+  const [openSnackbar, setOpenSnackbar] = useState(false); // Snackbar state
 
   const handleFormSubmit = (values, { resetForm }) => {
     // Structure ingredients and quantities as arrays
@@ -21,6 +23,14 @@ const RecipeForm = () => {
 
     // Reset the form after submission
     resetForm();
+
+    // Open Snackbar on successful submit
+    setOpenSnackbar(true);
+  };
+
+  // Close Snackbar
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -136,6 +146,18 @@ const RecipeForm = () => {
           </form>
         )}
       </Formik>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success">
+          Recipe has been successfully recorded!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

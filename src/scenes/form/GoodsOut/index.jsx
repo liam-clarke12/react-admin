@@ -1,16 +1,26 @@
-import { Box, Button, TextField, Grid, MenuItem } from "@mui/material";
+import { Box, Button, TextField, Grid, MenuItem, Snackbar, Alert } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
 import Header from "../../../components/Header";
 import { useData } from "../../../contexts/DataContext";
+import { useState } from "react"; // Import useState to manage Snackbar state
 
 const GoodsOutForm = () => {
   const { addGoodsOutRow, rows } = useData();
   const uniqueRecipes = [...new Set(rows.map((row) => row.recipe))];
-
+  
+  // Snackbar state to show success message
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  
   const handleFormSubmit = (values, { resetForm }) => {
     addGoodsOutRow(values);
     resetForm();
+    setOpenSnackbar(true); // Open Snackbar on successful submit
+  };
+
+  // Close Snackbar
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -50,29 +60,29 @@ const GoodsOutForm = () => {
 
               {/* Recipe */}
               <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                variant="filled"
-                select
-                label="Recipe"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.recipe}
-                name="recipe"
-                error={!!touched.recipe && !!errors.recipe}
-                helperText={touched.recipe && errors.recipe}
-                sx={{ gridColumn: "span 2" }}
-              >
-                {uniqueRecipes.length > 0 ? ( // Ensure unique recipes are available
-                  uniqueRecipes.map((recipe, index) => (
-                    <MenuItem key={index} value={recipe}>
-                      {recipe}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
-                )}
-              </TextField>
+                <TextField
+                  fullWidth
+                  variant="filled"
+                  select
+                  label="Recipe"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.recipe}
+                  name="recipe"
+                  error={!!touched.recipe && !!errors.recipe}
+                  helperText={touched.recipe && errors.recipe}
+                  sx={{ gridColumn: "span 2" }}
+                >
+                  {uniqueRecipes.length > 0 ? (
+                    uniqueRecipes.map((recipe, index) => (
+                      <MenuItem key={index} value={recipe}>
+                        {recipe}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
+                  )}
+                </TextField>
               </Grid>
 
               {/* Stock Amount */}
@@ -91,8 +101,8 @@ const GoodsOutForm = () => {
                 />
               </Grid>
 
-             {/* Recipients */}
-             <Grid item xs={12}>
+              {/* Recipients */}
+              <Grid item xs={12}>
                 <FieldArray name="recipients">
                   {({ push, remove }) => (
                     <>
@@ -147,6 +157,18 @@ const GoodsOutForm = () => {
           </form>
         )}
       </Formik>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success">
+          Goods Out has been successfully recorded!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

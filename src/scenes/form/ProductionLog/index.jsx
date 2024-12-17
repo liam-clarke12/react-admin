@@ -1,9 +1,10 @@
-import { Box, Button, TextField, MenuItem } from "@mui/material";
+import { Box, Button, TextField, MenuItem, Snackbar, Alert } from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from '../../../components/Header';
 import { useData } from '../../../contexts/DataContext'; // Use the custom hook for DataContext
+import { useState } from 'react'; // Import useState to manage Snackbar state
 
 const ProductionLogForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
@@ -12,10 +13,19 @@ const ProductionLogForm = () => {
   // Create a unique list of recipe names from rows
   const uniqueRecipes = [...new Set(rows.map(row => row.recipe))];
 
+  // Snackbar state to show success message
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+
   const handleFormSubmit = (values, { resetForm }) => {
     console.log("Submitting Values:", values);
     addProductionLogRow(values); // Submit the production log data
     resetForm(); // Reset the form after submission
+    setOpenSnackbar(true); // Open Snackbar on successful submit
+  };
+
+  // Close Snackbar
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -115,6 +125,18 @@ const ProductionLogForm = () => {
           </form>
         )}
       </Formik>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success">
+          Production log form has been successfully recorded!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

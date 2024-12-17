@@ -31,6 +31,7 @@ const Dashboard = () => {
     <Box m="20px">
       {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
+        {/* Add any header content here if needed */}
       </Box>
 
       {/* GRID & CHARTS */}
@@ -39,6 +40,23 @@ const Dashboard = () => {
         gridTemplateColumns="repeat(12, 1fr)"
         gridAutoRows="minmax(140px, auto)"
         gap="20px"
+        sx={{
+          // Mobile-first: single column layout for smaller screens
+          '@media (max-width: 600px)': {
+            gridTemplateColumns: 'repeat(1, 1fr)',
+            gap: '10px', // Smaller gap on mobile
+          },
+          // Tablets or larger devices: 2 columns
+          '@media (min-width: 600px) and (max-width: 960px)': {
+            gridTemplateColumns: 'repeat(6, 1fr)',
+            gap: '15px',
+          },
+          // Larger screens: 4 columns
+          '@media (min-width: 960px)': {
+            gridTemplateColumns: 'repeat(12, 1fr)',
+            gap: '20px',
+          },
+        }}
       >
         {/* ROW 1 */}
         <Box
@@ -47,6 +65,12 @@ const Dashboard = () => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          sx={{
+            // Mobile first: full width for small screens
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <StatBox
             title={`${zeroStockCount}`}
@@ -66,6 +90,11 @@ const Dashboard = () => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          sx={{
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <StatBox
             title="431,225"
@@ -85,6 +114,11 @@ const Dashboard = () => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          sx={{
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <StatBox
             title="32,441"
@@ -104,6 +138,11 @@ const Dashboard = () => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          sx={{
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <StatBox
             title={`${recipeCount}`}
@@ -124,6 +163,11 @@ const Dashboard = () => {
           backgroundColor={colors.primary[400]}
           height="94%"
           overflow="auto"
+          sx={{
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <Box
             mt="25px"
@@ -165,6 +209,11 @@ const Dashboard = () => {
           height ="94%"
           backgroundColor={colors.primary[400]}
           overflow="auto"
+          sx={{
+            '@media (max-width: 600px)': {
+              gridColumn: 'span 12',
+            },
+          }}
         >
           <Box
             display="flex"

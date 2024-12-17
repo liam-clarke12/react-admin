@@ -150,22 +150,15 @@ const GoodsIn = () => {
   };
 
   const handleDeleteSelectedRows = () => {
-    // Debugging: Log the current state of rows and selected IDs
-    console.log("Selected Rows for Deletion:", selectedRows);
-    console.log("Current Goods In Rows:", goodsInRows);
-  
     // Remove selected rows
     const remainingRows = goodsInRows.filter(
       (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`)
     );
-  
-    // Debugging: Log the remaining rows after filtering
-    console.log("Remaining Rows After Deletion:", remainingRows);
-  
+
     setGoodsInRows(remainingRows);
     localStorage.setItem("goodsInRows", JSON.stringify(remainingRows));
     setSelectedRows([]); // Clear selected rows
-  
+
     // Update ingredient inventory
     const updatedInventory = ingredientInventory.map((item) => {
       const matchingRow = goodsInRows.find(
@@ -177,10 +170,10 @@ const GoodsIn = () => {
         ? { ...item, amount: Math.max(0, item.amount - matchingRow.stockRemaining) }
         : item;
     });
-  
+
     setIngredientInventory(updatedInventory);
   };
-  
+
   const handleOpenConfirmDialog = () => {
     setOpenConfirmDialog(true);
   };
@@ -256,10 +249,10 @@ const GoodsIn = () => {
 
       <Box
         m="40px 0 0 0"
-        height="75vh"
         sx={{
+          height: "75vh",
           overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+          "& .MuiDataGrid-root": { border: "none" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
           "& .barCode-column--cell": { color: colors.greenAccent[300] },
           "& .MuiDataGrid-columnHeaders": {
@@ -283,6 +276,10 @@ const GoodsIn = () => {
           "& .expired-row": {
             backgroundColor: colors.red[500],
           },
+          // Responsive breakpoints
+          "@media (max-width: 600px)": {
+            "& .MuiDataGrid-root": { minWidth: "100%" },
+          },
         }}
       >
         <DataGrid
@@ -300,6 +297,10 @@ const GoodsIn = () => {
             const isEvenRow = rowIndex % 2 === 0;
             return isExpired ? "expired-row" : isEvenRow ? "even-row" : "odd-row";
           }}
+          pagination
+          pageSize={10}
+          rowsPerPageOptions={[5, 10, 25]}
+          virtualScrolling
           experimentalFeatures={{ newEditingApi: true }}
         />
       </Box>
