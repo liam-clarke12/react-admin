@@ -344,6 +344,12 @@ export const DataProvider = ({ children }) => {
               quantity: item.quantity - (log.stockAmount - remainingAmount), // Update quantity
               batchCode: nextBatch.batchCode, // Update batch code
             };
+          } else {
+            // If no remaining stock, set the quantity to 0, but keep the recipe in inventory
+            return {
+              ...item,
+              quantity: 0, // Set quantity to 0 instead of removing the recipe
+            };
           }
         }
         return item;
