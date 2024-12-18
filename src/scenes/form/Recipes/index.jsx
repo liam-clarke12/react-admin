@@ -1,9 +1,10 @@
-import { Box, Button, TextField, Grid, Snackbar, Alert } from "@mui/material";
+import { Box, Button, TextField, Grid, Snackbar, Alert, Fab } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
-import Header from '../../../components/Header';
-import { useData } from '../../../contexts/DataContext'; // Import useData hook
-import { useState } from 'react'; // Import useState to manage Snackbar state
+import Header from "../../../components/Header";
+import { useData } from "../../../contexts/DataContext"; // Import useData hook
+import { useState } from "react"; // Import useState to manage Snackbar state
+import AddIcon from "@mui/icons-material/Add"; // Import Add Icon for the FAB
 
 const RecipeForm = () => {
   const { addRow } = useData(); // Get addRow function from context
@@ -11,8 +12,8 @@ const RecipeForm = () => {
 
   const handleFormSubmit = (values, { resetForm }) => {
     // Structure ingredients and quantities as arrays
-    const ingredients = values.ingredients.map(ing => ing.name);
-    const quantities = values.ingredients.map(ing => ing.quantity);
+    const ingredients = values.ingredients.map((ing) => ing.name);
+    const quantities = values.ingredients.map((ing) => ing.quantity);
 
     // Add the structured data to rows, keeping ingredients and quantities as arrays
     addRow({
@@ -64,7 +65,7 @@ const RecipeForm = () => {
                   name="recipe"
                   error={!!(touched.recipe && errors.recipe)}
                   helperText={touched.recipe && errors.recipe}
-                  sx={{ borderRadius: '8px' }} // Custom border radius for Recipe field
+                  sx={{ borderRadius: "8px" }} // Custom border radius for Recipe field
                 />
               </Grid>
 
@@ -74,7 +75,13 @@ const RecipeForm = () => {
                     {({ push, remove }) => (
                       <>
                         {values.ingredients.map((ingredient, index) => (
-                          <Grid container spacing={2} key={index} alignItems="center" sx={{ mt: index > 0 ? 1 : 0 }}>
+                          <Grid
+                            container
+                            spacing={2}
+                            key={index}
+                            alignItems="center"
+                            sx={{ mt: index > 0 ? 1 : 0 }}
+                          >
                             <Grid item xs={12} sm={5}>
                               <TextField
                                 fullWidth
@@ -87,7 +94,7 @@ const RecipeForm = () => {
                                 value={ingredient.name}
                                 error={!!(touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name)}
                                 helperText={touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name}
-                                sx={{ borderRadius: '8px' }} // Custom border radius for Ingredient field
+                                sx={{ borderRadius: "8px" }} // Custom border radius for Ingredient field
                               />
                             </Grid>
                             <Grid item xs={12} sm={5}>
@@ -102,7 +109,7 @@ const RecipeForm = () => {
                                 value={ingredient.quantity}
                                 error={!!(touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity)}
                                 helperText={touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity}
-                                sx={{ borderRadius: '8px' }} // Custom border radius for Quantity field
+                                sx={{ borderRadius: "8px" }} // Custom border radius for Quantity field
                               />
                             </Grid>
                             <Grid item xs={12} sm={2}>
@@ -120,10 +127,15 @@ const RecipeForm = () => {
                           <Button
                             type="button"
                             color="secondary"
-                            variant="contained"
+                            variant="text"
                             onClick={() => push({ name: "", quantity: "" })}
+                            sx={{
+                              fontWeight: "normal", // Default font weight for text
+                              display: "inline-flex",
+                              alignItems: "center",
+                            }}
                           >
-                            Add Ingredient
+                            <strong style={{ marginRight: "8px" }}>+</strong> Add Ingredient
                           </Button>
                         </Box>
                       </>
@@ -134,13 +146,22 @@ const RecipeForm = () => {
 
               {/* Full-width Box to align the button to the right */}
               <Box display="flex" justifyContent="flex-end" mt="20px" width="100%">
-                <Button
-                  type="submit"
+                <Fab
                   color="secondary"
-                  variant="contained"
+                  onClick={handleSubmit} // Submit the form when FAB is clicked
+                  sx={{
+                    position: "fixed",
+                    bottom: "20px",
+                    right: "20px",
+                    zIndex: 10,
+                    transition: "transform 0.3s",
+                    "&:hover": {
+                      transform: "scale(1.1)",
+                    },
+                  }}
                 >
-                  Record Recipe
-                </Button>
+                  <AddIcon fontSize="large" />
+                </Fab>
               </Box>
             </Grid>
           </form>

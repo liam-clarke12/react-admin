@@ -1,10 +1,11 @@
-import { Box, Button, TextField, Snackbar, Alert } from "@mui/material";
+import { Box, TextField, Snackbar, Alert, Fab } from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import Header from '../../../components/Header';
-import { useData } from '../../../contexts/DataContext'; // Import the DataContext
+import Header from "../../../components/Header";
+import { useData } from "../../../contexts/DataContext"; // Import the DataContext
 import { useState } from "react"; // Import useState to manage Snackbar state
+import AddIcon from "@mui/icons-material/Add"; // Import Add Icon for the FAB
 
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
@@ -117,10 +118,25 @@ const GoodsInForm = () => {
                 sx={{ gridColumn: "span 2" }}
               />
             </Box>
-            <Box display="flex" justifyContent="end" mt="20px">
-              <Button type="submit" color="secondary" variant="contained">
-                Record Stock In
-              </Button>
+
+            {/* Floating Action Button (FAB) for form submission */}
+            <Box display="flex" justifyContent="center" mt="20px" sx={{ position: "relative" }}>
+              <Fab
+                color="secondary"
+                onClick={handleSubmit} // Submit the form when FAB is clicked
+                sx={{
+                  position: "fixed",
+                  bottom: "20px",
+                  right: "20px",
+                  zIndex: 10,
+                  transition: "transform 0.3s",
+                  "&:hover": {
+                    transform: "scale(1.1)",
+                  },
+                }}
+              >
+                <AddIcon fontSize="large" />
+              </Fab>
             </Box>
           </form>
         )}

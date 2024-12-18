@@ -1,17 +1,18 @@
-import { Box, Button, TextField, MenuItem, Snackbar, Alert } from "@mui/material";
+import { Box, TextField, MenuItem, Snackbar, Alert, Fab } from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import Header from '../../../components/Header';
-import { useData } from '../../../contexts/DataContext'; // Use the custom hook for DataContext
-import { useState } from 'react'; // Import useState to manage Snackbar state
+import Header from "../../../components/Header";
+import { useData } from "../../../contexts/DataContext"; // Use the custom hook for DataContext
+import { useState } from "react"; // Import useState to manage Snackbar state
+import AddIcon from "@mui/icons-material/Add"; // Import Add Icon for the FAB
 
 const ProductionLogForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { addProductionLogRow, rows } = useData(); // Use the context to get rows (recipes)
 
   // Create a unique list of recipe names from rows
-  const uniqueRecipes = [...new Set(rows.map(row => row.recipe))];
+  const uniqueRecipes = [...new Set(rows.map((row) => row.recipe))];
 
   // Snackbar state to show success message
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -117,10 +118,25 @@ const ProductionLogForm = () => {
                 sx={{ gridColumn: "span 2" }}
               />
             </Box>
-            <Box display="flex" justifyContent="end" mt="20px">
-              <Button type="submit" color="secondary" variant="contained">
-                Record Production
-              </Button>
+
+            {/* Floating Action Button to submit */}
+            <Box display="flex" justifyContent="flex-end" mt={3}>
+              <Fab
+                color="secondary"
+                onClick={handleSubmit}
+                sx={{
+                  position: "fixed",
+                  bottom: "20px",
+                  right: "20px",
+                  zIndex: 10,
+                  transition: "transform 0.3s",
+                  "&:hover": {
+                    transform: "scale(1.1)",
+                  },
+                }}
+              >
+                <AddIcon />
+              </Fab>
             </Box>
           </form>
         )}

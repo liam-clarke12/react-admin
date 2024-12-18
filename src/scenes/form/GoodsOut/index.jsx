@@ -1,24 +1,23 @@
-import { Box, Button, TextField, Grid, MenuItem, Snackbar, Alert } from "@mui/material";
+import { Box, TextField, Grid, MenuItem, Snackbar, Alert, Fab, Typography, Button } from "@mui/material";
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
 import Header from "../../../components/Header";
 import { useData } from "../../../contexts/DataContext";
-import { useState } from "react"; // Import useState to manage Snackbar state
+import { useState } from "react";
+import AddIcon from '@mui/icons-material/Add';  // Import the "+" icon
 
 const GoodsOutForm = () => {
   const { addGoodsOutRow, rows } = useData();
   const uniqueRecipes = [...new Set(rows.map((row) => row.recipe))];
   
-  // Snackbar state to show success message
   const [openSnackbar, setOpenSnackbar] = useState(false);
   
   const handleFormSubmit = (values, { resetForm }) => {
     addGoodsOutRow(values);
     resetForm();
-    setOpenSnackbar(true); // Open Snackbar on successful submit
+    setOpenSnackbar(true);
   };
 
-  // Close Snackbar
   const handleCloseSnackbar = () => {
     setOpenSnackbar(false);
   };
@@ -134,14 +133,21 @@ const GoodsOutForm = () => {
                         </Grid>
                       ))}
                       <Box mt={2}>
-                        <Button
-                          type="button"
+                        <Typography
+                          variant="body1"
                           color="secondary"
-                          variant="contained"
+                          sx={{
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            fontWeight: '500',
+                            '&:hover': {
+                              textDecoration: 'underline',
+                            },
+                          }}
                           onClick={() => push("")}
                         >
-                          Add Recipient
-                        </Button>
+                          <strong style={{ fontWeight: 'bold' }}>+</strong> Add Recipient {/* Make only the "+" bold */}
+                        </Typography>
                       </Box>
                     </>
                   )}
@@ -150,9 +156,22 @@ const GoodsOutForm = () => {
             </Grid>
 
             <Box display="flex" justifyContent="flex-end" mt={3}>
-              <Button type="submit" color="secondary" variant="contained">
-                Record Stock Out
-              </Button>
+              <Fab
+                color="secondary"
+                onClick={handleSubmit}
+                sx={{
+                  position: 'fixed',
+                  bottom: '20px',
+                  right: '20px',
+                  zIndex: 10,
+                  transition: 'transform 0.3s',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                  },
+                }}
+              >
+                <AddIcon />
+              </Fab>
             </Box>
           </form>
         )}
