@@ -153,11 +153,11 @@ const goodsInSchema = yup.object().shape({
 });
 
 const initialValues = {
-  date: "",
+  date: "...",
   ingredient: "",
   stockReceived: "",
   barCode: "",
-  expiryDate: "",
+  expiryDate: "...",
 };
 
 export default GoodsInForm;

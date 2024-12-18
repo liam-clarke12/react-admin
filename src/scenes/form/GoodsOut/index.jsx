@@ -184,7 +184,7 @@ const goodsOutSchema = yup.object().shape({
 });
 
 const initialValues = {
-  date: "",
+  date: "...",
   recipe: "",
   stockAmount: "",
   recipients: [""],
