@@ -137,7 +137,7 @@ const Topbar = () => {
             >
                 <Box minWidth={300}>
                     {/* Header Section with full-width green background */}
-                    <Box sx={{ backgroundColor: colors.greenAccent[500], px: 2, py: 1 }}>
+                    <Box sx={{ backgroundColor: colors.blueAccent[500], px: 2, py: 1 }}>
                         <Typography variant="body2" fontWeight="bold">Notifications</Typography>
                     </Box>
 
@@ -161,7 +161,7 @@ const Topbar = () => {
                                                 <IconButton 
                                                     onClick={handleNotificationClick}
                                                     sx={{
-                                                        color: colors.greenAccent[500],
+                                                        color: colors.blueAccent[500],
                                                         padding: 0
                                                     }}
                                                 >

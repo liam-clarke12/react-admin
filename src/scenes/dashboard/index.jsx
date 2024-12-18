@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { tokens } from "../../themes";
+import Header from "../../components/Header";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
@@ -29,9 +30,8 @@ const Dashboard = () => {
 
   return (
     <Box m="20px">
-      {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        {/* Add any header content here if needed */}
+        <Header title="DASHBOARD" subtitle="Welcome to your Dashboard" />
       </Box>
 
       {/* GRID & CHARTS */}
@@ -223,7 +223,7 @@ const Dashboard = () => {
             p="15px"
           >
             <Typography color={colors.grey[100]} variant="h5" fontWeight="600">
-              Ingredient Inventory
+              Recent Goods Out
             </Typography>
           </Box>
           <Box height="280px" overflow="auto">
