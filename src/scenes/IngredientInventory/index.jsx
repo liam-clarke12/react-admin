@@ -88,7 +88,7 @@ const IngredientsInventory = () => {
           onClick={() => setDrawerOpen(true)}
           aria-label="Open Bar Chart"
           sx={{
-            color: colors.greenAccent[300], // No background, only color change
+            color: colors.blueAccent[300], // No background, only color change
             "&:hover": {
               backgroundColor: "transparent", // Transparent background on hover
               color: colors.blueAccent[700], // Color change on hover
@@ -112,7 +112,7 @@ const IngredientsInventory = () => {
             borderBottom: "none",
           },
           "& .barCode-column--cell": {
-            color: colors.greenAccent[300], // Set color for barcode
+            color: colors.blueAccent[300], // Set color for barcode
           },
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: colors.blueAccent[700],
@@ -126,7 +126,7 @@ const IngredientsInventory = () => {
             backgroundColor: colors.blueAccent[700],
           },
           "& .MuiCheckbox-root": {
-            color: `${colors.greenAccent[200]} !important`,
+            color: `${colors.blueAccent[200]} !important`,
           },
           "& .even-row": {
             backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)

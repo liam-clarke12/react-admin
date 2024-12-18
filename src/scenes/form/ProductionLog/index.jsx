@@ -56,7 +56,7 @@ const ProductionLogForm = () => {
             >
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="date"
                 label="Date"
                 onBlur={handleBlur}
@@ -69,7 +69,7 @@ const ProductionLogForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 select
                 label="Recipe Name"
                 onBlur={handleBlur}
@@ -92,7 +92,7 @@ const ProductionLogForm = () => {
               </TextField>
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="number"
                 label="Batches Produced"
                 onBlur={handleBlur}
@@ -105,7 +105,7 @@ const ProductionLogForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="text"
                 label="Batch Code"
                 onBlur={handleBlur}

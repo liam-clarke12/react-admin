@@ -22,7 +22,7 @@ const Recipes = () => {
       flex: 1,
       renderCell: (params) => (
         <span
-          style={{ cursor: "pointer", color: colors.greenAccent[500] }} // Updated color
+          style={{ cursor: "pointer", color: colors.blueAccent[500] }} // Updated color
           onClick={() => handleDrawerOpen("Ingredients", params.row.ingredients)}
         >
           Show Ingredients
@@ -35,7 +35,7 @@ const Recipes = () => {
       flex: 1,
       renderCell: (params) => (
         <span
-          style={{ cursor: "pointer", color: colors.greenAccent[500] }} // Updated color
+          style={{ cursor: "pointer", color: colors.blueAccent[500] }} // Updated color
           onClick={() =>
             handleDrawerOpen(
               "Quantities",
@@ -117,7 +117,7 @@ const Recipes = () => {
           <Box
             sx={{
               width: "100%",
-              backgroundColor: colors.greenAccent[500],
+              backgroundColor: colors.blueAccent[500],
               color: colors.grey[100],
               padding: "10px",
               display: "flex",

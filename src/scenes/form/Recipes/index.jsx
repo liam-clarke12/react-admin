@@ -55,7 +55,7 @@ const RecipeForm = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  variant="filled"
+                  variant="outlined"
                   type="text"
                   label="Recipe"
                   onBlur={handleBlur}
@@ -78,7 +78,7 @@ const RecipeForm = () => {
                             <Grid item xs={12} sm={5}>
                               <TextField
                                 fullWidth
-                                variant="filled"
+                                variant="outlined"
                                 type="text"
                                 label="Ingredient"
                                 name={`ingredients.${index}.name`}
@@ -93,7 +93,7 @@ const RecipeForm = () => {
                             <Grid item xs={12} sm={5}>
                               <TextField
                                 fullWidth
-                                variant="filled"
+                                variant="outlined"
                                 type="number"
                                 label="Quantity per Batch (kg)"
                                 name={`ingredients.${index}.quantity`}

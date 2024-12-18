@@ -222,7 +222,7 @@ const GoodsIn = () => {
             position: "absolute",
             top: 0,
             right: 0,
-            color: colors.greenAccent[500],
+            color: colors.blueAccent[500],
             ...(selectedRows.length === 0 && { opacity: 0.5 }),
           }}
           disabled={selectedRows.length === 0}
@@ -238,7 +238,7 @@ const GoodsIn = () => {
           Deleting this row(s) will remove "Stock Remaining" from the Ingredients Inventory!
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.greenAccent[500] }}>
+          <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.blueAccent[500] }}>
             Cancel
           </Button>
           <Button onClick={handleConfirmDelete} color="error">
@@ -254,7 +254,7 @@ const GoodsIn = () => {
           overflowX: "auto",
           "& .MuiDataGrid-root": { border: "none" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .barCode-column--cell": { color: colors.greenAccent[300] },
+          "& .barCode-column--cell": { color: colors.blueAccent[300] },
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: colors.blueAccent[700],
             borderBottom: "none",
@@ -265,7 +265,7 @@ const GoodsIn = () => {
             backgroundColor: colors.blueAccent[700],
           },
           "& .MuiCheckbox-root": {
-            color: `${colors.greenAccent[200]} !important`,
+            color: `${colors.blueAccent[200]} !important`,
           },
           "& .even-row": {
             backgroundColor: colors.primary[450],

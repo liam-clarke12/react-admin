@@ -92,7 +92,7 @@ const GoodsOut = () => {
     
         return (
           <span
-            style={{ cursor: "pointer", color: colors.greenAccent[500] }}
+            style={{ cursor: "pointer", color: colors.blueAccent[500] }}
             onClick={() => handleDrawerOpen("Batchcodes", batchcodes)}
           >
             Show Batchcodes
@@ -174,7 +174,7 @@ const GoodsOut = () => {
             <Box
               sx={{
                 width: "100%",
-                backgroundColor: colors.greenAccent[500],
+                backgroundColor: colors.blueAccent[500],
                 color: colors.grey[100],
                 padding: "10px",
                 display: "flex",

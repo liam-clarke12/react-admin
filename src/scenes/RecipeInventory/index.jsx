@@ -52,7 +52,7 @@ const RecipeInventory = () => {
         <IconButton
           onClick={() => setDrawerOpen(true)}
           sx={{
-            color: colors.greenAccent[300], // No background, only color change
+            color: colors.blueAccent[300], // No background, only color change
             "&:hover": {
               backgroundColor: "transparent", // Transparent background on hover
               color: colors.blueAccent[700], // Color change on hover
@@ -74,7 +74,7 @@ const RecipeInventory = () => {
           "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
           "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
-          "& .MuiCheckbox-root": { color: `${colors.greenAccent[200]} !important` },
+          "& .MuiCheckbox-root": { color: `${colors.blueAccent[200]} !important` },
 
           // Alternating row colors
           "& .even-row": {
@@ -120,7 +120,7 @@ const RecipeInventory = () => {
             sx={{
               width: "100%",
               height: "50px", // Reduced height for a thinner header
-              backgroundColor: colors.greenAccent[500], // Same background color as the Recipes drawer
+              backgroundColor: colors.blueAccent[500], // Same background color as the Recipes drawer
               color: colors.grey[100],
               display: "flex",
               alignItems: "center",

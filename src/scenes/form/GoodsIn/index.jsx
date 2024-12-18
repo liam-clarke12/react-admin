@@ -53,7 +53,7 @@ const GoodsInForm = () => {
             >
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="date"
                 label="Date"
                 onBlur={handleBlur}
@@ -66,7 +66,7 @@ const GoodsInForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="text"
                 label="Ingredient"
                 onBlur={handleBlur}
@@ -79,7 +79,7 @@ const GoodsInForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="number"
                 label="Stock Received"
                 onBlur={handleBlur}
@@ -92,7 +92,7 @@ const GoodsInForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="text"
                 label="Bar Code"
                 onBlur={handleBlur}
@@ -105,7 +105,7 @@ const GoodsInForm = () => {
               />
               <TextField
                 fullWidth
-                variant="filled"
+                variant="outlined"
                 type="date"
                 label="Expiry Date"
                 onBlur={handleBlur}

@@ -71,7 +71,7 @@ const StockUsage = () => {
       flex: 1,
       renderCell: (params) => (
         <span
-          style={{ cursor: "pointer", color: colors.greenAccent[500] }}
+          style={{ cursor: "pointer", color: colors.blueAccent[500] }}
           onClick={() => handleDrawerOpen("Ingredients", params.row.ingredients)}
         >
           Show Ingredients
@@ -107,7 +107,7 @@ const StockUsage = () => {
     
         return (
           <span
-            style={{ cursor: "pointer", color: colors.greenAccent[500] }}
+            style={{ cursor: "pointer", color: colors.blueAccent[500] }}
             onClick={() => handleDrawerOpen("Barcodes", barcodes)}
           >
             Show Barcodes
@@ -122,7 +122,7 @@ const StockUsage = () => {
       <Header title="STOCK USAGE" subtitle="Keep Track of Your Stock Usage" />
       <Button
         onClick={clearStockUsage}
-        sx={{ color: colors.greenAccent[500], border: `1px solid ${colors.greenAccent[500]}` }}
+        sx={{ color: colors.blueAccent[500], border: `1px solid ${colors.blueAccent[500]}` }}
       >
         Clear Stock Usage
       </Button>
@@ -163,7 +163,7 @@ const StockUsage = () => {
           <Box
             sx={{
               width: "100%",
-              backgroundColor: colors.greenAccent[500],
+              backgroundColor: colors.blueAccent[500],
               color: colors.grey[100],
               padding: "10px",
               display: "flex",

@@ -46,7 +46,7 @@ const GoodsOutForm = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  variant="filled"
+                  variant="outlined"
                   type="date"
                   label="Date"
                   onBlur={handleBlur}
@@ -62,7 +62,7 @@ const GoodsOutForm = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  variant="filled"
+                  variant="outlined"
                   select
                   label="Recipe"
                   onBlur={handleBlur}
@@ -89,7 +89,7 @@ const GoodsOutForm = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  variant="filled"
+                  variant="outlined"
                   type="number"
                   label="Stock Amount (per batch)"
                   onBlur={handleBlur}
@@ -111,7 +111,7 @@ const GoodsOutForm = () => {
                           <Grid item xs={10}>
                             <TextField
                               fullWidth
-                              variant="filled"
+                              variant="outlined"
                               type="text"
                               label={`Recipient ${index + 1}`}
                               name={`recipients.${index}`}
