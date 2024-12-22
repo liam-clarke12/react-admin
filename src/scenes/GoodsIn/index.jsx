@@ -41,6 +41,8 @@ const GoodsIn = () => {
     },
     { field: "date", headerName: "Date", flex: 1, editable: true },
     { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
+    { field: "temperature", headerName: "Temperature", flex: 1, editable: true },
+
     {
       field: "stockReceived",
       headerName: "Stock Received (kg)",

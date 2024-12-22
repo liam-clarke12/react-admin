@@ -117,8 +117,20 @@ const GoodsInForm = () => {
                 helperText={touched.expiryDate && errors.expiryDate}
                 sx={{ gridColumn: "span 2" }}
               />
+            <TextField
+              fullWidth
+              variant="outlined"
+              type="number"
+              label="Temperature (℃)"
+              onBlur={handleBlur}
+              onChange={handleChange}
+              value={values.Temperature} // Ensure this matches the initialValues key
+              name="Temperature"
+              error={!!touched.Temperature && !!errors.Temperature}
+              helperText={touched.Temperature && errors.Temperature}
+              sx={{ gridColumn: "span 2" }}
+            />
             </Box>
-
             {/* Floating Action Button (FAB) for form submission */}
             <Box display="flex" justifyContent="center" mt="20px" sx={{ position: "relative" }}>
               <Fab
@@ -169,11 +181,12 @@ const goodsInSchema = yup.object().shape({
 });
 
 const initialValues = {
-  date: "...",
+  date: new Date().toISOString().split("T")[0],
   ingredient: "",
   stockReceived: "",
   barCode: "",
-  expiryDate: "...",
+  expiryDate: new Date().toISOString().split("T")[0],
+  Temperature: ""
 };
 
 export default GoodsInForm;

@@ -11,27 +11,22 @@ const RecipeForm = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false); // Snackbar state
 
   const handleFormSubmit = (values, { resetForm }) => {
-    // Structure ingredients and quantities as arrays
     const ingredients = values.ingredients.map((ing) => ing.name);
     const quantities = values.ingredients.map((ing) => ing.quantity);
 
-    // Add the structured data to rows, keeping ingredients and quantities as arrays
     addRow({
       recipe: values.recipe,
+      upb: values.upb,
       ingredients: ingredients, // Array of ingredients
-      quantities: quantities,   // Array of quantities
+      quantities: quantities, // Array of quantities
     });
 
-    // Reset the form after submission
     resetForm();
-
-    // Open Snackbar on successful submit
-    setOpenSnackbar(true);
+    setOpenSnackbar(true); // Open Snackbar on successful submit
   };
 
-  // Close Snackbar
   const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
+    setOpenSnackbar(false); // Close Snackbar
   };
 
   return (
@@ -67,8 +62,20 @@ const RecipeForm = () => {
                   helperText={touched.recipe && errors.recipe}
                   sx={{ borderRadius: "8px" }} // Custom border radius for Recipe field
                 />
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="number"
+                  label="Units per Batch"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.upb}
+                  name="upb"
+                  error={!!(touched.upb && errors.upb)}
+                  helperText={touched.upb && errors.upb}
+                  sx={{ borderRadius: "8px", mt: 3 }} // Add margin-top for spacing
+                />
               </Grid>
-
               <Grid container item xs={12} spacing={3}>
                 <Grid item xs={12} sm={6}>
                   <FieldArray name="ingredients">
@@ -92,9 +99,13 @@ const RecipeForm = () => {
                                 onBlur={handleBlur}
                                 onChange={handleChange}
                                 value={ingredient.name}
-                                error={!!(touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name)}
-                                helperText={touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name}
-                                sx={{ borderRadius: "8px" }} // Custom border radius for Ingredient field
+                                error={
+                                  !!(touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name)
+                                }
+                                helperText={
+                                  touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name
+                                }
+                                sx={{ borderRadius: "8px" }}
                               />
                             </Grid>
                             <Grid item xs={12} sm={5}>
@@ -107,9 +118,13 @@ const RecipeForm = () => {
                                 onBlur={handleBlur}
                                 onChange={handleChange}
                                 value={ingredient.quantity}
-                                error={!!(touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity)}
-                                helperText={touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity}
-                                sx={{ borderRadius: "8px" }} // Custom border radius for Quantity field
+                                error={
+                                  !!(touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity)
+                                }
+                                helperText={
+                                  touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity
+                                }
+                                sx={{ borderRadius: "8px" }}
                               />
                             </Grid>
                             <Grid item xs={12} sm={2}>
@@ -130,7 +145,7 @@ const RecipeForm = () => {
                             variant="text"
                             onClick={() => push({ name: "", quantity: "" })}
                             sx={{
-                              fontWeight: "normal", // Default font weight for text
+                              fontWeight: "normal",
                               display: "inline-flex",
                               alignItems: "center",
                             }}
@@ -144,11 +159,10 @@ const RecipeForm = () => {
                 </Grid>
               </Grid>
 
-              {/* Full-width Box to align the button to the right */}
               <Box display="flex" justifyContent="flex-end" mt="20px" width="100%">
                 <Fab
                   color="secondary"
-                  onClick={handleSubmit} // Submit the form when FAB is clicked
+                  onClick={handleSubmit}
                   sx={{
                     position: "fixed",
                     bottom: "20px",
@@ -168,7 +182,6 @@ const RecipeForm = () => {
         )}
       </Formik>
 
-      {/* Success Snackbar */}
       <Snackbar
         open={openSnackbar}
         autoHideDuration={3000}
@@ -183,21 +196,24 @@ const RecipeForm = () => {
   );
 };
 
-// Validation schema for the form
 const RecipeSchema = yup.object().shape({
   recipe: yup.string().required("Recipe is required"),
+  upb: yup.string().required("Number is required"),
   ingredients: yup.array().of(
     yup.object().shape({
       name: yup.string().required("Ingredient is required"),
-      quantity: yup.number().required("Quantity per Batch is required").positive("Must be positive"),
+      quantity: yup
+        .number()
+        .required("Quantity per Batch is required")
+        .positive("Must be positive"),
     })
   ),
 });
 
-// Initial values for the form
 const initialValues = {
   recipe: "",
-  ingredients: [{ name: "", quantity: "" }], // Ingredients array should be initialized like this
+  upb: "",
+  ingredients: [{ name: "", quantity: "" }],
 };
 
 export default RecipeForm;

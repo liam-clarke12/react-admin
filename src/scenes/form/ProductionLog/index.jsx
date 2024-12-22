@@ -167,7 +167,7 @@ const productionLogSchema = yup.object().shape({
 
 // Initial values for the form
 const initialValues = {
-  date: "...",
+  date: new Date().toISOString().split("T")[0],
   recipe: "",
   batchesProduced: "",
   batchCode: "",

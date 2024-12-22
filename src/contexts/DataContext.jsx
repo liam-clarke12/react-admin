@@ -10,8 +10,8 @@ export const DataProvider = ({ children }) => {
 
   const [rows, setRows] = useState(() => {
     const savedRecipeRows = localStorage.getItem('recipeRows');
-    return savedRecipeRows ? JSON.parse(savedRecipeRows) : [];
-  });
+    return savedRecipeRows ? JSON.parse(savedRecipeRows) : []; // Default to an empty array
+  });  
 
   const [productionLogs, setProductionLogs] = useState(() => {
     const savedLogs = localStorage.getItem('productionLogs');
@@ -169,7 +169,8 @@ export const DataProvider = ({ children }) => {
       ...row,
       id: `${row.barCode}-${Date.now()}`, // Ensure uniqueness with barcode and timestamp
       stockRemaining: row.stockReceived,
-      expiryDate: row.expiryDate, // Ensure expiryDate is converted to a Date object
+      expiryDate: row.expiryDate,
+      temperature: `${row.Temperature}℃`, // Ensure expiryDate is converted to a Date object
     };
   
     console.log("Formatted Row:", newRow); // Log the formatted row
@@ -219,6 +220,7 @@ export const DataProvider = ({ children }) => {
     const newRow = {
       id: `${row.recipe}-${Date.now()}`, // Generate a unique ID
       recipe: row.recipe,
+      upb: row.upb,
       ingredients: row.ingredients,
       quantities: row.quantities,
     };
@@ -236,32 +238,57 @@ export const DataProvider = ({ children }) => {
       return;
     }
   
-    const newLog = { id: `${log.recipe}-${Date.now()}`, batchremaining: log.batchesProduced, ...log };
+    // Retrieve recipe details from the recipe table (localStorage)
+    const recipeDetails = rows.find(
+      (recipe) => recipe.recipe === log.recipe // Check against the 'recipe' property
+    );
+  
+    if (!recipeDetails) {
+      console.warn(`Recipe not found: ${log.recipe}`);
+      return;
+    }
+  
+    const unitsPerBatch = recipeDetails.upb || 1; // Default UPB to 1 if not defined
+  
+    // Calculate total units produced
+    const totalUnitsProduced = log.batchesProduced * unitsPerBatch;
+    console.log('Total units produced:', totalUnitsProduced); // Debugging log
+  
+    // Create the new production log row
+    const newLog = {
+      id: `${log.recipe}-${Date.now()}`,
+      batchremaining: totalUnitsProduced, // Reflect total units produced
+      ...log,
+    };
+  
+    console.log('New production log:', newLog); // Debugging log
+  
+    // Update production logs
     setProductionLogs((prevLogs) => {
       const updatedLogs = [...prevLogs, newLog];
       localStorage.setItem("productionLog", JSON.stringify(updatedLogs)); // Save production logs
       return updatedLogs;
     });
   
-    // Update recipeInventory
+    // Update recipeInventory (use total units produced instead of batches)
     const updatedInventory = recipeInventory.map((item) =>
       item.recipe === log.recipe
         ? {
             ...item,
-            quantity: item.quantity + log.batchesProduced,
+            quantity: item.quantity + totalUnitsProduced, // Add total units produced
             date: log.date,
             batchCode: item.batchCode || log.batchCode, // Only set batchCode if it doesn't exist
           }
         : item
     );
   
-    // Check if recipe exists in the inventory
+    // Check if the recipe exists in the inventory
     const recipeExists = recipeInventory.some((item) => item.recipe === log.recipe);
   
     if (!recipeExists) {
       updatedInventory.push({
         recipe: log.recipe,
-        quantity: log.batchesProduced,
+        quantity: totalUnitsProduced, // Use total units produced
         date: log.date,
         batchCode: log.batchCode,
       });
@@ -288,7 +315,7 @@ export const DataProvider = ({ children }) => {
     });
   
     setShouldUpdateBarcodes(true);
-  };
+  };  
 
   const deductFromProductionLogs = (recipe, amountToDeduct) => {
     const updatedLogs = [...productionLogs];
@@ -381,7 +408,7 @@ export const DataProvider = ({ children }) => {
         const newLog = {
           id: `${log.recipe}-${Date.now()}`,
           amount: log.stockAmount,
-          recipients: Array.isArray(log.recipient) ? log.recipient : [log.recipient], // Ensure recipients is always an array
+          recipients: log.recipient, // Ensure recipients is always an array
           ...log,
           batchcodeChanges,
         };

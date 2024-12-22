@@ -16,6 +16,7 @@ const Recipes = () => {
 
   const columns = [
     { field: "recipe", headerName: "Recipe", flex: 1 },
+    { field: "upb", headerName: "Units per Batch", flex: 1 },
     {
       field: "ingredients",
       headerName: "Ingredients",

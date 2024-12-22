@@ -1,5 +1,5 @@
-import { Box, TextField, Grid, MenuItem, Snackbar, Alert, Fab, Typography, Button } from "@mui/material";
-import { Formik, FieldArray } from "formik";
+import { Box, TextField, Grid, MenuItem, Snackbar, Alert, Fab} from "@mui/material";
+import { Formik } from "formik";
 import * as yup from "yup";
 import Header from "../../../components/Header";
 import { useData } from "../../../contexts/DataContext";
@@ -90,7 +90,7 @@ const GoodsOutForm = () => {
                   fullWidth
                   variant="outlined"
                   type="number"
-                  label="Stock Amount (per batch)"
+                  label="Amount of Units"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.stockAmount}
@@ -100,58 +100,20 @@ const GoodsOutForm = () => {
                 />
               </Grid>
 
-              {/* Recipients */}
+              {/* Single Recipient */}
               <Grid item xs={12}>
-                <FieldArray name="recipients">
-                  {({ push, remove }) => (
-                    <>
-                      {values.recipients.map((recipient, index) => (
-                        <Grid container spacing={2} key={index} alignItems="center">
-                          <Grid item xs={10}>
-                            <TextField
-                              fullWidth
-                              variant="outlined"
-                              type="text"
-                              label={`Recipient ${index + 1}`}
-                              name={`recipients.${index}`}
-                              onBlur={handleBlur}
-                              onChange={handleChange}
-                              value={recipient}
-                              error={!!touched.recipients?.[index] && !!errors.recipients?.[index]}
-                              helperText={touched.recipients?.[index] && errors.recipients?.[index]}
-                            />
-                          </Grid>
-                          <Grid item xs={2}>
-                            <Button
-                              variant="outlined"
-                              color="error"
-                              onClick={() => remove(index)}
-                            >
-                              Remove
-                            </Button>
-                          </Grid>
-                        </Grid>
-                      ))}
-                      <Box mt={2}>
-                        <Typography
-                          variant="body1"
-                          color="secondary"
-                          sx={{
-                            cursor: 'pointer',
-                            fontSize: '1rem',
-                            fontWeight: '500',
-                            '&:hover': {
-                              textDecoration: 'underline',
-                            },
-                          }}
-                          onClick={() => push("")}
-                        >
-                          <strong style={{ fontWeight: 'bold' }}>+</strong> Add Recipient {/* Make only the "+" bold */}
-                        </Typography>
-                      </Box>
-                    </>
-                  )}
-                </FieldArray>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="text"
+                  label="Recipient"
+                  name="recipients" // Only one recipient input
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.recipients}
+                  error={!!touched.recipients && !!errors.recipients}
+                  helperText={touched.recipients && errors.recipients}
+                />
               </Grid>
             </Grid>
 
@@ -196,17 +158,14 @@ const goodsOutSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
   stockAmount: yup.number().required("Stock amount is required").positive("Must be positive"),
-  recipients: yup
-    .array()
-    .of(yup.string().required("Recipient is required"))
-    .min(1, "At least one recipient is required"),
+  recipients: yup.string().required("Recipient is required")
 });
 
 const initialValues = {
-  date: "...",
+  date: new Date().toISOString().split("T")[0],
   recipe: "",
   stockAmount: "",
-  recipients: [""],
+  recipients: "", // Only one recipient field
 };
 
 export default GoodsOutForm;

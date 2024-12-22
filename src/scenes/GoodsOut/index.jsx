@@ -63,7 +63,7 @@ const GoodsOut = () => {
     { field: "recipe", headerName: "Recipe Name", flex: 1, editable: false },
     {
       field: "amount",
-      headerName: "Amount",
+      headerName: "Units going Out",
       type: "number",
       flex: 1,
       headerAlign: "left",
@@ -104,12 +104,9 @@ const GoodsOut = () => {
       field: "recipients",
       headerName: "Recipients",
       flex: 1,
-      renderCell: (params) => {
-        // Check if recipients is an array and join them as a string
-        return Array.isArray(params.value)
-          ? params.value.join(", ") // Display recipients as a comma-separated list
-          : "No Recipients";
-      },
+      headerAlign: "left",
+      align: "left",
+      editable: false,
     },
       ];
 

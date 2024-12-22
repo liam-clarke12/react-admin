@@ -23,7 +23,7 @@ const ProductionLog = () => {
     },
     {
       field: "batchremaining",
-      headerName: "Batches Remaining",
+      headerName: "Units Remaining",
       type: "number",
       flex: 1,
       headerAlign: "left",
