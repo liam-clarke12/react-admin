@@ -159,48 +159,54 @@ export const DataProvider = ({ children }) => {
   };  
   
   const addGoodsInRow = (row) => {
+    console.log("addGoodsInRow called with row:", row);
+  
+    // Ensure file is properly passed and log it
+    console.log("File data in row:", row.file);
+  
     if (!row.ingredient || !row.stockReceived) {
       console.warn("Invalid row data:", row);
       return;
     }
   
-    // Ensure the row has a unique ID (e.g., combining barcode and timestamp)
+    // Construct the new row with the file's name if available
     const newRow = {
       ...row,
-      id: `${row.barCode}-${Date.now()}`, // Ensure uniqueness with barcode and timestamp
+      id: `${row.barCode}-${Date.now()}`,
       stockRemaining: row.stockReceived,
       expiryDate: row.expiryDate,
-      temperature: `${row.Temperature}℃`, // Ensure expiryDate is converted to a Date object
+      temperature: `${row.Temperature}℃`,
+      file: row.file ? row.file.name : "", // Add the file's name here
     };
   
-    console.log("Formatted Row:", newRow); // Log the formatted row
+    console.log("Formatted Row with File:", newRow);
   
-    // Update goods in rows state
+    // Update the state for goodsInRows
     setGoodsInRows((prevRows) => {
-      const updatedRows = [...prevRows, newRow];
-      console.log("Updated Goods In Rows:", updatedRows); // Log the updated state
+      console.log("Previous goods in rows state:", prevRows);
   
-      // Persist the updated rows to localStorage
-      localStorage.setItem('goodsInRows', JSON.stringify(updatedRows));
+      const updatedRows = [...prevRows, newRow];
+      console.log("Updated goods in rows with new file attached:", updatedRows);
+  
+      // Persist updated rows to localStorage
+      localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
       setShouldCheckProcessed(true);
   
       return updatedRows;
     });
   
-    // Update ingredient inventory using function-based state update
+    // Update the ingredient inventory
     setIngredientInventory((prevInventory) => {
-      // Check if the ingredient exists in the inventory
       const existingIngredient = prevInventory.find(item => item.ingredient === row.ingredient);
-      
+  
+      console.log("Checking for existing ingredient:", row.ingredient);
       if (existingIngredient) {
-        // If the ingredient exists, update the amount
         return prevInventory.map(item =>
           item.ingredient === row.ingredient
             ? { ...item, amount: item.amount + row.stockReceived }
             : item
         );
       } else {
-        // If the ingredient doesn't exist, add it to the inventory
         console.log("Adding new ingredient to inventory");
         return [
           ...prevInventory,
@@ -208,7 +214,7 @@ export const DataProvider = ({ children }) => {
         ];
       }
     });
-  };
+  };  
   
   // Function to add a new row to the Recipe table
   const addRow = (row) => {

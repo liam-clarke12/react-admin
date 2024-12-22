@@ -14,11 +14,15 @@ import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router-dom";  // Import for navigation
+import { useAuth } from "../../contexts/AuthContext";  // Importing AuthContext
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory, updateNotifications } = useData();
+  const { isAuthenticated } = useAuth(); // Destructure to access isAuthenticated from AuthContext
+  const navigate = useNavigate();  // Hook for navigation
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
@@ -42,7 +46,6 @@ const GoodsIn = () => {
     { field: "date", headerName: "Date", flex: 1, editable: true },
     { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
     { field: "temperature", headerName: "Temperature", flex: 1, editable: true },
-
     {
       field: "stockReceived",
       headerName: "Stock Received (kg)",
@@ -79,6 +82,26 @@ const GoodsIn = () => {
       headerName: "Processed",
       flex: 1,
       editable: false,
+    },
+    {
+      field: "fileAttachment", // New column for the uploaded file
+      headerName: "File Attachment",
+      renderCell: (params) => {
+        const file = params.row.file; // Use the row's file
+        return (
+          <Box>
+            {file ? (
+              <Button variant="outlined" color="primary" onClick={() => handleFileOpen(file)}>
+                View File
+              </Button>
+            ) : (
+              "No File"
+            )}
+          </Box>
+        );
+      },
+      flex: 1,
+      align: "center",
     },
   ];
 
@@ -154,7 +177,7 @@ const GoodsIn = () => {
   const handleDeleteSelectedRows = () => {
     // Remove selected rows
     const remainingRows = goodsInRows.filter(
-      (row) => !selectedRows.includes(`${row.barCode}-${row.ingredient}`)
+      (row) => !selectedRows.includes(row.id)
     );
 
     setGoodsInRows(remainingRows);
@@ -165,7 +188,7 @@ const GoodsIn = () => {
     const updatedInventory = ingredientInventory.map((item) => {
       const matchingRow = goodsInRows.find(
         (row) =>
-          selectedRows.includes(`${row.barCode}-${row.ingredient}`) &&
+          selectedRows.includes(row.id) &&
           row.ingredient === item.ingredient
       );
       return matchingRow
@@ -187,6 +210,16 @@ const GoodsIn = () => {
   const handleConfirmDelete = () => {
     handleDeleteSelectedRows();
     handleCloseConfirmDialog();
+  };
+
+  const handleFileOpen = (fileUrl) => {
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
+      navigate("/login");
+    } else {
+      // Open file in a new tab
+      window.open(fileUrl, "_blank");
+    }
   };
 
   useEffect(() => {
@@ -277,10 +310,6 @@ const GoodsIn = () => {
           },
           "& .expired-row": {
             backgroundColor: colors.red[500],
-          },
-          // Responsive breakpoints
-          "@media (max-width: 600px)": {
-            "& .MuiDataGrid-root": { minWidth: "100%" },
           },
         }}
       >
