@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext"; // Import AuthProvider and useAuth
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider } from "@mui/material";
@@ -18,9 +19,26 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "./contexts/DataContext";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import LoginPage from "./login-signup/LoginPage";
+import axios from "axios"; // Import axios
 
 function App() {
   const [theme, colorMode] = useMode();
+  const [data, setData] = useState(null); // State to hold the API response
+
+  // Function to fetch data from the API
+  const fetchData = async () => {
+    try {
+      const response = await axios.get("https://yhnlbxvuhb.execute-api.eu-north-1.amazonaws.com/prod"); // Replace with your API Gateway endpoint
+      setData(response.data); // Set the response data
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  // Call fetchData when the component mounts
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   return (
     <AuthProvider> {/* Wrap the whole app with AuthProvider */}
@@ -30,6 +48,14 @@ function App() {
           <DataProvider>
             <div className="app">
               <AuthRoutes /> {/* Use AuthRoutes to handle routing */}
+              {/* Example: Displaying fetched data */}
+              <div>
+                {data ? (
+                  <p>API Data: {data}</p> // Render API data
+                ) : (
+                  <p>Loading data...</p> // Show loading message
+                )}
+              </div>
             </div>
           </DataProvider>
         </ThemeProvider>
