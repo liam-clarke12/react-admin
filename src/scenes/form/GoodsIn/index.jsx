@@ -223,17 +223,6 @@ const goodsInSchema = yup.object().shape({
     .positive("Must be positive"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
-  fileUpload: yup
-    .mixed()
-    .required("File upload is required")
-    .test("fileSize", "File size too large", (value) => {
-      if (value) return value.size <= 5 * 1024 * 1024; // Maximum file size of 5MB
-      return true;
-    })
-    .test("fileType", "Unsupported file type", (value) => {
-      if (value) return ["image/jpeg", "image/png", "application/pdf"].includes(value.type);
-      return true;
-    }),
 });
 
 // Initial Values for the Form
