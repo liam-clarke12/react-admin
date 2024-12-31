@@ -1,5 +1,0 @@
-{
-  "AppSyncApiName": "hupes",
-  "DynamoDBBillingMode": "PAY_PER_REQUEST",
-  "DynamoDBEnableServerSideEncryption": false
-}

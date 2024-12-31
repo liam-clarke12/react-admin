@@ -1,7 +1,0 @@
-{
-    "AppSyncApiName": "hupes",
-    "DynamoDBBillingMode": "PAY_PER_REQUEST",
-    "DynamoDBEnableServerSideEncryption": false,
-    "S3DeploymentBucket": "amplify-hupes-myhupes-70942-deployment",
-    "S3DeploymentRootKey": "amplify-appsync-files/05e07559affee93a09ebb33fb8cd45e8866a43f1"
-}
