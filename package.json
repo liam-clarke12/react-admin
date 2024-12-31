@@ -21,7 +21,6 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "aws-amplify-react-native": "^7.0.8",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
@@ -70,8 +69,6 @@
     ]
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.11.0",
-    "@aws-amplify/backend-cli": "^1.4.5",
     "aws-cdk": "^2.173.2",
     "aws-cdk-lib": "^2.173.2",
     "concurrently": "^9.1.0",
