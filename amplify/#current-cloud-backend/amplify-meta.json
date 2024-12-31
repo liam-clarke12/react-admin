@@ -1,0 +1,85 @@
+{
+  "providers": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-hupes-myhupes-70942-authRole",
+      "UnauthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-myhupes-70942-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-myhupes-70942-authRole",
+      "Region": "eu-west-1",
+      "DeploymentBucketName": "amplify-hupes-myhupes-70942-deployment",
+      "UnauthRoleName": "amplify-hupes-myhupes-70942-unauthRole",
+      "StackName": "amplify-hupes-myhupes-70942",
+      "StackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/amplify-hupes-myhupes-70942/a43691c0-c79c-11ef-9a75-060c028a6367",
+      "AmplifyAppId": "d2x94kbpd9kpkv"
+    }
+  },
+  "api": {
+    "hupes": {
+      "dependsOn": [],
+      "output": {
+        "authConfig": {
+          "additionalAuthenticationProviders": [],
+          "defaultAuthentication": {
+            "apiKeyConfig": {
+              "apiKeyExpirationDays": 7
+            },
+            "authenticationType": "API_KEY"
+          }
+        },
+        "GraphQLAPIIdOutput": "qpm3jsj4nzdbtbfbzzfcospbnq",
+        "GraphQLAPIEndpointOutput": "https://ngi6i4dtnnf6lni27namb6yo7u.appsync-api.eu-west-1.amazonaws.com/graphql",
+        "GraphQLAPIKeyOutput": "da2-gr5uxi6iynb6zef4drh2fytvua"
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "AppSync",
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-hupes-myhupes-70942-deployment/amplify-cfn-templates/api/cloudformation-template.json",
+        "logicalId": "apihupes"
+      },
+      "lastPushTimeStamp": "2024-12-31T17:33:55.809Z",
+      "lastPushDirHash": "I2UQeObixxhpwjXWbMym2TdmOGw="
+    }
+  },
+  "auth": {
+    "hupes048188ea": {
+      "customAuth": false,
+      "dependsOn": [],
+      "frontendAuthConfig": {
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyMinLength": 8,
+          "passwordPolicyCharacters": []
+        },
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "socialProviders": [],
+        "usernameAttributes": [
+          "EMAIL"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "Cognito",
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-hupes-myhupes-70942-deployment/amplify-cfn-templates/auth/hupes048188ea-cloudformation-template.json",
+        "logicalId": "authhupes048188ea"
+      },
+      "lastPushTimeStamp": "2024-12-31T17:33:55.809Z",
+      "output": {
+        "UserPoolId": "eu-west-1_jy1GjzZJE",
+        "AppClientIDWeb": "6ldla3m4te6fslkuv7lf242lbi",
+        "AppClientID": "4npebpi7bv4gs4m0n2e12ug503",
+        "IdentityPoolId": "eu-west-1:ae9c3e6f-c254-4fc7-9b40-79a8b0b104f3",
+        "UserPoolArn": "arn:aws:cognito-idp:eu-west-1:127214157415:userpool/eu-west-1_jy1GjzZJE",
+        "IdentityPoolName": "hupes048188ea_identitypool_048188ea__myhupes",
+        "UserPoolName": "hupes048188ea_userpool_048188ea"
+      },
+      "lastPushDirHash": "ro4XnDMu3BzmND0Z0jWRt9Wj8G8="
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-hupes-dev-86fd9-authRole",
+      "UnauthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-dev-86fd9-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-dev-86fd9-authRole",
+      "Region": "eu-west-1",
+      "DeploymentBucketName": "amplify-hupes-dev-86fd9-deployment",
+      "UnauthRoleName": "amplify-hupes-dev-86fd9-unauthRole",
+      "StackName": "amplify-hupes-dev-86fd9",
+      "StackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/amplify-hupes-dev-86fd9/8a2669d0-c220-11ef-a525-0ad07e38a801",
+      "AmplifyAppId": "d2x94kbpd9kpkv"
+    },
+    "categories": {
+      "auth": {
+        "hupes048188ea": {}
+      },
+      "api": {
+        "hupes": {}
+      }
+    }
+  },
+  "myhupes": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-hupes-myhupes-70942-authRole",
+      "UnauthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-myhupes-70942-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::127214157415:role/amplify-hupes-myhupes-70942-authRole",
+      "Region": "eu-west-1",
+      "DeploymentBucketName": "amplify-hupes-myhupes-70942-deployment",
+      "UnauthRoleName": "amplify-hupes-myhupes-70942-unauthRole",
+      "StackName": "amplify-hupes-myhupes-70942",
+      "StackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/amplify-hupes-myhupes-70942/a43691c0-c79c-11ef-9a75-060c028a6367",
+      "AmplifyAppId": "d2x94kbpd9kpkv"
+    },
+    "categories": {
+      "auth": {
+        "hupes048188ea": {}
+      },
+      "api": {
+        "hupes": {}
+      }
+    }
+  }
+}
