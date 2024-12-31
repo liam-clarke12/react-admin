@@ -37,7 +37,14 @@
         "hupes048188ea": {}
       },
       "api": {
-        "hupes": {}
+        "hupes": {},
+        "MyHupesAPI": {}
+      },
+      "function": {
+        "HupesLambdaFunction": {
+          "deploymentBucketName": "amplify-hupes-myhupes-70942-deployment",
+          "s3Key": "amplify-builds/HupesLambdaFunction-664e4a364c7252784141-build.zip"
+        }
       }
     }
   }

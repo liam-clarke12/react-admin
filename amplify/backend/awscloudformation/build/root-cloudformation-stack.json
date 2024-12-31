@@ -213,6 +213,27 @@
         }
       }
     },
+    "apiMyHupesAPI": {
+      "Type": "AWS::CloudFormation::Stack",
+      "Properties": {
+        "TemplateURL": "https://s3.amazonaws.com/amplify-hupes-myhupes-70942-deployment/amplify-cfn-templates/api/MyHupesAPI-cloudformation-template.json",
+        "Parameters": {
+          "functionHupesLambdaFunctionName": {
+            "Fn::GetAtt": [
+              "functionHupesLambdaFunction",
+              "Outputs.Name"
+            ]
+          },
+          "functionHupesLambdaFunctionArn": {
+            "Fn::GetAtt": [
+              "functionHupesLambdaFunction",
+              "Outputs.Arn"
+            ]
+          },
+          "env": "myhupes"
+        }
+      }
+    },
     "authhupes048188ea": {
       "Type": "AWS::CloudFormation::Stack",
       "Properties": {
@@ -264,6 +285,17 @@
           },
           "breakCircularDependency": true,
           "dependsOn": "",
+          "env": "myhupes"
+        }
+      }
+    },
+    "functionHupesLambdaFunction": {
+      "Type": "AWS::CloudFormation::Stack",
+      "Properties": {
+        "TemplateURL": "https://s3.amazonaws.com/amplify-hupes-myhupes-70942-deployment/amplify-cfn-templates/function/HupesLambdaFunction-cloudformation-template.json",
+        "Parameters": {
+          "deploymentBucketName": "amplify-hupes-myhupes-70942-deployment",
+          "s3Key": "amplify-builds/HupesLambdaFunction-664e4a364c7252784141-build.zip",
           "env": "myhupes"
         }
       }
