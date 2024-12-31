@@ -13,38 +13,46 @@ const SignupPage = ({ onSignup }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+
     // Basic validation
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
+        setError("Passwords do not match.");
+        return;
+    }
+
+    // Additional validation for email format
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+        setError("Please enter a valid email address.");
+        return;
     }
 
     setLoading(true); // Set loading state
 
     try {
-      const response = await fetch('http://localhost:5000/api/signup', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-    });
+        const response = await fetch('http://localhost:5000/api/signup', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sign up');
-      }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to sign up');
+        }
 
-      const data = await response.json();
-      console.log(data.message); // Handle success message
-      onSignup(); // Call onSignup prop to update authentication state in App.js
-      navigate("/"); // Navigate to Dashboard
+        const data = await response.json();
+        console.log(data.message); // Handle success message
+        onSignup(); // Call onSignup prop to update authentication state in App.js
+        navigate("/"); // Navigate to Dashboard
     } catch (error) {
-      setError(error.message); // Set error message to display
+        setError(error.message); // Set error message to display
     } finally {
-      setLoading(false); // Reset loading state
+        setLoading(false); // Reset loading state
     }
-  };
+};
 
   return (
     <div className="login-container">
