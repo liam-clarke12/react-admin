@@ -18,6 +18,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "./contexts/DataContext";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import LoginPage from "./login-signup/LoginPage";
+import SignupPage from "./login-signup/SignupPage"; // Import the SignupPage
 
 function App() {
   const [theme, colorMode] = useMode();
@@ -30,7 +31,6 @@ function App() {
           <DataProvider>
             <div className="app">
               <AuthRoutes /> {/* Use AuthRoutes to handle routing */}
-              {/* Example: Displaying fetched data */}
             </div>
           </DataProvider>
         </ThemeProvider>
@@ -68,6 +68,7 @@ const AuthRoutes = () => {
   ) : (
     <Routes>
       <Route path="/login" element={<LoginPage onLogin={() => setIsAuthenticated(true)} />} />
+      <Route path="/signup" element={<SignupPage onSignup={() => setIsAuthenticated(true)} />} /> {/* Add Signup route */}
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );

@@ -76,7 +76,14 @@ const LoginPage = ({ onLogin }) => {
       </form>
 
       <p className="signup-prompt">
-        Don&apos;t have an account? <span className="signup-link">Sign up</span>
+        Don&apos;t have an account?{" "}
+        <span
+          className="signup-link"
+          onClick={() => navigate("/signup")} // Navigate to signup page
+          style={{ cursor: "pointer", color: "#6870fa" }} // Add styles for pointer and color
+        >
+          Sign up
+        </span>
       </p>
     </div>
   );
