@@ -70,6 +70,9 @@
     ]
   },
   "devDependencies": {
+    "@aws-amplify/backend": "^1.11.0",
+    "@aws-amplify/backend-cli": "^1.4.5",
+    "@aws-amplify/cli": "^12.13.1",
     "@babel/core": "^7.26.0",
     "@babel/plugin-transform-async-generator-functions": "^7.25.9",
     "@babel/plugin-transform-class-properties": "^7.25.9",
@@ -85,7 +88,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
-    "aws-cdk": "^2.173.2",
+    "aws-cdk": "^2.173.4",
     "aws-cdk-lib": "^2.173.2",
     "concurrently": "^9.1.2",
     "constructs": "^10.0.0",
