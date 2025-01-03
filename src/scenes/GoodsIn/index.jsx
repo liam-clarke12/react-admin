@@ -14,15 +14,11 @@ import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useNavigate } from "react-router-dom";  // Import for navigation
-import { useAuth } from "../../contexts/AuthContext";  // Importing AuthContext
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory, updateNotifications } = useData();
-  const { isAuthenticated } = useAuth(); // Destructure to access isAuthenticated from AuthContext
-  const navigate = useNavigate();  // Hook for navigation
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
@@ -213,13 +209,7 @@ const GoodsIn = () => {
   };
 
   const handleFileOpen = (fileUrl) => {
-    if (!isAuthenticated) {
-      // Redirect to login if not authenticated
-      navigate("/login");
-    } else {
-      // Open file in a new tab
-      window.open(fileUrl, "_blank");
-    }
+      window.open(fileUrl, "_blank"); 
   };
 
   useEffect(() => {

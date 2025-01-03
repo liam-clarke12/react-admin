@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LoginSignup.css";
 
-const LoginPage = ({ onLogin }) => {
+const LoginPage= () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -17,7 +17,6 @@ const LoginPage = ({ onLogin }) => {
 
     // Check credentials
     if (email === validEmail && password === validPassword) {
-      onLogin(); // Call onLogin prop to update authentication state in App.js
       navigate("/"); // Navigate to Dashboard
     } else {
       setError("Invalid email or password.");
