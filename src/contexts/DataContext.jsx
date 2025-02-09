@@ -161,9 +161,6 @@ export const DataProvider = ({ children }) => {
   const addGoodsInRow = (row) => {
     console.log("addGoodsInRow called with row:", row);
   
-    // Ensure file is properly passed and log it
-    console.log("File data in row:", row.file);
-  
     if (!row.ingredient || !row.stockReceived) {
       console.warn("Invalid row data:", row);
       return;
@@ -176,7 +173,6 @@ export const DataProvider = ({ children }) => {
       stockRemaining: row.stockReceived,
       expiryDate: row.expiryDate,
       temperature: `${row.Temperature}℃`,
-      file: row.file ? row.file.name : "", // Add the file's name here
     };
   
     console.log("Formatted Row with File:", newRow);
@@ -216,7 +212,6 @@ export const DataProvider = ({ children }) => {
     });
   };  
   
-  // Function to add a new row to the Recipe table
   const addRow = (row) => {
     if (!row.recipe || !row.ingredients.length) {
       console.warn("Invalid row data:", row);
@@ -236,7 +231,7 @@ export const DataProvider = ({ children }) => {
       return updatedRows;
     });
   };
-
+  
   // Function to add a new row to the Production Logs and update Recipe Inventory
   const addProductionLogRow = (log) => {
     if (!log.recipe || !log.batchesProduced || !log.date || !log.batchCode) {

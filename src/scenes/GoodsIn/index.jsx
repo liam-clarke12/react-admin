@@ -14,14 +14,49 @@ import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
 
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory, updateNotifications } = useData();
+  const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory } = useData();
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
+  const { cognitoId } = useAuth(); // Get cognitoId from context
+
+  useEffect(() => {
+    const fetchGoodsInData = async () => {
+      try {
+        console.log('Fetching Goods In data for cognitoId from component state:', cognitoId);
+        
+        if (!cognitoId) {
+          console.error('cognitoId is not available in the component state.');
+          return;
+        }
+
+        const response = await fetch(`http://localhost:5000/api/goods-in?cognito_id=${cognitoId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch Goods In data');
+        }
+        
+        const data = await response.json();
+        console.log('Goods In data fetched:', data);
+
+        setGoodsInRows(data.map(row => ({
+          ...row,
+          processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
+        }))); // Ensure data is set to the goodsInRows state
+      } catch (error) {
+        console.error('Error fetching Goods In data:', error);
+      }
+    };
+
+    if (cognitoId) {
+      fetchGoodsInData(); // Fetch data only if cognitoId is available
+    }
+  }, [cognitoId, setGoodsInRows]); // Runs when cognitoId is available or updated
 
   const columns = [
     {
@@ -170,29 +205,33 @@ const GoodsIn = () => {
     });
   };
 
-  const handleDeleteSelectedRows = () => {
-    // Remove selected rows
-    const remainingRows = goodsInRows.filter(
-      (row) => !selectedRows.includes(row.id)
-    );
+  const handleDeleteSelectedRows = async () => {
+    try {
+      if (!cognitoId) {
+        console.error("Cognito ID is missing.");
+        return;
+      }
 
-    setGoodsInRows(remainingRows);
-    localStorage.setItem("goodsInRows", JSON.stringify(remainingRows));
-    setSelectedRows([]); // Clear selected rows
-
-    // Update ingredient inventory
-    const updatedInventory = ingredientInventory.map((item) => {
-      const matchingRow = goodsInRows.find(
-        (row) =>
-          selectedRows.includes(row.id) &&
-          row.ingredient === item.ingredient
+      await Promise.all(
+        selectedRows.map(async (id) => {
+          const response = await fetch("http://localhost:5000/api/delete-row", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, cognito_id: cognitoId }),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to delete row with id ${id}`);
+          }
+        })
       );
-      return matchingRow
-        ? { ...item, amount: Math.max(0, item.amount - matchingRow.stockRemaining) }
-        : item;
-    });
 
-    setIngredientInventory(updatedInventory);
+      setGoodsInRows(goodsInRows.filter((row) => !selectedRows.includes(row.id)));
+      localStorage.setItem("goodsInRows", JSON.stringify(goodsInRows));
+      setSelectedRows([]);
+      handleCloseConfirmDialog();
+    } catch (error) {
+      console.error("Error deleting rows:", error);
+    }
   };
 
   const handleOpenConfirmDialog = () => {
@@ -203,37 +242,46 @@ const GoodsIn = () => {
     setOpenConfirmDialog(false);
   };
 
-  const handleConfirmDelete = () => {
-    handleDeleteSelectedRows();
-    handleCloseConfirmDialog();
+  const handleConfirmDelete = async () => {
+    try {
+      if (!cognitoId) {
+        console.error("Cognito ID is missing, cannot delete rows.");
+        return;
+      }
+  
+      // Send a delete request for each selected row
+      await Promise.all(
+        selectedRows.map(async (id) => {
+          const response = await fetch("http://localhost:5000/api/delete-row", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, cognito_id: cognitoId }),
+          });
+  
+          if (!response.ok) {
+            throw new Error(`Failed to delete row with id ${id}`);
+          }
+        })
+      );
+  
+      console.log("Rows deleted successfully from the database");
+  
+      // Remove selected rows from the frontend state after successful deletion
+      const remainingRows = goodsInRows.filter((row) => !selectedRows.includes(row.id));
+      setGoodsInRows(remainingRows);
+      localStorage.setItem("goodsInRows", JSON.stringify(remainingRows));
+      setSelectedRows([]); // Clear selection
+  
+      handleCloseConfirmDialog();
+    } catch (error) {
+      console.error("Error deleting rows:", error);
+    }
   };
+  
 
   const handleFileOpen = (fileUrl) => {
-      window.open(fileUrl, "_blank"); 
+    window.open(fileUrl, "_blank");
   };
-
-  useEffect(() => {
-    const storedData = JSON.parse(localStorage.getItem("goodsInRows")) || [];
-    const initializedData = storedData.map((row) => ({
-      ...row,
-      processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
-    }));
-    setGoodsInRows(initializedData);
-  }, [setGoodsInRows]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentDate = new Date();
-      const expiredItems = goodsInRows.filter((row) => new Date(row.expiryDate) < currentDate);
-
-      const notifications = expiredItems.map((item) => `Your ${item.ingredient} (${item.barCode}) has expired!`);
-      if (notifications.length > 0) {
-        updateNotifications(notifications);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [goodsInRows, updateNotifications]);
 
   return (
     <Box m="20px">
@@ -266,7 +314,7 @@ const GoodsIn = () => {
           <Button onClick={handleCloseConfirmDialog} sx={{ color: colors.blueAccent[500] }}>
             Cancel
           </Button>
-          <Button onClick={handleConfirmDelete} color="error">
+          <Button onClick={handleDeleteSelectedRows} color="error">
             Confirm
           </Button>
         </DialogActions>
@@ -286,20 +334,8 @@ const GoodsIn = () => {
           },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
           "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
             backgroundColor: colors.blueAccent[700],
-          },
-          "& .MuiCheckbox-root": {
-            color: `${colors.blueAccent[200]} !important`,
-          },
-          "& .even-row": {
-            backgroundColor: colors.primary[450],
-          },
-          "& .odd-row": {
-            backgroundColor: colors.primary[400],
-          },
-          "& .expired-row": {
-            backgroundColor: colors.red[500],
+            borderTop: "none",
           },
         }}
       >
@@ -310,19 +346,13 @@ const GoodsIn = () => {
             processed: row.processed || "No",
           }))}
           columns={columns}
-          processRowUpdate={processRowUpdate}
-          getRowId={(row) => `${row.barCode}-${row.ingredient}`}
-          getRowClassName={(params) => {
-            const isExpired = new Date(params.row.expiryDate) < new Date();
-            const rowIndex = goodsInRows.findIndex((row) => row.id === params.row.id);
-            const isEvenRow = rowIndex % 2 === 0;
-            return isExpired ? "expired-row" : isEvenRow ? "even-row" : "odd-row";
+          pageSize={5}
+          rowsPerPageOptions={[5]}
+          checkboxSelection
+          onSelectionModelChange={(newSelection) => {
+            setSelectedRows(newSelection.selectionModel);
           }}
-          pagination
-          pageSize={10}
-          rowsPerPageOptions={[5, 10, 25]}
-          virtualScrolling
-          experimentalFeatures={{ newEditingApi: true }}
+          processRowUpdate={processRowUpdate}
         />
       </Box>
     </Box>

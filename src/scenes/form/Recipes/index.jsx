@@ -2,28 +2,55 @@ import { Box, Button, TextField, Grid, Snackbar, Alert, Fab } from "@mui/materia
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
 import Header from "../../../components/Header";
-import { useData } from "../../../contexts/DataContext"; // Import useData hook
 import { useState } from "react"; // Import useState to manage Snackbar state
 import AddIcon from "@mui/icons-material/Add"; // Import Add Icon for the FAB
+import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth hook
+
 
 const RecipeForm = () => {
-  const { addRow } = useData(); // Get addRow function from context
   const [openSnackbar, setOpenSnackbar] = useState(false); // Snackbar state
+  const { cognitoId } = useAuth(); // Get cognitoId from context
+  
 
-  const handleFormSubmit = (values, { resetForm }) => {
+  const handleFormSubmit = async (values, { resetForm }) => {
+    if (!cognitoId) {
+      console.error("Cognito ID is missing.");
+      return;
+    }
+  
     const ingredients = values.ingredients.map((ing) => ing.name);
     const quantities = values.ingredients.map((ing) => ing.quantity);
-
-    addRow({
+  
+    const payload = {
       recipe: values.recipe,
       upb: values.upb,
-      ingredients: ingredients, // Array of ingredients
-      quantities: quantities, // Array of quantities
-    });
-
-    resetForm();
-    setOpenSnackbar(true); // Open Snackbar on successful submit
-  };
+      ingredients,
+      quantities,
+      cognito_id: cognitoId, // Pass Cognito ID
+    };
+  
+    try {
+      const response = await fetch("http://localhost:5000/api/add-recipe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+  
+      if (!response.ok) {
+        throw new Error("Failed to add recipe");
+      }
+  
+      const result = await response.json();
+      console.log("Recipe added successfully:", result);
+  
+      resetForm();
+      setOpenSnackbar(true); // Show success message
+    } catch (error) {
+      console.error("Error submitting recipe:", error);
+    }
+  };  
 
   const handleCloseSnackbar = () => {
     setOpenSnackbar(false); // Close Snackbar

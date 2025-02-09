@@ -1,25 +1,34 @@
-// src/contexts/AuthContext.jsx
+// src/contexts/AuthContext.js
 import { createContext, useContext, useState, useEffect } from "react";
+import { getCurrentUser } from "aws-amplify/auth";
 
-// Create the context for authentication
+// Create AuthContext
 const AuthContext = createContext();
 
-// Custom hook to use the Auth context
-export const useAuth = () => useContext(AuthContext);
-
-// AuthProvider to wrap the App and provide authentication status
+// AuthProvider component to wrap the entire app
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [cognitoId, setCognitoId] = useState(null);
 
   useEffect(() => {
-    // Check if the user is authenticated, e.g., by checking localStorage or a session cookie
-    const userAuthenticated = localStorage.getItem("isAuthenticated");
-    setIsAuthenticated(userAuthenticated === "true");
+    const fetchCognitoId = async () => {
+      try {
+        const user = await getCurrentUser();
+        console.log("✅ Fetched Cognito ID:", user?.username);
+        setCognitoId(user?.username);
+      } catch (error) {
+        console.error("❌ Error fetching Cognito ID:", error);
+      }
+    };
+
+    fetchCognitoId();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
+    <AuthContext.Provider value={{ cognitoId }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+// Custom hook for easy access to context
+export const useAuth = () => useContext(AuthContext);
