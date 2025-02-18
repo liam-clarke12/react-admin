@@ -19,7 +19,7 @@ import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
 const GoodsIn = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { goodsInRows, setGoodsInRows, ingredientInventory, setIngredientInventory } = useData();
+  const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
 
   const [selectedRows, setSelectedRows] = useState([]); // Manually track selected rows
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false); // State for opening/closing the dialog
@@ -197,9 +197,11 @@ const GoodsIn = () => {
     setSelectedRows((prevSelectedRows) => {
       if (prevSelectedRows.includes(row.id)) {
         // Unselect the row
+        console.log(`Unselecting row with id: ${row.id}`); // Log when unselecting
         return prevSelectedRows.filter((id) => id !== row.id);
       } else {
         // Add to selection
+        console.log(`Selecting row with id: ${row.id}`); // Log when selecting
         return [...prevSelectedRows, row.id];
       }
     });
@@ -211,28 +213,48 @@ const GoodsIn = () => {
         console.error("Cognito ID is missing.");
         return;
       }
-
+  
+      // Log selected rows for debugging
+      console.log("Selected rows for deletion:", selectedRows);
+  
+      // Ensure we are working with the latest goodsInRows state
+      const rowsToDelete = goodsInRows.filter((row) =>
+        selectedRows.includes(`${row.barCode}-${row.ingredient}`)
+      );
+      
+      if (rowsToDelete.length === 0) {
+        console.error("No rows selected for deletion.");
+        return;
+      }
+  
       await Promise.all(
-        selectedRows.map(async (id) => {
+        rowsToDelete.map(async (row) => {
+          const { barCode } = row;
           const response = await fetch("http://localhost:5000/api/delete-row", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, cognito_id: cognitoId }),
+            body: JSON.stringify({ barCode, cognito_id: cognitoId }),
           });
+  
           if (!response.ok) {
-            throw new Error(`Failed to delete row with id ${id}`);
+            throw new Error(`Failed to delete row with Bar Code ${barCode}`);
           }
         })
       );
-
-      setGoodsInRows(goodsInRows.filter((row) => !selectedRows.includes(row.id)));
-      localStorage.setItem("goodsInRows", JSON.stringify(goodsInRows));
-      setSelectedRows([]);
+  
+      // Remove the selected rows from the frontend state after deletion
+      const updatedRows = goodsInRows.filter((row) =>
+        !selectedRows.includes(`${row.barCode}-${row.ingredient}`)
+      );
+      setGoodsInRows(updatedRows);
+      localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
+      setSelectedRows([]); // Clear selection
       handleCloseConfirmDialog();
     } catch (error) {
       console.error("Error deleting rows:", error);
     }
   };
+  
 
   const handleOpenConfirmDialog = () => {
     setOpenConfirmDialog(true);
@@ -241,43 +263,6 @@ const GoodsIn = () => {
   const handleCloseConfirmDialog = () => {
     setOpenConfirmDialog(false);
   };
-
-  const handleConfirmDelete = async () => {
-    try {
-      if (!cognitoId) {
-        console.error("Cognito ID is missing, cannot delete rows.");
-        return;
-      }
-  
-      // Send a delete request for each selected row
-      await Promise.all(
-        selectedRows.map(async (id) => {
-          const response = await fetch("http://localhost:5000/api/delete-row", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, cognito_id: cognitoId }),
-          });
-  
-          if (!response.ok) {
-            throw new Error(`Failed to delete row with id ${id}`);
-          }
-        })
-      );
-  
-      console.log("Rows deleted successfully from the database");
-  
-      // Remove selected rows from the frontend state after successful deletion
-      const remainingRows = goodsInRows.filter((row) => !selectedRows.includes(row.id));
-      setGoodsInRows(remainingRows);
-      localStorage.setItem("goodsInRows", JSON.stringify(remainingRows));
-      setSelectedRows([]); // Clear selection
-  
-      handleCloseConfirmDialog();
-    } catch (error) {
-      console.error("Error deleting rows:", error);
-    }
-  };
-  
 
   const handleFileOpen = (fileUrl) => {
     window.open(fileUrl, "_blank");
@@ -350,6 +335,7 @@ const GoodsIn = () => {
           rowsPerPageOptions={[5]}
           checkboxSelection
           onSelectionModelChange={(newSelection) => {
+            console.log("New selection:", newSelection.selectionModel); // Log selected rows
             setSelectedRows(newSelection.selectionModel);
           }}
           processRowUpdate={processRowUpdate}

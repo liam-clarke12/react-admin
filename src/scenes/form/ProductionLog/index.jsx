@@ -3,25 +3,78 @@ import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from "../../../components/Header";
-import { useData } from "../../../contexts/DataContext"; // Use the custom hook for DataContext
-import { useState } from "react"; // Import useState to manage Snackbar state
+import { useState, useEffect } from "react"; // Import useState and useEffect
 import AddIcon from "@mui/icons-material/Add"; // Import Add Icon for the FAB
+import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth hook
 
 const ProductionLogForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
-  const { addProductionLogRow, rows } = useData(); // Use the context to get rows (recipes)
+  const { cognitoId } = useAuth(); // Get cognitoId from context
+  const [filteredRecipes, setFilteredRecipes] = useState([]); // State to store filtered recipe names
+  const [loading, setLoading] = useState(false); // State to track loading status
+  const [error, setError] = useState(null); // State to track error
 
-  // Create a unique list of recipe names from rows
-  const uniqueRecipes = [...new Set(rows.map((row) => row.recipe))];
+  // Fetch unique recipe names from the backend based on cognitoId
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      if (!cognitoId) return;
+  
+      setLoading(true);
+      setError(null);
+  
+      try {
+        // Pass the cognitoId as a query parameter
+        const response = await fetch(`http://localhost:5000/get-recipes?cognito_id=${cognitoId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch recipes');
+        }
+  
+        const data = await response.json();
+        
+        // Log the recipes fetched to debug
+        console.log('Fetched recipes:', data);
+  
+        // Extract recipe names
+        const recipeNames = data.map((recipe) => recipe.recipe_name);
+        setFilteredRecipes(recipeNames);
+      } catch (err) {
+        setError('Error fetching recipes');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchRecipes();
+  }, [cognitoId]); // Re-run when cognitoId changes
+  
 
   // Snackbar state to show success message
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  const handleFormSubmit = (values, { resetForm }) => {
-    console.log("Submitting Values:", values);
-    addProductionLogRow(values); // Submit the production log data
-    resetForm(); // Reset the form after submission
-    setOpenSnackbar(true); // Open Snackbar on successful submit
+  const handleFormSubmit = async (values, { resetForm }) => {
+    const payload = { ...values, cognito_id: cognitoId };
+
+    console.log("📤 Sending payload:", payload); // Debug log
+
+    try {
+      const response = await fetch("http://localhost:5000/add-production-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit data");
+      }
+
+      console.log("✅ Data successfully sent to the backend.");
+      resetForm();
+      setOpenSnackbar(true);
+    } catch (error) {
+      console.error("❌ Error submitting data:", error);
+    }
   };
 
   // Close Snackbar
@@ -81,14 +134,18 @@ const ProductionLogForm = () => {
                 helperText={touched.recipe && errors.recipe}
                 sx={{ gridColumn: "span 2" }}
               >
-                {uniqueRecipes.length > 0 ? ( // Ensure unique recipes are available
-                  uniqueRecipes.map((recipe, index) => (
+                {loading ? (
+                  <MenuItem disabled>Loading recipes...</MenuItem>
+                ) : error ? (
+                  <MenuItem disabled>{error}</MenuItem>
+                ) : filteredRecipes.length > 0 ? (
+                  filteredRecipes.map((recipe, index) => (
                     <MenuItem key={index} value={recipe}>
                       {recipe}
                     </MenuItem>
                   ))
                 ) : (
-                  <MenuItem disabled>Please add recipes in the "Recipe Form"</MenuItem>
+                  <MenuItem disabled>No recipes available</MenuItem>
                 )}
               </TextField>
               <TextField

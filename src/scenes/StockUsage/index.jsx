@@ -1,63 +1,125 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, useTheme, Button, Drawer, Typography, IconButton } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { useData } from "../../contexts/DataContext";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import { useAuth } from "../../contexts/AuthContext";
+import axios from "axios";
 
 const StockUsage = () => {
+  const { cognitoId } = useAuth();
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { stockUsage, clearStockUsage } = useData();
+  const [stockUsage, setStockUsage] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]);
 
-  const handleDrawerOpen = (header, content) => {
-    let formattedContent;
-  
-    // If header is "Barcodes", we need to show both the previous and current barcodes (if different)
-    if (header === "Barcodes") {
-      formattedContent = content.length
-        ? content.map((item, index) => {
-            const prevBarcode = item.prevBarcode || "No previous barcode";
-            const currentBarcode = item.currentBarcode || "No current barcode";
-  
-            // If the previous and current barcodes are the same, only display ingredient: currentBarcode
-            if (prevBarcode === currentBarcode) {
-              return (
-                <div key={index}>
-                  {item.ingredient}: {currentBarcode}
-                </div>
-              );
-            }
-  
-            // Otherwise, show both the previous and current barcodes
-            return (
-              <div key={index}>
-                {item.ingredient}: {prevBarcode}, {currentBarcode}
-              </div>
-            );
-          })
-        : ["No data available"];
-    } 
-    // If header is "Ingredients", show the ingredient details as usual
-    else if (header === "Ingredients") {
-      formattedContent = content.length
-        ? content.map((ingredient, index) => (
-            <div key={index}>
-              {ingredient.ingredient}: {ingredient.quantity}
-            </div>
-          ))
-        : ["No ingredients available"];
+  // Fetch stock usage when cognitoId is available
+  useEffect(() => {
+    if (!cognitoId) {
+      console.warn("Cognito ID is not available, skipping fetch.");
+      return;
     }
-  
+
+    const fetchStockUsage = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/stock-usage/${cognitoId}`);
+        
+        const groupedData = {};
+
+        response.data.forEach((item) => {
+          const key = `${item.recipe_name}-${item.production_log_date}-${item.batchCode}`;
+          if (!groupedData[key]) {
+            groupedData[key] = {
+              id: key,
+              date: item.production_log_date,
+              recipeName: item.recipe_name,
+              batchCode: item.batchCode,
+              batchesProduced: item.batchesProduced, // Add batchesProduced
+              ingredients: [],
+              barcodes: [],
+            };
+          }
+
+          item.ingredients.forEach((ingredient) => {
+            const totalQuantity = ingredient.quantity * item.batchesProduced; // Calculate total quantity
+            groupedData[key].ingredients.push(`${ingredient.ingredient_name}: ${totalQuantity}`);
+            groupedData[key].barcodes.push(`${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes}`);
+          });
+        });
+
+        const formattedData = Object.values(groupedData).map((entry) => ({
+          ...entry,
+          ingredients: entry.ingredients.join("; "), // Use "; " as the delimiter
+          barcodes: entry.barcodes.join("; "), // Use "; " as the delimiter
+        }));
+
+        setStockUsage(formattedData);
+      } catch (error) {
+        console.error("Error fetching stock usage:", error);
+      }
+    };
+
+    fetchStockUsage();
+  }, [cognitoId]);
+
+  // Open the drawer with proper content
+  const handleDrawerOpen = (header, content) => {
     setDrawerHeader(header);
-    setDrawerContent(formattedContent);
+    console.log(`Drawer Header: ${header}, Content:`, content);
+
+    if (header === "Barcodes") {
+      // Ensure content is an array before processing
+      if (content && Array.isArray(content)) {
+        // Display ingredient-barcode associations in the format "Test1: T1, T2"
+        setDrawerContent(
+          content.length ? (
+            <ul>
+              {content.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No data available</p>
+          )
+        );
+      } else {
+        // Handle case where content is invalid or not an array
+        console.error("Invalid content passed to Barcodes drawer:", content);
+        setDrawerContent(<p>Error: Invalid data</p>);
+      }
+    } else if (header === "Ingredients") {
+      // Handling Ingredients
+      if (Array.isArray(content)) {
+        // Display ingredient names and calculated quantities
+        setDrawerContent(
+          content.length ? (
+            <ul>
+              {content.map((item, index) => {
+                const [ingredientName, quantity] = item.split(": ");
+                return (
+                  <li key={index}>
+                    {ingredientName}: {quantity}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p>No data available</p>
+          )
+        );
+      } else {
+        console.error("Invalid content passed to Ingredients drawer:", content);
+        setDrawerContent(<p>Error: Invalid data</p>);
+      }
+    }
+
     setDrawerOpen(true);
   };
-  
+
+  // Close the drawer
   const handleDrawerClose = () => {
     setDrawerOpen(false);
   };
@@ -72,7 +134,10 @@ const StockUsage = () => {
       renderCell: (params) => (
         <span
           style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-          onClick={() => handleDrawerOpen("Ingredients", params.row.ingredients)}
+          onClick={() => {
+            console.log("Ingredients Content:", params.row.ingredients);
+            handleDrawerOpen("Ingredients", params.row.ingredients.split("; ")); // Use "; " for splitting
+          }}
         >
           Show Ingredients
         </span>
@@ -83,37 +148,17 @@ const StockUsage = () => {
       field: "barcodes",
       headerName: "Barcodes",
       flex: 1,
-      renderCell: (params) => {
-        // Initialize empty objects for barcode tracking
-        let previousBarcodes = {};
-        let barcodesAfterRemoval = {};
-    
-        // Assuming you have the logic to extract the previous and current barcodes
-        params.row.ingredients.forEach((ingredient) => {
-          const normalizedIngredient = ingredient.ingredient.toLowerCase().trim();
-          previousBarcodes[normalizedIngredient] = ingredient.prevBarcode || "No previous barcode";
-          barcodesAfterRemoval[normalizedIngredient] = ingredient.currentBarcode || "No current barcode";
-        });
-    
-        // Create the barcode display for each ingredient
-        const barcodes = params.row.ingredients.map((ingredient) => {
-          const normalizedIngredient = ingredient.ingredient.toLowerCase().trim();
-          return {
-            ingredient: ingredient.ingredient || "Unknown ingredient",
-            prevBarcode: previousBarcodes[normalizedIngredient] || "No previous barcode",
-            currentBarcode: barcodesAfterRemoval[normalizedIngredient] || "No current barcode"
-          };
-        });
-    
-        return (
-          <span
-            style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-            onClick={() => handleDrawerOpen("Barcodes", barcodes)}
-          >
-            Show Barcodes
-          </span>
-        );
-      },
+      renderCell: (params) => (
+        <span
+          style={{ cursor: "pointer", color: colors.blueAccent[500] }}
+          onClick={() => {
+            console.log("Barcodes Content:", params.row.barcodes);
+            handleDrawerOpen("Barcodes", params.row.barcodes.split("; ")); // Use "; " for splitting
+          }}
+        >
+          Show Barcodes
+        </span>
+      ),
     },
   ];
 
@@ -121,12 +166,11 @@ const StockUsage = () => {
     <Box m="20px">
       <Header title="STOCK USAGE" subtitle="Keep Track of Your Stock Usage" />
       <Button
-        onClick={clearStockUsage}
+        onClick={() => setStockUsage([])}
         sx={{ color: colors.blueAccent[500], border: `1px solid ${colors.blueAccent[500]}` }}
       >
         Clear Stock Usage
       </Button>
-
       <Box
         m="40px 0 0 0"
         height="75vh"
@@ -139,27 +183,15 @@ const StockUsage = () => {
           "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
         }}
       >
-        <DataGrid
-          rows={stockUsage}
-          columns={columns}
-          getRowId={(row) => `${row.recipeName}-${row.date}-${row.batchCode}`} // Create unique ID for each row
-        />
+        <DataGrid rows={stockUsage} columns={columns} getRowId={(row) => row.id} />
       </Box>
-
-      {/* Drawer for displaying Ingredients or Barcodes */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={handleDrawerClose}
-        sx={{
-          "& .MuiDrawer-paper": {
-            borderRadius: "20px 0 0 20px",
-            overflow: "hidden",
-          },
-        }}
+        sx={{ "& .MuiDrawer-paper": { borderRadius: "20px 0 0 20px", overflow: "hidden" } }}
       >
         <Box width="300px" p={0}>
-          {/* Drawer Header */}
           <Box
             sx={{
               width: "100%",
@@ -178,15 +210,7 @@ const StockUsage = () => {
               {drawerHeader}
             </Typography>
           </Box>
-
-          {/* Drawer Content */}
-          <Box p={2}>
-            <ul>
-              {drawerContent.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          </Box>
+          <Box p={2}>{drawerContent}</Box>
         </Box>
       </Drawer>
     </Box>

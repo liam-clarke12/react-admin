@@ -1,4 +1,4 @@
-import { Box, useTheme, Button, Drawer, Typography, IconButton, Snackbar, useMediaQuery } from "@mui/material";
+import { Box, useTheme, Drawer, Typography, IconButton, Snackbar, useMediaQuery } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
@@ -7,6 +7,8 @@ import BarChart from "../../components/BarChart"; // Use BarChart instead of Pie
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined"; // Import Menu Icon
 import { useState, useEffect } from "react";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
+
 
 const IngredientsInventory = () => {
   const theme = useTheme();
@@ -14,84 +16,105 @@ const IngredientsInventory = () => {
   const { ingredientInventory, setIngredientInventory } = useData(); // Use setIngredientInventory from context
   const [drawerOpen, setDrawerOpen] = useState(false); // State to handle drawer visibility
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  
+  const [snackbarMessage] = useState('');
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { cognitoId } = useAuth(); // Get cognitoId from context
+  
 
-  // Load from localStorage on initial render
   useEffect(() => {
-    try {
-      const storedData = localStorage.getItem("ingredientInventory");
-      if (storedData) {
-        setIngredientInventory(JSON.parse(storedData));
-      }
-    } catch (error) {
-      console.error("Error reading localStorage:", error);
+    if (cognitoId) {
+      const fetchGoodsInData = async () => {
+        try {
+          console.log("Fetching Goods In data...");
+          const response = await fetch(`http://localhost:5000/api/goods-in?cognito_id=${cognitoId}`);
+          if (!response.ok) {
+            throw new Error("Failed to fetch Goods In data");
+          }
+          const data = await response.json();
+          console.log("Goods In data fetched:", data);
+  
+          const processedData = processInventoryData(data);
+          setIngredientInventory(processedData);
+        } catch (error) {
+          console.error("Error fetching Goods In data:", error);
+        }
+      };
+  
+      fetchGoodsInData();
     }
-  }, [setIngredientInventory]);
+  }, [cognitoId, setIngredientInventory]); // Added setIngredientInventory
+  
+  
 
-  // Sync state with localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("ingredientInventory", JSON.stringify(ingredientInventory));
-  }, [ingredientInventory]);
+  // Function to process the fetched data
+  const processInventoryData = (data) => {
+    // Step 1: Filter out rows with stockRemaining === 0
+    const filteredData = data.filter(row => row.stockRemaining > 0);
+
+    // Step 2: Group by 'ingredient' and process each group
+    const groupedData = filteredData.reduce((acc, row) => {
+      const existingGroup = acc[row.ingredient];
+
+      if (existingGroup) {
+        // Step 3: Sum the stockRemaining
+        existingGroup.stockOnHand += row.stockRemaining;
+
+        // Step 4: Assign the barcode from the row with the smallest ID
+        if (row.id < existingGroup.minId) {
+          existingGroup.minId = row.id;
+          existingGroup.barcode = row.barCode;
+        }
+      } else {
+        // Initialize the group
+        acc[row.ingredient] = {
+          id: row.ingredient, // Use ingredient as unique ID for DataGrid
+          ingredient: row.ingredient,
+          stockOnHand: row.stockRemaining,
+          barcode: row.barCode,
+          minId: row.id // Track min ID for barcode selection
+        };
+      }
+
+      return acc;
+    }, {});
+
+    // Convert grouped object back into an array
+    return Object.values(groupedData).map(({ minId, ...row }) => row);
+  };
 
   const columns = [
     { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
-    { field: "amount", headerName: "Stock on Hand (kg)", flex: 1, editable: true },
+    { field: "stockOnHand", headerName: "Stock on Hand (kg)", flex: 1, editable: true },
     {
       field: "barcode",
       headerName: "Barcode",
       flex: 1,
       headerAlign: "left",
       align: "left",
-      cellClassName: "barCode-column--cell", // Style barcode column
+      cellClassName: "barCode-column--cell",
       editable: true,
     },
   ];
 
-  const handleClearStorage = () => {
-    localStorage.removeItem("ingredientInventory");
-    setIngredientInventory([]); // Reset the state
-    setSnackbarMessage("Data cleared successfully!");
-    setOpenSnackbar(true); // Show Snackbar confirmation
-  };
-
-  const handleRowEdit = (newRow, oldRow) => {
-    const updatedRows = ingredientInventory.map((row) =>
-      row.ingredient === oldRow.ingredient ? newRow : row
-    );
-
-    setIngredientInventory(updatedRows); // Update context
-
-    // Also store updated data in localStorage
-    localStorage.setItem("ingredientInventory", JSON.stringify(updatedRows));
-
-    return newRow; // Return the new row for display
-  };
-
-  // Prepare the data for the bar chart
+  // Prepare data for the bar chart
   const barChartData = ingredientInventory.map((item) => ({
-    ingredient: item.ingredient, // Use ingredient as the index
-    amount: item.amount, // Key for value
+    ingredient: item.ingredient,
+    amount: item.stockOnHand, // Key for value
   }));
 
   return (
     <Box m="20px">
       <Header title="INGREDIENT INVENTORY" subtitle="Stay on Top of your Stock Levels" />
-      <Button onClick={handleClearStorage} color="error" variant="contained" sx={{ mb: 2 }}>
-        Clear Data
-      </Button>
-
-      {/* Bar Chart Icon Button - Positioned above the table */}
+      {/* Bar Chart Icon Button */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <IconButton
           onClick={() => setDrawerOpen(true)}
           aria-label="Open Bar Chart"
           sx={{
-            color: colors.blueAccent[300], // No background, only color change
+            color: colors.blueAccent[300],
             "&:hover": {
-              backgroundColor: "transparent", // Transparent background on hover
-              color: colors.blueAccent[700], // Color change on hover
+              backgroundColor: "transparent",
+              color: colors.blueAccent[700],
             },
           }}
         >
@@ -104,94 +127,50 @@ const IngredientsInventory = () => {
         m="40px 0 0 0"
         height="75vh"
         sx={{
-          overflowX: 'auto',
-          "& .MuiDataGrid-root": { 
-            border: "none", minWidth: "650px" 
-          },
-          "& .MuiDataGrid-cell": {
-            borderBottom: "none",
-          },
-          "& .barCode-column--cell": {
-            color: colors.blueAccent[300], // Set color for barcode
-          },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-          },
-          "& .MuiDataGrid-virtualScroller": {
-            backgroundColor: colors.primary[400],
-          },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700],
-          },
-          "& .MuiCheckbox-root": {
-            color: `${colors.blueAccent[200]} !important`,
-          },
-          "& .even-row": {
-            backgroundColor: colors.primary[450], // Color for even rows (adjust per mode)
-          },
-          "& .odd-row": {
-            backgroundColor: colors.primary[400], // Color for odd rows (adjust per mode)
-          },
+          overflowX: "auto",
+          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+          "& .MuiDataGrid-cell": { borderBottom: "none" },
+          "& .barCode-column--cell": { color: colors.blueAccent[300] },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700] },
+          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
+          "& .MuiDataGrid-footerContainer": { backgroundColor: colors.blueAccent[700] },
         }}
       >
         <DataGrid
           autoHeight
           checkboxSelection
-          rows={ingredientInventory.map((row, index) => ({
-            ...row,
-            id: row.ingredient, // Use ingredient as unique ID
-            rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row', // Apply alternating row classes
-          }))}
+          rows={ingredientInventory}
           columns={columns}
-          pageSize={10}  // Enable pagination
-          rowsPerPageOptions={[5, 10, 20]}  // Allow users to select page size
-          processRowUpdate={handleRowEdit}
-          getRowClassName={(params) => 
-            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row'
-          }
+          pageSize={10}
+          rowsPerPageOptions={[5, 10, 20]}
         />
       </Box>
 
       {/* Drawer for Bar Chart */}
       <Drawer
-        anchor={isMobile ? "bottom" : "right"} // Adjust position on mobile
+        anchor={isMobile ? "bottom" : "right"}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
-          sx: {
-            width: isMobile ? "100%" : "90%",
-            borderRadius: "20px 0 0 20px",
-            overflow: "hidden",
-          },
+          sx: { width: isMobile ? "100%" : "90%", borderRadius: "20px 0 0 20px" },
         }}
       >
-        <Box
-          sx={{
-            backgroundColor: colors.primary[400],
-            height: "100%",
-          }}
-        >
-          {/* Drawer Header */}
+        <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
           <Box
             sx={{
               width: "100%",
-              height: "50px", // Reduced height for a thinner header
-              backgroundColor: colors.greenAccent[500], // Same background color as the Recipes drawer
+              height: "50px",
+              backgroundColor: colors.greenAccent[500],
               color: colors.grey[100],
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              position: "relative", // To position the close icon correctly
-              top: 0, // Fill the top of the drawer
-              padding: "0 10px", // Added padding for left/right
+              position: "relative",
+              top: 0,
+              padding: "0 10px",
             }}
           >
-            <IconButton
-              onClick={() => setDrawerOpen(false)}
-              sx={{ color: "white", position: "absolute", left: 10 }}
-            >
+            <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "white", position: "absolute", left: 10 }}>
               <MenuOutlinedIcon />
             </IconButton>
             <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
@@ -200,34 +179,14 @@ const IngredientsInventory = () => {
           </Box>
 
           {/* BarChart inside the Drawer */}
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            sx={{
-              width: "100%", // Full width
-              height: "70%", // Height for the bar chart
-              mt: 2, // Added margin-top for spacing between header and chart
-            }}
-          >
-            <BarChart
-              data={barChartData}
-              keys={["amount"]}
-              indexBy="ingredient"
-              height="500px" // Height for the bar chart
-              width="90%"    // Adjust width for a better fit
-            />
+          <Box display="flex" justifyContent="center" alignItems="center" sx={{ width: "100%", height: "70%", mt: 2 }}>
+            <BarChart data={barChartData} keys={["amount"]} indexBy="ingredient" height="500px" width="90%" />
           </Box>
         </Box>
       </Drawer>
 
       {/* Snackbar for Clear Storage */}
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={3000}
-        onClose={() => setOpenSnackbar(false)}
-        message={snackbarMessage}
-      />
+      <Snackbar open={openSnackbar} autoHideDuration={3000} onClose={() => setOpenSnackbar(false)} message={snackbarMessage} />
     </Box>
   );
 };
