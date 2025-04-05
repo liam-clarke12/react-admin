@@ -675,6 +675,146 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
   });
 });
 
+app.post("/api/add-goods-out", async (req, res) => {
+  const { date, recipe, stockAmount, recipients, cognito_id } = req.body;
+
+  console.log("Received /add-goods-out request with:", req.body);
+
+  if (!date || !recipe || !stockAmount || !recipients || !cognito_id) {
+    console.error("Missing fields in request:", req.body);
+    return res.status(400).json({ error: "All fields are required, including cognito_id" });
+  }
+
+  const connection = await db.promise().getConnection();
+  try {
+    console.log("Starting database transaction...");
+    await connection.beginTransaction();
+
+    // 1. Insert into goods_out
+    const goodsoutQuery = `
+      INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    const [GoodsOutResult] = await connection.execute(goodsoutQuery, [
+      date,
+      recipe,
+      stockAmount,
+      recipients,
+      cognito_id,
+    ]);
+
+    const goodsOutId = GoodsOutResult.insertId;
+    console.log("Inserted into goods_out. ID:", goodsOutId);
+
+    // 2. Deduct from production_log (starting from highest ID)
+    let remainingToDeduct = stockAmount;
+
+    const [productionRows] = await connection.execute(
+      `SELECT id, batchRemaining, batchCode FROM production_log WHERE recipe = ? AND batchRemaining > 0 ORDER BY id ASC`,
+      [recipe]
+    );
+
+    for (const row of productionRows) {
+      if (remainingToDeduct <= 0) break;
+
+      const deductAmount = Math.min(row.batchRemaining, remainingToDeduct);
+
+      // Deduct batches
+      await connection.execute(
+        `UPDATE production_log SET batchRemaining = batchRemaining - ? WHERE id = ?`,
+        [deductAmount, row.id]
+      );
+
+      // Track which batch (production_log row) was used and the quantity
+      await connection.execute(
+        `INSERT INTO goods_out_batches (goods_out_id, production_log_id, quantity_used) VALUES (?, ?, ?)`,
+        [goodsOutId, row.id, deductAmount] // Insert quantity used here
+      );
+
+      console.log(`Deducted ${deductAmount} from production_log ID ${row.id}`);
+      remainingToDeduct -= deductAmount;
+    }
+
+    if (remainingToDeduct > 0) {
+      console.warn(`Warning: Not enough batches to cover stockAmount. ${remainingToDeduct} still unaccounted for.`);
+      // Optional: throw error or continue as partial
+    }
+
+    await connection.commit();
+    res.status(200).json({ message: "Goods out added and production log updated with batch tracking." });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error processing transaction:", err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
+app.get("/api/goods-out-with-batches", async (req, res) => {
+  const { cognito_id } = req.query;
+
+  if (!cognito_id) {
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  try {
+    const query = `
+      SELECT 
+        go.id AS goods_out_id,
+        go.date,
+        go.recipe,
+        go.stockAmount,
+        go.recipients,
+        go.user_id,
+        GROUP_CONCAT(pl.batchCode ORDER BY pl.id SEPARATOR ', ') AS batchCodesUsed,
+        GROUP_CONCAT(gob.quantity_used ORDER BY pl.id SEPARATOR ', ') AS quantitiesUsed
+      FROM goods_out go
+      JOIN goods_out_batches gob ON go.id = gob.goods_out_id
+      JOIN production_log pl ON gob.production_log_id = pl.id
+      WHERE go.user_id = ?
+      GROUP BY go.id
+      ORDER BY go.date DESC
+    `;
+
+    const [results] = await db.promise().query(query, [cognito_id]);
+
+    res.json(results);
+  } catch (err) {
+    console.error("Error fetching goods_out with batchCodes:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+app.get("/api/goods-out", async (req, res) => {
+  const { cognito_id } = req.query; // Get cognito_id from query parameters
+
+  if (!cognito_id) {
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  try {
+    const query = `
+      SELECT go.id, go.date, go.recipe, go.stockAmount, go.recipients,
+             JSON_ARRAYAGG(pl.batchCode) AS batchcodes,
+             JSON_ARRAYAGG(gob.quantity_used) AS quantitiesUsed
+      FROM goods_out go
+      JOIN goods_out_batches gob ON go.id = gob.goods_out_id
+      JOIN production_log pl ON gob.production_log_id = pl.id
+      WHERE go.user_id = ?
+      GROUP BY go.id
+      ORDER BY go.date DESC
+    `;
+    
+    const [results] = await db.promise().query(query, [cognito_id]);
+
+    res.json(results);
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

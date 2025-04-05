@@ -1,45 +1,72 @@
-import { Box, IconButton, useTheme, Popover, Typography, Grid } from "@mui/material";
+import { 
+    Box, IconButton, useTheme, Popover, Typography, Grid, MenuItem, Dialog, DialogActions, DialogContent, 
+    DialogContentText, DialogTitle, Button 
+} from "@mui/material";
 import { useContext, useState, useEffect } from "react";
 import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"; 
+import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined"; 
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import { useData } from "../../contexts/DataContext"; 
+import { useAuth } from "../../contexts/AuthContext";  
 import { useNavigate } from "react-router-dom"; 
 
 const Topbar = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
-    const { goodsInRows } = useData(); // Access goodsInRows from the context
+    const { goodsInRows } = useData(); 
+    const { cognitoId, signOut } = useAuth();  
+    const navigate = useNavigate();
+
     const [notifications, setNotifications] = useState(() => {
         const savedNotifications = localStorage.getItem('notifications');
         return savedNotifications ? JSON.parse(savedNotifications) : [];
     });
-    const [anchorEl, setAnchorEl] = useState(null);
-    const navigate = useNavigate();
 
-    const handleClick = (event) => {
-        setAnchorEl(event.currentTarget);
+    const [notifAnchor, setNotifAnchor] = useState(null);
+    const [profileAnchor, setProfileAnchor] = useState(null);
+    const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+
+    const handleNotifClick = (event) => {
+        setNotifAnchor(event.currentTarget);
     };
 
-    const handleClose = () => {
-        setAnchorEl(null);
+    const handleCloseNotif = () => {
+        setNotifAnchor(null);
+    };
+
+    const handleProfileClick = (event) => {
+        setProfileAnchor(event.currentTarget);
+    };
+
+    const handleCloseProfile = () => {
+        setProfileAnchor(null);
     };
 
     const handleNotificationClick = () => {
         navigate("/GoodsIn");
-        setNotifications([]);  // Clear notifications after clicking
-        localStorage.setItem('notifications', JSON.stringify([])); // Update localStorage
-        handleClose();
+        setNotifications([]);  
+        localStorage.setItem('notifications', JSON.stringify([])); 
+        handleCloseNotif();
     };
 
-    const open = Boolean(anchorEl);
+    const handleLogoutClick = () => {
+        setLogoutDialogOpen(true);
+    };
+
+    const handleConfirmLogout = async () => {
+        setLogoutDialogOpen(false);
+        await signOut();
+        navigate("/login");
+    };
 
     useEffect(() => {
         const notifiedBarcodes = new Set(notifications.map(notification => notification.barcode));
@@ -48,12 +75,10 @@ const Topbar = () => {
             const currentDate = new Date();
             const expiredRows = goodsInRows.filter(row => new Date(row.expiryDate) < currentDate);
 
-            // Filter out notifications that no longer have expired items in goodsInRows
             const activeNotifications = notifications.filter(notification => 
                 expiredRows.some(row => row.barCode === notification.barcode)
             );
 
-            // Add new notifications for items not yet notified
             const newNotifications = expiredRows
                 .filter(row => !notifiedBarcodes.has(row.barCode))
                 .map(row => ({
@@ -92,7 +117,9 @@ const Topbar = () => {
                         <LightModeOutlinedIcon />
                     )}
                 </IconButton>
-                <IconButton onClick={handleClick} style={{ position: 'relative' }}>
+
+                {/* Notifications Icon */}
+                <IconButton onClick={handleNotifClick} style={{ position: 'relative' }}>
                     <NotificationsOutlinedIcon />
                     {notifications.length > 0 && (
                         <span style={{
@@ -113,71 +140,87 @@ const Topbar = () => {
                         </span>
                     )}
                 </IconButton>
-                <IconButton>
-                    <SettingsOutlinedIcon />
-                </IconButton>
-                <IconButton>
+
+                {/* Profile Icon */}
+                <IconButton onClick={handleProfileClick}>
                     <PersonOutlinedIcon />
                 </IconButton>
             </Box>
 
             {/* Notification Dropdown */}
             <Popover
-                open={open}
-                anchorEl={anchorEl}
-                onClose={handleClose}
-                anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'center',
-                }}
-                transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'center',
-                }}
+                open={Boolean(notifAnchor)}
+                anchorEl={notifAnchor}
+                onClose={handleCloseNotif}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
                 <Box minWidth={300}>
-                    {/* Header Section with full-width green background */}
                     <Box sx={{ backgroundColor: colors.blueAccent[500], px: 2, py: 1 }}>
                         <Typography variant="body2" fontWeight="bold">Notifications</Typography>
                     </Box>
 
                     <Box p={2}>
                         {notifications.length > 0 ? (
-                            <Box>
-                                {/* Notification Rows */}
-                                {notifications.map((notification, index) => (
-                                    <Box 
-                                        key={index} 
-                                        sx={{
-                                            borderBottom: index < notifications.length - 1 ? `1px solid ${colors.primary[300]}` : 'none',
-                                            paddingY: '8px',
-                                        }}
-                                    >
-                                        <Grid container alignItems="center" justifyContent="space-between">
-                                            <Grid item>
-                                                <Typography variant="body2">{notification.message}</Typography>
-                                            </Grid>
-                                            <Grid item>
-                                                <IconButton 
-                                                    onClick={handleNotificationClick}
-                                                    sx={{
-                                                        color: colors.blueAccent[500],
-                                                        padding: 0
-                                                    }}
-                                                >
-                                                    <ArrowCircleRightOutlinedIcon />
-                                                </IconButton>
-                                            </Grid>
+                            notifications.map((notification, index) => (
+                                <Box 
+                                    key={index} 
+                                    sx={{
+                                        borderBottom: index < notifications.length - 1 ? `1px solid ${colors.primary[300]}` : 'none',
+                                        paddingY: '8px',
+                                    }}
+                                >
+                                    <Grid container alignItems="center" justifyContent="space-between">
+                                        <Grid item>
+                                            <Typography variant="body2">{notification.message}</Typography>
                                         </Grid>
-                                    </Box>
-                                ))}
-                            </Box>
+                                        <Grid item>
+                                            <IconButton 
+                                                onClick={handleNotificationClick}
+                                                sx={{ color: colors.blueAccent[500], padding: 0 }}
+                                            >
+                                                <ArrowCircleRightOutlinedIcon />
+                                            </IconButton>
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                            ))
                         ) : (
                             <Typography variant="body2">You have no notifications</Typography>
                         )}
                     </Box>
                 </Box>
             </Popover>
+
+            {/* Profile Dropdown */}
+            <Popover
+                open={Boolean(profileAnchor)}
+                anchorEl={profileAnchor}
+                onClose={handleCloseProfile}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Box minWidth={220} p={1.5}>
+                    <Typography variant="body2" fontWeight="bold" px={1.5}>Account ID: {cognitoId || "Not available"}</Typography>
+                    <Box height="1px" bgcolor={colors.primary[300]} my={1} />
+
+                    <MenuItem onClick={() => navigate("/account")}><AccountCircleOutlinedIcon fontSize="small" /> Account</MenuItem>
+                    <MenuItem onClick={() => navigate("/settings")}><SettingsOutlinedIcon fontSize="small" /> Settings</MenuItem>
+                    <MenuItem onClick={handleLogoutClick} sx={{ color: colors.red[500] }}>
+                        <LogoutOutlinedIcon fontSize="small" /> Logout
+                    </MenuItem>
+                </Box>
+            </Popover>
+
+            {/* Logout Confirmation Dialog */}
+            <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
+                <DialogTitle>Confirm Logout</DialogTitle>
+                <DialogContent><DialogContentText>Are you sure you want to log out?</DialogContentText></DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleConfirmLogout} color="error">Logout</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

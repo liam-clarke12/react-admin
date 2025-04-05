@@ -20,7 +20,6 @@ const ProductionLog = () => {
   const colors = tokens(theme.palette.mode);
   const { cognitoId } = useAuth();
   const [productionLogs, setProductionLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
@@ -34,9 +33,7 @@ const ProductionLog = () => {
         setProductionLogs(data);
       } catch (error) {
         console.error("Error fetching production log:", error);
-      } finally {
-        setLoading(false);
-      }
+      };
     };
     if (cognitoId) fetchProductionLogData();
   }, [cognitoId]);
@@ -92,8 +89,6 @@ const ProductionLog = () => {
   const handleCloseConfirmDialog = () => {
     setOpenConfirmDialog(false);
   };
-
-  if (loading) return <div>Loading...</div>;
 
   return (
     <Box m="20px">

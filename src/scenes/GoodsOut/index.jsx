@@ -1,58 +1,73 @@
-import { Box, useTheme, Button, Drawer, Typography, IconButton } from "@mui/material";
-import React, { useState } from "react";
+import {
+  Box,
+  useTheme,
+  Drawer,
+  Typography,
+  IconButton,
+} from "@mui/material";
+import React, { useState, useEffect } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
-import { useData } from "../../contexts/DataContext";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import { useAuth } from "../../contexts/AuthContext";
 
 const GoodsOut = () => {
+  const { cognitoId } = useAuth();
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { GoodsOut, clearGoodsOut, loading, addGoodsOutRow } = useData();
+  const [GoodsOut, setGoodsOut] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]);
 
+  useEffect(() => {
+    const fetchGoodsOutData = async () => {
+      try {
+        if (!cognitoId) return;
+        const response = await fetch(
+          `http://localhost:5000/api/goods-out?cognito_id=${cognitoId}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch data");
+        const data = await response.json();
+        
+        // Log the fetched data for inspection
+        console.log("Fetched Goods Out Data:", data);
+        
+        setGoodsOut(data);
+      } catch (error) {
+        console.error("Error fetching goods out:", error);
+      }
+    };
+
+    if (cognitoId) fetchGoodsOutData();
+  }, [cognitoId]);
+
   const handleDrawerOpen = (header, content) => {
-    console.log("Opening Drawer with Header:", header);
-    console.log("Drawer Content Input:", content);
-  
-    // Check for content length and process accordingly
     let formattedContent;
   
     if (header === "Batchcodes") {
-      formattedContent = content.length
-        ? content.map((item, index) => {
-            const prevBatchcode = item.prevBatchcode || "No previous batchcode";
-            const currentBatchcode = item.currentBatchcode || "No current batchcode";
+      // Log the batchcodes to verify if the data is correctly received
+      console.log("Batchcodes content:", content);
   
-            if (prevBatchcode === currentBatchcode) {
-              console.log(`Batchcode for ${item.recipe}: No change`);
-              return (
-                <div key={index}>
-                  {item.recipe}: {currentBatchcode}
-                </div>
-              );
-            }
-  
-            console.log(`Batchcode Change for ${item.recipe}: ${prevBatchcode} -> ${currentBatchcode}`);
-            return (
-              <div key={index}>
-                {item.recipe}: {prevBatchcode}, {currentBatchcode}
-              </div>
-            );
-          })
-        : ["No batchcodes available"];
+      // Ensure batchcodes and quantitiesUsed are paired together
+      if (content.batchcodes && content.quantitiesUsed) {
+        formattedContent = content.batchcodes.map((batchCode, index) => (
+          <div key={index}>
+            {batchCode}: {content.quantitiesUsed[index]}
+          </div>
+        ));
+      } else {
+        formattedContent = ["No batchcodes available"];
+      }
     } else {
       formattedContent = ["No data available"];
     }
   
-    console.log("Formatted Drawer Content:", formattedContent);
     setDrawerHeader(header);
     setDrawerContent(formattedContent);
     setDrawerOpen(true);
-  };  
+  };
 
   const handleDrawerClose = () => {
     setDrawerOpen(false);
@@ -62,7 +77,7 @@ const GoodsOut = () => {
     { field: "date", headerName: "Date", flex: 1, editable: false },
     { field: "recipe", headerName: "Recipe Name", flex: 1, editable: false },
     {
-      field: "amount",
+      field: "stockAmount",
       headerName: "Units going Out",
       type: "number",
       flex: 1,
@@ -75,31 +90,33 @@ const GoodsOut = () => {
       headerName: "Batchcodes",
       flex: 1,
       renderCell: (params) => {
-        // Log the params object to inspect its structure
-        console.log("Batchcodes Field Params:", params);
-    
-        // Safely check for batchcodeChanges in the row
-        const batchcodes = Array.isArray(params.row.batchcodeChanges) && params.row.batchcodeChanges.length
-          ? params.row.batchcodeChanges.map((change) => ({
-              recipe: change.recipe || "Unknown recipe",
-              prevBatchcode: change.prevBatchcode || "No previous batchcode",
-              currentBatchcode: change.currentBatchcode || "No current batchcode",
-            }))
-          : [];
-    
-        // Log the mapped batchcodes to verify what we are passing to the drawer
-        console.log("Mapped Batchcodes for Drawer:", batchcodes);
-    
+        let batchcodes = [];
+        let quantitiesUsed = [];
+
+        try {
+          batchcodes = Array.isArray(params.row.batchcodes)
+            ? params.row.batchcodes
+            : JSON.parse(params.row.batchcodes || "[]");
+
+          quantitiesUsed = Array.isArray(params.row.quantitiesUsed)
+            ? params.row.quantitiesUsed
+            : JSON.parse(params.row.quantitiesUsed || "[]");
+        } catch (e) {
+          console.error("Failed to parse batchcodes:", e);
+        }
+
         return (
           <span
             style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-            onClick={() => handleDrawerOpen("Batchcodes", batchcodes)}
+            onClick={() =>
+              handleDrawerOpen("Batchcodes", { batchcodes, quantitiesUsed })
+            }
           >
             Show Batchcodes
           </span>
         );
       },
-    },    
+    },
     {
       field: "recipients",
       headerName: "Recipients",
@@ -108,27 +125,11 @@ const GoodsOut = () => {
       align: "left",
       editable: false,
     },
-      ];
-
-  const processRowUpdate = (newRow) => {
-    addGoodsOutRow(newRow);
-    return newRow;
-  };
-
-  if (loading) return <div>Loading...</div>;
+  ];
 
   return (
     <Box m="20px">
       <Header title="GOODS OUT" subtitle="Track Goods Out Information" />
-
-      <Button
-        variant="contained"
-        color="secondary"
-        onClick={clearGoodsOut}
-        sx={{ mb: 2 }}
-      >
-        Clear Data
-      </Button>
 
       <Box
         m="40px 0 0 0"
@@ -208,14 +209,13 @@ const GoodsOut = () => {
             Array.isArray(GoodsOut)
               ? GoodsOut.map((row, index) => ({
                   ...row,
-                  id: row.batchCode || `${row.recipe}-${index}`,
+                  id: row.id || `${row.recipe}-${index}`,
                   rowClassName: index % 2 === 0 ? "even-row" : "odd-row",
                 }))
               : []
           }
           columns={columns}
-          processRowUpdate={processRowUpdate}
-          getRowId={(row) => row.batchCode || row.id}
+          getRowId={(row) => row.id}
           disableSelectionOnClick
           getRowClassName={(params) =>
             params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row"

@@ -1,22 +1,76 @@
-import { Box, useTheme, Button, Drawer, Typography, IconButton } from "@mui/material";
+import { Box, useTheme, Drawer, Typography, IconButton } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import BarChart from "../../components/BarChart"; // Import BarChart
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined"; // Import Menu Icon
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
 
 const RecipeInventory = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { recipeInventory, clearRecipeInventory } = useData(); // Access the recipe inventory and clear function from context
+  const { recipeInventory, setRecipeInventory } = useData(); // Access the recipe inventory and clear function from context
   const [drawerOpen, setDrawerOpen] = useState(false); // State to handle drawer visibility
+  const { cognitoId } = useAuth(); // Get cognitoId from context
 
   // Safeguard: Ensure recipeInventory is an array
   const rows = recipeInventory && recipeInventory.length > 0 ? recipeInventory : [];
 
+    useEffect(() => {
+      if (cognitoId) {
+        const fetchProductionLogData = async () => {
+          try {
+            console.log("Fetching Production Log data...");
+            const response = await fetch(`http://localhost:5000/api/production-log?cognito_id=${cognitoId}`);
+            if (!response.ok) {
+              throw new Error("Failed to fetch Production Log data");
+            }
+            const data = await response.json();
+            console.log("Production Log data fetched:", data);
+    
+            const processedData = processRecipeInventoryData(data);
+            setRecipeInventory(processedData);
+          } catch (error) {
+            console.error("Error fetching Production Log data:", error);
+          }
+        };
+    
+        fetchProductionLogData();
+      }
+    }, [cognitoId, setRecipeInventory]); // Added setIngredientInventory
+
+     // Function to process the fetched data
+     const processRecipeInventoryData = (data) => {
+      const filteredData = data.filter(row => row.batchRemaining > 0);
+    
+      const groupedData = filteredData.reduce((acc, row) => {
+        const existingGroup = acc[row.recipe];
+    
+        if (existingGroup) {
+          existingGroup.quantity += row.batchRemaining;
+          if (row.id < existingGroup.minId) {
+            existingGroup.minId = row.id;
+            existingGroup.batchCode = row.batchCode;
+          }
+        } else {
+          acc[row.recipe] = {
+            id: row.batchCode, // Use batchCode as unique ID for DataGrid
+            date: row.date,
+            recipe: row.recipe,
+            quantity: row.batchRemaining,
+            batchCode: row.batchCode,
+            minId: row.id
+          };
+        }
+    
+        return acc;
+      }, {});
+    
+      return Object.values(groupedData).map(({ minId, ...row }) => row);
+    };
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
     { field: "recipe", headerName: "Recipe Name", flex: 1 },
@@ -30,22 +84,9 @@ const RecipeInventory = () => {
     quantity: item.quantity, // Key for value
   }));
 
-  const handleClearStorage = () => {
-    localStorage.removeItem("recipeInventory"); // Remove specific item
-    clearRecipeInventory(); // Reset the state
-  };
-
   return (
     <Box m="20px">
       <Header title="STOCK INVENTORY" subtitle="Track Your Stock Based on Production" />
-      <Button 
-        variant="contained" 
-        color="error" 
-        onClick={handleClearStorage}
-        sx={{ mb: 2 }} // Add some margin below the button
-      >
-        Clear Logs
-      </Button>
 
       {/* Bar Chart Icon Button - Positioned above the table */}
       <Box display="flex" justifyContent="flex-end" mb={2}>

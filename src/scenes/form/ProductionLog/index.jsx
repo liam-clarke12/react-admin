@@ -23,30 +23,30 @@ const ProductionLogForm = () => {
       setError(null);
   
       try {
-        // Pass the cognitoId as a query parameter
         const response = await fetch(`http://localhost:5000/get-recipes?cognito_id=${cognitoId}`);
         if (!response.ok) {
-          throw new Error('Failed to fetch recipes');
+          throw new Error("Failed to fetch recipes");
         }
   
         const data = await response.json();
-        
-        // Log the recipes fetched to debug
-        console.log('Fetched recipes:', data);
+        console.log("Fetched recipes:", data);
   
-        // Extract recipe names
-        const recipeNames = data.map((recipe) => recipe.recipe_name);
-        setFilteredRecipes(recipeNames);
+        if (data.length > 0) {
+          setFilteredRecipes(data.map((recipe) => recipe.recipe_name));
+        } else {
+          setFilteredRecipes([]); // No recipes found
+        }
+  
       } catch (err) {
-        setError('Error fetching recipes');
+        setError("Error fetching recipes");
+        setFilteredRecipes([]); // Reset on error
       } finally {
-        setLoading(false);
+        setLoading(false); // Ensure loading stops
       }
     };
   
     fetchRecipes();
-  }, [cognitoId]); // Re-run when cognitoId changes
-  
+  }, [cognitoId]);
 
   // Snackbar state to show success message
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -121,33 +121,32 @@ const ProductionLogForm = () => {
                 helperText={touched.date && errors.date}
                 sx={{ gridColumn: "span 2" }}
               />
-              <TextField
-                fullWidth
-                variant="outlined"
-                select
-                label="Recipe Name"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.recipe}
-                name="recipe"
-                error={!!touched.recipe && !!errors.recipe}
-                helperText={touched.recipe && errors.recipe}
-                sx={{ gridColumn: "span 2" }}
-              >
-                {loading ? (
-                  <MenuItem disabled>Loading recipes...</MenuItem>
-                ) : error ? (
-                  <MenuItem disabled>{error}</MenuItem>
-                ) : filteredRecipes.length > 0 ? (
-                  filteredRecipes.map((recipe, index) => (
-                    <MenuItem key={index} value={recipe}>
-                      {recipe}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem disabled>No recipes available</MenuItem>
-                )}
-              </TextField>
+            <TextField
+              fullWidth
+              variant="outlined"
+              select
+              label="Recipe"
+              onBlur={handleBlur}
+              onChange={handleChange}
+              value={values.recipe}
+              name="recipe"
+              error={!!touched.recipe && !!errors.recipe}
+              helperText={touched.recipe && errors.recipe}
+            >
+              {loading ? (
+                <MenuItem disabled>Loading recipes...</MenuItem>
+              ) : error ? (
+                <MenuItem disabled>{error}</MenuItem>
+              ) : filteredRecipes.length > 0 ? (
+                filteredRecipes.map((recipe, index) => (
+                  <MenuItem key={index} value={recipe}>
+                    {recipe}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem disabled>No recipes available</MenuItem>
+              )}
+            </TextField>
               <TextField
                 fullWidth
                 variant="outlined"

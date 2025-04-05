@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
@@ -7,15 +7,19 @@ import EggAltIcon from '@mui/icons-material/EggAlt';
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import BarChart from "../../components/BarChart"; // Use the BarChart component from the ingredients inventory
+import BarChart from "../../components/BarChart";
 import StatBox from "../../components/StatBox";
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext'; // Import the useAuth hook
 
 const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   
   const { ingredientInventory, rows } = useData();
+  const { cognitoId } = useAuth(); // Get cognitoId from context
+
+  // Fetching logic for cognitoId is handled in the AuthContext, so no need to do it here.
 
   const zeroStockCount = ingredientInventory.filter(item => item.amount === 0).length;
   const totalIngredients = ingredientInventory.length;
@@ -24,9 +28,15 @@ const Dashboard = () => {
 
   // Prepare data for the bar chart
   const barChartData = ingredientInventory.map(item => ({
-    ingredient: item.ingredient, // Use ingredient name as the index
-    amount: item.amount, // The amount of each ingredient
+    ingredient: item.ingredient,
+    amount: item.amount,
   }));
+
+  useEffect(() => {
+    if (cognitoId) {
+      console.log("Cognito ID fetched:", cognitoId);
+    }
+  }, [cognitoId]); // Log cognitoId when it is fetched
 
   return (
     <Box m="20px">
@@ -41,17 +51,14 @@ const Dashboard = () => {
         gridAutoRows="minmax(140px, auto)"
         gap="20px"
         sx={{
-          // Mobile-first: single column layout for smaller screens
           '@media (max-width: 600px)': {
             gridTemplateColumns: 'repeat(1, 1fr)',
-            gap: '10px', // Smaller gap on mobile
+            gap: '10px',
           },
-          // Tablets or larger devices: 2 columns
           '@media (min-width: 600px) and (max-width: 960px)': {
             gridTemplateColumns: 'repeat(6, 1fr)',
             gap: '15px',
           },
-          // Larger screens: 4 columns
           '@media (min-width: 960px)': {
             gridTemplateColumns: 'repeat(12, 1fr)',
             gap: '20px',
@@ -66,7 +73,6 @@ const Dashboard = () => {
           alignItems="center"
           justifyContent="center"
           sx={{
-            // Mobile first: full width for small screens
             '@media (max-width: 600px)': {
               gridColumn: 'span 12',
             },
@@ -206,7 +212,7 @@ const Dashboard = () => {
         <Box
           gridColumn="span 4"
           gridRow="span 2"
-          height ="94%"
+          height="94%"
           backgroundColor={colors.primary[400]}
           overflow="auto"
           sx={{
