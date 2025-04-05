@@ -1,25 +1,5 @@
 {
   "features": {
-    "graphqltransformer": {
-      "addmissingownerfields": true,
-      "improvepluralization": false,
-      "validatetypenamereservedwords": true,
-      "useexperimentalpipelinedtransformer": true,
-      "enableiterativegsiupdates": true,
-      "secondarykeyasgsi": true,
-      "skipoverridemutationinputtypes": true,
-      "transformerversion": 2,
-      "suppressschemamigrationprompt": true,
-      "securityenhancementnotification": false,
-      "showfieldauthnotification": false,
-      "usesubusernamefordefaultidentityclaim": true,
-      "usefieldnameforprimarykeyconnectionfield": false,
-      "enableautoindexquerynames": true,
-      "respectprimarykeyattributesonconnectionfield": true,
-      "shoulddeepmergedirectiveconfigdefaults": false,
-      "populateownerfieldforstaticgroupauth": true,
-      "subscriptionsinheritprimaryauth": false
-    },
     "frontend-ios": {
       "enablexcodeintegration": true
     },
