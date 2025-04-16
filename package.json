@@ -24,7 +24,6 @@
     "@nivo/line": "^0.87.0",
     "@nivo/pie": "^0.87.0",
     "@parcel/watcher": "^2.5.0",
-    "@react-native-community/netinfo": "^11.4.1",
     "aws-amplify": "^6.12.2",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.7.9",
