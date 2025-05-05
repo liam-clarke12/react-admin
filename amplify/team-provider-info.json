@@ -16,5 +16,23 @@
         "reactadmib27feec2d": {}
       }
     }
+  },
+  "devv": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-reactadmib-devv-0992b-authRole",
+      "UnauthRoleArn": "arn:aws:iam::127214157415:role/amplify-reactadmib-devv-0992b-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::127214157415:role/amplify-reactadmib-devv-0992b-authRole",
+      "Region": "eu-west-1",
+      "DeploymentBucketName": "amplify-reactadmib-devv-0992b-deployment",
+      "UnauthRoleName": "amplify-reactadmib-devv-0992b-unauthRole",
+      "StackName": "amplify-reactadmib-devv-0992b",
+      "StackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/amplify-reactadmib-devv-0992b/1e493b00-1ef2-11f0-af22-069f335fcaa9",
+      "AmplifyAppId": "d3aslije2is3h5"
+    },
+    "categories": {
+      "auth": {
+        "reactadmib27feec2d": {}
+      }
+    }
   }
 }
