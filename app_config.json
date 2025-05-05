@@ -1,0 +1,9 @@
+﻿{
+    "appId":  "d2fdrxobxyr2je",
+    "environmentVariables":  {
+
+                             },
+    "serviceRoleArn":  "arn:aws:iam::127214157415:role/service-role/AmplifySSRLoggingRole-997dbf3a-9041-482a-bc28-e42f87c4d76b",
+    "name":  "react-admin",
+    "defaultDomain":  "d2fdrxobxyr2je.amplifyapp.com"
+}
