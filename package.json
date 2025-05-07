@@ -46,12 +46,13 @@
     "react-router-dom": "^6.26.2",
     "react-scripts": "4.0.3",
     "rimraf": "^6.0.1",
+    "rollup": "^4.40.2",
     "sockjs": "^0.3.24",
     "svgo": "^3.3.2",
     "terser": "^4.8.1",
     "tough-cookie": "^4.1.4",
     "web-vitals": "^2.1.4",
-    "webpack-dev-middleware": "^5.3.4",
+    "webpack-dev-middleware": "^7.4.2",
     "xstate": "^5.19.2",
     "yargs-parser": "^13.1.2",
     "yup": "^1.6.1"
@@ -125,14 +126,25 @@
     "tsx": "^4.19.2",
     "typescript": "^4.9.5"
   },
-"resolutions": {
-  "postcss": "^8.4.31",
-  "postcss-selector-matches": "^4.0.0",
-  "postcss-selector-not": "^4.0.0",
-  "postcss-reduce-initial": "^5.0.0",
-  "postcss-reduce-transforms": "^5.0.0",
-  "postcss-unique-selectors": "^5.0.0",
-  "stylehacks": "^5.0.0",
-  "rollup": "^2.79.2"
-}
+  "resolutions": {
+    "postcss": "^8.4.31",
+    "postcss-normalize-string": "^5.1.0",
+    "postcss-normalize-timing-functions": "^5.1.0",
+    "postcss-normalize-unicode": "^5.1.0",
+    "postcss-normalize-url": "^5.1.0",
+    "postcss-normalize-whitespace": "^5.1.0",
+    "postcss-ordered-values": "^5.1.0",
+    "postcss-overflow-shorthand": "^3.0.0",
+    "postcss-page-break": "^3.0.0",
+    "postcss-place": "^7.0.0",
+    "postcss-pseudo-class-any-link": "^7.1.0",
+    "postcss-reduce-initial": "^5.1.0",
+    "postcss-reduce-transforms": "^5.1.0",
+    "postcss-replace-overflow-wrap": "^4.0.0",
+    "postcss-selector-matches": "^5.0.0",
+    "postcss-selector-not": "^5.0.0",
+    "postcss-unique-selectors": "^5.1.0",
+    "stylehacks": "^5.1.0",
+    "resolve-url-loader": "^5.0.0"
+  }
 }
