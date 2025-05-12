@@ -1,17 +1,22 @@
 version: 1
 frontend:
+  environment:
+    variables:
+      NODE_VERSION: "20.17.0"   # Use Node.js version 20.17.0
+      NPM_VERSION: "11.3.0"     # Use npm version 11.3.0
   phases:
     preBuild:
       commands:
-        - npm install -g npm@latest
-        - npm install --legacy-peer-deps
+        - nvm install $NODE_VERSION        # Install the correct Node.js version
+        - npm install -g npm@$NPM_VERSION  # Install the correct npm version
+        - npm install --legacy-peer-deps   # Install dependencies with legacy peer deps
     build:
       commands:
-        - npm run build
+        - npm run build                    # Run the build command
   artifacts:
     baseDirectory: build
     files:
-      - '**/*'
+      - '**/*'                            # Include all files in the build directory
   cache:
     paths:
-      - node_modules/**/*
+      - node_modules/**/*                  # Cache node_modules for faster subsequent builds
