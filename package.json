@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "webpack": "4.29.6",
+    "webpack": "5.89.0",
     "@aws-amplify/auth": "^6.10.1",
     "@aws-amplify/core": "^6.9.2",
     "@aws-amplify/ui-react": "^6.9.1",
@@ -23,7 +23,7 @@
     "@nivo/geo": "^0.87.0",
     "@nivo/line": "^0.87.0",
     "@nivo/pie": "^0.87.0",
-    "@xstate/react": "^5.0.3",
+    "@xstate/react": "3.2.2",
     "aws-amplify": "^6.12.2",
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
@@ -35,7 +35,7 @@
     "react-dom": "^18.3.1",
     "react-pro-sidebar": "^0.7.1",
     "react-router-dom": "^6.26.2",
-    "react-scripts": "3.4.4",
+    "react-scripts": "5.0.1",
     "yup": "^1.6.1"
   },
   "scripts": {
@@ -65,9 +65,7 @@
     ]
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.11.0",
-    "@aws-amplify/backend-cli": "^1.4.5",
-    "@aws-amplify/cli": "^12.13.1",
+    "@aws-amplify/cli": "^13.0.1",
     "@babel/core": "^7.26.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -76,11 +74,11 @@
     "aws-cdk-lib": "^2.173.2",
     "concurrently": "^9.1.2",
     "constructs": "^10.0.0",
-    "typescript": "3.9.10"
+    "typescript": "5.0.4"
   },
   "resolutions": {
-    "webpack": "4.29.6",
-    "typescript": "3.9.10",
-    "postcss": "^8.4.31"
+    "webpack": "5.89.0",
+    "typescript": "5.0.4",
+    "xstate": "4.38.3"
   }
 }
