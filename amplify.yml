@@ -1,24 +1,30 @@
 version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - echo "Backend build phase"
 frontend:
-  environment:
-    variables:
-      NODE_VERSION: "20.17.0"   # Use Node.js version 20.17.0
-      NPM_VERSION: "11.3.0"     # Use npm version 11.3.0
   phases:
     preBuild:
       commands:
-        - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash  # Install NVM
-        - export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"  # Set up NVM environment
-        - nvm install $NODE_VERSION        # Install the correct Node.js version
-        - npm install -g npm@$NPM_VERSION  # Install the correct npm version
-        - npm install --legacy-peer-deps   # Install dependencies with legacy peer deps
+        # Install nvm and set Node.js version
+        - echo "Installing NVM and setting up Node.js"
+        - export NVM_DIR="$HOME/.nvm"
+        - [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+        - nvm install 20.17.0  # Install Node.js 20.17.0
+        - nvm use 20.17.0  # Switch to Node.js 20.17.0
+        - node -v  # Verify Node version
+        - npm install -g npm@11.3.0  # Update npm to version 11.3.0
     build:
       commands:
-        - npm run build                    # Run the build command
+        - echo "Frontend build phase"
+        - npm install --legacy-peer-deps  # Install dependencies while bypassing peer dependency conflicts
+        - npm run build  # Build the React project
   artifacts:
     baseDirectory: build
     files:
-      - '**/*'                            # Include all files in the build directory
+      - '**/*'  # Include all files in the build directory
   cache:
     paths:
-      - node_modules/**/*                  # Cache node_modules for faster subsequent builds
+      - node_modules/**/*  # Cache node_modules to speed up future builds
