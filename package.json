@@ -78,7 +78,7 @@
     "typescript": "^3.9.10"
   },
   "resolutions": {
-    "webpack": "5.89.0",
+    "webpack": "4.42.0",
     "typescript": "5.0.4",
     "xstate": "4.38.3"
   }
