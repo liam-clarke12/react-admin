@@ -19,7 +19,7 @@ const GoodsInForm = () => {
     console.log("📤 Sending payload:", payload); // Debug log
 
     try {
-      const response = await fetch("http://localhost:5000/submit", {
+      const response = await fetch("https://react-admin-psiw.onrender.com/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
