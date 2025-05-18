@@ -1,0 +1,28 @@
+service: my-service
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: eu-west-1
+  environment:
+  DB_HOST: "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com"
+  DB_USER: "admin"
+  DB_PASS: "Hupes_123"
+  DB_NAME: "Hupes_Database"
+
+
+functions:
+  app:
+    handler: lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: '*'
+
+plugins:
+  - serverless-offline
+
+package:
+  individually: true

@@ -1,11 +1,8 @@
-const express = require("express");
-const mysql = require("mysql2");
-const cors = require("cors");
 const serverless = require('serverless-http');
-
+const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 5000;
-app.use(cors());
+const mysql = require('mysql2');
+
 app.use(express.json());
 
 // Create a MySQL connection pool
@@ -815,8 +812,8 @@ app.get("/api/goods-out", async (req, res) => {
   }
 });
 
-module.exports.handler = serverless(app);
-
-app.listen(PORT, () => {
-  console.log(`Server is running on ${PORT}`);
+app.get('/', (req, res) => {
+  res.send('Hello from Express + AWS Lambda!');
 });
+
+module.exports.handler = serverless(app);
