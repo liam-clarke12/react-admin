@@ -27,7 +27,7 @@ const ProductionLog = () => {
     const fetchProductionLogData = async () => {
       try {
         if (!cognitoId) return;
-        const response = await fetch(`http://localhost:5000/api/production-log?cognito_id=${cognitoId}`);
+        const response = await fetch(`https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`);
         if (!response.ok) throw new Error("Failed to fetch data");
         const data = await response.json();
         setProductionLogs(data);

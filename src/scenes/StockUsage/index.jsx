@@ -25,7 +25,7 @@ const StockUsage = () => {
 
     const fetchStockUsage = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/stock-usage/${cognitoId}`);
+        const response = await axios.get(`https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/stock-usage/${cognitoId}`);
         
         const groupedData = {};
 

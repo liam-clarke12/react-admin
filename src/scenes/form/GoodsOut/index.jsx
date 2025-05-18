@@ -28,7 +28,7 @@ const GoodsOutForm = () => {
     console.log("📤 Sending payload:", payload);
   
     try {
-      const response = await fetch("http://localhost:5000/api/add-goods-out", {
+      const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/add-goods-out", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

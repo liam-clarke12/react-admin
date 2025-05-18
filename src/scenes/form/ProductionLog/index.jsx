@@ -57,7 +57,7 @@ const ProductionLogForm = () => {
     console.log("📤 Sending payload:", payload); // Debug log
 
     try {
-      const response = await fetch("http://localhost:5000/add-production-log", {
+      const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/add-production-log", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
