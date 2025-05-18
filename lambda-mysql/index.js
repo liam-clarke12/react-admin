@@ -812,8 +812,9 @@ app.get("/api/goods-out", async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => {
+app.get('/*', (req, res) => {
   res.send('Hello from Express + AWS Lambda!');
 });
+
 
 module.exports.handler = serverless(app);
