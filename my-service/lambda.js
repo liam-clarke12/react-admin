@@ -7,6 +7,20 @@ const app = express();
 // Add middleware to parse JSON bodies
 app.use(express.json());
 
+// CORS middleware
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Or restrict to your frontend domain
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
 // MySQL connection
 const db = mysql.createPool({
   host: "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
