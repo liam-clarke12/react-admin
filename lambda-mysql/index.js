@@ -87,12 +87,12 @@ app.post("/dev/api/delete-row", async (req, res) => {
 
 // Insert into goods_in and update ingredient_inventory
 app.post("/dev/api/submit", async (req, res) => {
-  const { date, ingredient, stockReceived, barCode, expiryDate, Temperature, cognito_id } = req.body;
+  const { date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id } = req.body;
 
   // Log the incoming request data
   console.log("Received /submit request with:", req.body);
 
-  if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || !Temperature || !cognito_id) {
+  if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || !temperature || !cognito_id) {
     console.error("Missing fields in request:", req.body);
     return res.status(400).json({ error: "All fields are required, including cognito_id" });
   }
@@ -112,7 +112,7 @@ app.post("/dev/api/submit", async (req, res) => {
       stockRemaining: stockReceived, // Assuming stockRemaining equals stockReceived initially
       barCode,
       expiryDate,
-      Temperature,
+      temperature,
       user_id: cognito_id, // Store cognito_id directly in user_id
     });
 
@@ -128,7 +128,7 @@ app.post("/dev/api/submit", async (req, res) => {
       stockReceived, // Assuming stockRemaining equals stockReceived initially
       barCode,
       expiryDate,
-      Temperature,
+      temperature,
       cognito_id, // Store cognito_id directly in user_id
     ]);
 
