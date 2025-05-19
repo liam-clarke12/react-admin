@@ -86,7 +86,7 @@ app.post("/dev/api/delete-row", async (req, res) => {
 });
 
 // Insert into goods_in and update ingredient_inventory
-app.post("/dev/submit", async (req, res) => {
+app.post("/dev/api/submit", async (req, res) => {
   const { date, ingredient, stockReceived, barCode, expiryDate, Temperature, cognito_id } = req.body;
 
   // Log the incoming request data

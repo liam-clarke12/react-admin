@@ -8,8 +8,13 @@
       "name": "aws",
       "runtime": "nodejs18.x",
       "region": "eu-west-1",
+      "DB_HOST": "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
+      "DB_USER": "admin",
+      "DB_PASS": "Hupes_123",
+      "DB_NAME": "Hupes_Database",
       "stage": "dev",
       "versionFunctions": true,
+      "environment": null,
       "compiledCloudFormationTemplate": {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": "The AWS CloudFormation template for this Serverless application",
@@ -103,9 +108,9 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1747557998705-2025-05-18T08:46:38.705Z/app.zip"
+                "S3Key": "serverless/my-service/dev/1747643200848-2025-05-19T08:26:40.848Z/app.zip"
               },
-              "Handler": "lambda.handler",
+              "Handler": "index.handler",
               "Runtime": "nodejs18.x",
               "FunctionName": "my-service-dev-app",
               "MemorySize": 1024,
@@ -121,14 +126,14 @@
               "AppLogGroup"
             ]
           },
-          "AppLambdaVersionJsOTIOAGWWBgs7chbR92aJZ4mAr0mL9xonDD040sk": {
+          "AppLambdaVersionqE6H6hKqUGw9LDUxIgaSRGxCBzdkNnWbQTyxoxsNo": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppLambdaFunction"
               },
-              "CodeSha256": "aMdUlem7SypmkeXJjxFBwal2Pj8ayV+Xk8E1X23d3hw="
+              "CodeSha256": "OH2HqG0llmuEyPAQUlytZa40SceFYrFiq3k1n60HxO0="
             }
           },
           "HttpApi": {
@@ -234,7 +239,7 @@
           "AppLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppLambdaVersionJsOTIOAGWWBgs7chbR92aJZ4mAr0mL9xonDD040sk"
+              "Ref": "AppLambdaVersionqE6H6hKqUGw9LDUxIgaSRGxCBzdkNnWbQTyxoxsNo"
             },
             "Export": {
               "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
@@ -284,7 +289,7 @@
     "pluginsData": {},
     "functions": {
       "app": {
-        "handler": "lambda.handler",
+        "handler": "index.handler",
         "events": [
           {
             "httpApi": {
@@ -303,7 +308,7 @@
         "timeout": 6,
         "runtime": "nodejs18.x",
         "vpc": {},
-        "versionLogicalId": "AppLambdaVersionJsOTIOAGWWBgs7chbR92aJZ4mAr0mL9xonDD040sk"
+        "versionLogicalId": "AppLambdaVersionqE6H6hKqUGw9LDUxIgaSRGxCBzdkNnWbQTyxoxsNo"
       }
     },
     "configValidationMode": "warn",
@@ -324,7 +329,7 @@
         "individually": true,
         "artifactsS3KeyDirname": "serverless/my-service/dev/code-artifacts",
         "deploymentBucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-        "artifactDirectoryName": "serverless/my-service/dev/1747557998705-2025-05-18T08:46:38.705Z"
+        "artifactDirectoryName": "serverless/my-service/dev/1747643200848-2025-05-19T08:26:40.848Z"
       }
     },
     "appId": null,
@@ -333,7 +338,7 @@
   },
   "package": {
     "individually": true,
-    "artifactDirectoryName": "serverless/my-service/dev/1747557998705-2025-05-18T08:46:38.705Z",
+    "artifactDirectoryName": "serverless/my-service/dev/1747643200848-2025-05-19T08:26:40.848Z",
     "artifact": ""
   }
 }
