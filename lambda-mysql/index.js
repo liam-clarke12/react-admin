@@ -1,11 +1,27 @@
 const serverless = require('serverless-http');
 const express = require('express');
 const mysql = require('mysql2');
+const bodyParser = require("body-parser");
+
 
 const app = express();
 
 // Add middleware to parse JSON bodies
 app.use(express.json());
+app.use(bodyParser.json()); // <-- Required
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  if (Buffer.isBuffer(req.body)) {
+    try {
+      req.body = JSON.parse(req.body.toString('utf-8'));
+    } catch (e) {
+      console.error('Failed to parse body buffer:', e);
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+  }
+  next();
+});
+
 
 // CORS middleware
 app.use((req, res, next) => {
@@ -169,62 +185,81 @@ app.post("/dev/api/submit", async (req, res) => {
 
 // **New API Endpoint to Add a Recipe**
 app.post("/dev/api/add-recipe", async (req, res) => {
+  console.log("Received request body:", req.body);
+
   const { recipe, upb, ingredients, quantities, cognito_id } = req.body;
 
   if (!recipe || !upb || !ingredients || !quantities || ingredients.length !== quantities.length || !cognito_id) {
+    console.error("Invalid input data:", {
+      recipe,
+      upb,
+      ingredients,
+      quantities,
+      cognito_id
+    });
     return res.status(400).json({ error: "Invalid input data" });
   }
 
   const connection = await db.promise().getConnection();
+
   try {
     await connection.beginTransaction();
+    console.log("Transaction started");
 
-    // ✅ Insert into recipes table (now includes user_id)
+    // ✅ Insert into recipes table
     const [recipeResult] = await connection.execute(
-      "INSERT INTO recipes (recipe_name, units_per_batch, user_id) VALUES (?, ?, ?)", 
+      "INSERT INTO recipes (recipe_name, units_per_batch, user_id) VALUES (?, ?, ?)",
       [recipe, upb, cognito_id]
     );
     const recipeId = recipeResult.insertId;
+    console.log("Inserted recipe with ID:", recipeId);
 
     for (let i = 0; i < ingredients.length; i++) {
       let ingredientName = ingredients[i];
       let quantity = quantities[i];
+      console.log(`Processing ingredient: ${ingredientName} (Quantity: ${quantity})`);
 
       // ✅ Check if ingredient exists
       const [ingredientRows] = await connection.execute(
-        "SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ?", 
+        "SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ?",
         [ingredientName, cognito_id]
       );
 
       let ingredientId;
       if (ingredientRows.length > 0) {
         ingredientId = ingredientRows[0].id;
+        console.log(`Found existing ingredient "${ingredientName}" with ID:`, ingredientId);
       } else {
-        // ✅ Insert new ingredient (includes user_id)
+        // ✅ Insert new ingredient
         const [ingredientResult] = await connection.execute(
-          "INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)", 
+          "INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)",
           [ingredientName, cognito_id]
         );
         ingredientId = ingredientResult.insertId;
+        console.log(`Inserted new ingredient "${ingredientName}" with ID:`, ingredientId);
       }
 
-      // ✅ Insert into recipe_ingredients table (includes user_id)
+      // ✅ Insert into recipe_ingredients
       await connection.execute(
-        "INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, user_id) VALUES (?, ?, ?, ?)", 
+        "INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, user_id) VALUES (?, ?, ?, ?)",
         [recipeId, ingredientId, quantity, cognito_id]
       );
+      console.log(`Linked ingredient ID ${ingredientId} to recipe ID ${recipeId}`);
     }
 
     await connection.commit();
+    console.log("Transaction committed successfully");
     res.status(200).json({ message: "Recipe added successfully!" });
   } catch (error) {
     await connection.rollback();
-    console.error("Error adding recipe:", error);
-    res.status(500).json({ error: "Database transaction failed" });
+    console.error("Error adding recipe, transaction rolled back:", error);
+    res.status(500).json({ error: "Database transaction failed", details: error.message });
   } finally {
     connection.release();
+    console.log("Database connection released");
   }
 });
+
 
 // **Fetch all recipes**
 app.get("/dev/api/recipes", async (req, res) => {
@@ -802,4 +837,9 @@ app.use((err, req, res, next) => {
 });
 
 // Export Lambda handler
-module.exports.handler = serverless(app);
+module.exports.handler = serverless(app, {
+  request: {
+    // This forces serverless-http to decode the body from base64 if needed
+    parse: true,
+  },
+});
