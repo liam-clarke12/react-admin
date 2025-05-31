@@ -45,7 +45,7 @@ app.get('/', (req, res) => {
 });
 
 // Adjusted GET /dev/api/goods-in route to include stage prefix 'dev'
-app.get("/api/goods-in", async (req, res) => {
+app.get("/dev/api/goods-in", async (req, res) => {
   const { cognito_id } = req.query;
   console.log("Received cognito_id:", cognito_id);
 
