@@ -22,19 +22,28 @@ app.use((req, res, next) => {
   next();
 });
 
+const cors = require('cors');
 
-// CORS middleware
+// Option 1: Use cors package with specific config
+app.use(cors({
+  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com', // your frontend
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Option 2: Or if you prefer manual headers (not needed if using cors above)
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Or restrict to your frontend domain
+  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  // Handle preflight
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight OPTIONS request');
-    return res.sendStatus(204); // Respond to OPTIONS preflight immediately
+    return res.sendStatus(204);
   }
-  
+
   next();
 });
 
