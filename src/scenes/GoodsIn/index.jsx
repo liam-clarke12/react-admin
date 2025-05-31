@@ -35,7 +35,7 @@ const GoodsIn = () => {
           return;
         }
 
-        const response = await fetch(`https://master.d2fdrxobxyr2je.amplifyapp.com/dev/api/goods-in?cognito_id=${cognitoId}`);
+        const response = await fetch(`https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/cors_enabled/dev/api/goods-in?cognito_id=${cognitoId}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch Goods In data');
