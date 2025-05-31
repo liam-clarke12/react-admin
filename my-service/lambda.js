@@ -88,6 +88,9 @@ app.post("/dev/api/delete-row", async (req, res) => {
   }
 });
 
+// OPTIONS Preflight Handler - MUST come before POST
+app.options('/dev/api/submit', cors());  // 👈 Critical for CORS
+
 // Insert into goods_in and update ingredient_inventory
 app.post("/dev/api/submit", async (req, res) => {
   const { date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id } = req.body;
