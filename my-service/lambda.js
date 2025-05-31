@@ -2,56 +2,30 @@ const serverless = require('serverless-http');
 const express = require('express');
 const mysql = require('mysql2');
 const bodyParser = require("body-parser");
-
+const cors = require('cors');
 
 const app = express();
 
-// Add middleware to parse JSON bodies
-app.use(express.json());
-app.use(bodyParser.json()); // <-- Required
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use((req, res, next) => {
-  if (Buffer.isBuffer(req.body)) {
-    try {
-      req.body = JSON.parse(req.body.toString('utf-8'));
-    } catch (e) {
-      console.error('Failed to parse body buffer:', e);
-      return res.status(400).json({ error: 'Invalid JSON' });
-    }
-  }
-  next();
-});
+// Middleware Setup
+// --- (1) Use only express.json(), NOT bodyParser (redundant) ---
+app.use(express.json()); // Parses JSON bodies automatically
+app.use(express.urlencoded({ extended: true })); // For URL-encoded forms
 
-const cors = require('cors');
-
-// Option 1: Use cors package with specific config
+// --- (2) CORS Setup (use only one method) ---
 app.use(cors({
-  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com', // your frontend
+  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com',
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
-// Option 2: Or if you prefer manual headers (not needed if using cors above)
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+// --- (3) Remove the custom buffer-parsing middleware (not needed) ---
 
-  if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight OPTIONS request');
-    return res.sendStatus(204);
-  }
-
-  next();
-});
-
-// MySQL connection
+// MySQL Connection
 const db = mysql.createPool({
   host: "database-2.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
   user: "admin",
-  password: "Incorrect_123",
+  password: "Incorrect_123", // 🔴⚠️ **SECURITY WARNING:** Never hardcode passwords in code!
   database: "hupes_database"
 });
 
@@ -65,13 +39,13 @@ db.getConnection((err, conn) => {
   conn.release();
 });
 
-// Example root route
+// Example route
 app.get('/', (req, res) => {
   res.json({ message: 'Hello from Express + AWS Lambda!' });
 });
 
 // Adjusted GET /dev/api/goods-in route to include stage prefix 'dev'
-app.get("/dev/api/goods-in", async (req, res) => {
+app.get("/api/goods-in", async (req, res) => {
   const { cognito_id } = req.query;
   console.log("Received cognito_id:", cognito_id);
 
