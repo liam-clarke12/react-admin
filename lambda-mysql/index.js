@@ -72,15 +72,18 @@ app.get('/', (req, res) => {
 
 // Adjusted GET /dev/api/goods-in route to include stage prefix 'dev'
 app.get("/dev/api/goods-in", async (req, res) => {
-  const { cognito_id } = req.query; // Get cognito_id from query parameters
+  const { cognito_id } = req.query;
+  console.log("Received cognito_id:", cognito_id);
 
   if (!cognito_id) {
+    console.log("No cognito_id provided in query");
     return res.status(400).json({ error: "cognito_id is required" });
   }
 
   try {
     const query = "SELECT * FROM goods_in WHERE user_id = ?";
     const [results] = await db.promise().query(query, [cognito_id]);
+    console.log("DB returned rows:", results.length);
     res.json(results);
   } catch (err) {
     console.error("Database error:", err);
