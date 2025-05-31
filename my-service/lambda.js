@@ -49,10 +49,10 @@ app.use((req, res, next) => {
 
 // MySQL connection
 const db = mysql.createPool({
-  host: "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
+  host: "database-2.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
   user: "admin",
-  password: "Hupes_123",
-  database: "Hupes_Database"
+  password: "Incorrect_123",
+  database: "hupes_database"
 });
 
 // Test connection

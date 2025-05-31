@@ -22,7 +22,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 const cors = require('cors');
 
 // Option 1: Use cors package with specific config
@@ -50,10 +49,10 @@ app.use((req, res, next) => {
 
 // MySQL connection
 const db = mysql.createPool({
-  host: "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
+  host: "database-2.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
   user: "admin",
-  password: "Hupes_123",
-  database: "Hupes_Database"
+  password: "Incorrect_123",
+  database: "hupes_database"
 });
 
 // Test connection
@@ -847,7 +846,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Export Lambda handler
 module.exports.handler = serverless(app, {
   request: {
     // This forces serverless-http to decode the body from base64 if needed
