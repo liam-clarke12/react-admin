@@ -19,6 +19,15 @@ app.use(cors({
   credentials: true
 }));
 
+const corsOptions = {
+  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+console.log('CORS configuration:', corsOptions);
+app.use(cors(corsOptions));
+
 // --- (3) Remove the custom buffer-parsing middleware (not needed) ---
 
 // MySQL Connection
@@ -92,7 +101,16 @@ app.post("/dev/api/delete-row", async (req, res) => {
 app.options('/dev/api/submit', cors());  // 👈 Critical for CORS
 
 // Insert into goods_in and update ingredient_inventory
-app.post("/dev/api/submit", async (req, res) => {
+app.options("/dev/api/submit", async (req, res) => {
+
+  res.header('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(204).send();
+  
+  console.log('POST /submit received with body:', req.body);
+
   const { date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id } = req.body;
 
   // Log the incoming request data
@@ -171,6 +189,19 @@ app.post("/dev/api/submit", async (req, res) => {
     connection.release();
     console.log("Connection released.");
   }
+});
+
+app.use((req, res, next) => {
+  const oldSend = res.send;
+  res.send = function(data) {
+    console.log('Response:', {
+      statusCode: res.statusCode,
+      headers: res.getHeaders(),
+      body: data
+    });
+    oldSend.apply(res, arguments);
+  };
+  next();
 });
 
 // **New API Endpoint to Add a Recipe**
