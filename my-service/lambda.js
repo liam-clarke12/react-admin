@@ -30,11 +30,20 @@ db.getConnection((err, conn) => {
   console.log('DB connected successfully');
   conn.release();
 });
+
+// ✅ CORS Configuration
 app.use(cors({
   origin: function (origin, callback) {
     console.log(`CORS Origin Check: ${origin}`);
-    // Allow all during debugging - restrict in production
-    callback(null, true);
+    const allowedOrigins = [
+      'https://master.d2fdrxobxyr2je.amplifyapp.com',
+      'http://localhost:3000' // For local development
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
@@ -56,10 +65,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Insert into goods_in and update ingredient_inventory
-app.post("/dev/api/submit", async (req, res) => {
+// ✅ Route: Submit Goods In
+app.post("/api/submit", async (req, res) => {
+  // Set CORS headers explicitly (redundant with cors middleware but ensures they're present)
   res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
   try {
     console.log("Raw request body:", req.body);
     
@@ -88,21 +99,24 @@ app.post("/dev/api/submit", async (req, res) => {
     try {
       await connection.beginTransaction();
 
+      // Insert into goods_in
       const goodsInQuery = `
-        INSERT INTO goods_in (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, user_id)
+        INSERT INTO goods_in 
+        (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, user_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsInResult] = await connection.execute(goodsInQuery, [
         date,
         ingredient,
         stockReceived,
-        stockReceived,
+        stockReceived, // Initial stockRemaining equals stockReceived
         barCode,
         expiryDate,
         temperature,
         cognito_id,
       ]);
 
+      // Update ingredient_inventory
       const ingredientInventoryQuery = `
         INSERT INTO ingredient_inventory (ingredient, amount, barcode)
         VALUES (?, ?, ?)
@@ -116,7 +130,9 @@ app.post("/dev/api/submit", async (req, res) => {
       ]);
 
       await connection.commit();
+      
       res.status(200).json({ 
+        success: true,
         message: "Data saved successfully", 
         id: goodsInResult.insertId 
       });
@@ -128,7 +144,11 @@ app.post("/dev/api/submit", async (req, res) => {
         sql: err.sql,
         parameters: err.parameters
       });
-      res.status(500).json({ error: "Database operation failed", details: err.message });
+      res.status(500).json({ 
+        success: false,
+        error: "Database operation failed", 
+        details: err.message 
+      });
     } finally {
       connection.release();
     }
@@ -141,7 +161,11 @@ app.post("/dev/api/submit", async (req, res) => {
         body: req.body
       }
     });
-    res.status(500).json({ error: "Server error", details: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: "Server error", 
+      details: err.message 
+    });
   }
 });
 
