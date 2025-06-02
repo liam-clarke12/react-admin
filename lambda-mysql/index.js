@@ -54,14 +54,24 @@ app.use(cors({
 }));
 
 // ✅ Request context logger middleware
+// Remove the cors() middleware and use this instead:
 app.use((req, res, next) => {
-  console.log('\n=== REQUEST CONTEXT ===');
-  console.log('Method:', req.method);
-  console.log('Path:', req.path);
-  console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('Query:', req.query);
-  console.log('Body:', req.body);
-  console.log('======================\n');
+  const allowedOrigins = [
+    'https://master.d2fdrxobxyr2je.amplifyapp.com',
+    'http://localhost:3000'
+  ];
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
   next();
 });
 
