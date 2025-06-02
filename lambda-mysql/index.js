@@ -1,44 +1,27 @@
 const serverless = require('serverless-http');
 const express = require('express');
 const mysql = require('mysql2');
-const bodyParser = require("body-parser");
 const cors = require('cors');
+const morgan = require('morgan');
 
 const app = express();
 
-// Middleware Setup
-// --- (1) Use only express.json(), NOT bodyParser (redundant) ---
-app.use(express.json()); // Parses JSON bodies automatically
-app.use(express.urlencoded({ extended: true })); // For URL-encoded forms
+// ✅ Enhanced request logging
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms\nHeaders: :req[headers]\nBody: :req[body]'));
 
-// --- (2) CORS Setup (use only one method) ---
-app.use(cors({
-  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+// ✅ Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-const corsOptions = {
-  origin: 'https://master.d2fdrxobxyr2je.amplifyapp.com',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
-console.log('CORS configuration:', corsOptions);
-app.use(cors(corsOptions));
-
-// --- (3) Remove the custom buffer-parsing middleware (not needed) ---
-
-// MySQL Connection
+// ✅ MySQL connection pool
 const db = mysql.createPool({
   host: "database-2.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
   user: "admin",
-  password: "Incorrect_123", // 🔴⚠️ **SECURITY WARNING:** Never hardcode passwords in code!
+  password: "Incorrect_123",
   database: "hupes_database"
 });
 
-// Test connection
+// ✅ Test database connection
 db.getConnection((err, conn) => {
   if (err) {
     console.error('DB connection failed:', err);
@@ -47,26 +30,137 @@ db.getConnection((err, conn) => {
   console.log('DB connected successfully');
   conn.release();
 });
+app.use(cors({
+  origin: function (origin, callback) {
+    console.log(`CORS Origin Check: ${origin}`);
+    // Allow all during debugging - restrict in production
+    callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
+  credentials: true,
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
-// Example route
+// ✅ Request context logger middleware
+app.use((req, res, next) => {
+  console.log('\n=== REQUEST CONTEXT ===');
+  console.log('Method:', req.method);
+  console.log('Path:', req.path);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Query:', req.query);
+  console.log('Body:', req.body);
+  console.log('======================\n');
+  next();
+});
+
+// Insert into goods_in and update ingredient_inventory
+app.post("/dev/api/submit", async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  try {
+    console.log("Raw request body:", req.body);
+    
+    // Convert all fields to strings to prevent type issues
+    const { 
+      date, 
+      ingredient, 
+      stockReceived, 
+      barCode, 
+      expiryDate, 
+      temperature, 
+      cognito_id 
+    } = req.body;
+
+    // Validate required fields
+    if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || 
+        temperature === undefined || temperature === null || !cognito_id) {
+      console.error("Missing fields in request:", req.body);
+      return res.status(400).json({ 
+        error: "All fields are required, including cognito_id",
+        received: req.body 
+      });
+    }
+
+    const connection = await db.promise().getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const goodsInQuery = `
+        INSERT INTO goods_in (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [goodsInResult] = await connection.execute(goodsInQuery, [
+        date,
+        ingredient,
+        stockReceived,
+        stockReceived,
+        barCode,
+        expiryDate,
+        temperature,
+        cognito_id,
+      ]);
+
+      const ingredientInventoryQuery = `
+        INSERT INTO ingredient_inventory (ingredient, amount, barcode)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE amount = amount + ?
+      `;
+      await connection.execute(ingredientInventoryQuery, [
+        ingredient, 
+        stockReceived, 
+        barCode, 
+        stockReceived
+      ]);
+
+      await connection.commit();
+      res.status(200).json({ 
+        message: "Data saved successfully", 
+        id: goodsInResult.insertId 
+      });
+    } catch (err) {
+      await connection.rollback();
+      console.error("Database error:", {
+        message: err.message,
+        stack: err.stack,
+        sql: err.sql,
+        parameters: err.parameters
+      });
+      res.status(500).json({ error: "Database operation failed", details: err.message });
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error("Server error:", {
+      message: err.message,
+      stack: err.stack,
+      request: {
+        headers: req.headers,
+        body: req.body
+      }
+    });
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
+// Example root route
 app.get('/', (req, res) => {
   res.json({ message: 'Hello from Express + AWS Lambda!' });
 });
 
 // Adjusted GET /dev/api/goods-in route to include stage prefix 'dev'
 app.get("/dev/api/goods-in", async (req, res) => {
-  const { cognito_id } = req.query;
-  console.log("Received cognito_id:", cognito_id);
+  const { cognito_id } = req.query; // Get cognito_id from query parameters
 
   if (!cognito_id) {
-    console.log("No cognito_id provided in query");
     return res.status(400).json({ error: "cognito_id is required" });
   }
 
   try {
     const query = "SELECT * FROM goods_in WHERE user_id = ?";
     const [results] = await db.promise().query(query, [cognito_id]);
-    console.log("DB returned rows:", results.length);
     res.json(results);
   } catch (err) {
     console.error("Database error:", err);
@@ -95,113 +189,6 @@ app.post("/dev/api/delete-row", async (req, res) => {
     console.error("Failed to delete row:", err);
     res.status(500).json({ error: "Failed to delete row" });
   }
-});
-
-// OPTIONS Preflight Handler - MUST come before POST
-app.options('/dev/api/submit', cors());  // 👈 Critical for CORS
-
-// Insert into goods_in and update ingredient_inventory
-app.options("/dev/api/submit", async (req, res) => {
-
-  res.header('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
-  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(204).send();
-  
-  console.log('POST /submit received with body:', req.body);
-
-  const { date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id } = req.body;
-
-  // Log the incoming request data
-  console.log("Received /submit request with:", req.body);
-
-  if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || !temperature || !cognito_id) {
-    console.error("Missing fields in request:", req.body);
-    return res.status(400).json({ error: "All fields are required, including cognito_id" });
-  }
-
-  const connection = await db.promise().getConnection();
-  try {
-    console.log("Starting database transaction...");
-
-    await connection.beginTransaction();
-
-    // Log before inserting into goods_in
-    console.log("Inserting into goods_in with the following data:");
-    console.log({
-      date,
-      ingredient,
-      stockReceived,
-      stockRemaining: stockReceived, // Assuming stockRemaining equals stockReceived initially
-      barCode,
-      expiryDate,
-      temperature,
-      user_id: cognito_id, // Store cognito_id directly in user_id
-    });
-
-    // Insert into goods_in with cognito_id directly in user_id column (no need to check users table)
-    const goodsInQuery = `
-      INSERT INTO goods_in (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    const [goodsInResult] = await connection.execute(goodsInQuery, [
-      date,
-      ingredient,
-      stockReceived,
-      stockReceived, // Assuming stockRemaining equals stockReceived initially
-      barCode,
-      expiryDate,
-      temperature,
-      cognito_id, // Store cognito_id directly in user_id
-    ]);
-
-    console.log("Successfully inserted into goods_in. Inserted ID:", goodsInResult.insertId);
-
-    // Log before inserting into ingredient_inventory
-    console.log("Inserting into ingredient_inventory with the following data:");
-    console.log({
-      ingredient,
-      amount: stockReceived,
-      barcode: barCode,
-    });
-
-    // Insert into ingredient_inventory (or update if exists)
-    const ingredientInventoryQuery = `
-      INSERT INTO ingredient_inventory (ingredient, amount, barcode)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE amount = amount + ?
-    `;
-    await connection.execute(ingredientInventoryQuery, [ingredient, stockReceived, barCode, stockReceived]);
-
-    console.log("Successfully inserted/updated ingredient_inventory.");
-
-    // Commit transaction and log success
-    await connection.commit();
-    console.log("Transaction committed successfully.");
-    
-    res.status(200).json({ message: "Data saved successfully", id: goodsInResult.insertId });
-  } catch (err) {
-    await connection.rollback();
-    console.error("Error processing transaction:", err);
-    res.status(500).json({ error: err.message });
-  } finally {
-    connection.release();
-    console.log("Connection released.");
-  }
-});
-
-app.use((req, res, next) => {
-  const oldSend = res.send;
-  res.send = function(data) {
-    console.log('Response:', {
-      statusCode: res.statusCode,
-      headers: res.getHeaders(),
-      body: data
-    });
-    oldSend.apply(res, arguments);
-  };
-  next();
 });
 
 // **New API Endpoint to Add a Recipe**
@@ -846,20 +833,71 @@ app.get("/dev/api/goods-out", async (req, res) => {
   }
 });
 
-// 404 handler for everything else
+app.get('/dev/health', (req, res) => {
+  db.getConnection((err, conn) => {
+    if (err) {
+      res.status(500).json({ db: "DOWN", error: err.message });
+    } else {
+      conn.release();
+      res.json({ db: "OK" });
+    }
+  });
+});
+
 app.use((req, res) => {
+  console.error('404 Not Found:', {
+    method: req.method,
+    url: req.originalUrl,
+    headers: req.headers,
+    ip: req.ip
+  });
   res.status(404).json({ error: 'Not found' });
 });
 
-// Error handling middleware
+// ✅ Enhanced error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  const errorDetails = {
+    message: err.message,
+    stack: err.stack,
+    type: err.type,
+    status: err.status,
+    request: {
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      body: req.body,
+      query: req.query
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  console.error('SERVER ERROR:', JSON.stringify(errorDetails, null, 2));
+
+  // Special handling for CORS errors
+  if (err.message.includes('CORS')) {
+    console.error('CORS ERROR DETAILS:', {
+      origin: req.headers.origin,
+      allowedOrigins: '*', // Update this in production
+      method: req.method
+    });
+    
+    return res.status(403).json({
+      error: 'CORS Error',
+      message: err.message,
+      details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+    });
+  }
+
+  res.status(err.status || 500).json({
+    error: 'Internal server error',
+    message: err.message,
+    details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+  });
 });
 
 module.exports.handler = serverless(app, {
   request: {
-    // This forces serverless-http to decode the body from base64 if needed
     parse: true,
+    passThrough: true,
   },
 });

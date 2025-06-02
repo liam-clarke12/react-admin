@@ -32,6 +32,7 @@
     "formik": "^2.4.6",
     "formik-mui": "^5.0.0-alpha.1",
     "material-ui-popup-state": "^5.3.1",
+    "path-to-regexp": "6.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-pro-sidebar": "^0.7.1",

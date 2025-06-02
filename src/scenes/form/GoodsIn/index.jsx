@@ -13,31 +13,41 @@ const GoodsInForm = () => {
   const { cognitoId } = useAuth(); // Get cognitoId from context
 
 
-  const handleFormSubmit = async (values, { resetForm }) => {
-    const payload = { ...values, cognito_id: cognitoId };
+const handleFormSubmit = async (values, { resetForm }) => {
+  const payload = { ...values, cognito_id: cognitoId };
 
-    console.log("📤 Sending payload:", payload); // Debug log
+  console.log("📤 Sending payload:", payload);
 
-    try {
-      const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+  try {
+    const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include", // Don't forget this!
+      body: JSON.stringify(payload),
+    });
 
-      if (!response.ok) {
-        throw new Error("Failed to submit data");
-      }
-
-      console.log("✅ Data successfully sent to the backend.");
-      resetForm();
-      setOpenSnackbar(true);
-    } catch (error) {
-      console.error("❌ Error submitting data:", error);
+    if (!response.ok) {
+      throw new Error("Failed to submit data");
     }
-  };
+
+    console.log("✅ Data successfully sent to the backend.");
+    resetForm();
+    setOpenSnackbar(true);
+  } catch (error) {
+    // 👇 This is where the new error handling goes:
+    console.error("❌ CORS/Network Error:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    });
+    
+    if (error.message.includes("CORS") || error.name === "TypeError") {
+      alert("CORS error - Check console for details");
+    }
+  }
+};
 
   const handleCloseSnackbar = () => {
     setOpenSnackbar(false);
