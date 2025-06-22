@@ -1,17 +1,28 @@
 service: my-service
 
-frameworkVersion: '4'
-
 provider:
   name: aws
   runtime: nodejs18.x
   region: eu-west-1
-  environment:
-  DB_HOST: "database-1.clk2kak2yxlo.eu-west-1.rds.amazonaws.com"
-  DB_USER: "admin"
-  DB_PASS: "Hupes_123"
-  DB_NAME: "Hupes_Database"
 
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://master.d2fdrxobxyr2je.amplifyapp.com
+        - http://localhost:3000
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - X-Requested-With
+        - Origin
+        - Accept
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowCredentials: true
 
 functions:
   app:
@@ -23,6 +34,3 @@ functions:
 
 plugins:
   - serverless-offline
-
-package:
-  individually: true

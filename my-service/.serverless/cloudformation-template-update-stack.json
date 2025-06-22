@@ -91,7 +91,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1747643200848-2025-05-19T08:26:40.848Z/app.zip"
+          "S3Key": "serverless/my-service/dev/1750606291575-2025-06-22T15:31:31.575Z/my-service.zip"
         },
         "Handler": "index.handler",
         "Runtime": "nodejs18.x",
@@ -109,21 +109,42 @@
         "AppLogGroup"
       ]
     },
-    "AppLambdaVersionqE6H6hKqUGw9LDUxIgaSRGxCBzdkNnWbQTyxoxsNo": {
+    "AppLambdaVersionGVg5UBcE721spxG8ME4ZKrGEK336DlFOjEiImTLl0KE": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppLambdaFunction"
         },
-        "CodeSha256": "OH2HqG0llmuEyPAQUlytZa40SceFYrFiq3k1n60HxO0="
+        "CodeSha256": "6MZ/PZzmyYvxJAPUluigGX7bubIY1NSN9iKQCphPQpA="
       }
     },
     "HttpApi": {
       "Type": "AWS::ApiGatewayV2::Api",
       "Properties": {
         "Name": "dev-my-service",
-        "ProtocolType": "HTTP"
+        "ProtocolType": "HTTP",
+        "CorsConfiguration": {
+          "AllowCredentials": true,
+          "AllowHeaders": [
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Origin",
+            "Accept"
+          ],
+          "AllowMethods": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS"
+          ],
+          "AllowOrigins": [
+            "https://master.d2fdrxobxyr2je.amplifyapp.com",
+            "http://localhost:3000"
+          ]
+        }
       }
     },
     "HttpApiStage": {
@@ -225,7 +246,7 @@
     "AppLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppLambdaVersionqE6H6hKqUGw9LDUxIgaSRGxCBzdkNnWbQTyxoxsNo"
+        "Ref": "AppLambdaVersionGVg5UBcE721spxG8ME4ZKrGEK336DlFOjEiImTLl0KE"
       },
       "Export": {
         "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
