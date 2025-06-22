@@ -4,6 +4,8 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const morgan = require('morgan');
 
+// ... (previous code)
+
 const app = express();
 
 // ✅ Enhanced request logging
@@ -31,7 +33,7 @@ db.getConnection((err, conn) => {
   conn.release();
 });
 
-// ✅ CORS Configuration
+// ✅ CORS Configuration (THIS IS THE ONE TO KEEP)
 app.use(cors({
   origin: function (origin, callback) {
     console.log(`CORS Origin Check: ${origin}`);
@@ -49,31 +51,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
   credentials: true,
   maxAge: 86400,
-  preflightContinue: false,
+  preflightContinue: false, // This is usually false, meaning the cors middleware handles the preflight.
   optionsSuccessStatus: 204
 }));
-
-// ✅ Request context logger middleware
-// Remove the cors() middleware and use this instead:
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    'https://master.d2fdrxobxyr2je.amplifyapp.com',
-    'http://localhost:3000'
-  ];
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  next();
-});
 
 // ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {

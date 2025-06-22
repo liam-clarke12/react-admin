@@ -23,7 +23,6 @@ const handleFormSubmit = async (values, { resetForm }) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Origin": "https://master.d2fdrxobxyr2je.amplifyapp.com" ,
       },
       credentials: "include", // Don't forget this!
       body: JSON.stringify(payload),
