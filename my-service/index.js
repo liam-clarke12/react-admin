@@ -55,6 +55,9 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+app.options('*', cors()); // Allow preflight requests globally
+
+
 // ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {
   // Set CORS headers explicitly (redundant with cors middleware but ensures they're present)
