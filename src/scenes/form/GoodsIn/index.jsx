@@ -19,7 +19,7 @@ const handleFormSubmit = async (values, { resetForm }) => {
   console.log("📤 Sending payload:", payload);
 
   try {
-    const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
+    const response = await fetch("https://6vojqdsif5.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -151,10 +151,10 @@ const handleFormSubmit = async (values, { resetForm }) => {
                 label="Temperature (℃)"
                 onBlur={handleBlur}
                 onChange={handleChange}
-                value={values.Temperature}
-                name="Temperature"
-                error={!!touched.Temperature && !!errors.Temperature}
-                helperText={touched.Temperature && errors.Temperature}
+                value={values.temperature}
+                name="temperature"
+                error={!!touched.temperature && !!errors.temperature}
+                helperText={touched.temperature && errors.temperature}
                 sx={{ gridColumn: "span 2" }}
               />
             </Box>
@@ -192,7 +192,7 @@ const goodsInSchema = yup.object().shape({
     .positive("Must be positive"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
-  Temperature: yup.number().required("Temperature is required"),
+  temperature: yup.number().required("Temperature is required"),
 });
 
 // **Initial Values**
@@ -202,7 +202,7 @@ const initialValues = {
   stockReceived: "",
   barCode: "",
   expiryDate: new Date().toISOString().split("T")[0],
-  Temperature: "",
+  temperature: "",
 };
 
 export default GoodsInForm;

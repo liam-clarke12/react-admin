@@ -4,33 +4,20 @@ provider:
   name: aws
   runtime: nodejs18.x
   region: eu-west-1
+  stage: dev
 
-  httpApi:
-    cors:
-      allowedOrigins:
-        - https://master.d2fdrxobxyr2je.amplifyapp.com
-        - http://localhost:3000
-      allowedHeaders:
-        - Content-Type
-        - Authorization
-        - X-Requested-With
-        - Origin
-        - Accept
-      allowedMethods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - OPTIONS
-      allowCredentials: true
+  apiGateway:
+    shouldStartNameWithService: true
+    minimumCompressionSize: 1024
 
 functions:
   app:
     handler: index.handler
     events:
-      - httpApi:
+      - http:
           path: /{proxy+}
-          method: '*'
+          method: any
+          cors: true
 
 plugins:
   - serverless-offline
