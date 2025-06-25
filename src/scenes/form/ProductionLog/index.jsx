@@ -10,6 +10,7 @@ import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth h
 const ProductionLogForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth(); // Get cognitoId from context
+  const [filteredRecipes, setFilteredRecipes] = useState([]); // State to store filtered recipe names
   const [loading, setLoading] = useState(false); // State to track loading status
   const [error, setError] = useState(null); // State to track error
 
