@@ -26,7 +26,7 @@ const IngredientsInventory = () => {
       const fetchGoodsInData = async () => {
         try {
           console.log("Fetching Goods In data...");
-          const response = await fetch(`https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`);
+          const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`);
           if (!response.ok) {
             throw new Error("Failed to fetch Goods In data");
           }
