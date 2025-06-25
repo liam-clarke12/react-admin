@@ -537,13 +537,16 @@ app.post("/api/add-production-log", async (req, res) => {
         );
 
         // Insert stock usage record
+        console.log(`Inserting into stock_usage: production_log_id=${productionLogResult.insertId}, goods_in_id=${goodsInId}, user_id=${cognito_id}`);
         await connection.execute(
           `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
            VALUES (?, ?, ?)`,
           [productionLogResult.insertId, goodsInId, cognito_id]
         );
 
-        amountNeeded -= deduction;  // Reduce the amount needed by the deduction
+        console.log(`amountNeeded before: ${amountNeeded}`);
+        amountNeeded -= deduction;
+        console.log(`amountNeeded after: ${amountNeeded}`);
       }
     }
 
