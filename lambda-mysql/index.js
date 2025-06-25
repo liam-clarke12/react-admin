@@ -626,7 +626,7 @@ app.post("/dev/api/delete-production-log", async (req, res) => {
   }
 });
 
-app.get('/api/stock-usage', (req, res) => {
+app.get('/api/stock-usage/:cognitoId', (req, res) => {
   console.log(`Received request for stock usage with cognitoId: ${req.params.cognitoId}`);
 
   const sqlQuery = `

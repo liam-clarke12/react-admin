@@ -25,8 +25,8 @@ const StockUsage = () => {
 
     const fetchStockUsage = async () => {
       try {
-        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/stock-usage/${cognitoId}`);
-        const data = await response.json(); // 👈 parse JSON
+        const response = await axios.get(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/stock-usage/${cognitoId}`);
+        
         const groupedData = {};
 
         response.data.forEach((item) => {
