@@ -100,7 +100,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750883731630-2025-06-25T20:35:31.630Z/my-service.zip"
+          "S3Key": "serverless/my-service/dev/1750885054386-2025-06-25T20:57:34.386Z/my-service.zip"
         },
         "Handler": "index.handler",
         "Runtime": "nodejs18.x",
@@ -118,14 +118,14 @@
         "AppLogGroup"
       ]
     },
-    "AppLambdaVersionxPCulwDWkRes1zj3oMvI5BXBPHO1yBQI2WdQFXTQAA": {
+    "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppLambdaFunction"
         },
-        "CodeSha256": "PAuRyqQV6SW6HRa7tXOivuGrPMMF0kXbYoxfyQueeP0="
+        "CodeSha256": "02QyuvK/me4qsMSTOzCmVZ/MzP3ZxEtT0mrd45JZ4MM="
       }
     },
     "ApiGatewayRestApi": {
@@ -210,13 +210,13 @@
         }
       }
     },
-    "ApiGatewayResourceApiStockDashusageCognitoid": {
+    "ApiGatewayResourceApiStockDashusageCognitoidVar": {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
         "ParentId": {
           "Ref": "ApiGatewayResourceApiStockDashusage"
         },
-        "PathPart": ":cognitoId",
+        "PathPart": "{cognitoId}",
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
         }
@@ -464,7 +464,7 @@
         }
       }
     },
-    "ApiGatewayMethodApiStockDashusageCognitoidOptions": {
+    "ApiGatewayMethodApiStockDashusageCognitoidVarOptions": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "AuthorizationType": "NONE",
@@ -506,7 +506,7 @@
           ]
         },
         "ResourceId": {
-          "Ref": "ApiGatewayResourceApiStockDashusageCognitoid"
+          "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -1043,13 +1043,13 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayMethodApiStockDashusageCognitoidGet": {
+    "ApiGatewayMethodApiStockDashusageCognitoidVarGet": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "HttpMethod": "GET",
         "RequestParameters": {},
         "ResourceId": {
-          "Ref": "ApiGatewayResourceApiStockDashusageCognitoid"
+          "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -1457,7 +1457,7 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1750883692085": {
+    "ApiGatewayDeployment1750885026625": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
@@ -1469,7 +1469,7 @@
         "ApiGatewayMethodHealthOptions",
         "ApiGatewayMethodApiGoodsDashinOptions",
         "ApiGatewayMethodApiProductionDashlogOptions",
-        "ApiGatewayMethodApiStockDashusageCognitoidOptions",
+        "ApiGatewayMethodApiStockDashusageCognitoidVarOptions",
         "ApiGatewayMethodApiRecipesOptions",
         "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesOptions",
         "ApiGatewayMethodApiGoodsDashoutOptions",
@@ -1481,7 +1481,7 @@
         "ApiGatewayMethodHealthGet",
         "ApiGatewayMethodApiGoodsDashinGet",
         "ApiGatewayMethodApiProductionDashlogGet",
-        "ApiGatewayMethodApiStockDashusageCognitoidGet",
+        "ApiGatewayMethodApiStockDashusageCognitoidVarGet",
         "ApiGatewayMethodApiRecipesGet",
         "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesGet",
         "ApiGatewayMethodApiGoodsDashoutGet",
@@ -1660,7 +1660,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750883731630-2025-06-25T20:35:31.630Z/custom-resources.zip"
+          "S3Key": "serverless/my-service/dev/1750885054386-2025-06-25T20:57:34.386Z/custom-resources.zip"
         },
         "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
         "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -1696,7 +1696,7 @@
     "AppLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppLambdaVersionxPCulwDWkRes1zj3oMvI5BXBPHO1yBQI2WdQFXTQAA"
+        "Ref": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
       },
       "Export": {
         "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
