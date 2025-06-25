@@ -308,7 +308,7 @@ app.post("/dev/api/add-recipe", async (req, res) => {
 
 
 // **Fetch all recipes**
-app.get("/dev/api/recipes", async (req, res) => {
+app.get("/api/recipes", async (req, res) => {
   const { cognito_id } = req.query;
 
   if (!cognito_id) {
