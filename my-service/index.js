@@ -57,27 +57,48 @@ app.use(cors({
 
 app.options(/(.*)/, cors()); // Allow preflight requests globally
 
+app.use((req, res, next) => {
+  if (typeof req.body === 'string') {
+    try {
+      req.body = JSON.parse(req.body);
+    } catch (err) {
+      console.error('Error parsing JSON body:', err.message);
+    }
+  }
+  next();
+});
 
 // ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {
+
+    const { 
+    date, 
+    ingredient, 
+    stockReceived, 
+    barCode, 
+    expiryDate, 
+    temperature, 
+    cognito_id 
+  } = req.body;
+
   // Set CORS headers explicitly (redundant with cors middleware but ensures they're present)
   res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   
   try {
     console.log("Raw request body:", req.body);
-    
-    // Convert all fields to strings to prevent type issues
-    const { 
-      date, 
-      ingredient, 
-      stockReceived, 
-      barCode, 
-      expiryDate, 
-      temperature, 
-      cognito_id 
-    } = req.body;
 
+    if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || 
+    temperature === undefined || temperature === null || !cognito_id) {
+  console.error("❌ Missing fields in request body:", {
+    date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id
+  });
+  return res.status(400).json({ 
+    error: "All fields are required",
+    received: req.body
+  });
+}
+    
     // Validate required fields
     if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || 
         temperature === undefined || temperature === null || !cognito_id) {
