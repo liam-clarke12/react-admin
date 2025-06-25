@@ -55,7 +55,7 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-app.options('*', cors()); // Allow preflight requests globally
+app.options(/(.*)/, cors()); // Allow preflight requests globally
 
 
 // ✅ Route: Submit Goods In
