@@ -46,7 +46,59 @@ functions:
             allowCredentials: true
             maxAge: 86400
       - http:
+          path: api/production-log
+          method: GET
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/stock-usage/:cognitoId
+          method: GET
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
           path: api/recipes
+          method: GET
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/goods-out-with-batches
+          method: GET
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/goods-out
           method: GET
           cors:
             origin: https://master.d2fdrxobxyr2je.amplifyapp.com
@@ -73,6 +125,32 @@ functions:
             maxAge: 86400
       - http:
           path: api/add-recipe
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/add-production-log
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/add-goods-out
           method: POST
           cors:
             origin: https://master.d2fdrxobxyr2je.amplifyapp.com

@@ -23,7 +23,7 @@ const ProductionLogForm = () => {
       setError(null);
   
       try {
-        const response = await fetch(`http://localhost:5000/get-recipes?cognito_id=${cognitoId}`);
+        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch recipes");
         }
@@ -57,7 +57,7 @@ const ProductionLogForm = () => {
     console.log("📤 Sending payload:", payload); // Debug log
 
     try {
-      const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/add-production-log", {
+      const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/add-production-log", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -25,9 +25,7 @@ const GoodsOut = () => {
     const fetchGoodsOutData = async () => {
       try {
         if (!cognitoId) return;
-        const response = await fetch(
-          `https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`
-        );
+        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`);
         if (!response.ok) throw new Error("Failed to fetch data");
         const data = await response.json();
         

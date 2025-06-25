@@ -438,7 +438,7 @@ app.post('/dev/api/add-user', async (req, res) => {
   }
 });
 
-app.post("/dev/add-production-log", async (req, res) => {
+app.post("/api/add-production-log", async (req, res) => {
   const { date, recipe, batchesProduced, batchCode, cognito_id } = req.body;
 
   console.log("Received /add-production-log request with:", req.body);
@@ -558,7 +558,7 @@ app.post("/dev/add-production-log", async (req, res) => {
   }
 });
 
-app.get("/dev/api/production-log", async (req, res) => {
+app.get("/api/production-log", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
 
   // Log the incoming request
@@ -626,7 +626,7 @@ app.post("/dev/api/delete-production-log", async (req, res) => {
   }
 });
 
-app.get('/dev/api/stock-usage/:cognitoId', (req, res) => {
+app.get('/api/stock-usage/:cognitoId', (req, res) => {
   console.log(`Received request for stock usage with cognitoId: ${req.params.cognitoId}`);
 
   const sqlQuery = `
@@ -731,7 +731,7 @@ app.get('/dev/api/stock-usage/:cognitoId', (req, res) => {
   });
 });
 
-app.post("/dev/api/add-goods-out", async (req, res) => {
+app.post("/api/add-goods-out", async (req, res) => {
   const { date, recipe, stockAmount, recipients, cognito_id } = req.body;
 
   console.log("Received /add-goods-out request with:", req.body);
@@ -807,7 +807,7 @@ app.post("/dev/api/add-goods-out", async (req, res) => {
   }
 });
 
-app.get("/dev/api/goods-out-with-batches", async (req, res) => {
+app.get("/api/goods-out-with-batches", async (req, res) => {
   const { cognito_id } = req.query;
 
   if (!cognito_id) {
@@ -842,7 +842,7 @@ app.get("/dev/api/goods-out-with-batches", async (req, res) => {
   }
 });
 
-app.get("/dev/api/goods-out", async (req, res) => {
+app.get("/api/goods-out", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
 
   if (!cognito_id) {
