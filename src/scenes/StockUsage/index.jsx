@@ -17,53 +17,78 @@ const StockUsage = () => {
   const [drawerContent, setDrawerContent] = useState([]);
 
   // Fetch stock usage when cognitoId is available
-  useEffect(() => {
-    if (!cognitoId) {
-      console.warn("Cognito ID is not available, skipping fetch.");
-      return;
-    }
+useEffect(() => {
+  if (!cognitoId) {
+    console.warn("[StockUsage] ❗ Cognito ID not available. Skipping fetch.");
+    return;
+  }
 
-    const fetchStockUsage = async () => {
-      try {
-        const response = await axios.get(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/stock-usage/${cognitoId}`);
-        
-        const groupedData = {};
+  const fetchStockUsage = async () => {
+    console.log("[StockUsage] 📡 Fetching stock usage for:", cognitoId);
 
-        response.data.forEach((item) => {
-          const key = `${item.recipe_name}-${item.production_log_date}-${item.batchCode}`;
-          if (!groupedData[key]) {
-            groupedData[key] = {
-              id: key,
-              date: item.production_log_date,
-              recipeName: item.recipe_name,
-              batchCode: item.batchCode,
-              batchesProduced: item.batchesProduced, // Add batchesProduced
-              ingredients: [],
-              barcodes: [],
-            };
-          }
+    try {
+      const url = `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/stock-usage/${cognitoId}`;
+      console.log("[StockUsage] 🌐 Request URL:", url);
 
-          item.ingredients.forEach((ingredient) => {
-            const totalQuantity = ingredient.quantity * item.batchesProduced; // Calculate total quantity
-            groupedData[key].ingredients.push(`${ingredient.ingredient_name}: ${totalQuantity}`);
-            groupedData[key].barcodes.push(`${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes}`);
-          });
-        });
+      const response = await axios.get(url);
 
-        const formattedData = Object.values(groupedData).map((entry) => ({
-          ...entry,
-          ingredients: entry.ingredients.join("; "), // Use "; " as the delimiter
-          barcodes: entry.barcodes.join("; "), // Use "; " as the delimiter
-        }));
+      console.log("[StockUsage] ✅ Raw response data:", response.data);
 
-        setStockUsage(formattedData);
-      } catch (error) {
-        console.error("Error fetching stock usage:", error);
+      if (!Array.isArray(response.data)) {
+        console.error("[StockUsage] ❌ Expected array in response, got:", typeof response.data);
+        return;
       }
-    };
 
-    fetchStockUsage();
-  }, [cognitoId]);
+      const groupedData = {};
+
+      response.data.forEach((item, idx) => {
+        console.log(`[StockUsage] 🔄 Processing item [${idx}]:`, item);
+
+        const key = `${item.recipe_name}-${item.production_log_date}-${item.batchCode}`;
+        if (!groupedData[key]) {
+          groupedData[key] = {
+            id: key,
+            date: item.production_log_date,
+            recipeName: item.recipe_name,
+            batchCode: item.batchCode,
+            batchesProduced: item.batchesProduced,
+            ingredients: [],
+            barcodes: [],
+          };
+        }
+
+        if (!Array.isArray(item.ingredients)) {
+          console.warn(`[StockUsage] ⚠️ No ingredients array for item [${idx}]:`, item);
+          return;
+        }
+
+        item.ingredients.forEach((ingredient) => {
+          const totalQuantity = ingredient.quantity * item.batchesProduced;
+          groupedData[key].ingredients.push(`${ingredient.ingredient_name}: ${totalQuantity}`);
+          groupedData[key].barcodes.push(`${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes}`);
+        });
+      });
+
+      const formattedData = Object.values(groupedData).map((entry) => ({
+        ...entry,
+        ingredients: entry.ingredients.join("; "),
+        barcodes: entry.barcodes.join("; "),
+      }));
+
+      console.log("[StockUsage] 📦 Final formatted stock usage data:", formattedData);
+
+      setStockUsage(formattedData);
+    } catch (error) {
+      console.error("[StockUsage] ❌ Error fetching stock usage:", error.message);
+      if (error.response) {
+        console.error("[StockUsage] ❌ Backend returned error:", error.response.status, error.response.data);
+      }
+    }
+  };
+
+  fetchStockUsage();
+}, [cognitoId]);
+
 
   // Open the drawer with proper content
   const handleDrawerOpen = (header, content) => {

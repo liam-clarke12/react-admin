@@ -134,7 +134,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/my-service.zip"
+                "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/my-service.zip"
               },
               "Handler": "index.handler",
               "Runtime": "nodejs18.x",
@@ -152,14 +152,14 @@
               "AppLogGroup"
             ]
           },
-          "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs": {
+          "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppLambdaFunction"
               },
-              "CodeSha256": "CtyeThYHEptwl6alPtwxZFiq2/qjFP6b5vilN8naUCc="
+              "CodeSha256": "02QyuvK/me4qsMSTOzCmVZ/MzP3ZxEtT0mrd45JZ4MM="
             }
           },
           "ApiGatewayRestApi": {
@@ -239,6 +239,18 @@
                 "Ref": "ApiGatewayResourceApi"
               },
               "PathPart": "stock-usage",
+              "RestApiId": {
+                "Ref": "ApiGatewayRestApi"
+              }
+            }
+          },
+          "ApiGatewayResourceApiStockDashusageCognitoidVar": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+              "ParentId": {
+                "Ref": "ApiGatewayResourceApiStockDashusage"
+              },
+              "PathPart": "{cognitoId}",
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
               }
@@ -486,7 +498,7 @@
               }
             }
           },
-          "ApiGatewayMethodApiStockDashusageOptions": {
+          "ApiGatewayMethodApiStockDashusageCognitoidVarOptions": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
               "AuthorizationType": "NONE",
@@ -528,7 +540,7 @@
                 ]
               },
               "ResourceId": {
-                "Ref": "ApiGatewayResourceApiStockDashusage"
+                "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
               },
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
@@ -1065,13 +1077,13 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayMethodApiStockDashusageGet": {
+          "ApiGatewayMethodApiStockDashusageCognitoidVarGet": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
               "HttpMethod": "GET",
               "RequestParameters": {},
               "ResourceId": {
-                "Ref": "ApiGatewayResourceApiStockDashusage"
+                "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
               },
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
@@ -1479,7 +1491,7 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayDeployment1750885577332": {
+          "ApiGatewayDeployment1750887722624": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -1491,7 +1503,7 @@
               "ApiGatewayMethodHealthOptions",
               "ApiGatewayMethodApiGoodsDashinOptions",
               "ApiGatewayMethodApiProductionDashlogOptions",
-              "ApiGatewayMethodApiStockDashusageOptions",
+              "ApiGatewayMethodApiStockDashusageCognitoidVarOptions",
               "ApiGatewayMethodApiRecipesOptions",
               "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesOptions",
               "ApiGatewayMethodApiGoodsDashoutOptions",
@@ -1503,7 +1515,7 @@
               "ApiGatewayMethodHealthGet",
               "ApiGatewayMethodApiGoodsDashinGet",
               "ApiGatewayMethodApiProductionDashlogGet",
-              "ApiGatewayMethodApiStockDashusageGet",
+              "ApiGatewayMethodApiStockDashusageCognitoidVarGet",
               "ApiGatewayMethodApiRecipesGet",
               "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesGet",
               "ApiGatewayMethodApiGoodsDashoutGet",
@@ -1682,7 +1694,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/custom-resources.zip"
+                "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/custom-resources.zip"
               },
               "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
               "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -1718,7 +1730,7 @@
           "AppLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+              "Ref": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
             },
             "Export": {
               "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
@@ -1840,7 +1852,7 @@
           },
           {
             "http": {
-              "path": "api/stock-usage",
+              "path": "api/stock-usage/{cognitoId}",
               "method": "get",
               "cors": {
                 "origin": "https://master.d2fdrxobxyr2je.amplifyapp.com",
@@ -2052,7 +2064,7 @@
         "timeout": 6,
         "runtime": "nodejs18.x",
         "vpc": {},
-        "versionLogicalId": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+        "versionLogicalId": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
       }
     },
     "configValidationMode": "warn",
@@ -2078,7 +2090,7 @@
     "artifact": "C:\\Users\\Asus\\react-admin\\my-service\\.serverless\\my-service.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z",
+    "artifactDirectoryName": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z",
     "artifact": "my-service.zip"
   }
 }

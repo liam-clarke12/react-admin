@@ -141,7 +141,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                  "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/my-service.zip"
+                  "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/my-service.zip"
                 },
                 "Handler": "index.handler",
                 "Runtime": "nodejs18.x",
@@ -159,14 +159,14 @@
                 "AppLogGroup"
               ]
             },
-            "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs": {
+            "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA": {
               "Type": "AWS::Lambda::Version",
               "DeletionPolicy": "Retain",
               "Properties": {
                 "FunctionName": {
                   "Ref": "AppLambdaFunction"
                 },
-                "CodeSha256": "CtyeThYHEptwl6alPtwxZFiq2/qjFP6b5vilN8naUCc="
+                "CodeSha256": "02QyuvK/me4qsMSTOzCmVZ/MzP3ZxEtT0mrd45JZ4MM="
               }
             },
             "ApiGatewayRestApi": {
@@ -246,6 +246,18 @@
                   "Ref": "ApiGatewayResourceApi"
                 },
                 "PathPart": "stock-usage",
+                "RestApiId": {
+                  "Ref": "ApiGatewayRestApi"
+                }
+              }
+            },
+            "ApiGatewayResourceApiStockDashusageCognitoidVar": {
+              "Type": "AWS::ApiGateway::Resource",
+              "Properties": {
+                "ParentId": {
+                  "Ref": "ApiGatewayResourceApiStockDashusage"
+                },
+                "PathPart": "{cognitoId}",
                 "RestApiId": {
                   "Ref": "ApiGatewayRestApi"
                 }
@@ -493,7 +505,7 @@
                 }
               }
             },
-            "ApiGatewayMethodApiStockDashusageOptions": {
+            "ApiGatewayMethodApiStockDashusageCognitoidVarOptions": {
               "Type": "AWS::ApiGateway::Method",
               "Properties": {
                 "AuthorizationType": "NONE",
@@ -535,7 +547,7 @@
                   ]
                 },
                 "ResourceId": {
-                  "Ref": "ApiGatewayResourceApiStockDashusage"
+                  "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
                 },
                 "RestApiId": {
                   "Ref": "ApiGatewayRestApi"
@@ -1072,13 +1084,13 @@
                 "AppLambdaPermissionApiGateway"
               ]
             },
-            "ApiGatewayMethodApiStockDashusageGet": {
+            "ApiGatewayMethodApiStockDashusageCognitoidVarGet": {
               "Type": "AWS::ApiGateway::Method",
               "Properties": {
                 "HttpMethod": "GET",
                 "RequestParameters": {},
                 "ResourceId": {
-                  "Ref": "ApiGatewayResourceApiStockDashusage"
+                  "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
                 },
                 "RestApiId": {
                   "Ref": "ApiGatewayRestApi"
@@ -1486,7 +1498,7 @@
                 "AppLambdaPermissionApiGateway"
               ]
             },
-            "ApiGatewayDeployment1750885577332": {
+            "ApiGatewayDeployment1750887722624": {
               "Type": "AWS::ApiGateway::Deployment",
               "Properties": {
                 "RestApiId": {
@@ -1498,7 +1510,7 @@
                 "ApiGatewayMethodHealthOptions",
                 "ApiGatewayMethodApiGoodsDashinOptions",
                 "ApiGatewayMethodApiProductionDashlogOptions",
-                "ApiGatewayMethodApiStockDashusageOptions",
+                "ApiGatewayMethodApiStockDashusageCognitoidVarOptions",
                 "ApiGatewayMethodApiRecipesOptions",
                 "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesOptions",
                 "ApiGatewayMethodApiGoodsDashoutOptions",
@@ -1510,7 +1522,7 @@
                 "ApiGatewayMethodHealthGet",
                 "ApiGatewayMethodApiGoodsDashinGet",
                 "ApiGatewayMethodApiProductionDashlogGet",
-                "ApiGatewayMethodApiStockDashusageGet",
+                "ApiGatewayMethodApiStockDashusageCognitoidVarGet",
                 "ApiGatewayMethodApiRecipesGet",
                 "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesGet",
                 "ApiGatewayMethodApiGoodsDashoutGet",
@@ -1684,7 +1696,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                  "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/custom-resources.zip"
+                  "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/custom-resources.zip"
                 },
                 "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
                 "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -1720,7 +1732,7 @@
             "AppLambdaFunctionQualifiedArn": {
               "Description": "Current Lambda function version",
               "Value": {
-                "Ref": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+                "Ref": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
               },
               "Export": {
                 "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
@@ -1832,7 +1844,7 @@
             },
             {
               "http": {
-                "path": "api/stock-usage",
+                "path": "api/stock-usage/{cognitoId}",
                 "method": "get",
                 "cors": {
                   "origin": "https://master.d2fdrxobxyr2je.amplifyapp.com",
@@ -2044,7 +2056,7 @@
           "timeout": 6,
           "runtime": "nodejs18.x",
           "vpc": {},
-          "versionLogicalId": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+          "versionLogicalId": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
         }
       },
       "plugins": [
@@ -2193,7 +2205,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/my-service.zip"
+                "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/my-service.zip"
               },
               "Handler": "index.handler",
               "Runtime": "nodejs18.x",
@@ -2211,14 +2223,14 @@
               "AppLogGroup"
             ]
           },
-          "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs": {
+          "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppLambdaFunction"
               },
-              "CodeSha256": "CtyeThYHEptwl6alPtwxZFiq2/qjFP6b5vilN8naUCc="
+              "CodeSha256": "02QyuvK/me4qsMSTOzCmVZ/MzP3ZxEtT0mrd45JZ4MM="
             }
           },
           "ApiGatewayRestApi": {
@@ -2298,6 +2310,18 @@
                 "Ref": "ApiGatewayResourceApi"
               },
               "PathPart": "stock-usage",
+              "RestApiId": {
+                "Ref": "ApiGatewayRestApi"
+              }
+            }
+          },
+          "ApiGatewayResourceApiStockDashusageCognitoidVar": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+              "ParentId": {
+                "Ref": "ApiGatewayResourceApiStockDashusage"
+              },
+              "PathPart": "{cognitoId}",
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
               }
@@ -2545,7 +2569,7 @@
               }
             }
           },
-          "ApiGatewayMethodApiStockDashusageOptions": {
+          "ApiGatewayMethodApiStockDashusageCognitoidVarOptions": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
               "AuthorizationType": "NONE",
@@ -2587,7 +2611,7 @@
                 ]
               },
               "ResourceId": {
-                "Ref": "ApiGatewayResourceApiStockDashusage"
+                "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
               },
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
@@ -3124,13 +3148,13 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayMethodApiStockDashusageGet": {
+          "ApiGatewayMethodApiStockDashusageCognitoidVarGet": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
               "HttpMethod": "GET",
               "RequestParameters": {},
               "ResourceId": {
-                "Ref": "ApiGatewayResourceApiStockDashusage"
+                "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
               },
               "RestApiId": {
                 "Ref": "ApiGatewayRestApi"
@@ -3538,7 +3562,7 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayDeployment1750885577332": {
+          "ApiGatewayDeployment1750887722624": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -3550,7 +3574,7 @@
               "ApiGatewayMethodHealthOptions",
               "ApiGatewayMethodApiGoodsDashinOptions",
               "ApiGatewayMethodApiProductionDashlogOptions",
-              "ApiGatewayMethodApiStockDashusageOptions",
+              "ApiGatewayMethodApiStockDashusageCognitoidVarOptions",
               "ApiGatewayMethodApiRecipesOptions",
               "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesOptions",
               "ApiGatewayMethodApiGoodsDashoutOptions",
@@ -3562,7 +3586,7 @@
               "ApiGatewayMethodHealthGet",
               "ApiGatewayMethodApiGoodsDashinGet",
               "ApiGatewayMethodApiProductionDashlogGet",
-              "ApiGatewayMethodApiStockDashusageGet",
+              "ApiGatewayMethodApiStockDashusageCognitoidVarGet",
               "ApiGatewayMethodApiRecipesGet",
               "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesGet",
               "ApiGatewayMethodApiGoodsDashoutGet",
@@ -3736,7 +3760,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/custom-resources.zip"
+                "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/custom-resources.zip"
               },
               "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
               "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -3772,7 +3796,7 @@
           "AppLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+              "Ref": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
             },
             "Export": {
               "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
@@ -3817,7 +3841,7 @@
       "serviceProvider": null,
       "instanceParameters": null
     },
-    "serviceRawFile": "service: my-service\r\n\r\nprovider:\r\n  name: aws\r\n  runtime: nodejs18.x\r\n  region: eu-west-1\r\n  stage: dev\r\n  logs:\r\n    restApi: true\r\n  tracing:\r\n    apiGateway: true\r\n  apiGateway:\r\n    shouldStartNameWithService: true\r\n    minimumCompressionSize: 1024\r\n    binaryMediaTypes:\r\n      - '*/*'\r\n  iam:\r\n    role:\r\n      statements:\r\n        - Effect: Allow\r\n          Action:\r\n            - logs:CreateLogGroup\r\n            - logs:CreateLogStream\r\n            - logs:PutLogEvents\r\n          Resource: \"*\"\r\n\r\nfunctions:\r\n  app:\r\n    handler: index.handler\r\n    events:\r\n      - http:\r\n          path: health\r\n          method: GET\r\n          cors: true\r\n      - http:\r\n          path: api/goods-in\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/production-log\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/stock-usage\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/recipes\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/goods-out-with-batches\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/goods-out\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/submit\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-recipe\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-production-log\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-goods-out\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: /{proxy+}\r\n          method: ANY\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n\r\nplugins:\r\n  - serverless-offline\r\n\r\ncustom:\r\n  serverless-offline:\r\n    httpPort: 4000\r\n    noPrependStageInUrl: true\r\n",
+    "serviceRawFile": "service: my-service\r\n\r\nprovider:\r\n  name: aws\r\n  runtime: nodejs18.x\r\n  region: eu-west-1\r\n  stage: dev\r\n  logs:\r\n    restApi: true\r\n  tracing:\r\n    apiGateway: true\r\n  apiGateway:\r\n    shouldStartNameWithService: true\r\n    minimumCompressionSize: 1024\r\n    binaryMediaTypes:\r\n      - '*/*'\r\n  iam:\r\n    role:\r\n      statements:\r\n        - Effect: Allow\r\n          Action:\r\n            - logs:CreateLogGroup\r\n            - logs:CreateLogStream\r\n            - logs:PutLogEvents\r\n          Resource: \"*\"\r\n\r\nfunctions:\r\n  app:\r\n    handler: index.handler\r\n    events:\r\n      - http:\r\n          path: health\r\n          method: GET\r\n          cors: true\r\n      - http:\r\n          path: api/goods-in\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/production-log\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/stock-usage/{cognitoId}\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/recipes\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/goods-out-with-batches\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/goods-out\r\n          method: GET\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/submit\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-recipe\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-production-log\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: api/add-goods-out\r\n          method: POST\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n      - http:\r\n          path: /{proxy+}\r\n          method: ANY\r\n          cors:\r\n            origin: https://master.d2fdrxobxyr2je.amplifyapp.com\r\n            headers:\r\n              - Content-Type\r\n              - X-Amz-Date\r\n              - Authorization\r\n              - X-Api-Key\r\n              - X-Amz-Security-Token\r\n            allowCredentials: true\r\n            maxAge: 86400\r\n\r\nplugins:\r\n  - serverless-offline\r\n\r\ncustom:\r\n  serverless-offline:\r\n    httpPort: 4000\r\n    noPrependStageInUrl: true\r\n",
     "command": [
       "deploy"
     ],
@@ -3830,12 +3854,12 @@
     "serviceProviderAwsCfStackName": "my-service-dev",
     "serviceProviderAwsCfStackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/my-service-dev/b2e89000-4fa1-11f0-a599-0212b991b5e5",
     "serviceProviderAwsCfStackCreated": "2025-06-22T19:47:15.946Z",
-    "serviceProviderAwsCfStackUpdated": "2025-06-25T20:57:38.212Z",
+    "serviceProviderAwsCfStackUpdated": "2025-06-25T21:06:49.300Z",
     "serviceProviderAwsCfStackStatus": "UPDATE_COMPLETE",
     "serviceProviderAwsCfStackOutputs": [
       {
         "OutputKey": "AppLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:eu-west-1:127214157415:function:my-service-dev-app:57",
+        "OutputValue": "arn:aws:lambda:eu-west-1:127214157415:function:my-service-dev-app:58",
         "Description": "Current Lambda function version",
         "ExportName": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
       },
@@ -3953,7 +3977,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-              "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/my-service.zip"
+              "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/my-service.zip"
             },
             "Handler": "index.handler",
             "Runtime": "nodejs18.x",
@@ -3971,14 +3995,14 @@
             "AppLogGroup"
           ]
         },
-        "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs": {
+        "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA": {
           "Type": "AWS::Lambda::Version",
           "DeletionPolicy": "Retain",
           "Properties": {
             "FunctionName": {
               "Ref": "AppLambdaFunction"
             },
-            "CodeSha256": "CtyeThYHEptwl6alPtwxZFiq2/qjFP6b5vilN8naUCc="
+            "CodeSha256": "02QyuvK/me4qsMSTOzCmVZ/MzP3ZxEtT0mrd45JZ4MM="
           }
         },
         "ApiGatewayRestApi": {
@@ -4058,6 +4082,18 @@
               "Ref": "ApiGatewayResourceApi"
             },
             "PathPart": "stock-usage",
+            "RestApiId": {
+              "Ref": "ApiGatewayRestApi"
+            }
+          }
+        },
+        "ApiGatewayResourceApiStockDashusageCognitoidVar": {
+          "Type": "AWS::ApiGateway::Resource",
+          "Properties": {
+            "ParentId": {
+              "Ref": "ApiGatewayResourceApiStockDashusage"
+            },
+            "PathPart": "{cognitoId}",
             "RestApiId": {
               "Ref": "ApiGatewayRestApi"
             }
@@ -4305,7 +4341,7 @@
             }
           }
         },
-        "ApiGatewayMethodApiStockDashusageOptions": {
+        "ApiGatewayMethodApiStockDashusageCognitoidVarOptions": {
           "Type": "AWS::ApiGateway::Method",
           "Properties": {
             "AuthorizationType": "NONE",
@@ -4347,7 +4383,7 @@
               ]
             },
             "ResourceId": {
-              "Ref": "ApiGatewayResourceApiStockDashusage"
+              "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
             },
             "RestApiId": {
               "Ref": "ApiGatewayRestApi"
@@ -4884,13 +4920,13 @@
             "AppLambdaPermissionApiGateway"
           ]
         },
-        "ApiGatewayMethodApiStockDashusageGet": {
+        "ApiGatewayMethodApiStockDashusageCognitoidVarGet": {
           "Type": "AWS::ApiGateway::Method",
           "Properties": {
             "HttpMethod": "GET",
             "RequestParameters": {},
             "ResourceId": {
-              "Ref": "ApiGatewayResourceApiStockDashusage"
+              "Ref": "ApiGatewayResourceApiStockDashusageCognitoidVar"
             },
             "RestApiId": {
               "Ref": "ApiGatewayRestApi"
@@ -5298,7 +5334,7 @@
             "AppLambdaPermissionApiGateway"
           ]
         },
-        "ApiGatewayDeployment1750885577332": {
+        "ApiGatewayDeployment1750887722624": {
           "Type": "AWS::ApiGateway::Deployment",
           "Properties": {
             "RestApiId": {
@@ -5310,7 +5346,7 @@
             "ApiGatewayMethodHealthOptions",
             "ApiGatewayMethodApiGoodsDashinOptions",
             "ApiGatewayMethodApiProductionDashlogOptions",
-            "ApiGatewayMethodApiStockDashusageOptions",
+            "ApiGatewayMethodApiStockDashusageCognitoidVarOptions",
             "ApiGatewayMethodApiRecipesOptions",
             "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesOptions",
             "ApiGatewayMethodApiGoodsDashoutOptions",
@@ -5322,7 +5358,7 @@
             "ApiGatewayMethodHealthGet",
             "ApiGatewayMethodApiGoodsDashinGet",
             "ApiGatewayMethodApiProductionDashlogGet",
-            "ApiGatewayMethodApiStockDashusageGet",
+            "ApiGatewayMethodApiStockDashusageCognitoidVarGet",
             "ApiGatewayMethodApiRecipesGet",
             "ApiGatewayMethodApiGoodsDashoutDashwithDashbatchesGet",
             "ApiGatewayMethodApiGoodsDashoutGet",
@@ -5496,7 +5532,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-              "S3Key": "serverless/my-service/dev/1750885604211-2025-06-25T21:06:44.211Z/custom-resources.zip"
+              "S3Key": "serverless/my-service/dev/1750887759258-2025-06-25T21:42:39.258Z/custom-resources.zip"
             },
             "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
             "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -5532,7 +5568,7 @@
         "AppLambdaFunctionQualifiedArn": {
           "Description": "Current Lambda function version",
           "Value": {
-            "Ref": "AppLambdaVersionPaEM0hXpA9cmak3AB4MOqfhFlI1aAutWYuVOK5zgjQs"
+            "Ref": "AppLambdaVersion9KmT0jmHngppx0yAgw0leXURvMGIRVNCnnmeDicNFA"
           },
           "Export": {
             "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
