@@ -59,7 +59,7 @@ functions:
             allowCredentials: true
             maxAge: 86400
       - http:
-          path: api/stock-usage/{cognitoId}
+          path: api/stock-usage
           method: GET
           cors:
             origin: https://master.d2fdrxobxyr2je.amplifyapp.com
