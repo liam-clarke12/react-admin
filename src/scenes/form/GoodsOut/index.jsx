@@ -76,7 +76,7 @@ const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws
         const data = await response.json();
         console.log('Fetched recipes:', data);
 
-        setFilteredRecipes(data.map((recipe) => recipe.recipe_name));
+        setFilteredRecipes(data.map((recipe) => recipe.recipe));
 
       } catch (err) {
         setError('Error fetching recipes');

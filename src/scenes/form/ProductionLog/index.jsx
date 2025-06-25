@@ -32,7 +32,7 @@ const ProductionLogForm = () => {
         console.log("Fetched recipes:", data);
   
         if (data.length > 0) {
-          setFilteredRecipes(data.map((recipe) => recipe.recipe_name));
+          setFilteredRecipes(data.map((recipe) => recipe.recipe));
         } else {
           setFilteredRecipes([]); // No recipes found
         }

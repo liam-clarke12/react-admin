@@ -134,7 +134,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750865248060-2025-06-25T15:27:28.060Z/my-service.zip"
+                "S3Key": "serverless/my-service/dev/1750883731630-2025-06-25T20:35:31.630Z/my-service.zip"
               },
               "Handler": "index.handler",
               "Runtime": "nodejs18.x",
@@ -1491,7 +1491,7 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayDeployment1750865229872": {
+          "ApiGatewayDeployment1750883692085": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -1694,7 +1694,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750865248060-2025-06-25T15:27:28.060Z/custom-resources.zip"
+                "S3Key": "serverless/my-service/dev/1750883731630-2025-06-25T20:35:31.630Z/custom-resources.zip"
               },
               "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
               "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -2090,7 +2090,7 @@
     "artifact": "C:\\Users\\Asus\\react-admin\\my-service\\.serverless\\my-service.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/my-service/dev/1750865248060-2025-06-25T15:27:28.060Z",
+    "artifactDirectoryName": "serverless/my-service/dev/1750883731630-2025-06-25T20:35:31.630Z",
     "artifact": "my-service.zip"
   }
 }
