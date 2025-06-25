@@ -230,7 +230,7 @@ app.post("/dev/api/delete-row", async (req, res) => {
 });
 
 // **New API Endpoint to Add a Recipe**
-app.post("/dev/api/add-recipe", async (req, res) => {
+app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
 
   const { recipe, upb, ingredients, quantities, cognito_id } = req.body;

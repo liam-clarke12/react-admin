@@ -230,7 +230,7 @@ app.post("/dev/api/delete-row", async (req, res) => {
 });
 
 // **New API Endpoint to Add a Recipe**
-app.post("/dev/api/add-recipe", async (req, res) => {
+app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
 
   const { recipe, upb, ingredients, quantities, cognito_id } = req.body;
@@ -308,7 +308,7 @@ app.post("/dev/api/add-recipe", async (req, res) => {
 
 
 // **Fetch all recipes**
-app.get("/dev/api/recipes", async (req, res) => {
+app.get("/api/recipes", async (req, res) => {
   const { cognito_id } = req.query;
 
   if (!cognito_id) {

@@ -72,6 +72,19 @@ functions:
             allowCredentials: true
             maxAge: 86400
       - http:
+          path: api/add-recipe
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
           path: /{proxy+}
           method: ANY
           cors:

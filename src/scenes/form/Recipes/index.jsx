@@ -30,7 +30,7 @@ const RecipeForm = () => {
     };
   
     try {
-      const response = await fetch("https://612wy8dkj5.execute-api.eu-west-1.amazonaws.com/dev/api/add-recipe", {
+      const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/add-recipe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
