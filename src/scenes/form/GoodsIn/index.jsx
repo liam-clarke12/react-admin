@@ -19,7 +19,7 @@ const handleFormSubmit = async (values, { resetForm }) => {
   console.log("📤 Sending payload:", payload);
 
   try {
-    const response = await fetch("https://6vojqdsif5.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
+const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

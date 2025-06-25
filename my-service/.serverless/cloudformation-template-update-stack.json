@@ -100,7 +100,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750854650103-2025-06-25T12:30:50.103Z/my-service.zip"
+          "S3Key": "serverless/my-service/dev/1750857305311-2025-06-25T13:15:05.311Z/my-service.zip"
         },
         "Handler": "index.handler",
         "Runtime": "nodejs18.x",
@@ -118,14 +118,14 @@
         "AppLogGroup"
       ]
     },
-    "AppLambdaVersion6S6LxYECOPKMuaNRzo4x45R2C8fNDtcj1pDAxkwGFo": {
+    "AppLambdaVersion6eHfsz4w1HHZOxTOOBgs1HfMV6c03cdBlQGqLZE": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppLambdaFunction"
         },
-        "CodeSha256": "cpbEDD/nnD6jndkywZhBdgxjdxnJfFxdB80wpZUjxYw="
+        "CodeSha256": "cW5DaI0HyqnrpWCUqKpTPhNyKNK+Y4/bZgH+E8t+J8Y="
       }
     },
     "ApiGatewayRestApi": {
@@ -159,7 +159,7 @@
         }
       }
     },
-    "ApiGatewayResourceDev": {
+    "ApiGatewayResourceApi": {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
         "ParentId": {
@@ -168,41 +168,17 @@
             "RootResourceId"
           ]
         },
-        "PathPart": "dev",
-        "RestApiId": {
-          "Ref": "ApiGatewayRestApi"
-        }
-      }
-    },
-    "ApiGatewayResourceDevHealth": {
-      "Type": "AWS::ApiGateway::Resource",
-      "Properties": {
-        "ParentId": {
-          "Ref": "ApiGatewayResourceDev"
-        },
-        "PathPart": "health",
-        "RestApiId": {
-          "Ref": "ApiGatewayRestApi"
-        }
-      }
-    },
-    "ApiGatewayResourceDevApi": {
-      "Type": "AWS::ApiGateway::Resource",
-      "Properties": {
-        "ParentId": {
-          "Ref": "ApiGatewayResourceDev"
-        },
         "PathPart": "api",
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
         }
       }
     },
-    "ApiGatewayResourceDevApiGoodsDashin": {
+    "ApiGatewayResourceApiGoodsDashin": {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
         "ParentId": {
-          "Ref": "ApiGatewayResourceDevApi"
+          "Ref": "ApiGatewayResourceApi"
         },
         "PathPart": "goods-in",
         "RestApiId": {
@@ -210,11 +186,26 @@
         }
       }
     },
-    "ApiGatewayResourceDevProxyVar": {
+    "ApiGatewayResourceApiSubmit": {
       "Type": "AWS::ApiGateway::Resource",
       "Properties": {
         "ParentId": {
-          "Ref": "ApiGatewayResourceDev"
+          "Ref": "ApiGatewayResourceApi"
+        },
+        "PathPart": "submit",
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayResourceProxyVar": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "ApiGatewayRestApi",
+            "RootResourceId"
+          ]
         },
         "PathPart": "{proxy+}",
         "RestApiId": {
@@ -267,52 +258,7 @@
         }
       }
     },
-    "ApiGatewayMethodDevHealthOptions": {
-      "Type": "AWS::ApiGateway::Method",
-      "Properties": {
-        "AuthorizationType": "NONE",
-        "HttpMethod": "OPTIONS",
-        "MethodResponses": [
-          {
-            "StatusCode": "200",
-            "ResponseParameters": {
-              "method.response.header.Access-Control-Allow-Origin": true,
-              "method.response.header.Access-Control-Allow-Headers": true,
-              "method.response.header.Access-Control-Allow-Methods": true
-            },
-            "ResponseModels": {}
-          }
-        ],
-        "RequestParameters": {},
-        "Integration": {
-          "Type": "MOCK",
-          "RequestTemplates": {
-            "application/json": "{statusCode:200}"
-          },
-          "ContentHandling": "CONVERT_TO_TEXT",
-          "IntegrationResponses": [
-            {
-              "StatusCode": "200",
-              "ResponseParameters": {
-                "method.response.header.Access-Control-Allow-Origin": "'*'",
-                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Amzn-Trace-Id'",
-                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET'"
-              },
-              "ResponseTemplates": {
-                "application/json": ""
-              }
-            }
-          ]
-        },
-        "ResourceId": {
-          "Ref": "ApiGatewayResourceDevHealth"
-        },
-        "RestApiId": {
-          "Ref": "ApiGatewayRestApi"
-        }
-      }
-    },
-    "ApiGatewayMethodDevApiGoodsDashinOptions": {
+    "ApiGatewayMethodApiGoodsDashinOptions": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "AuthorizationType": "NONE",
@@ -354,14 +300,63 @@
           ]
         },
         "ResourceId": {
-          "Ref": "ApiGatewayResourceDevApiGoodsDashin"
+          "Ref": "ApiGatewayResourceApiGoodsDashin"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
         }
       }
     },
-    "ApiGatewayMethodDevProxyVarOptions": {
+    "ApiGatewayMethodApiSubmitOptions": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Origin": true,
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Credentials": true,
+              "method.response.header.Access-Control-Max-Age": true
+            },
+            "ResponseModels": {}
+          }
+        ],
+        "RequestParameters": {},
+        "Integration": {
+          "Type": "MOCK",
+          "RequestTemplates": {
+            "application/json": "{statusCode:200}"
+          },
+          "ContentHandling": "CONVERT_TO_TEXT",
+          "IntegrationResponses": [
+            {
+              "StatusCode": "200",
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "''https://master.d2fdrxobxyr2je.amplifyapp.com''",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+                "method.response.header.Access-Control-Allow-Credentials": "'true'",
+                "method.response.header.Access-Control-Max-Age": "'86400'"
+              },
+              "ResponseTemplates": {
+                "application/json": ""
+              }
+            }
+          ]
+        },
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceApiSubmit"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodProxyVarOptions": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "AuthorizationType": "NONE",
@@ -403,7 +398,7 @@
           ]
         },
         "ResourceId": {
-          "Ref": "ApiGatewayResourceDevProxyVar"
+          "Ref": "ApiGatewayResourceProxyVar"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -456,13 +451,13 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayMethodDevHealthGet": {
+    "ApiGatewayMethodApiGoodsDashinGet": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "HttpMethod": "GET",
         "RequestParameters": {},
         "ResourceId": {
-          "Ref": "ApiGatewayResourceDevHealth"
+          "Ref": "ApiGatewayResourceApiGoodsDashin"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -502,13 +497,13 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayMethodDevApiGoodsDashinGet": {
+    "ApiGatewayMethodApiSubmitPost": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
-        "HttpMethod": "GET",
+        "HttpMethod": "POST",
         "RequestParameters": {},
         "ResourceId": {
-          "Ref": "ApiGatewayResourceDevApiGoodsDashin"
+          "Ref": "ApiGatewayResourceApiSubmit"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -548,13 +543,13 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayMethodDevProxyVarAny": {
+    "ApiGatewayMethodProxyVarAny": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
         "HttpMethod": "ANY",
         "RequestParameters": {},
         "ResourceId": {
-          "Ref": "ApiGatewayResourceDevProxyVar"
+          "Ref": "ApiGatewayResourceProxyVar"
         },
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
@@ -594,7 +589,7 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1750854625692": {
+    "ApiGatewayDeployment1750857277634": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
@@ -604,13 +599,13 @@
       },
       "DependsOn": [
         "ApiGatewayMethodHealthOptions",
-        "ApiGatewayMethodDevHealthOptions",
-        "ApiGatewayMethodDevApiGoodsDashinOptions",
-        "ApiGatewayMethodDevProxyVarOptions",
+        "ApiGatewayMethodApiGoodsDashinOptions",
+        "ApiGatewayMethodApiSubmitOptions",
+        "ApiGatewayMethodProxyVarOptions",
         "ApiGatewayMethodHealthGet",
-        "ApiGatewayMethodDevHealthGet",
-        "ApiGatewayMethodDevApiGoodsDashinGet",
-        "ApiGatewayMethodDevProxyVarAny"
+        "ApiGatewayMethodApiGoodsDashinGet",
+        "ApiGatewayMethodApiSubmitPost",
+        "ApiGatewayMethodProxyVarAny"
       ]
     },
     "AppLambdaPermissionApiGateway": {
@@ -781,7 +776,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750854650103-2025-06-25T12:30:50.103Z/custom-resources.zip"
+          "S3Key": "serverless/my-service/dev/1750857305311-2025-06-25T13:15:05.311Z/custom-resources.zip"
         },
         "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
         "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -817,7 +812,7 @@
     "AppLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppLambdaVersion6S6LxYECOPKMuaNRzo4x45R2C8fNDtcj1pDAxkwGFo"
+        "Ref": "AppLambdaVersion6eHfsz4w1HHZOxTOOBgs1HfMV6c03cdBlQGqLZE"
       },
       "Export": {
         "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"

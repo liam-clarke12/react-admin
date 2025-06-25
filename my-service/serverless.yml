@@ -33,11 +33,7 @@ functions:
           method: GET
           cors: true
       - http:
-          path: dev/health
-          method: GET
-          cors: true
-      - http:
-          path: dev/api/goods-in
+          path: api/goods-in
           method: GET
           cors:
             origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
@@ -50,7 +46,20 @@ functions:
             allowCredentials: true
             maxAge: 86400
       - http:
-          path: dev/{proxy+}
+          path: api/submit
+          method: POST
+          cors:
+            origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: /{proxy+}
           method: ANY
           cors:
             origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
