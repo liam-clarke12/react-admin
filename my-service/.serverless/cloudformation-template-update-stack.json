@@ -100,7 +100,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750857305311-2025-06-25T13:15:05.311Z/my-service.zip"
+          "S3Key": "serverless/my-service/dev/1750858075597-2025-06-25T13:27:55.597Z/my-service.zip"
         },
         "Handler": "index.handler",
         "Runtime": "nodejs18.x",
@@ -118,14 +118,14 @@
         "AppLogGroup"
       ]
     },
-    "AppLambdaVersion6eHfsz4w1HHZOxTOOBgs1HfMV6c03cdBlQGqLZE": {
+    "AppLambdaVersionhsdFQ5ZvEPKZz80ADQCZzKNzskxesUPG2fXtNbHQ": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppLambdaFunction"
         },
-        "CodeSha256": "cW5DaI0HyqnrpWCUqKpTPhNyKNK+Y4/bZgH+E8t+J8Y="
+        "CodeSha256": "Knx91KgR7L9kaZNiPjXbDJY/m7Vr935aP/0ZuO9qpkc="
       }
     },
     "ApiGatewayRestApi": {
@@ -287,7 +287,7 @@
             {
               "StatusCode": "200",
               "ResponseParameters": {
-                "method.response.header.Access-Control-Allow-Origin": "''https://master.d2fdrxobxyr2je.amplifyapp.com''",
+                "method.response.header.Access-Control-Allow-Origin": "'https://master.d2fdrxobxyr2je.amplifyapp.com'",
                 "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
                 "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET'",
                 "method.response.header.Access-Control-Allow-Credentials": "'true'",
@@ -336,7 +336,7 @@
             {
               "StatusCode": "200",
               "ResponseParameters": {
-                "method.response.header.Access-Control-Allow-Origin": "''https://master.d2fdrxobxyr2je.amplifyapp.com''",
+                "method.response.header.Access-Control-Allow-Origin": "'https://master.d2fdrxobxyr2je.amplifyapp.com'",
                 "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
                 "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
                 "method.response.header.Access-Control-Allow-Credentials": "'true'",
@@ -385,7 +385,7 @@
             {
               "StatusCode": "200",
               "ResponseParameters": {
-                "method.response.header.Access-Control-Allow-Origin": "''https://master.d2fdrxobxyr2je.amplifyapp.com''",
+                "method.response.header.Access-Control-Allow-Origin": "'https://master.d2fdrxobxyr2je.amplifyapp.com'",
                 "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
                 "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,DELETE,GET,HEAD,PATCH,POST,PUT'",
                 "method.response.header.Access-Control-Allow-Credentials": "'true'",
@@ -589,7 +589,7 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1750857277634": {
+    "ApiGatewayDeployment1750858051958": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
@@ -776,7 +776,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750857305311-2025-06-25T13:15:05.311Z/custom-resources.zip"
+          "S3Key": "serverless/my-service/dev/1750858075597-2025-06-25T13:27:55.597Z/custom-resources.zip"
         },
         "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
         "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -812,7 +812,7 @@
     "AppLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppLambdaVersion6eHfsz4w1HHZOxTOOBgs1HfMV6c03cdBlQGqLZE"
+        "Ref": "AppLambdaVersionhsdFQ5ZvEPKZz80ADQCZzKNzskxesUPG2fXtNbHQ"
       },
       "Export": {
         "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"

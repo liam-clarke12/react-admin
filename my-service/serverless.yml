@@ -36,7 +36,7 @@ functions:
           path: api/goods-in
           method: GET
           cors:
-            origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
             headers:
               - Content-Type
               - X-Amz-Date
@@ -49,7 +49,7 @@ functions:
           path: api/submit
           method: POST
           cors:
-            origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
             headers:
               - Content-Type
               - X-Amz-Date
@@ -62,7 +62,7 @@ functions:
           path: /{proxy+}
           method: ANY
           cors:
-            origin: "'https://master.d2fdrxobxyr2je.amplifyapp.com'"
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
             headers:
               - Content-Type
               - X-Amz-Date

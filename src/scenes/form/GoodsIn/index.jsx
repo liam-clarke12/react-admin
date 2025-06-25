@@ -16,7 +16,8 @@ const GoodsInForm = () => {
 const handleFormSubmit = async (values, { resetForm }) => {
   const payload = { ...values, cognito_id: cognitoId };
 
-  console.log("📤 Sending payload:", payload);
+  console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
+
 
   try {
 const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
