@@ -23,7 +23,7 @@ const Topbar = () => {
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
     const { goodsInRows } = useData(); 
-    const { cognitoId, signOut } = useAuth();  
+    const { signOut } = useAuth();  
     const navigate = useNavigate();
 
     const [notifications, setNotifications] = useState(() => {
@@ -110,7 +110,7 @@ const Topbar = () => {
 
             {/* Icons */}
             <Box display="flex" position="relative">
-                <IconButton onClick={colorMode.toggleColorMode}>
+                <IconButton onClick={() => colorMode?.toggleColorMode?.()}>
                     {theme.palette.mode === 'dark' ? (
                         <DarkModeOutlinedIcon />
                     ) : (
