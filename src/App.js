@@ -112,8 +112,8 @@ function App() {
   return (
     <AuthProvider> {/* Wrap the entire app */}
       <Authenticator components={components}>
-        {({ signOut, user }) => (
-          <AuthProvider value={{ user, signOut }}>
+        {({ signOut, user }) =>
+          user ? (
             <ColorModeContext.Provider value={colorMode}>
               <ThemeProvider theme={theme}>
                 <CssBaseline />
@@ -142,8 +142,12 @@ function App() {
                 </DataProvider>
               </ThemeProvider>
             </ColorModeContext.Provider>
-          </AuthProvider>
-        )}
+          ) : (
+            <Routes>
+              <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+          )
+        }
       </Authenticator>
     </AuthProvider>
   );

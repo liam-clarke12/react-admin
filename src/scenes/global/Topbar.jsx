@@ -23,7 +23,7 @@ const Topbar = () => {
     const colors = tokens(theme.palette.mode);
     const colorMode = useContext(ColorModeContext);
     const { goodsInRows } = useData(); 
-    const { signOut } = useAuth();  
+    const { cognitoId, signOut } = useAuth();  
     const navigate = useNavigate();
 
     const [notifications, setNotifications] = useState(() => {
@@ -110,7 +110,7 @@ const Topbar = () => {
 
             {/* Icons */}
             <Box display="flex" position="relative">
-                <IconButton onClick={() => colorMode?.toggleColorMode?.()}>
+                <IconButton onClick={colorMode.toggleColorMode}>
                     {theme.palette.mode === 'dark' ? (
                         <DarkModeOutlinedIcon />
                     ) : (
@@ -204,23 +204,10 @@ const Topbar = () => {
                     <Typography variant="body2" fontWeight="bold" px={1.5}>Account ID: {cognitoId || "Not available"}</Typography>
                     <Box height="1px" bgcolor={colors.primary[300]} my={1} />
 
-                    <MenuItem onClick={() => navigate("/account")}>
-                    <Box display="flex" alignItems="center">
-                        <AccountCircleOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-                        <Typography variant="body2">Account</Typography>
-                    </Box>
-                    </MenuItem>
-                    <MenuItem onClick={() => navigate("/settings")}>
-                    <Box display="flex" alignItems="center">
-                        <SettingsOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-                        <Typography variant="body2">Settings</Typography>
-                    </Box>
-                    </MenuItem>
+                    <MenuItem onClick={() => navigate("/account")}><AccountCircleOutlinedIcon fontSize="small" /> Account</MenuItem>
+                    <MenuItem onClick={() => navigate("/settings")}><SettingsOutlinedIcon fontSize="small" /> Settings</MenuItem>
                     <MenuItem onClick={handleLogoutClick} sx={{ color: colors.red[500] }}>
-                    <Box display="flex" alignItems="center">
-                        <LogoutOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-                        <Typography variant="body2">Logout</Typography>
-                    </Box>
+                        <LogoutOutlinedIcon fontSize="small" /> Logout
                     </MenuItem>
                 </Box>
             </Popover>
