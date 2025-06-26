@@ -100,7 +100,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750937325842-2025-06-26T11:28:45.842Z/my-service.zip"
+          "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/my-service.zip"
         },
         "Handler": "index.handler",
         "Runtime": "nodejs18.x",
@@ -118,14 +118,14 @@
         "AppLogGroup"
       ]
     },
-    "AppLambdaVersion1rNNVFvaVuA9LeQed5Eujc8jbDv9ftOT0XZKR09cyc": {
+    "AppLambdaVersionA7t35qUZJ7RcLzEAxzhpSCCinVxvFDy1JAxesgkIzVU": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppLambdaFunction"
         },
-        "CodeSha256": "BqH9rlvUPQSxloQr3NRigaz3hqewkR9j7Nysk+Gpq7w="
+        "CodeSha256": "TmI5R/A3mGxyncdWTylPAWSmT55jHVb8lxNYBdz9rbY="
       }
     },
     "ApiGatewayRestApi": {
@@ -1021,7 +1021,7 @@
               "ResponseParameters": {
                 "method.response.header.Access-Control-Allow-Origin": "'https://master.d2fdrxobxyr2je.amplifyapp.com'",
                 "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,DELETE'",
                 "method.response.header.Access-Control-Allow-Credentials": "'true'",
                 "method.response.header.Access-Control-Max-Age": "'86400'"
               },
@@ -1686,10 +1686,10 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayMethodApiDeleteDashrecipePost": {
+    "ApiGatewayMethodApiDeleteDashrecipeDelete": {
       "Type": "AWS::ApiGateway::Method",
       "Properties": {
-        "HttpMethod": "POST",
+        "HttpMethod": "DELETE",
         "RequestParameters": {},
         "ResourceId": {
           "Ref": "ApiGatewayResourceApiDeleteDashrecipe"
@@ -1778,7 +1778,7 @@
         "AppLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1750937302771": {
+    "ApiGatewayDeployment1750937823256": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
@@ -1815,7 +1815,7 @@
         "ApiGatewayMethodApiAddDashgoodsDashoutPost",
         "ApiGatewayMethodProxyVarAny",
         "ApiGatewayMethodApiDeleteDashrowPost",
-        "ApiGatewayMethodApiDeleteDashrecipePost",
+        "ApiGatewayMethodApiDeleteDashrecipeDelete",
         "ApiGatewayMethodApiDeleteDashproductionDashlogPost"
       ]
     },
@@ -1987,7 +1987,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-          "S3Key": "serverless/my-service/dev/1750937325842-2025-06-26T11:28:45.842Z/custom-resources.zip"
+          "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/custom-resources.zip"
         },
         "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
         "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -2023,7 +2023,7 @@
     "AppLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppLambdaVersion1rNNVFvaVuA9LeQed5Eujc8jbDv9ftOT0XZKR09cyc"
+        "Ref": "AppLambdaVersionA7t35qUZJ7RcLzEAxzhpSCCinVxvFDy1JAxesgkIzVU"
       },
       "Export": {
         "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
