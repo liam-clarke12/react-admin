@@ -134,7 +134,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/my-service.zip"
+                "S3Key": "serverless/my-service/dev/1750939751066-2025-06-26T12:09:11.066Z/my-service.zip"
               },
               "Handler": "index.handler",
               "Runtime": "nodejs18.x",
@@ -152,14 +152,14 @@
               "AppLogGroup"
             ]
           },
-          "AppLambdaVersionA7t35qUZJ7RcLzEAxzhpSCCinVxvFDy1JAxesgkIzVU": {
+          "AppLambdaVersiono87REAvaVX250sOPlgPJDjORXKy62ASZKlRUTS4IfvE": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppLambdaFunction"
               },
-              "CodeSha256": "TmI5R/A3mGxyncdWTylPAWSmT55jHVb8lxNYBdz9rbY="
+              "CodeSha256": "0QRmY18B/I2p0n6ZyWiIuLHul137J+X8U22RwYVgxwA="
             }
           },
           "ApiGatewayRestApi": {
@@ -1055,7 +1055,7 @@
                     "ResponseParameters": {
                       "method.response.header.Access-Control-Allow-Origin": "'https://master.d2fdrxobxyr2je.amplifyapp.com'",
                       "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-                      "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,DELETE'",
+                      "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
                       "method.response.header.Access-Control-Allow-Credentials": "'true'",
                       "method.response.header.Access-Control-Max-Age": "'86400'"
                     },
@@ -1720,10 +1720,10 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayMethodApiDeleteDashrecipeDelete": {
+          "ApiGatewayMethodApiDeleteDashrecipePost": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
-              "HttpMethod": "DELETE",
+              "HttpMethod": "POST",
               "RequestParameters": {},
               "ResourceId": {
                 "Ref": "ApiGatewayResourceApiDeleteDashrecipe"
@@ -1812,7 +1812,7 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayDeployment1750939199942": {
+          "ApiGatewayDeployment1750939721066": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -1849,7 +1849,7 @@
               "ApiGatewayMethodApiAddDashgoodsDashoutPost",
               "ApiGatewayMethodProxyVarAny",
               "ApiGatewayMethodApiDeleteDashrowPost",
-              "ApiGatewayMethodApiDeleteDashrecipeDelete",
+              "ApiGatewayMethodApiDeleteDashrecipePost",
               "ApiGatewayMethodApiDeleteDashproductionDashlogPost"
             ]
           },
@@ -2021,7 +2021,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/custom-resources.zip"
+                "S3Key": "serverless/my-service/dev/1750939751066-2025-06-26T12:09:11.066Z/custom-resources.zip"
               },
               "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
               "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -2057,7 +2057,7 @@
           "AppLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppLambdaVersionA7t35qUZJ7RcLzEAxzhpSCCinVxvFDy1JAxesgkIzVU"
+              "Ref": "AppLambdaVersiono87REAvaVX250sOPlgPJDjORXKy62ASZKlRUTS4IfvE"
             },
             "Export": {
               "Name": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
@@ -2410,12 +2410,12 @@
           {
             "http": {
               "path": "api/delete-recipe",
-              "method": "delete",
+              "method": "post",
               "cors": {
                 "origin": "https://master.d2fdrxobxyr2je.amplifyapp.com",
                 "methods": [
                   "OPTIONS",
-                  "DELETE"
+                  "POST"
                 ],
                 "headers": [
                   "Content-Type",
@@ -2460,7 +2460,7 @@
         "timeout": 6,
         "runtime": "nodejs18.x",
         "vpc": {},
-        "versionLogicalId": "AppLambdaVersionA7t35qUZJ7RcLzEAxzhpSCCinVxvFDy1JAxesgkIzVU"
+        "versionLogicalId": "AppLambdaVersiono87REAvaVX250sOPlgPJDjORXKy62ASZKlRUTS4IfvE"
       }
     },
     "configValidationMode": "warn",
@@ -2486,7 +2486,7 @@
     "artifact": "C:\\Users\\Asus\\react-admin\\my-service\\.serverless\\my-service.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z",
+    "artifactDirectoryName": "serverless/my-service/dev/1750939751066-2025-06-26T12:09:11.066Z",
     "artifact": "my-service.zip"
   }
 }

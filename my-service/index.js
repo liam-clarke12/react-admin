@@ -333,7 +333,7 @@ app.get("/api/recipes", async (req, res) => {
 });
 
 // **Delete Recipe by Name**
-app.delete("/api/delete-recipe", async (req, res) => {
+app.post("/api/delete-recipe", async (req, res) => {
   const { recipeName, cognito_id } = req.body;
 
   // Validate input

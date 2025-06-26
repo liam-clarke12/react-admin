@@ -76,7 +76,7 @@ const Recipes = () => {
             const response = await fetch(
               "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-recipe",
               {
-                method: "DELETE",
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   recipeName: recipeToDelete.recipe,
