@@ -190,7 +190,7 @@ functions:
             maxAge: 86400
       - http:
           path: api/delete-recipe
-          method: POST
+          method: DELETE
           cors:
             origin: https://master.d2fdrxobxyr2je.amplifyapp.com
             headers:

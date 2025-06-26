@@ -141,7 +141,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                  "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/my-service.zip"
+                  "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/my-service.zip"
                 },
                 "Handler": "index.handler",
                 "Runtime": "nodejs18.x",
@@ -1819,7 +1819,7 @@
                 "AppLambdaPermissionApiGateway"
               ]
             },
-            "ApiGatewayDeployment1750937823256": {
+            "ApiGatewayDeployment1750939199942": {
               "Type": "AWS::ApiGateway::Deployment",
               "Properties": {
                 "RestApiId": {
@@ -2023,7 +2023,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                  "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/custom-resources.zip"
+                  "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/custom-resources.zip"
                 },
                 "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
                 "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -2601,7 +2601,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/my-service.zip"
+                "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/my-service.zip"
               },
               "Handler": "index.handler",
               "Runtime": "nodejs18.x",
@@ -4279,7 +4279,7 @@
               "AppLambdaPermissionApiGateway"
             ]
           },
-          "ApiGatewayDeployment1750937823256": {
+          "ApiGatewayDeployment1750939199942": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -4483,7 +4483,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-                "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/custom-resources.zip"
+                "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/custom-resources.zip"
               },
               "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
               "Handler": "api-gateway-cloud-watch-role/handler.handler",
@@ -4577,12 +4577,12 @@
     "serviceProviderAwsCfStackName": "my-service-dev",
     "serviceProviderAwsCfStackId": "arn:aws:cloudformation:eu-west-1:127214157415:stack/my-service-dev/b2e89000-4fa1-11f0-a599-0212b991b5e5",
     "serviceProviderAwsCfStackCreated": "2025-06-22T19:47:15.946Z",
-    "serviceProviderAwsCfStackUpdated": "2025-06-26T11:28:48.426Z",
-    "serviceProviderAwsCfStackStatus": "UPDATE_COMPLETE",
+    "serviceProviderAwsCfStackUpdated": "2025-06-26T11:58:13.117Z",
+    "serviceProviderAwsCfStackStatus": "UPDATE_ROLLBACK_COMPLETE",
     "serviceProviderAwsCfStackOutputs": [
       {
         "OutputKey": "AppLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:eu-west-1:127214157415:function:my-service-dev-app:60",
+        "OutputValue": "arn:aws:lambda:eu-west-1:127214157415:function:my-service-dev-app:63",
         "Description": "Current Lambda function version",
         "ExportName": "sls-my-service-dev-AppLambdaFunctionQualifiedArn"
       },
@@ -4700,7 +4700,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-              "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/my-service.zip"
+              "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/my-service.zip"
             },
             "Handler": "index.handler",
             "Runtime": "nodejs18.x",
@@ -6378,7 +6378,7 @@
             "AppLambdaPermissionApiGateway"
           ]
         },
-        "ApiGatewayDeployment1750937823256": {
+        "ApiGatewayDeployment1750939199942": {
           "Type": "AWS::ApiGateway::Deployment",
           "Properties": {
             "RestApiId": {
@@ -6582,7 +6582,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-eu-west-1-2a658044-966a",
-              "S3Key": "serverless/my-service/dev/1750937836963-2025-06-26T11:37:16.963Z/custom-resources.zip"
+              "S3Key": "serverless/my-service/dev/1750939213670-2025-06-26T12:00:13.670Z/custom-resources.zip"
             },
             "FunctionName": "my-service-dev-custom-resource-apigw-cw-role",
             "Handler": "api-gateway-cloud-watch-role/handler.handler",
