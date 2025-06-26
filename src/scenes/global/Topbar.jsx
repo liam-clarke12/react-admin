@@ -207,7 +207,9 @@ const Topbar = () => {
                     <MenuItem onClick={() => navigate("/account")}><AccountCircleOutlinedIcon fontSize="small" /> Account</MenuItem>
                     <MenuItem onClick={() => navigate("/settings")}><SettingsOutlinedIcon fontSize="small" /> Settings</MenuItem>
                     <MenuItem onClick={handleLogoutClick} sx={{ color: colors.red[500] }}>
-                        <LogoutOutlinedIcon fontSize="small" /> Logout
+                        <Box display="flex" alignItems="center">
+                            <LogoutOutlinedIcon fontSize="small" /> Logout
+                        </Box>
                     </MenuItem>
                 </Box>
             </Popover>
