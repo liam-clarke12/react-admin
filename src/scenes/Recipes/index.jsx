@@ -74,7 +74,7 @@ const Recipes = () => {
           const recipeToDelete = rows.find((row) => row.id === rowId);
           if (recipeToDelete) {
             const response = await fetch(
-              "http://localhost:5000/api/delete-recipe",
+              "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-recipe",
               {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },

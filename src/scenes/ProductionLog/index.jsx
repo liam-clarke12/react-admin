@@ -62,7 +62,7 @@ const ProductionLog = () => {
   
       await Promise.all(
         rowsToDelete.map(async (row) => {
-          const response = await fetch("http://localhost:5000/api/delete-production-log", {
+          const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }), // Use batchCode

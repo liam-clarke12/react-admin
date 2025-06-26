@@ -206,7 +206,7 @@ app.get("/api/goods-in", async (req, res) => {
   }
 });
 
-app.post("/dev/api/delete-row", async (req, res) => {
+app.post("/api/delete-row", async (req, res) => {
   const { barCode, cognito_id } = req.body; // Use barCode instead of id
 
   if (!barCode || !cognito_id) {
@@ -333,7 +333,7 @@ app.get("/api/recipes", async (req, res) => {
 });
 
 // **Delete Recipe by Name**
-app.delete("/dev/api/delete-recipe", async (req, res) => {
+app.delete("/api/delete-recipe", async (req, res) => {
   const { recipeName, cognito_id } = req.body;
 
   // Validate input
@@ -595,7 +595,7 @@ app.get("/api/production-log", async (req, res) => {
   }
 });
 
-app.post("/dev/api/delete-production-log", async (req, res) => {
+app.post("/api/delete-production-log", async (req, res) => {
   console.log("Received delete request:", req.body); // Debugging log
   const { batchCode, cognito_id } = req.body;
 

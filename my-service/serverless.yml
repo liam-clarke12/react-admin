@@ -175,6 +175,45 @@ functions:
               - X-Amz-Security-Token
             allowCredentials: true
             maxAge: 86400
+      - http:
+          path: api/delete-row
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/delete-recipe
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
+      - http:
+          path: api/delete-production-log
+          method: POST
+          cors:
+            origin: https://master.d2fdrxobxyr2je.amplifyapp.com
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: true
+            maxAge: 86400
 
 plugins:
   - serverless-offline
