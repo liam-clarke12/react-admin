@@ -4,9 +4,9 @@ import {
 } from "@mui/material";
 import { useContext, useState, useEffect } from "react";
 import { ColorModeContext, tokens } from "../../themes";
-import InputBase from "@mui/material/InputBase"; 
-import Autocomplete from "@mui/material/Autocomplete";
+import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
+import SearchIcon from "@mui/icons-material/Search";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
@@ -36,6 +36,13 @@ const pageOptions = [
   { label: "Account", path: "/account" },
 ];
 
+// Only show suggestions when input has at least 1 character
+const filterOptions = createFilterOptions({
+  matchFrom: 'start',
+  stringify: (option) => option.label,
+  trim: true,
+});
+
 export default function Topbar() {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
@@ -44,7 +51,9 @@ export default function Topbar() {
   const { cognitoId, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // notifications state
+  // state for autocomplete input
+  const [inputValue, setInputValue] = useState("");
+  // state for notifications
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem('notifications');
     return saved ? JSON.parse(saved) : [];
@@ -53,17 +62,15 @@ export default function Topbar() {
   const [profileAnchor, setProfileAnchor] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
-  // update notifications
+  // update notifications every 5s
   useEffect(() => {
-    const notified = new Set(notifications.map(n => n.barcode));
+    const seen = new Set(notifications.map(n => n.barcode));
     const check = () => {
       const now = new Date();
       const expired = goodsInRows.filter(r => new Date(r.expiryDate) < now);
-      const still = notifications.filter(n => 
-        expired.some(r => r.barCode === n.barcode)
-      );
+      const still = notifications.filter(n => expired.some(r => r.barCode === n.barcode));
       const fresh = expired
-        .filter(r => !notified.has(r.barCode))
+        .filter(r => !seen.has(r.barCode))
         .map(r => ({
           message: `Your ${r.ingredient} (${r.barCode}) has expired!`,
           barcode: r.barCode
@@ -98,6 +105,14 @@ export default function Topbar() {
     navigate("/login");
   };
 
+  // when Enter pressed in the textfield
+  const handleEnterKey = (currentValue) => {
+    const match = pageOptions.find(
+      o => o.label.toLowerCase() === currentValue.toLowerCase()
+    );
+    if (match) navigate(match.path);
+  };
+
   return (
     <Box display="flex" justifyContent="space-between" p={2}>
       {/* Page-autocomplete */}
@@ -105,12 +120,16 @@ export default function Topbar() {
         <Autocomplete
           freeSolo
           options={pageOptions}
-          getOptionLabel={opt => typeof opt === 'string' ? opt : opt.label}
+          filterOptions={(opts, state) =>
+            state.inputValue.trim().length > 0
+              ? filterOptions(opts, state)
+              : []
+          }
+          getOptionLabel={opt => (typeof opt === 'string' ? opt : opt.label)}
+          inputValue={inputValue}
+          onInputChange={(_, value) => setInputValue(value)}
           onChange={(_, selected) => {
             if (selected?.path) navigate(selected.path);
-          }}
-          onInputChange={(_, value, reason) => {
-            // nothing extra needed here for now
           }}
           renderInput={params => (
             <TextField
@@ -120,11 +139,23 @@ export default function Topbar() {
               size="small"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
-                  const match = pageOptions.find(
-                    o => o.label.toLowerCase() === params.inputProps.value.toLowerCase()
-                  );
-                  if (match) navigate(match.path);
+                  handleEnterKey(inputValue);
                 }
+              }}
+              InputProps={{
+                ...params.InputProps,
+                endAdornment: (
+                  <>
+                    {params.InputProps.endAdornment}
+                    <IconButton
+                      onClick={() => handleEnterKey(inputValue)}
+                      edge="end"
+                      size="small"
+                    >
+                      <SearchIcon />
+                    </IconButton>
+                  </>
+                )
               }}
             />
           )}
