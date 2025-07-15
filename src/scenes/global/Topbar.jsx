@@ -5,11 +5,12 @@ import {
 import { useContext, useState, useEffect } from "react";
 import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import SearchIcon from "@mui/icons-material/Search";
 import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"; 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined"; 
@@ -18,25 +19,32 @@ import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";  
 import { useNavigate } from "react-router-dom"; 
 
-const Topbar = () => {
+const pageOptions = [
+  { label: "Dashboard", path: "/" },
+  { label: "Goods In", path: "/GoodsIn" },
+  { label: "Goods In Form", path: "/GoodsInForm" },
+  { label: "Recipes", path: "/recipes" },
+  { label: "Recipe Form", path: "/recipeform" },
+  { label: "Ingredients Inventory", path: "/IngredientsInventory" },
+  { label: "Daily Production Log", path: "/daily_production" },
+  { label: "Production Log Form", path: "/recipe_production" },
+  { label: "Stock Inventory", path: "/stock_inventory" },
+  { label: "Stock Usage", path: "/stock_usage" },
+  { label: "Goods Out", path: "/goods_out" },
+  { label: "Goods Out Form", path: "/goods_out_form" },
+  { label: "Settings", path: "/settings" },
+  { label: "Account", path: "/account" },
+];
+
+export default function Topbar() {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const colorMode = useContext(ColorModeContext);
-  const { goodsInRows } = useData(); 
-  const { cognitoId, signOut } = useAuth();  
+  const { goodsInRows } = useData();
+  const { cognitoId, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // ─── New: search state ────────────────────────────────────────────────
-  const [searchText, setSearchText] = useState("");
-
-  const handleSearch = () => {
-    const query = searchText.trim();
-    if (query) {
-      navigate(`/search?query=${encodeURIComponent(query)}`);
-    }
-  };
-  // ───────────────────────────────────────────────────────────────────────
-
+  // notifications state
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem('notifications');
     return saved ? JSON.parse(saved) : [];
@@ -45,11 +53,34 @@ const Topbar = () => {
   const [profileAnchor, setProfileAnchor] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
-  const handleNotifClick = (e) => setNotifAnchor(e.currentTarget);
-  const handleCloseNotif = () => setNotifAnchor(null);
-  const handleProfileClick = (e) => setProfileAnchor(e.currentTarget);
-  const handleCloseProfile = () => setProfileAnchor(null);
+  // update notifications
+  useEffect(() => {
+    const notified = new Set(notifications.map(n => n.barcode));
+    const check = () => {
+      const now = new Date();
+      const expired = goodsInRows.filter(r => new Date(r.expiryDate) < now);
+      const still = notifications.filter(n => 
+        expired.some(r => r.barCode === n.barcode)
+      );
+      const fresh = expired
+        .filter(r => !notified.has(r.barCode))
+        .map(r => ({
+          message: `Your ${r.ingredient} (${r.barCode}) has expired!`,
+          barcode: r.barCode
+        }));
+      if (fresh.length || still.length !== notifications.length) {
+        const updated = [...still, ...fresh];
+        setNotifications(updated);
+        localStorage.setItem('notifications', JSON.stringify(updated));
+      }
+    };
+    const id = setInterval(check, 5000);
+    return () => clearInterval(id);
+  }, [goodsInRows, notifications]);
 
+  // notification handlers
+  const handleNotifClick = e => setNotifAnchor(e.currentTarget);
+  const handleCloseNotif = () => setNotifAnchor(null);
   const handleNotificationClick = () => {
     navigate("/GoodsIn");
     setNotifications([]);
@@ -57,6 +88,9 @@ const Topbar = () => {
     handleCloseNotif();
   };
 
+  // profile handlers
+  const handleProfileClick = e => setProfileAnchor(e.currentTarget);
+  const handleCloseProfile = () => setProfileAnchor(null);
   const handleLogoutClick = () => setLogoutDialogOpen(true);
   const handleConfirmLogout = async () => {
     setLogoutDialogOpen(false);
@@ -64,44 +98,37 @@ const Topbar = () => {
     navigate("/login");
   };
 
-  useEffect(() => {
-    const notifiedBarcodes = new Set(notifications.map(n => n.barcode));
-    const checkNotifications = () => {
-      const now = new Date();
-      const expired = goodsInRows.filter(r => new Date(r.expiryDate) < now);
-      const active = notifications.filter(n => 
-        expired.some(r => r.barCode === n.barcode)
-      );
-      const fresh = expired
-        .filter(r => !notifiedBarcodes.has(r.barCode))
-        .map(r => ({
-          message: `Your ${r.ingredient} (${r.barCode}) has expired!`,
-          barcode: r.barCode
-        }));
-      if (fresh.length > 0 || active.length !== notifications.length) {
-        const updated = [...active, ...fresh];
-        setNotifications(updated);
-        localStorage.setItem('notifications', JSON.stringify(updated));
-      }
-    };
-    const interval = setInterval(checkNotifications, 5000);
-    return () => clearInterval(interval);
-  }, [goodsInRows, notifications]);
-
   return (
     <Box display="flex" justifyContent="space-between" p={2}>
-      {/* Search Bar */}
-      <Box display="flex" backgroundColor={colors.primary[400]} borderRadius="3px">
-        <InputBase
-          sx={{ ml: 2, flex: 1 }}
-          placeholder="Search…"
-          value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") handleSearch(); }}
+      {/* Page-autocomplete */}
+      <Box width={300}>
+        <Autocomplete
+          freeSolo
+          options={pageOptions}
+          getOptionLabel={opt => typeof opt === 'string' ? opt : opt.label}
+          onChange={(_, selected) => {
+            if (selected?.path) navigate(selected.path);
+          }}
+          onInputChange={(_, value, reason) => {
+            // nothing extra needed here for now
+          }}
+          renderInput={params => (
+            <TextField
+              {...params}
+              variant="outlined"
+              placeholder="Go to page…"
+              size="small"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const match = pageOptions.find(
+                    o => o.label.toLowerCase() === params.inputProps.value.toLowerCase()
+                  );
+                  if (match) navigate(match.path);
+                }
+              }}
+            />
+          )}
         />
-        <IconButton type="button" sx={{ p: 1 }} onClick={handleSearch}>
-          <SearchIcon />
-        </IconButton>
       </Box>
 
       {/* Icons */}
@@ -115,9 +142,7 @@ const Topbar = () => {
         <IconButton onClick={handleNotifClick} sx={{ position: 'relative' }}>
           <NotificationsOutlinedIcon />
           {notifications.length > 0 && (
-            <Box
-              component="span"
-              sx={{
+            <Box component="span" sx={{
                 backgroundColor: colors.red[500],
                 color: 'white',
                 borderRadius: '50%',
@@ -130,8 +155,7 @@ const Topbar = () => {
                 top: -2,
                 right: -1,
                 fontSize: 10,
-              }}
-            >
+              }}>
               {notifications.length}
             </Box>
           )}
@@ -142,7 +166,7 @@ const Topbar = () => {
         </IconButton>
       </Box>
 
-      {/* Notification Dropdown */}
+      {/* Notification Popover */}
       <Popover
         open={Boolean(notifAnchor)}
         anchorEl={notifAnchor}
@@ -157,12 +181,9 @@ const Topbar = () => {
           <Box p={2}>
             {notifications.length > 0 ? (
               notifications.map((n, i) => (
-                <Box
-                  key={i}
-                  sx={{
+                <Box key={i} sx={{
                     borderBottom: i < notifications.length - 1 ? `1px solid ${colors.primary[300]}` : 'none',
-                    py: '8px',
-                  }}
+                    py: '8px'}}  
                 >
                   <Grid container alignItems="center" justifyContent="space-between">
                     <Grid item>
@@ -183,7 +204,7 @@ const Topbar = () => {
         </Box>
       </Popover>
 
-      {/* Profile Dropdown */}
+      {/* Profile Popover */}
       <Popover
         open={Boolean(profileAnchor)}
         anchorEl={profileAnchor}
@@ -208,7 +229,7 @@ const Topbar = () => {
         </Box>
       </Popover>
 
-      {/* Logout Confirmation Dialog */}
+      {/* Logout Confirmation */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
         <DialogTitle>Confirm Logout</DialogTitle>
         <DialogContent>
@@ -223,6 +244,4 @@ const Topbar = () => {
       </Dialog>
     </Box>
   );
-};
-
-export default Topbar;
+}
