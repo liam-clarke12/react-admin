@@ -3,7 +3,7 @@ import {
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button 
 } from "@mui/material";
 import { useContext, useState, useEffect } from "react";
-import { ColorModeContext, tokens } from "././themes";
+import { ColorModeContext, tokens } from "../../themes";
 import InputBase from "@mui/material/InputBase"; 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -14,8 +14,8 @@ import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOu
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"; 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined"; 
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import { useData } from "././contexts/DataContext"; 
-import { useAuth } from "././contexts/AuthContext";  
+import { useData } from "../../contexts/DataContext"; 
+import { useAuth } from "../../contexts/AuthContext";  
 import { useNavigate } from "react-router-dom"; 
 
 const Topbar = () => {
