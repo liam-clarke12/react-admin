@@ -1,46 +1,66 @@
-// src/contexts/AuthContext.js
 import { createContext, useContext, useState, useEffect } from "react";
-import { Amplify } from "aws-amplify";
-import Auth from "@aws-amplify/auth";
-import awsExports from "../aws-exports";  // wherever your aws-exports.js lives
-
-// Configure Amplify and the Auth category
-Amplify.configure(awsExports);
-Auth.configure(awsExports);
+import { getCurrentUser } from "aws-amplify/auth";
+import axios from "axios";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [cognitoId, setCognitoId] = useState(null);
-  const [userAttributes, setUserAttributes] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 1. Grab cognitoId on mount
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchCognitoId = async () => {
       try {
-        const user = await Auth.currentAuthenticatedUser();
-        setCognitoId(user.username);
-        setUserAttributes(user.attributes);
-      } catch (error) {
-        console.error("❌ Error fetching user:", error);
-        setUserAttributes(null);
+        const user = await getCurrentUser();
+        if (user && user.username) {
+          setCognitoId(user.username);
+        } else {
+          console.warn("No Cognito user found");
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Error fetching Cognito ID:", err);
+        setLoading(false);
+      }
+    };
+    fetchCognitoId();
+  }, []);
+
+  // 2. When cognitoId is known, fetch full profile from your backend
+  useEffect(() => {
+    if (!cognitoId) return;
+    const fetchProfile = async () => {
+      try {
+        const resp = await axios.get("/api/me", {
+          headers: { Authorization: `Bearer ${cognitoId}` }
+        });
+        // expect { email, name, phone_number, address, company, picture }
+        setUserProfile(resp.data);
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchUser();
-  }, []);
+    fetchProfile();
+  }, [cognitoId]);
 
-  const updateAttributes = async (attrs) => {
-    const user = await Auth.currentAuthenticatedUser();
-    return Auth.updateUserAttributes(user, attrs);
+  // 3. Helper to update profile via your backend
+  const updateProfile = async (updates) => {
+    const resp = await axios.put("/api/me", updates, {
+      headers: { Authorization: `Bearer ${cognitoId}` }
+    });
+    setUserProfile(resp.data);
+    return resp.data;
   };
 
   return (
     <AuthContext.Provider value={{
       cognitoId,
-      userAttributes,
-      updateAttributes,
+      userProfile,
+      updateProfile,
       loading
     }}>
       {children}

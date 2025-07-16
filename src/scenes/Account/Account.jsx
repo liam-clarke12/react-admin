@@ -1,4 +1,3 @@
-// src/scenes/account/AccountPage.jsx
 import {
   Box, Button, TextField, Typography, Avatar, IconButton,
   Grid, Paper, CircularProgress
@@ -11,10 +10,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccountPage() {
-  // Pull everything from your AuthContext
-  const { cognitoId, userAttributes, updateAttributes, loading } = useAuth();
+  const { cognitoId, userProfile, updateProfile, loading } = useAuth();
 
-  // Local state
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -24,26 +21,24 @@ export default function AccountPage() {
   });
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  // When the context finishes loading and provides attributes,
-  // initialize our form & log the name/email
+  // Initialize form once profile loads
   useEffect(() => {
-    if (!loading && userAttributes) {
+    if (!loading && userProfile) {
       console.log('✅ Fetched from context:', {
         username: cognitoId,
-        name: userAttributes.name,
-        email: userAttributes.email,
+        name: userProfile.name,
+        email: userProfile.email,
       });
       setForm({
-        name: userAttributes.name || '',
-        phone_number: userAttributes.phone_number || '',
-        address: userAttributes.address || '',
-        company: userAttributes['custom:company'] || '',
+        name: userProfile.name || '',
+        phone_number: userProfile.phone_number || '',
+        address: userProfile.address || '',
+        company: userProfile.company || '',
       });
-      setAvatarUrl(userAttributes.picture || '');
+      setAvatarUrl(userProfile.picture || '');
     }
-  }, [loading, userAttributes, cognitoId]);
+  }, [loading, userProfile, cognitoId]);
 
-  // Show spinner while the context is still fetching
   if (loading) {
     return (
       <Box p={4} display="flex" justifyContent="center">
@@ -58,20 +53,17 @@ export default function AccountPage() {
   const onAvatarUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarUrl(url);
-    // TODO: upload to S3 and then include the URL on save
+    setAvatarUrl(URL.createObjectURL(file));
   };
 
   const onCancel = () => {
-    // revert edits
     setForm({
-      name: userAttributes.name || '',
-      phone_number: userAttributes.phone_number || '',
-      address: userAttributes.address || '',
-      company: userAttributes['custom:company'] || '',
+      name: userProfile.name || '',
+      phone_number: userProfile.phone_number || '',
+      address: userProfile.address || '',
+      company: userProfile.company || '',
     });
-    setAvatarUrl(userAttributes.picture || '');
+    setAvatarUrl(userProfile.picture || '');
     setEditMode(false);
   };
 
@@ -80,16 +72,15 @@ export default function AccountPage() {
       name: form.name,
       phone_number: form.phone_number,
       address: form.address,
-      'custom:company': form.company,
-      // picture: avatarUrl
+      company: form.company,
+      // picture: avatarUrl  // if you implement upload
     };
     try {
-      await updateAttributes(toUpdate);
-      console.log('✅ Attributes updated:', toUpdate);
+      await updateProfile(toUpdate);
+      console.log('✅ Profile updated:', toUpdate);
       setEditMode(false);
     } catch (err) {
-      console.error('❌ Failed to update attributes:', err);
-      // you might show a Snackbar here
+      console.error('❌ Failed to update profile:', err);
     }
   };
 
@@ -124,17 +115,14 @@ export default function AccountPage() {
 
           {/* Form fields */}
           <Grid item xs={12} sm={8} container spacing={2}>
-            {/* Email (read-only) */}
             <Grid item xs={12}>
               <TextField
                 label="Email"
                 fullWidth
-                value={userAttributes.email || ''}
+                value={userProfile.email || ''}
                 InputProps={{ readOnly: true }}
               />
             </Grid>
-
-            {/* Full name */}
             <Grid item xs={12}>
               <TextField
                 label="Full Name"
@@ -144,8 +132,6 @@ export default function AccountPage() {
                 disabled={!editMode}
               />
             </Grid>
-
-            {/* Phone */}
             <Grid item xs={12}>
               <TextField
                 label="Phone Number"
@@ -155,8 +141,6 @@ export default function AccountPage() {
                 disabled={!editMode}
               />
             </Grid>
-
-            {/* Address */}
             <Grid item xs={12}>
               <TextField
                 label="Address"
@@ -168,8 +152,6 @@ export default function AccountPage() {
                 rows={2}
               />
             </Grid>
-
-            {/* Company */}
             <Grid item xs={12}>
               <TextField
                 label="Company"
@@ -185,20 +167,12 @@ export default function AccountPage() {
           {editMode && (
             <Grid item xs={12} container justifyContent="flex-end" spacing={1}>
               <Grid item>
-                <Button
-                  variant="outlined"
-                  startIcon={<CancelIcon />}
-                  onClick={onCancel}
-                >
+                <Button variant="outlined" startIcon={<CancelIcon />} onClick={onCancel}>
                   Cancel
                 </Button>
               </Grid>
               <Grid item>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  onClick={onSave}
-                >
+                <Button variant="contained" startIcon={<SaveIcon />} onClick={onSave}>
                   Save
                 </Button>
               </Grid>
