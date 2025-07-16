@@ -24,12 +24,7 @@ export default function AccountPage() {
 
   // Initialize form once profile loads
   useEffect(() => {
-    if (!loading) {
-      if (!userProfile) {
-        console.error("No userProfile available!");
-        return;
-      }
-      console.log("Loaded profile:", { cognitoId, ...userProfile });
+    if (!loading && userProfile) {
       setForm({
         name: userProfile.name || '',
         phone_number: userProfile.phone_number || '',
@@ -38,7 +33,7 @@ export default function AccountPage() {
       });
       setAvatarUrl(userProfile.picture || '');
     }
-  }, [loading, userProfile, cognitoId]);
+  }, [loading, userProfile]);
 
   if (loading) {
     return (
@@ -50,9 +45,7 @@ export default function AccountPage() {
   if (!userProfile) {
     return (
       <Box p={4}>
-        <Typography color="error">
-          Failed to load user profile.
-        </Typography>
+        <Typography color="error">Failed to load profile data.</Typography>
       </Box>
     );
   }
@@ -67,6 +60,7 @@ export default function AccountPage() {
   };
 
   const onCancel = () => {
+    setEditMode(false);
     setForm({
       name: userProfile.name || '',
       phone_number: userProfile.phone_number || '',
@@ -74,7 +68,6 @@ export default function AccountPage() {
       company: userProfile['custom:company'] || '',
     });
     setAvatarUrl(userProfile.picture || '');
-    setEditMode(false);
   };
 
   const onSave = async () => {
@@ -83,11 +76,10 @@ export default function AccountPage() {
       phone_number: form.phone_number,
       address: form.address,
       'custom:company': form.company,
-      // picture: avatarUrl
+      // picture: avatarUrl  // wire up your upload later
     };
     try {
       await updateProfile(toUpdate);
-      console.log('Profile updated:', toUpdate);
       setEditMode(false);
     } catch (err) {
       console.error('Failed to update profile:', err);
@@ -107,12 +99,16 @@ export default function AccountPage() {
 
       <Paper sx={{ p: 3, maxWidth: 600 }}>
         <Grid container spacing={2} alignItems="center">
+
           {/* Avatar */}
           <Grid item xs={12} sm={4} container justifyContent="center">
             <Box position="relative" textAlign="center">
               <Avatar src={avatarUrl} sx={{ width: 100, height: 100, margin: 'auto' }} />
               {editMode && (
-                <IconButton component="label" sx={{ position: 'absolute', bottom: 0, right: 0 }}>
+                <IconButton
+                  component="label"
+                  sx={{ position: 'absolute', bottom: 0, right: 0 }}
+                >
                   <UploadIcon />
                   <input hidden accept="image/*" type="file" onChange={onAvatarUpload} />
                 </IconButton>
@@ -122,6 +118,8 @@ export default function AccountPage() {
 
           {/* Form fields */}
           <Grid item xs={12} sm={8} container spacing={2}>
+
+            {/* Email (always read-only) */}
             <Grid item xs={12}>
               <TextField
                 label="Email"
@@ -130,42 +128,50 @@ export default function AccountPage() {
                 InputProps={{ readOnly: true }}
               />
             </Grid>
+
+            {/* Full Name */}
             <Grid item xs={12}>
               <TextField
                 label="Full Name"
                 fullWidth
                 value={form.name}
                 onChange={onChange('name')}
-                disabled={!editMode}
+                InputProps={{ readOnly: !editMode }}
               />
             </Grid>
+
+            {/* Phone Number */}
             <Grid item xs={12}>
               <TextField
                 label="Phone Number"
                 fullWidth
                 value={form.phone_number}
                 onChange={onChange('phone_number')}
-                disabled={!editMode}
+                InputProps={{ readOnly: !editMode }}
               />
             </Grid>
+
+            {/* Address */}
             <Grid item xs={12}>
               <TextField
                 label="Address"
                 fullWidth
-                value={form.address}
-                onChange={onChange('address')}
-                disabled={!editMode}
                 multiline
                 rows={2}
+                value={form.address}
+                onChange={onChange('address')}
+                InputProps={{ readOnly: !editMode }}
               />
             </Grid>
+
+            {/* Company */}
             <Grid item xs={12}>
               <TextField
                 label="Company"
                 fullWidth
                 value={form.company}
                 onChange={onChange('company')}
-                disabled={!editMode}
+                InputProps={{ readOnly: !editMode }}
               />
             </Grid>
           </Grid>
@@ -174,17 +180,26 @@ export default function AccountPage() {
           {editMode && (
             <Grid item xs={12} container justifyContent="flex-end" spacing={1}>
               <Grid item>
-                <Button variant="outlined" startIcon={<CancelIcon />} onClick={onCancel}>
+                <Button
+                  variant="outlined"
+                  startIcon={<CancelIcon />}
+                  onClick={onCancel}
+                >
                   Cancel
                 </Button>
               </Grid>
               <Grid item>
-                <Button variant="contained" startIcon={<SaveIcon />} onClick={onSave}>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={onSave}
+                >
                   Save
                 </Button>
               </Grid>
             </Grid>
           )}
+
         </Grid>
       </Paper>
     </Box>
