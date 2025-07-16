@@ -1,6 +1,6 @@
+// src/contexts/AuthContext.js
 import { createContext, useContext, useState, useEffect } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
-import axios from "axios";
 
 const AuthContext = createContext();
 
@@ -9,60 +9,63 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Grab cognitoId on mount
+  // 1) Grab the CognitoUser on mount
   useEffect(() => {
-    const fetchCognitoId = async () => {
+    const fetchUser = async () => {
       try {
         const user = await getCurrentUser();
-        if (user && user.username) {
-          setCognitoId(user.username);
-        } else {
+        if (!user) {
           console.warn("No Cognito user found");
           setLoading(false);
+          return;
         }
+        setCognitoId(user.getUsername());
+        // 2) Pull all attributes
+        user.getUserAttributes((err, attrs) => {
+          if (err) {
+            console.error("getUserAttributes error", err);
+            setLoading(false);
+            return;
+          }
+          // Turn array into an object map
+          const profile = attrs.reduce((acc, { Name, Value }) => {
+            acc[Name] = Value;
+            return acc;
+          }, {});
+          setUserProfile(profile);
+          setLoading(false);
+        });
       } catch (err) {
-        console.error("Error fetching Cognito ID:", err);
+        console.error("Error fetching Cognito user", err);
         setLoading(false);
       }
     };
-    fetchCognitoId();
+    fetchUser();
   }, []);
 
-  // 2. When cognitoId is known, fetch full profile from your backend
-  useEffect(() => {
-    if (!cognitoId) return;
-    const fetchProfile = async () => {
+  // 3) Helper to save edits back to Cognito
+  const updateProfile = (updates) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        const resp = await axios.get("/api/me", {
-          headers: { Authorization: `Bearer ${cognitoId}` }
+        const user = await getCurrentUser();
+        // `updates` is { name: "...", phone_number: "...", … }
+        const attributeList = Object.entries(updates).map(
+          ([Name, Value]) => ({ Name, Value })
+        );
+        user.updateAttributes(attributeList, (err, result) => {
+          if (err) return reject(err);
+          // Merge new values into userProfile
+          setUserProfile(p => ({ ...p, ...updates }));
+          resolve(result);
         });
-        // expect { email, name, phone_number, address, company, picture }
-        setUserProfile(resp.data);
       } catch (err) {
-        console.error("Error fetching user profile:", err);
-      } finally {
-        setLoading(false);
+        reject(err);
       }
-    };
-    fetchProfile();
-  }, [cognitoId]);
-
-  // 3. Helper to update profile via your backend
-  const updateProfile = async (updates) => {
-    const resp = await axios.put("/api/me", updates, {
-      headers: { Authorization: `Bearer ${cognitoId}` }
     });
-    setUserProfile(resp.data);
-    return resp.data;
   };
 
   return (
-    <AuthContext.Provider value={{
-      cognitoId,
-      userProfile,
-      updateProfile,
-      loading
-    }}>
+    <AuthContext.Provider value={{ cognitoId, userProfile, updateProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );
