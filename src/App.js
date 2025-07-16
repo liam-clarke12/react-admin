@@ -129,6 +129,7 @@ function App() {
                         <Route path="/GoodsInForm" element={<GoodsInForm />} />
                         <Route path="/recipeform" element={<RecipeForm />} />
                         <Route path="/recipes" element={<Recipes />} />
+                        <Route path="/account" element={<AccountPage />} />
                         <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
                         <Route path="/daily_production" element={<ProductionLog />} />
                         <Route path="/recipe_production" element={<ProductionLogForm />} />

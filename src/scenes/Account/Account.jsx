@@ -1,6 +1,7 @@
 // src/scenes/account/AccountPage.jsx
 import {
-  Box, Button, TextField, Typography, Avatar, IconButton, Grid, Paper, CircularProgress
+  Box, Button, TextField, Typography, Avatar, IconButton,
+  Grid, Paper, CircularProgress
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
@@ -10,9 +11,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccountPage() {
-  const { userAttributes, updateAttributes } = useAuth();
+  // Pull everything from your AuthContext
+  const { cognitoId, userAttributes, updateAttributes, loading } = useAuth();
 
-  // Local state for edit mode, form values, and avatar
+  // Local state
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -21,11 +23,16 @@ export default function AccountPage() {
     company: '',
   });
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  // When userAttributes load (or change), populate form & avatar
+  // When the context finishes loading and provides attributes,
+  // initialize our form & log the name/email
   useEffect(() => {
-    if (userAttributes) {
+    if (!loading && userAttributes) {
+      console.log('✅ Fetched from context:', {
+        username: cognitoId,
+        name: userAttributes.name,
+        email: userAttributes.email,
+      });
       setForm({
         name: userAttributes.name || '',
         phone_number: userAttributes.phone_number || '',
@@ -33,11 +40,10 @@ export default function AccountPage() {
         company: userAttributes['custom:company'] || '',
       });
       setAvatarUrl(userAttributes.picture || '');
-      setLoading(false);
     }
-  }, [userAttributes]);
+  }, [loading, userAttributes, cognitoId]);
 
-  // Guard: show spinner until attributes are present
+  // Show spinner while the context is still fetching
   if (loading) {
     return (
       <Box p={4} display="flex" justifyContent="center">
@@ -46,22 +52,19 @@ export default function AccountPage() {
     );
   }
 
-  // Field change handler
-  const onChange = (field) => (e) => {
-    setForm(f => ({ ...f, [field]: e.target.value }));
-  };
+  const onChange = (field) => (e) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  // Avatar upload (simulated)
   const onAvatarUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setAvatarUrl(url);
-    // TODO: upload to S3 and include resulting URL as 'picture' on save
+    // TODO: upload to S3 and then include the URL on save
   };
 
-  // Cancel edits, revert to last-synced values
   const onCancel = () => {
+    // revert edits
     setForm({
       name: userAttributes.name || '',
       phone_number: userAttributes.phone_number || '',
@@ -72,21 +75,21 @@ export default function AccountPage() {
     setEditMode(false);
   };
 
-  // Save edits back to Cognito
   const onSave = async () => {
     const toUpdate = {
       name: form.name,
       phone_number: form.phone_number,
       address: form.address,
       'custom:company': form.company,
-      // picture: avatarUrl  // once you have real upload in place
+      // picture: avatarUrl
     };
     try {
       await updateAttributes(toUpdate);
+      console.log('✅ Attributes updated:', toUpdate);
       setEditMode(false);
     } catch (err) {
-      console.error('Failed to update user attributes', err);
-      // Optionally show an error Snackbar here
+      console.error('❌ Failed to update attributes:', err);
+      // you might show a Snackbar here
     }
   };
 
@@ -95,11 +98,7 @@ export default function AccountPage() {
       <Typography variant="h4" gutterBottom>
         My Account
         {!editMode && (
-          <IconButton
-            size="small"
-            sx={{ ml: 1 }}
-            onClick={() => setEditMode(true)}
-          >
+          <IconButton size="small" sx={{ ml: 1 }} onClick={() => setEditMode(true)}>
             <EditIcon fontSize="small" />
           </IconButton>
         )}
@@ -110,27 +109,14 @@ export default function AccountPage() {
           {/* Avatar */}
           <Grid item xs={12} sm={4} container justifyContent="center">
             <Box position="relative" textAlign="center">
-              <Avatar
-                src={avatarUrl}
-                sx={{ width: 100, height: 100, margin: 'auto' }}
-              />
+              <Avatar src={avatarUrl} sx={{ width: 100, height: 100, margin: 'auto' }} />
               {editMode && (
                 <IconButton
                   component="label"
-                  sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    bgcolor: 'background.paper'
-                  }}
+                  sx={{ position: 'absolute', bottom: 0, right: 0, bgcolor: 'background.paper' }}
                 >
                   <UploadIcon />
-                  <input
-                    hidden
-                    accept="image/*"
-                    type="file"
-                    onChange={onAvatarUpload}
-                  />
+                  <input hidden accept="image/*" type="file" onChange={onAvatarUpload} />
                 </IconButton>
               )}
             </Box>
