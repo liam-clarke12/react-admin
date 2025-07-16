@@ -12,17 +12,12 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccountPage() {
   const { cognitoId, userProfile, updateProfile, loading } = useAuth();
-
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
-    name: '',
-    phone_number: '',
-    address: '',
-    company: '',
+    name: '', phone_number: '', address: '', company: ''
   });
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  // initialize form
   useEffect(() => {
     if (!loading && userProfile) {
       setForm({
@@ -36,29 +31,17 @@ export default function AccountPage() {
   }, [loading, userProfile]);
 
   if (loading) {
-    return (
-      <Box p={4} display="flex" justifyContent="center">
-        <CircularProgress />
-      </Box>
-    );
+    return <Box p={4} display="flex" justifyContent="center"><CircularProgress/></Box>;
   }
   if (!userProfile) {
-    return (
-      <Box p={4}>
-        <Typography color="error">Failed to load profile data.</Typography>
-      </Box>
-    );
+    return <Box p={4}><Typography color="error">Failed to load profile.</Typography></Box>;
   }
 
-  const onChange = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
-
-  const onAvatarUpload = (e) => {
+  const onChange = field => e => setForm(f => ({ ...f, [field]: e.target.value }));
+  const onAvatarUpload = e => {
     const file = e.target.files[0];
-    if (!file) return;
-    setAvatarUrl(URL.createObjectURL(file));
+    if (file) setAvatarUrl(URL.createObjectURL(file));
   };
-
   const onCancel = () => {
     setEditMode(false);
     setForm({
@@ -69,7 +52,6 @@ export default function AccountPage() {
     });
     setAvatarUrl(userProfile.picture || '');
   };
-
   const onSave = async () => {
     const toUpdate = {
       name: form.name,
@@ -81,8 +63,8 @@ export default function AccountPage() {
     try {
       await updateProfile(toUpdate);
       setEditMode(false);
-    } catch {
-      /* error logged in context */
+    } catch (err) {
+      console.error('Failed to update profile:', err);
     }
   };
 
@@ -91,92 +73,68 @@ export default function AccountPage() {
       <Typography variant="h4" gutterBottom>
         My Account
         {!editMode && (
-          <IconButton size="small" sx={{ ml: 1 }} onClick={() => setEditMode(true)}>
-            <EditIcon fontSize="small" />
+          <IconButton size="small" sx={{ ml:1 }} onClick={() => setEditMode(true)}>
+            <EditIcon fontSize="small"/>
           </IconButton>
         )}
       </Typography>
-
-      <Paper sx={{ p: 3, maxWidth: 600 }}>
+      <Paper sx={{p:3, maxWidth:600}}>
         <Grid container spacing={2} alignItems="center">
-          {/* Avatar */}
           <Grid item xs={12} sm={4} container justifyContent="center">
             <Box position="relative" textAlign="center">
-              <Avatar src={avatarUrl} sx={{ width: 100, height: 100, margin: 'auto' }} />
+              <Avatar src={avatarUrl} sx={{ width:100, height:100, m:'auto' }}/>
               {editMode && (
-                <IconButton component="label" sx={{ position: 'absolute', bottom: 0, right: 0 }}>
-                  <UploadIcon />
-                  <input hidden accept="image/*" type="file" onChange={onAvatarUpload} />
+                <IconButton component="label" sx={{ position:'absolute', bottom:0, right:0 }}>
+                  <UploadIcon/>
+                  <input hidden type="file" accept="image/*" onChange={onAvatarUpload}/>
                 </IconButton>
               )}
             </Box>
           </Grid>
-
-          {/* Form fields */}
           <Grid item xs={12} sm={8} container spacing={2}>
             <Grid item xs={12}>
+              <TextField label="Email" fullWidth value={userProfile.email||''} InputProps={{ readOnly:true }}/>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
-                label="Email"
-                fullWidth
-                value={userProfile.email || ''}
-                InputProps={{ readOnly: true }}
+                label="Full Name" fullWidth value={form.name}
+                onChange={onChange('name')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Full Name"
-                fullWidth
-                value={form.name}
-                onChange={onChange('name')}
-                InputProps={{ readOnly: !editMode }}
+                label="Phone Number" fullWidth value={form.phone_number}
+                onChange={onChange('phone_number')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Phone Number"
-                fullWidth
-                value={form.phone_number}
-                onChange={onChange('phone_number')}
-                InputProps={{ readOnly: !editMode }}
+                label="Address" fullWidth multiline rows={2}
+                value={form.address} onChange={onChange('address')}
+                InputProps={{ readOnly:!editMode }}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Address"
-                fullWidth
-                multiline
-                rows={2}
-                value={form.address}
-                onChange={onChange('address')}
-                InputProps={{ readOnly: !editMode }}
+                label="Company" fullWidth value={form.company}
+                onChange={onChange('company')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Company"
-                fullWidth
-                value={form.company}
-                onChange={onChange('company')}
-                InputProps={{ readOnly: !editMode }}
-              />
-            </Grid>
+            {editMode && (
+              <Grid item xs={12} container justifyContent="flex-end" spacing={1}>
+                <Grid item>
+                  <Button variant="outlined" startIcon={<CancelIcon/>} onClick={onCancel}>
+                    Cancel
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button variant="contained" startIcon={<SaveIcon/>} onClick={onSave}>
+                    Save
+                  </Button>
+                </Grid>
+              </Grid>
+            )}
           </Grid>
-
-          {/* Action buttons */}
-          {editMode && (
-            <Grid item xs={12} container justifyContent="flex-end" spacing={1}>
-              <Grid item>
-                <Button variant="outlined" startIcon={<CancelIcon />} onClick={onCancel}>
-                  Cancel
-                </Button>
-              </Grid>
-              <Grid item>
-                <Button variant="contained" startIcon={<SaveIcon />} onClick={onSave}>
-                  Save
-                </Button>
-              </Grid>
-            </Grid>
-          )}
         </Grid>
       </Paper>
     </Box>
