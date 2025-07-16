@@ -1,3 +1,4 @@
+// src/scenes/account/AccountPage.jsx
 import {
   Box, Button, TextField, Typography, Avatar, IconButton,
   Grid, Paper, CircularProgress
@@ -21,6 +22,7 @@ export default function AccountPage() {
   });
   const [avatarUrl, setAvatarUrl] = useState('');
 
+  // initialize form
   useEffect(() => {
     if (!loading && userProfile) {
       setForm({
@@ -48,9 +50,8 @@ export default function AccountPage() {
     );
   }
 
-  const onChange = (field) => (e) => {
+  const onChange = (field) => (e) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
-  };
 
   const onAvatarUpload = (e) => {
     const file = e.target.files[0];
@@ -80,8 +81,8 @@ export default function AccountPage() {
     try {
       await updateProfile(toUpdate);
       setEditMode(false);
-    } catch (err) {
-      console.error('Failed to update profile:', err);
+    } catch {
+      /* error logged in context */
     }
   };
 
