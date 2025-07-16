@@ -24,8 +24,12 @@ export default function AccountPage() {
 
   // Initialize form once profile loads
   useEffect(() => {
-    if (!loading && userProfile) {
-      console.log('✅ Loaded userProfile:', { cognitoId, ...userProfile });
+    if (!loading) {
+      if (!userProfile) {
+        console.error("No userProfile available!");
+        return;
+      }
+      console.log("Loaded profile:", { cognitoId, ...userProfile });
       setForm({
         name: userProfile.name || '',
         phone_number: userProfile.phone_number || '',
@@ -40,6 +44,15 @@ export default function AccountPage() {
     return (
       <Box p={4} display="flex" justifyContent="center">
         <CircularProgress />
+      </Box>
+    );
+  }
+  if (!userProfile) {
+    return (
+      <Box p={4}>
+        <Typography color="error">
+          Failed to load user profile.
+        </Typography>
       </Box>
     );
   }
@@ -70,14 +83,14 @@ export default function AccountPage() {
       phone_number: form.phone_number,
       address: form.address,
       'custom:company': form.company,
-      // picture: avatarUrl  // once you wire upload
+      // picture: avatarUrl
     };
     try {
       await updateProfile(toUpdate);
-      console.log('✅ updateProfile succeeded:', toUpdate);
+      console.log('Profile updated:', toUpdate);
       setEditMode(false);
     } catch (err) {
-      console.error('❌ updateProfile failed:', err);
+      console.error('Failed to update profile:', err);
     }
   };
 
