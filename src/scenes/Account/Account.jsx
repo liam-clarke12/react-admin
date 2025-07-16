@@ -1,55 +1,67 @@
 // src/scenes/account/AccountPage.jsx
 import {
-  Box, Button, TextField, Typography, Avatar, IconButton, Grid, Paper
+  Box, Button, TextField, Typography, Avatar, IconButton, Grid, Paper, CircularProgress
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import UploadIcon from '@mui/icons-material/Upload';
-import { useState, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccountPage() {
   const { userAttributes, updateAttributes } = useAuth();
+
+  // Local state for edit mode, form values, and avatar
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
-    name: userAttributes.name || '',
-    phone_number: userAttributes.phone_number || '',
-    address: userAttributes.address || '',
-    company: userAttributes['custom:company'] || '',
-    // you can add more custom fields here...
+    name: '',
+    phone_number: '',
+    address: '',
+    company: '',
   });
-  const [avatarUrl, setAvatarUrl] = useState(userAttributes.picture || '');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // handle form field changes
+  // When userAttributes load (or change), populate form & avatar
+  useEffect(() => {
+    if (userAttributes) {
+      setForm({
+        name: userAttributes.name || '',
+        phone_number: userAttributes.phone_number || '',
+        address: userAttributes.address || '',
+        company: userAttributes['custom:company'] || '',
+      });
+      setAvatarUrl(userAttributes.picture || '');
+      setLoading(false);
+    }
+  }, [userAttributes]);
+
+  // Guard: show spinner until attributes are present
+  if (loading) {
+    return (
+      <Box p={4} display="flex" justifyContent="center">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Field change handler
   const onChange = (field) => (e) => {
     setForm(f => ({ ...f, [field]: e.target.value }));
   };
 
-  // simulate avatar upload
+  // Avatar upload (simulated)
   const onAvatarUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setAvatarUrl(url);
-    // TODO: actually upload to S3 or similar and save the URL
+    // TODO: upload to S3 and include resulting URL as 'picture' on save
   };
 
-  const onSave = async () => {
-    // assemble Cognito attributes
-    const toUpdate = {
-      name: form.name,
-      phone_number: form.phone_number,
-      address: form.address,
-      'custom:company': form.company,
-      // if you end up uploading avatar, include 'picture': uploadedUrl
-    };
-    await updateAttributes(toUpdate);
-    setEditMode(false);
-  };
-
+  // Cancel edits, revert to last-synced values
   const onCancel = () => {
-    // revert form to original values
     setForm({
       name: userAttributes.name || '',
       phone_number: userAttributes.phone_number || '',
@@ -58,6 +70,24 @@ export default function AccountPage() {
     });
     setAvatarUrl(userAttributes.picture || '');
     setEditMode(false);
+  };
+
+  // Save edits back to Cognito
+  const onSave = async () => {
+    const toUpdate = {
+      name: form.name,
+      phone_number: form.phone_number,
+      address: form.address,
+      'custom:company': form.company,
+      // picture: avatarUrl  // once you have real upload in place
+    };
+    try {
+      await updateAttributes(toUpdate);
+      setEditMode(false);
+    } catch (err) {
+      console.error('Failed to update user attributes', err);
+      // Optionally show an error Snackbar here
+    }
   };
 
   return (
