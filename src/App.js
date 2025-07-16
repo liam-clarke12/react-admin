@@ -4,6 +4,7 @@ import awsExports from './aws-exports';
 import '@aws-amplify/ui-react/styles.css';
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider } from "@mui/material";
+import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
 import Dashboard from "./scenes/dashboard";
@@ -131,6 +132,7 @@ function App() {
                         <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
                         <Route path="/daily_production" element={<ProductionLog />} />
                         <Route path="/recipe_production" element={<ProductionLogForm />} />
+                        <Route path="/account" element={<Account />} />
                         <Route path="/stock_inventory" element={<RecipeInventory />} />
                         <Route path="/stock_usage" element={<StockUsage />} />
                         <Route path="/goods_out_form" element={<GoodsOutForm />} />
