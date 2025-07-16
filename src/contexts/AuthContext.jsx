@@ -1,24 +1,25 @@
 // src/contexts/AuthContext.js
 import { createContext, useContext, useState, useEffect } from "react";
-import { Auth } from "aws-amplify";
+import { Amplify } from "aws-amplify";
+import Auth from "@aws-amplify/auth";
+import awsExports from "../aws-exports";  // wherever your aws-exports.js lives
 
-// Create AuthContext
+// Configure Amplify and the Auth category
+Amplify.configure(awsExports);
+Auth.configure(awsExports);
+
 const AuthContext = createContext();
 
-// AuthProvider component to wrap the entire app
 export const AuthProvider = ({ children }) => {
   const [cognitoId, setCognitoId] = useState(null);
   const [userAttributes, setUserAttributes] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, load current user and their attributes
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const user = await Auth.currentAuthenticatedUser();
-        // user.username is the Cognito 'sub' / ID
         setCognitoId(user.username);
-        // user.attributes contains email, name, phone_number, custom:company, picture, etc.
         setUserAttributes(user.attributes);
       } catch (error) {
         console.error("❌ Error fetching user:", error);
@@ -27,13 +28,10 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     };
-
     fetchUser();
   }, []);
 
-  // Helper to update user attributes in Cognito
   const updateAttributes = async (attrs) => {
-    // attrs is an object like { name: "...", phone_number: "...", 'custom:company': "..." }
     const user = await Auth.currentAuthenticatedUser();
     return Auth.updateUserAttributes(user, attrs);
   };
@@ -50,5 +48,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Custom hook for easy access to context
 export const useAuth = () => useContext(AuthContext);

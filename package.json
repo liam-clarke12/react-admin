@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@aws-amplify/auth": "^6.10.1",
+    "@aws-amplify/auth": "^6.13.3",
     "@aws-amplify/core": "^6.9.2",
     "@aws-amplify/ui-react": "^6.9.1",
     "@aws-sdk/client-dynamodb": "^3.716.0",
