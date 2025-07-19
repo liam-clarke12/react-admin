@@ -14,7 +14,7 @@ export default function AccountPage() {
   const { cognitoId, userProfile, updateProfile, loading } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
-    name: '', phone_number: '', address: '', company: ''
+    name: '', phone_number: '', address: ''
   });
   const [avatarUrl, setAvatarUrl] = useState('');
 
@@ -23,8 +23,7 @@ export default function AccountPage() {
       setForm({
         name: userProfile.name || '',
         phone_number: userProfile.phone_number || '',
-        address: userProfile.address || '',
-        company: userProfile['custom:company'] || '',
+        address: userProfile.address || ''
       });
       setAvatarUrl(userProfile.picture || '');
     }
@@ -47,8 +46,7 @@ export default function AccountPage() {
     setForm({
       name: userProfile.name || '',
       phone_number: userProfile.phone_number || '',
-      address: userProfile.address || '',
-      company: userProfile['custom:company'] || '',
+      address: userProfile.address || ''
     });
     setAvatarUrl(userProfile.picture || '');
   };
@@ -56,8 +54,7 @@ export default function AccountPage() {
     const toUpdate = {
       name: form.name,
       phone_number: form.phone_number,
-      address: form.address,
-      'custom:company': form.company,
+      address: form.address
       // picture: avatarUrl
     };
     try {
@@ -112,12 +109,6 @@ export default function AccountPage() {
                 label="Address" fullWidth multiline rows={2}
                 value={form.address} onChange={onChange('address')}
                 InputProps={{ readOnly:!editMode }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Company" fullWidth value={form.company}
-                onChange={onChange('company')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
             {editMode && (
