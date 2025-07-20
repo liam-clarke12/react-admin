@@ -172,7 +172,7 @@ const GoodsInForm = () => {
               <TextField
                 fullWidth
                 variant="outlined"
-                type="number"
+                type="text"
                 label="Temperature (℃)"
                 onBlur={handleBlur}
                 onChange={handleChange}
@@ -218,9 +218,7 @@ const goodsInSchema = yup.object().shape({
   unit: yup.string().required("Metric unit is required"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
-  temperature: yup
-    .number()
-    .required("Temperature is required")
+  temperature: yup.required("Temperature is required")
 });
 
 // **Initial Values**

@@ -70,42 +70,31 @@ app.use((req, res, next) => {
 
 // ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {
-
-    const { 
+  const { 
     date, 
     ingredient, 
     stockReceived, 
+    unit,            // new unit field
     barCode, 
     expiryDate, 
     temperature, 
     cognito_id 
   } = req.body;
 
-  // Set CORS headers explicitly (redundant with cors middleware but ensures they're present)
+  // Set CORS headers explicitly
   res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
+
   try {
     console.log("Raw request body:", req.body);
 
-    if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || 
-    temperature === undefined || temperature === null || !cognito_id) {
-  console.error("❌ Missing fields in request body:", {
-    date, ingredient, stockReceived, barCode, expiryDate, temperature, cognito_id
-  });
-  return res.status(400).json({ 
-    error: "All fields are required",
-    received: req.body
-  });
-}
-    
-    // Validate required fields
-    if (!date || !ingredient || !stockReceived || !barCode || !expiryDate || 
+    // Validate required fields, including unit
+    if (!date || !ingredient || !stockReceived || !unit || !barCode || !expiryDate || 
         temperature === undefined || temperature === null || !cognito_id) {
-      console.error("Missing fields in request:", req.body);
+      console.error("❌ Missing fields in request body:", { date, ingredient, stockReceived, unit, barCode, expiryDate, temperature, cognito_id });
       return res.status(400).json({ 
-        error: "All fields are required, including cognito_id",
-        received: req.body 
+        error: "All fields are required",
+        received: req.body
       });
     }
 
@@ -113,11 +102,11 @@ app.post("/api/submit", async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      // Insert into goods_in
+      // Insert into goods_in (including unit)
       const goodsInQuery = `
         INSERT INTO goods_in 
-        (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsInResult] = await connection.execute(goodsInQuery, [
         date,
@@ -127,24 +116,25 @@ app.post("/api/submit", async (req, res) => {
         barCode,
         expiryDate,
         temperature,
+        unit,          // pass unit
         cognito_id,
       ]);
 
-      // Update ingredient_inventory
+      // Update ingredient_inventory (including unit)
       const ingredientInventoryQuery = `
-        INSERT INTO ingredient_inventory (ingredient, amount, barcode)
-        VALUES (?, ?, ?)
+        INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit)
+        VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE amount = amount + ?
       `;
       await connection.execute(ingredientInventoryQuery, [
-        ingredient, 
-        stockReceived, 
-        barCode, 
+        ingredient,
+        stockReceived,
+        barCode,
+        unit,           // pass unit
         stockReceived
       ]);
 
       await connection.commit();
-      
       res.status(200).json({ 
         success: true,
         message: "Data saved successfully", 
@@ -152,34 +142,14 @@ app.post("/api/submit", async (req, res) => {
       });
     } catch (err) {
       await connection.rollback();
-      console.error("Database error:", {
-        message: err.message,
-        stack: err.stack,
-        sql: err.sql,
-        parameters: err.parameters
-      });
-      res.status(500).json({ 
-        success: false,
-        error: "Database operation failed", 
-        details: err.message 
-      });
+      console.error("Database error:", { message: err.message, stack: err.stack, sql: err.sql, parameters: err.parameters });
+      res.status(500).json({ success: false, error: "Database operation failed", details: err.message });
     } finally {
       connection.release();
     }
   } catch (err) {
-    console.error("Server error:", {
-      message: err.message,
-      stack: err.stack,
-      request: {
-        headers: req.headers,
-        body: req.body
-      }
-    });
-    res.status(500).json({ 
-      success: false,
-      error: "Server error", 
-      details: err.message 
-    });
+    console.error("Server error:", { message: err.message, stack: err.stack, request: { headers: req.headers, body: req.body } });
+    res.status(500).json({ success: false, error: "Server error", details: err.message });
   }
 });
 
