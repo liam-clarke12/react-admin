@@ -10,11 +10,8 @@ import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth h
 
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
-  { value: "kilograms", label: "Kilograms (kg)" },
   { value: "ml", label: "Milliliters (ml)" },
-  { value: "liters", label: "Liters (l)" },
   { value: "units", label: "Units" },
-  { value: "pieces", label: "Pieces" }
 ];
 
 const GoodsInForm = () => {
@@ -218,7 +215,7 @@ const goodsInSchema = yup.object().shape({
   unit: yup.string().required("Metric unit is required"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
-  temperature: yup.required("Temperature is required")
+  temperature: yup.string().required("Temperature is required")
 });
 
 // **Initial Values**
