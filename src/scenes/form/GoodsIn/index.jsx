@@ -1,4 +1,5 @@
-import { Box, TextField, Snackbar, Alert, Fab } from "@mui/material";
+// src/scenes/goods-in/GoodsInForm.jsx
+import { Box, TextField, Snackbar, Alert, Fab, MenuItem, FormControl, InputLabel, Select } from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -7,48 +8,54 @@ import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth hook
 
+const unitOptions = [
+  { value: "grams", label: "Grams (g)" },
+  { value: "kilograms", label: "Kilograms (kg)" },
+  { value: "ml", label: "Milliliters (ml)" },
+  { value: "liters", label: "Liters (l)" },
+  { value: "units", label: "Units" },
+  { value: "pieces", label: "Pieces" }
+];
+
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const { cognitoId } = useAuth(); // Get cognitoId from context
 
+  const handleFormSubmit = async (values, { resetForm }) => {
+    const payload = { ...values, cognito_id: cognitoId };
+    console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
 
-const handleFormSubmit = async (values, { resetForm }) => {
-  const payload = { ...values, cognito_id: cognitoId };
+    try {
+      const response = await fetch(
+        "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload)
+        }
+      );
 
-  console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
+      if (!response.ok) {
+        throw new Error("Failed to submit data");
+      }
 
+      console.log("✅ Data successfully sent to the backend.");
+      resetForm();
+      setOpenSnackbar(true);
+    } catch (error) {
+      console.error("❌ CORS/Network Error:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
 
-  try {
-const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include", // Don't forget this!
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to submit data");
+      if (error.message.includes("CORS") || error.name === "TypeError") {
+        alert("CORS error - Check console for details");
+      }
     }
-
-    console.log("✅ Data successfully sent to the backend.");
-    resetForm();
-    setOpenSnackbar(true);
-  } catch (error) {
-    // 👇 This is where the new error handling goes:
-    console.error("❌ CORS/Network Error:", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-    });
-    
-    if (error.message.includes("CORS") || error.name === "TypeError") {
-      alert("CORS error - Check console for details");
-    }
-  }
-};
+  };
 
   const handleCloseSnackbar = () => {
     setOpenSnackbar(false);
@@ -69,7 +76,7 @@ const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws
           touched,
           handleBlur,
           handleChange,
-          handleSubmit,
+          handleSubmit
         }) => (
           <form onSubmit={handleSubmit}>
             <Box
@@ -77,7 +84,7 @@ const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws
               gap="30px"
               gridTemplateColumns="repeat(4, minmax(0, 1fr))"
               sx={{
-                "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
+                "& > div": { gridColumn: isNonMobile ? undefined : "span 4" }
               }}
             >
               <TextField
@@ -117,8 +124,25 @@ const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws
                 name="stockReceived"
                 error={!!touched.stockReceived && !!errors.stockReceived}
                 helperText={touched.stockReceived && errors.stockReceived}
-                sx={{ gridColumn: "span 2" }}
+                sx={{ gridColumn: "span 1" }}
               />
+              <FormControl fullWidth sx={{ gridColumn: "span 1" }}>
+                <InputLabel id="unit-label">Metric</InputLabel>
+                <Select
+                  labelId="unit-label"
+                  id="unit"
+                  name="unit"
+                  value={values.unit}
+                  label="Metric"
+                  onChange={handleChange}
+                >
+                  {unitOptions.map(opt => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 fullWidth
                 variant="outlined"
@@ -191,9 +215,12 @@ const goodsInSchema = yup.object().shape({
     .number()
     .required("Stock amount is required")
     .positive("Must be positive"),
+  unit: yup.string().required("Metric unit is required"),
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
-  temperature: yup.number().required("Temperature is required"),
+  temperature: yup
+    .number()
+    .required("Temperature is required")
 });
 
 // **Initial Values**
@@ -201,9 +228,10 @@ const initialValues = {
   date: new Date().toISOString().split("T")[0],
   ingredient: "",
   stockReceived: "",
+  unit: "grams",
   barCode: "",
   expiryDate: new Date().toISOString().split("T")[0],
-  temperature: "",
+  temperature: "N/A"
 };
 
 export default GoodsInForm;
