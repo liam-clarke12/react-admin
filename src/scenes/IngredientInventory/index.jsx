@@ -9,7 +9,6 @@ import { useState, useEffect } from "react";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
 
-
 const IngredientsInventory = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
@@ -19,93 +18,76 @@ const IngredientsInventory = () => {
   const [snackbarMessage] = useState('');
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { cognitoId } = useAuth(); // Get cognitoId from context
-  
 
   useEffect(() => {
     if (cognitoId) {
       const fetchGoodsInData = async () => {
         try {
-          console.log("Fetching Goods In data...");
-          const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`);
+          const response = await fetch(
+            `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`
+          );
           if (!response.ok) {
             throw new Error("Failed to fetch Goods In data");
           }
           const data = await response.json();
-          console.log("Goods In data fetched:", data);
-  
+
+          // Process data to aggregate and include unit
           const processedData = processInventoryData(data);
           setIngredientInventory(processedData);
         } catch (error) {
           console.error("Error fetching Goods In data:", error);
         }
       };
-  
       fetchGoodsInData();
     }
-  }, [cognitoId, setIngredientInventory]); // Added setIngredientInventory
-  
-  
+  }, [cognitoId, setIngredientInventory]);
 
   // Function to process the fetched data
   const processInventoryData = (data) => {
-    // Step 1: Filter out rows with stockRemaining === 0
+    // Filter out rows with stockRemaining === 0
     const filteredData = data.filter(row => row.stockRemaining > 0);
 
-    // Step 2: Group by 'ingredient' and process each group
+    // Group by 'ingredient' and process each group
     const groupedData = filteredData.reduce((acc, row) => {
-      const existingGroup = acc[row.ingredient];
-
-      if (existingGroup) {
-        // Step 3: Sum the stockRemaining
-        existingGroup.stockOnHand += row.stockRemaining;
-
-        // Step 4: Assign the barcode from the row with the smallest ID
-        if (row.id < existingGroup.minId) {
-          existingGroup.minId = row.id;
-          existingGroup.barcode = row.barCode;
+      const key = row.ingredient;
+      if (acc[key]) {
+        // Sum the stockRemaining
+        acc[key].stockOnHand += row.stockRemaining;
+        // If this row is earlier, update barcode and unit
+        if (row.id < acc[key].minId) {
+          acc[key].minId = row.id;
+          acc[key].barcode = row.barCode;
+          acc[key].unit = row.unit;
         }
       } else {
-        // Initialize the group
-        acc[row.ingredient] = {
-          id: row.ingredient, // Use ingredient as unique ID for DataGrid
+        // Initialize group
+        acc[key] = {
+          id: key,                        // Use ingredient as unique ID
           ingredient: row.ingredient,
           stockOnHand: row.stockRemaining,
           barcode: row.barCode,
-          minId: row.id // Track min ID for barcode selection
+          unit: row.unit,                // Include unit
+          minId: row.id                  // Track minimum ID
         };
       }
-
       return acc;
     }, {});
 
-    // Convert grouped object back into an array
-    return Object.values(groupedData).map(({ minId, ...row }) => row);
+    // Convert grouped object back into an array, removing minId
+    return Object.values(groupedData).map(({ minId, ...rest }) => rest);
   };
 
   const columns = [
     { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
-    { field: "stockOnHand", headerName: "Stock on Hand (kg)", flex: 1, editable: true },
-    { 
-      field: "unit",
-      headerName: "Unit",
-      flex: 1,
-      editable: true 
-    },
-    {
-      field: "barcode",
-      headerName: "Barcode",
-      flex: 1,
-      headerAlign: "left",
-      align: "left",
-      cellClassName: "barCode-column--cell",
-      editable: true,
-    },
+    { field: "stockOnHand", headerName: "Stock on Hand", flex: 1, editable: true },
+    { field: "unit", headerName: "Unit", flex: 1, editable: true },
+    { field: "barcode", headerName: "Barcode", flex: 1, headerAlign: "left", align: "left", cellClassName: "barCode-column--cell", editable: true },
   ];
 
   // Prepare data for the bar chart
-  const barChartData = ingredientInventory.map((item) => ({
+  const barChartData = ingredientInventory.map(item => ({
     ingredient: item.ingredient,
-    amount: item.stockOnHand, // Key for value
+    amount: item.stockOnHand
   }));
 
   return (
@@ -118,10 +100,7 @@ const IngredientsInventory = () => {
           aria-label="Open Bar Chart"
           sx={{
             color: colors.blueAccent[300],
-            "&:hover": {
-              backgroundColor: "transparent",
-              color: colors.blueAccent[700],
-            },
+            "&:hover": { backgroundColor: "transparent", color: colors.blueAccent[700] }
           }}
         >
           <BarChartOutlinedIcon />
@@ -139,7 +118,7 @@ const IngredientsInventory = () => {
           "& .barCode-column--cell": { color: colors.blueAccent[300] },
           "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700] },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": { backgroundColor: colors.blueAccent[700] },
+          "& .MuiDataGrid-footerContainer": { backgroundColor: colors.blueAccent[700] }
         }}
       >
         <DataGrid
@@ -157,9 +136,7 @@ const IngredientsInventory = () => {
         anchor={isMobile ? "bottom" : "right"}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        PaperProps={{
-          sx: { width: isMobile ? "100%" : "90%", borderRadius: "20px 0 0 20px" },
-        }}
+        PaperProps={{ sx: { width: isMobile ? "100%" : "90%", borderRadius: "20px 0 0 20px" } }}
       >
         <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
           <Box
@@ -172,7 +149,6 @@ const IngredientsInventory = () => {
               alignItems: "center",
               justifyContent: "center",
               position: "relative",
-              top: 0,
               padding: "0 10px",
             }}
           >
