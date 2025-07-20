@@ -85,6 +85,12 @@ const IngredientsInventory = () => {
   const columns = [
     { field: "ingredient", headerName: "Ingredient Name", flex: 1, editable: true },
     { field: "stockOnHand", headerName: "Stock on Hand (kg)", flex: 1, editable: true },
+    { 
+      field: "unit",
+      headerName: "Unit",
+      flex: 1,
+      editable: true 
+    },
     {
       field: "barcode",
       headerName: "Barcode",

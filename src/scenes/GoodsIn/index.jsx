@@ -95,6 +95,18 @@ const GoodsIn = () => {
       align: "left",
       editable: true,
     },
+    { 
+      field: "unit",
+      headerName: "Unit",
+      flex: 1,
+      editable: true 
+    },
+    {
+      field: "expiryDate",
+      headerName: "Expiry Date",
+      flex: 1,
+      editable: true,
+    },
     {
       field: "expiryDate",
       headerName: "Expiry Date",
