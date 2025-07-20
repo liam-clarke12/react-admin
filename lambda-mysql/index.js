@@ -203,79 +203,89 @@ app.post("/api/delete-row", async (req, res) => {
 app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
 
-  const { recipe, upb, ingredients, quantities, cognito_id } = req.body;
+  const { recipe, upb, ingredients, quantities, units, cognito_id } = req.body;
 
-  if (!recipe || !upb || !ingredients || !quantities || ingredients.length !== quantities.length || !cognito_id) {
-    console.error("Invalid input data:", {
-      recipe,
-      upb,
-      ingredients,
-      quantities,
-      cognito_id
-    });
+  // Basic validation
+  if (
+    !recipe ||
+    !upb ||
+    !cognito_id ||
+    !Array.isArray(ingredients) ||
+    !Array.isArray(quantities) ||
+    !Array.isArray(units) ||
+    ingredients.length !== quantities.length ||
+    ingredients.length !== units.length
+  ) {
+    console.error("Invalid input data:", req.body);
     return res.status(400).json({ error: "Invalid input data" });
   }
 
   const connection = await db.promise().getConnection();
-
   try {
     await connection.beginTransaction();
     console.log("Transaction started");
 
-    // ✅ Insert into recipes table
+    // Insert into recipes
     const [recipeResult] = await connection.execute(
-      "INSERT INTO recipes (recipe_name, units_per_batch, user_id) VALUES (?, ?, ?)",
+      `INSERT INTO recipes 
+         (recipe_name, units_per_batch, user_id) 
+       VALUES (?, ?, ?)`,
       [recipe, upb, cognito_id]
     );
     const recipeId = recipeResult.insertId;
     console.log("Inserted recipe with ID:", recipeId);
 
+    // For each ingredient, link (with quantity + unit)
     for (let i = 0; i < ingredients.length; i++) {
-      let ingredientName = ingredients[i];
-      let quantity = quantities[i];
-      console.log(`Processing ingredient: ${ingredientName} (Quantity: ${quantity})`);
+      const name = ingredients[i];
+      const qty  = quantities[i];
+      const unit = units[i];
+      console.log(`Processing ${name}: ${qty} ${unit}`);
 
-      // ✅ Check if ingredient exists
-      const [ingredientRows] = await connection.execute(
-        "SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ?",
-        [ingredientName, cognito_id]
+      // Find or create ingredient
+      const [ingRows] = await connection.execute(
+        `SELECT id 
+           FROM ingredients 
+          WHERE ingredient_name = ? 
+            AND user_id = ?`,
+        [name, cognito_id]
       );
 
       let ingredientId;
-      if (ingredientRows.length > 0) {
-        ingredientId = ingredientRows[0].id;
-        console.log(`Found existing ingredient "${ingredientName}" with ID:`, ingredientId);
+      if (ingRows.length) {
+        ingredientId = ingRows[0].id;
       } else {
-        // ✅ Insert new ingredient
-        const [ingredientResult] = await connection.execute(
-          "INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)",
-          [ingredientName, cognito_id]
+        const [ingRes] = await connection.execute(
+          `INSERT INTO ingredients 
+             (ingredient_name, user_id) 
+           VALUES (?, ?)`,
+          [name, cognito_id]
         );
-        ingredientId = ingredientResult.insertId;
-        console.log(`Inserted new ingredient "${ingredientName}" with ID:`, ingredientId);
+        ingredientId = ingRes.insertId;
       }
 
-      // ✅ Insert into recipe_ingredients
+      // Link in recipe_ingredients (with unit)
       await connection.execute(
-        "INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, user_id) VALUES (?, ?, ?, ?)",
-        [recipeId, ingredientId, quantity, cognito_id]
+        `INSERT INTO recipe_ingredients 
+           (recipe_id, ingredient_id, quantity, unit, user_id) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [recipeId, ingredientId, qty, unit, cognito_id]
       );
-      console.log(`Linked ingredient ID ${ingredientId} to recipe ID ${recipeId}`);
+      console.log(`Linked ingredient ${ingredientId} → recipe ${recipeId}`);
     }
 
     await connection.commit();
-    console.log("Transaction committed successfully");
+    console.log("Transaction committed");
     res.status(200).json({ message: "Recipe added successfully!" });
-  } catch (error) {
+  } catch (err) {
     await connection.rollback();
-    console.error("Error adding recipe, transaction rolled back:", error);
-    res.status(500).json({ error: "Database transaction failed", details: error.message });
+    console.error("Error, rolled back:", err);
+    res.status(500).json({ error: "Database transaction failed", details: err.message });
   } finally {
     connection.release();
-    console.log("Database connection released");
+    console.log("Connection released");
   }
 });
-
 
 // **Fetch all recipes**
 app.get("/api/recipes", async (req, res) => {
