@@ -1,4 +1,13 @@
-import { Box, useTheme, Drawer, Typography, IconButton, Snackbar, useMediaQuery } from "@mui/material";
+// src/scenes/inventory/IngredientsInventory.jsx
+import { 
+  Box, 
+  useTheme, 
+  Drawer, 
+  Typography, 
+  IconButton, 
+  Snackbar, 
+  useMediaQuery 
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
@@ -37,6 +46,7 @@ const IngredientsInventory = () => {
     fetchGoodsInData();
   }, [cognitoId, setIngredientInventory]);
 
+  // Aggregates raw goods-in rows into per-ingredient totals
   const aggregateByIngredient = (rows) => {
     const map = {};
     rows.forEach(({ ingredient, stockRemaining, barCode, unit, id }) => {
@@ -55,10 +65,16 @@ const IngredientsInventory = () => {
   };
 
   const columns = [
-    { field: "ingredient", headerName: "Ingredient", flex: 1 },
-    { field: "stockOnHand", headerName: "Stock on Hand", flex: 1 },
-    { field: "unit", headerName: "Unit", flex: 1 },
-    { field: "barcode", headerName: "Barcode", flex: 1, cellClassName: "barCode-column--cell" },
+    { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
+    { field: "stockOnHand", headerName: "Stock on Hand", flex: 1, editable: false },
+    { field: "unit", headerName: "Unit", flex: 1, editable: false },
+    { 
+      field: "barcode", 
+      headerName: "Barcode", 
+      flex: 1, 
+      cellClassName: "barCode-column--cell", 
+      editable: false 
+    },
   ];
 
   const barChartData = ingredientInventory.map(item => ({
@@ -69,16 +85,44 @@ const IngredientsInventory = () => {
   return (
     <Box m="20px">
       <Header title="INGREDIENT INVENTORY" subtitle="Stay on Top of your Stock Levels" />
+
+      {/* Bar Chart toggle */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
-        <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: colors.blueAccent[300], '&:hover': { backgroundColor: 'transparent', color: colors.blueAccent[700] } }}>
+        <IconButton
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open Bar Chart"
+          sx={{
+            color: colors.blueAccent[300],
+            "&:hover": { backgroundColor: "transparent", color: colors.blueAccent[700] }
+          }}
+        >
           <BarChartOutlinedIcon />
         </IconButton>
       </Box>
 
-      <Box m="40px 0 0 0" height="75vh" sx={{ overflowX: 'auto' }}>
+      {/* Styled DataGrid */}
+      <Box
+        m="40px 0 0 0"
+        sx={{
+          height: "75vh",
+          overflowX: "auto",
+          "& .MuiDataGrid-root": { border: "none" },
+          "& .MuiDataGrid-cell": { borderBottom: "none" },
+          "& .barCode-column--cell": { color: colors.blueAccent[300] },
+          "& .MuiDataGrid-columnHeaders": {
+            backgroundColor: colors.blueAccent[700],
+            borderBottom: "none",
+          },
+          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
+          "& .MuiDataGrid-footerContainer": {
+            backgroundColor: colors.blueAccent[700],
+            borderTop: "none",
+          },
+        }}
+      >
         <DataGrid
           autoHeight
-          checkboxSelection
+          checkboxSelection={false}
           getRowId={(row) => row.ingredient}
           rows={ingredientInventory}
           columns={columns}
@@ -87,19 +131,52 @@ const IngredientsInventory = () => {
         />
       </Box>
 
+      {/* Drawer for Bar Chart */}
       <Drawer
-        anchor={isMobile ? 'bottom' : 'right'}
+        anchor={isMobile ? "bottom" : "right"}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: isMobile ? '100%' : '90%', borderRadius: '20px 0 0 20px' } }}
+        PaperProps={{
+          sx: { width: isMobile ? "100%" : "90%", borderRadius: "20px 0 0 20px" },
+        }}
       >
-        <Box sx={{ backgroundColor: colors.primary[400], height: '100%' }}>
-          <Box sx={{ width: '100%', height: '50px', backgroundColor: colors.greenAccent[500], display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: 'white', position: 'absolute', left: 10 }}><MenuOutlinedIcon /></IconButton>
-            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>Bar Chart</Typography>
+        <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
+          <Box
+            sx={{
+              width: "100%",
+              height: "50px",
+              backgroundColor: colors.greenAccent[500],
+              color: colors.grey[100],
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              padding: "0 10px",
+            }}
+          >
+            <IconButton 
+              onClick={() => setDrawerOpen(false)} 
+              sx={{ color: "white", position: "absolute", left: 10 }}
+            >
+              <MenuOutlinedIcon />
+            </IconButton>
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
+              Bar Chart
+            </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70%', mt: 2 }}>
-            <BarChart data={barChartData} keys={["amount"]} indexBy="ingredient" height="500px" width="90%" />
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            sx={{ width: "100%", height: "70%", mt: 2 }}
+          >
+            <BarChart
+              data={barChartData}
+              keys={["amount"]}
+              indexBy="ingredient"
+              height="500px"
+              width="90%"
+            />
           </Box>
         </Box>
       </Drawer>
