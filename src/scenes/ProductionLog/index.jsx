@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import {
   Box,
   useTheme,
@@ -7,13 +8,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Typography
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
 import { useAuth } from "../../contexts/AuthContext";
-import { useEffect, useState } from "react";
 
 const ProductionLog = () => {
   const theme = useTheme();
@@ -24,78 +25,105 @@ const ProductionLog = () => {
   const [selectedRows, setSelectedRows] = useState([]);
 
   useEffect(() => {
+    if (!cognitoId) {
+      console.log("ProductionLog: No cognitoId available, skipping fetch.");
+      return;
+    }
+
     const fetchProductionLogData = async () => {
+      console.log(`Fetching production log for user: ${cognitoId}`);
       try {
-        if (!cognitoId) return;
-        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`);
-        if (!response.ok) throw new Error("Failed to fetch data");
+        const response = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
+        );
+        console.log("Fetch status:", response.status);
+        if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
+
         const data = await response.json();
+        console.log("Raw production log data:", data);
+
+        // Optionally validate structure
+        if (!Array.isArray(data)) {
+          console.error("Expected an array of production logs, got:", data);
+        } else {
+          data.forEach((row, idx) => {
+            console.log(`Row ${idx}:`, row);
+          });
+        }
+
         setProductionLogs(data);
+        console.log("Set productionLogs state with fetched data.");
       } catch (error) {
         console.error("Error fetching production log:", error);
-      };
+      }
     };
-    if (cognitoId) fetchProductionLogData();
+
+    fetchProductionLogData();
   }, [cognitoId]);
 
   const handleRowSelection = (selectedIds) => {
+    console.log("Selected rows:", selectedIds);
     setSelectedRows(selectedIds);
   };
 
   const handleDeleteSelectedRows = async () => {
+    console.log("Attempting to delete selected rows:", selectedRows);
+    if (!cognitoId) {
+      console.error("Cognito ID is missing.");
+      return;
+    }
+
+    const rowsToDelete = productionLogs.filter((row) =>
+      selectedRows.includes(row.batchCode)
+    );
+    console.log("Rows matching selection for deletion:", rowsToDelete);
+
+    if (rowsToDelete.length === 0) {
+      console.warn("No rows found to delete for selected codes.");
+      return;
+    }
+
     try {
-      if (!cognitoId) {
-        console.error("Cognito ID is missing.");
-        return;
-      }
-  
-      console.log("Selected rows for deletion:", selectedRows);
-  
-      const rowsToDelete = productionLogs.filter((row) =>
-        selectedRows.includes(row.batchCode) // Ensure correct identifier
-      );
-  
-      if (rowsToDelete.length === 0) {
-        console.error("No rows selected for deletion.");
-        return;
-      }
-  
       await Promise.all(
         rowsToDelete.map(async (row) => {
-          const response = await fetch("https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }), // Use batchCode
-          });
-  
+          console.log("Deleting row with batchCode:", row.batchCode);
+          const response = await fetch(
+            "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
+            }
+          );
+          console.log(`Delete response for ${row.batchCode}:`, response.status);
           if (!response.ok) {
-            throw new Error(`Failed to delete row with batchCode ${row.batchCode}`);
+            throw new Error(`Failed to delete ${row.batchCode}`);
           }
         })
       );
-  
-      // Update state after successful deletion
-      const updatedRows = productionLogs.filter(
+
+      const updated = productionLogs.filter(
         (row) => !selectedRows.includes(row.batchCode)
       );
-      setProductionLogs(updatedRows);
-      setSelectedRows([]); // Clear selection
-      handleCloseConfirmDialog();
-    } catch (error) {
-      console.error("Error deleting rows:", error);
+      console.log("Updated productionLogs after deletion:", updated);
+      setProductionLogs(updated);
+      setSelectedRows([]);
+      setOpenConfirmDialog(false);
+    } catch (err) {
+      console.error("Error deleting rows:", err);
     }
-  };
-  
-  const handleCloseConfirmDialog = () => {
-    setOpenConfirmDialog(false);
   };
 
   return (
     <Box m="20px">
       <Header title="DAILY PRODUCTION" subtitle="Track daily stock produced" />
+
       <Box sx={{ position: "relative", mb: 2, height: 2 }}>
         <IconButton
-          onClick={() => setOpenConfirmDialog(true)}
+          onClick={() => {
+            console.log("Opening delete confirmation dialog");
+            setOpenConfirmDialog(true);
+          }}
           color="error"
           sx={{ position: "absolute", top: 0, right: 0, color: colors.blueAccent[500], opacity: selectedRows.length === 0 ? 0.5 : 1 }}
           disabled={selectedRows.length === 0}
@@ -103,14 +131,24 @@ const ProductionLog = () => {
           <DeleteIcon />
         </IconButton>
       </Box>
+
       <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>Are you sure you want to delete the selected row(s)?</DialogContent>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete the selected row(s)?
+          </Typography>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ color: colors.blueAccent[500] }}>Cancel</Button>
-          <Button onClick={handleDeleteSelectedRows} color="error">Confirm</Button>
+          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ color: colors.blueAccent[500] }}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteSelectedRows} color="error">
+            Confirm
+          </Button>
         </DialogActions>
       </Dialog>
+
       <Box
         m="40px 0 0 0"
         height="75vh"
@@ -124,7 +162,10 @@ const ProductionLog = () => {
         }}
       >
         <DataGrid
-          rows={productionLogs.map((row, index) => ({ ...row, id: row.batchCode || `generated-${index}-${Date.now()}` }))}
+          rows={productionLogs.map((row, idx) => ({
+            ...row,
+            id: row.batchCode || `generated-${idx}-${Date.now()}`
+          }))}
           columns={[
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
