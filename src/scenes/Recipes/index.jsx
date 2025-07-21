@@ -24,6 +24,7 @@ const Recipes = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
   const { rows, setRows } = useData();
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]);
@@ -31,172 +32,195 @@ const Recipes = () => {
   const [selectedRows, setSelectedRows] = useState([]);
 
   useEffect(() => {
-    const fetchRecipeData = async () => {
-      try {
-        if (!cognitoId) return;
-        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`);
-        if (!response.ok) throw new Error("Failed to fetch Recipe data");
-        const data = await response.json();
+    if (!cognitoId) {
+      console.log("No cognitoId, skipping fetch.");
+      return;
+    }
 
-        const formattedData = data.reduce((acc, row) => {
-          let existingRecipe = acc.find((r) => r.id === row.recipe_id);
-          if (existingRecipe) {
-            existingRecipe.ingredients.push(row.ingredient);
-            existingRecipe.quantities.push(row.quantity);
+    const fetchRecipeData = async () => {
+      console.log(`Fetching recipes for cognitoId=${cognitoId}`);
+      try {
+        const res = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
+        );
+        console.log("Fetch response status:", res.status);
+
+        if (!res.ok) throw new Error("Failed to fetch Recipe data");
+        const data = await res.json();
+        console.log("Raw recipe data:", data);
+
+        // Group rows by recipe_id
+        const formatted = data.reduce((acc, row) => {
+          console.log("Processing row:", row);
+          let entry = acc.find(r => r.id === row.recipe_id);
+          if (entry) {
+            entry.ingredients.push(row.ingredient);
+            entry.quantities.push(row.quantity);
+            entry.units.push(row.unit);
+            console.log(`Appended to recipe ${row.recipe_id}:`, { ingredient: row.ingredient, quantity: row.quantity, unit: row.unit });
           } else {
             acc.push({
-              id: row.recipe_id,
-              recipe: row.recipe,
-              upb: row.units_per_batch,
+              id:          row.recipe_id,
+              recipe:      row.recipe,
+              upb:         row.units_per_batch,
               ingredients: [row.ingredient],
-              quantities: [row.quantity],
+              quantities:  [row.quantity],
+              units:       [row.unit],
             });
+            console.log(`Created recipe entry ${row.recipe_id}:`, acc[acc.length - 1]);
           }
           return acc;
         }, []);
-        setRows(formattedData);
-      } catch (error) {
-        console.error("Error fetching Recipe data:", error);
+
+        console.log("Formatted recipe data:", formatted);
+        setRows(formatted);
+      } catch (err) {
+        console.error("Error fetching Recipe data:", err);
       }
     };
 
-    if (cognitoId) {
-      fetchRecipeData();
-    }
+    fetchRecipeData();
   }, [cognitoId, setRows]);
 
+  const handleRowSelection = (selectionModel) => {
+    console.log("Row selection changed:", selectionModel);
+    setSelectedRows(selectionModel);
+  };
+
+  const handleOpenDialog = () => {
+    console.log("Opening delete confirmation dialog");
+    setOpenDialog(true);
+  };
+  const handleCloseDialog = () => {
+    console.log("Closing delete confirmation dialog");
+    setOpenDialog(false);
+  };
+
   const handleDeleteRecipe = async () => {
-    if (!selectedRows.length || !cognitoId) return;
+    console.log("Deleting recipes:", selectedRows);
+    if (!selectedRows.length || !cognitoId) {
+      console.warn("No recipes selected or missing cognitoId");
+      return;
+    }
 
     try {
       await Promise.all(
-        selectedRows.map(async (rowId) => {
-          const recipeToDelete = rows.find((row) => row.id === rowId);
-          if (recipeToDelete) {
-            const response = await fetch(
-              "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-recipe",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  recipeName: recipeToDelete.recipe,
-                  cognito_id: cognitoId,
-                }),
-              }
-            );
-
-            if (response.ok) {
-              setRows((prevRows) => prevRows.filter((row) => row.id !== rowId));
+        selectedRows.map(async recipeId => {
+          const toDelete = rows.find(r => r.id === recipeId);
+          console.log("Deleting recipe entry:", toDelete);
+          if (!toDelete) return;
+          const resp = await fetch(
+            "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-recipe",
+            {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify({ recipeName: toDelete.recipe, cognito_id: cognitoId }),
             }
+          );
+          console.log(`Delete response for ${recipeId}:`, resp.status);
+          if (resp.ok) {
+            setRows(prev => prev.filter(r => r.id !== recipeId));
+            console.log(`Removed recipe ${recipeId} from state`);
           }
         })
       );
       setSelectedRows([]);
       setOpenDialog(false);
-    } catch (error) {
-      console.error("Error deleting selected recipes:", error);
+    } catch (err) {
+      console.error("Error deleting recipes:", err);
       alert("Error deleting selected recipes");
     }
   };
 
+  const handleDrawerOpen = (header, content) => {
+    console.log(`Opening drawer "${header}" with content:`, content);
+    setDrawerHeader(header);
+    setDrawerContent(Array.isArray(content) ? content : [content]);
+    setDrawerOpen(true);
+  };
+  const handleDrawerClose = () => {
+    console.log("Closing drawer");
+    setDrawerOpen(false);
+  };
+
   const columns = [
     { field: "recipe", headerName: "Recipe", flex: 1 },
-    { field: "upb", headerName: "Units per Batch", flex: 1 },
+    { field: "upb",    headerName: "Units per Batch", flex: 1 },
     {
       field: "ingredients",
       headerName: "Ingredients",
       flex: 1,
-      renderCell: (params) => (
-        <span
-          style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-          onClick={() =>
-            handleDrawerOpen("Ingredients", params.row.ingredients || [])
-          }
+      renderCell: params => (
+        <Typography
+          sx={{ cursor: "pointer", color: colors.blueAccent[500] }}
+          onClick={() => handleDrawerOpen("Ingredients", params.row.ingredients)}
         >
           Show Ingredients
-        </span>
+        </Typography>
       ),
     },
     {
       field: "quantities",
       headerName: "Quantities",
       flex: 1,
-      renderCell: (params) => (
-        <span
-          style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-          onClick={() =>
-            handleDrawerOpen(
-              "Quantities",
-              (params.row.ingredients || []).map(
-                (ingredient, index) =>
-                  `${ingredient}: ${(params.row.quantities || [])[index] || "N/A"}`
-              )
-            )
-          }
-        >
-          Show Quantities
-        </span>
-      ),
+      renderCell: params => {
+        const { ingredients = [], quantities = [], units = [] } = params.row;
+        const list = ingredients.map((ing, i) => {
+          const qty  = quantities[i] || "N/A";
+          const unit = units[i]      ? ` ${units[i]}` : "";
+          return `${ing}: ${qty}${unit}`;
+        });
+        return (
+          <Typography
+            sx={{ cursor: "pointer", color: colors.blueAccent[500] }}
+            onClick={() => handleDrawerOpen("Quantities", list)}
+          >
+            Show Quantities
+          </Typography>
+        );
+      },
     },
   ];
-
-  const handleDrawerOpen = (header, content) => {
-    setDrawerHeader(header);
-    setDrawerContent(Array.isArray(content) ? content : [content]);
-    setDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-  };
-
-  const handleRowSelection = (selection) => {
-    setSelectedRows(selection); // Correctly track selected rows
-  };
-
-  const handleOpenDialog = () => {
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => setOpenDialog(false);
 
   return (
     <Box m="20px">
       <Header title="RECIPES" subtitle="Keep Track of your Recipes" />
 
+      {/* Delete button */}
       <Box sx={{ position: "relative", mb: 2, height: "40px" }}>
         <IconButton
           onClick={handleOpenDialog}
           sx={{
-            position: "absolute",
-            top: "50%",
-            right: "10px",
+            position:  "absolute",
+            top:       "50%",
+            right:     "10px",
             transform: "translateY(-50%)",
-            color: selectedRows.length ? "red" : colors.blueAccent[500],
-            opacity: selectedRows.length ? 1 : 0.5,
+            color:     selectedRows.length ? "red" : colors.blueAccent[500],
+            opacity:   selectedRows.length ? 1 : 0.5,
           }}
-          disabled={selectedRows.length === 0}
+          disabled={!selectedRows.length}
         >
           <DeleteIcon />
         </IconButton>
       </Box>
 
+      {/* DataGrid */}
       <Box
         m="40px 0 0 0"
         height="75vh"
         sx={{
-          overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": {
+          overflowX:                         "auto",
+          "& .MuiDataGrid-root":            { border: "none", minWidth: "650px" },
+          "& .MuiDataGrid-cell":            { borderBottom: "none" },
+          "& .MuiDataGrid-columnHeaders":   {
             backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
+            borderBottom:     "none",
           },
           "& .MuiDataGrid-virtualScroller": {
             backgroundColor: colors.primary[400],
           },
           "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
+            borderTop:       "none",
             backgroundColor: colors.blueAccent[700],
           },
         }}
@@ -209,39 +233,42 @@ const Recipes = () => {
         />
       </Box>
 
+      {/* Drawer */}
       <Drawer anchor="right" open={drawerOpen} onClose={handleDrawerClose}>
-        <Box width="300px" p={0}>
+        <Box width="300px">
           <Box
             sx={{
-              width: "100%",
+              width:           "100%",
               backgroundColor: colors.blueAccent[500],
-              color: colors.grey[100],
-              padding: "10px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              color:           colors.grey[100],
+              p:               1,
+              display:         "flex",
+              alignItems:      "center",
+              justifyContent:  "center",
+              position:        "relative",
             }}
           >
             <IconButton
               onClick={handleDrawerClose}
-              sx={{ color: "white", position: "absolute", left: 10 }}
+              sx={{ color: "white", position: "absolute", left: 8 }}
             >
               <MenuOutlinedIcon />
             </IconButton>
-            <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               {drawerHeader}
             </Typography>
           </Box>
           <Box p={2}>
             <ul>
-              {drawerContent.map((content, index) => (
-                <li key={index}>{content}</li>
+              {drawerContent.map((item, idx) => (
+                <li key={idx}>{item}</li>
               ))}
             </ul>
           </Box>
         </Box>
       </Drawer>
 
+      {/* Delete Confirmation */}
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
