@@ -42,7 +42,7 @@ const ProductionLog = () => {
         const data = await response.json();
         console.log("Raw production log data:", data);
 
-        // Optionally validate structure
+        // Validate structure
         if (!Array.isArray(data)) {
           console.error("Expected an array of production logs, got:", data);
         } else {
@@ -164,13 +164,15 @@ const ProductionLog = () => {
         <DataGrid
           rows={productionLogs.map((row, idx) => ({
             ...row,
-            id: row.batchCode || `generated-${idx}-${Date.now()}`
+            id: row.batchCode || `generated-${idx}-${Date.now()}`,
+            unitsRemaining: row.batchRemaining * row.upb // calculated field
           }))}
           columns={[
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
-            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
-            { field: "batchRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: true, align: "left" },
+            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true },
+            { field: "batchRemaining", headerName: "Batches Remaining", type: "number", flex: 1, editable: true },
+            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, valueGetter: (params) => params.row.batchRemaining * params.row.upb },
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
