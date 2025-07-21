@@ -34,8 +34,8 @@ const Recipes = () => {
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
+      console.log(`Fetching recipes for user ${cognitoId}`);
       try {
-        console.log(`Fetching recipes for user ${cognitoId}`);
         const res = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
         );
@@ -133,7 +133,7 @@ const Recipes = () => {
 
   const columns = [
     { field: "recipe", headerName: "Recipe", flex: 1 },
-    { field: "upb", headerName: "Units per Batch", flex: 1 },
+    { field: "upb",    headerName: "Units per Batch", flex: 1 },
     {
       field: "ingredients",
       headerName: "Ingredients",
@@ -223,7 +223,7 @@ const Recipes = () => {
         <Box width="300px">
           <Box
             sx={{
-              width:           "100%", 
+              width:           "100%",
               backgroundColor: colors.blueAccent[500],
               color:           colors.grey[100],
               p:               1,
