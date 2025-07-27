@@ -153,6 +153,34 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
+app.get("/api/ingredients", async (req, res) => {
+  const userId = req.query.cognito_id;
+  if (!userId) {
+    return res.status(400).json({ error: "Missing cognito_id query parameter" });
+  }
+
+  try {
+    // fetch all ingredient names for this user
+    const { rows } = await pool.query(
+      `SELECT name
+         FROM user_ingredients`,
+      [userId]
+    );
+
+    // if your table had a separate id column, SELECT id,name and map directly
+    // here we use name as both id and label
+    const ingredients = rows.map((r) => ({
+      id: r.name,
+      name: r.name,
+    }));
+
+    res.json(ingredients);
+  } catch (err) {
+    console.error("Error fetching ingredients:", err);
+    res.status(500).json({ error: "Failed to fetch ingredients" });
+  }
+});
+
 // Example root route
 app.get('/', (req, res) => {
   res.json({ message: 'Hello from Express + AWS Lambda!' });
