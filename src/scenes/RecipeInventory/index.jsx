@@ -1,174 +1,195 @@
-import { Box, useTheme, Drawer, Typography, IconButton } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  useTheme,
+  Drawer,
+  Typography,
+  IconButton
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
+import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
+import BarChart from "../../components/BarChart";
+import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
-import BarChart from "../../components/BarChart"; // Import BarChart
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined"; // Import Menu Icon
-import { useState, useEffect } from "react";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
 
 const RecipeInventory = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const { recipeInventory, setRecipeInventory } = useData(); // Access the recipe inventory and clear function from context
-  const [drawerOpen, setDrawerOpen] = useState(false); // State to handle drawer visibility
-  const { cognitoId } = useAuth(); // Get cognitoId from context
+  const { cognitoId } = useAuth();
+  const { recipeInventory, setRecipeInventory } = useData();
+  const [recipesMap, setRecipesMap] = useState({});
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Safeguard: Ensure recipeInventory is an array
-  const rows = recipeInventory && recipeInventory.length > 0 ? recipeInventory : [];
-
-    useEffect(() => {
-      if (cognitoId) {
-        const fetchProductionLogData = async () => {
-          try {
-            console.log("Fetching Production Log data...");
-            const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`);
-            if (!response.ok) {
-              throw new Error("Failed to fetch Production Log data");
-            }
-            const data = await response.json();
-            console.log("Production Log data fetched:", data);
-    
-            const processedData = processRecipeInventoryData(data);
-            setRecipeInventory(processedData);
-          } catch (error) {
-            console.error("Error fetching Production Log data:", error);
-          }
-        };
-    
-        fetchProductionLogData();
+  // 1) Fetch recipes → build recipeName → units_per_batch map
+  useEffect(() => {
+    if (!cognitoId) return;
+    const fetchRecipes = async () => {
+      try {
+        const res = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch recipes");
+        const data = await res.json();
+        const map = {};
+        data.forEach((r, idx) => {
+          const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
+          map[key] = Number(r.units_per_batch) || 0;
+        });
+        setRecipesMap(map);
+      } catch (err) {
+        console.error("Error fetching recipes:", err);
       }
-    }, [cognitoId, setRecipeInventory]); // Added setIngredientInventory
-
-     // Function to process the fetched data
-     const processRecipeInventoryData = (data) => {
-      const filteredData = data.filter(row => row.batchRemaining > 0);
-    
-      const groupedData = filteredData.reduce((acc, row) => {
-        const existingGroup = acc[row.recipe];
-    
-        if (existingGroup) {
-          existingGroup.quantity += row.batchRemaining;
-          if (row.id < existingGroup.minId) {
-            existingGroup.minId = row.id;
-            existingGroup.batchCode = row.batchCode;
-          }
-        } else {
-          acc[row.recipe] = {
-            id: row.batchCode, // Use batchCode as unique ID for DataGrid
-            date: row.date,
-            recipe: row.recipe,
-            quantity: row.batchRemaining,
-            batchCode: row.batchCode,
-            minId: row.id
-          };
-        }
-    
-        return acc;
-      }, {});
-    
-      return Object.values(groupedData).map(({ minId, ...row }) => row);
     };
+    fetchRecipes();
+  }, [cognitoId]);
+
+  // 2) Once recipesMap is ready, fetch production-log, group & compute unitsInStock
+  useEffect(() => {
+    if (!cognitoId || Object.keys(recipesMap).length === 0) return;
+
+    const fetchAndProcess = async () => {
+      try {
+        const response = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch production-log");
+        const data = await response.json();
+        if (!Array.isArray(data)) return;
+
+        // filter out any zero-remaining batches
+        const filtered = data.filter((row) => Number(row.batchRemaining) > 0);
+
+        // group by recipe, summing batchRemaining
+        const grouped = filtered.reduce((acc, row) => {
+          const rec = row.recipe;
+          const rem = Number(row.batchRemaining) || 0;
+          if (!acc[rec]) {
+            acc[rec] = {
+              date: row.date,
+              recipe: rec,
+              totalBatches: rem,
+              batchCode: row.batchCode
+            };
+          } else {
+            acc[rec].totalBatches += rem;
+          }
+          return acc;
+        }, {});
+
+        // build final array, computing unitsInStock
+        const processed = Object.values(grouped).map((g) => ({
+          id: g.batchCode,
+          date: g.date,
+          recipe: g.recipe,
+          unitsInStock: g.totalBatches * (recipesMap[g.recipe] || 0),
+          batchCode: g.batchCode
+        }));
+
+        setRecipeInventory(processed);
+      } catch (err) {
+        console.error("Error processing recipe inventory:", err);
+      }
+    };
+
+    fetchAndProcess();
+  }, [cognitoId, recipesMap, setRecipeInventory]);
+
+  // define columns — no more batchesRemaining column
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
     { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    { field: "quantity", headerName: "Units in Stock", headerAlign: "left", align: "left", type: "number", flex: 1 },
-    { field: "batchCode", headerName: "Batch Code", flex: 1 },
+    {
+      field: "unitsInStock",
+      headerName: "Units in Stock",
+      type: "number",
+      align: "left",
+      headerAlign: "left",
+      flex: 1
+    },
+    { field: "batchCode", headerName: "Batch Code", flex: 1 }
   ];
 
-  // Prepare the data for the bar chart
+  // data for the bar chart
   const barChartData = recipeInventory.map((item) => ({
-    recipe: item.recipe, // Use recipe as the index
-    quantity: item.quantity, // Key for value
+    recipe: item.recipe,
+    units: item.unitsInStock
   }));
 
   return (
     <Box m="20px">
-      <Header title="STOCK INVENTORY" subtitle="Track Your Stock Based on Production" />
+      <Header
+        title="STOCK INVENTORY"
+        subtitle="Track Your Stock Based on Production"
+      />
 
-      {/* Bar Chart Icon Button - Positioned above the table */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <IconButton
           onClick={() => setDrawerOpen(true)}
           sx={{
-            color: colors.blueAccent[300], // No background, only color change
-            "&:hover": {
-              backgroundColor: "transparent", // Transparent background on hover
-              color: colors.blueAccent[700], // Color change on hover
-            },
+            color: colors.blueAccent[300],
+            "&:hover": { backgroundColor: "transparent", color: colors.blueAccent[700] }
           }}
         >
           <BarChartOutlinedIcon />
         </IconButton>
       </Box>
 
-      {/* DataGrid (Recipe Table) */}
       <Box
         m="40px 0 0 0"
         height="75vh"
         sx={{
-          overflowX: 'auto',
-          "& .MuiDataGrid-root": {border: "none", minWidth: "650px"},
+          overflowX: "auto",
+          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
-          "& .MuiCheckbox-root": { color: `${colors.blueAccent[200]} !important` },
-
-          // Alternating row colors
-          "& .even-row": {
-            backgroundColor: colors.primary[450], // Color for even rows
+          "& .MuiDataGrid-columnHeaders": {
+            backgroundColor: colors.blueAccent[700],
+            borderBottom: "none"
           },
-          "& .odd-row": {
-            backgroundColor: colors.primary[400], // Color for odd rows
+          "& .MuiDataGrid-virtualScroller": {
+            backgroundColor: colors.primary[400]
           },
+          "& .MuiDataGrid-footerContainer": {
+            borderTop: "none",
+            backgroundColor: colors.blueAccent[700]
+          }
         }}
       >
         <DataGrid
-          rows={rows.map((row, index) => ({ ...row, id: row.batchCode, rowClassName: index % 2 === 0 ? 'even-row' : 'odd-row' }))} // Add id to rows and class name
+          rows={recipeInventory}
           columns={columns}
           pageSize={10}
           rowsPerPageOptions={[10, 25, 50]}
-          getRowClassName={(params) => 
-            params.indexRelativeToCurrentPage % 2 === 0 ? 'even-row' : 'odd-row' // Apply alternating row classes
-          }
+          getRowId={(row) => row.id}
         />
       </Box>
 
-      {/* Drawer for Bar Chart */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
           sx: {
-            width: "90%", // Increased width of the drawer
-            borderRadius: "20px 0 0 20px", // Rounded top-left and bottom-left corners
-            overflow: "hidden", // Ensure content fits inside the curved drawer
-          },
+            width: "90%",
+            borderRadius: "20px 0 0 20px",
+            overflow: "hidden"
+          }
         }}
       >
-        <Box
-          sx={{
-            backgroundColor: colors.primary[400],
-            height: "100%",
-          }}
-        >
-          {/* Drawer Header */}
+        <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
           <Box
             sx={{
               width: "100%",
-              height: "50px", // Reduced height for a thinner header
-              backgroundColor: colors.blueAccent[500], // Same background color as the Recipes drawer
+              height: "50px",
+              backgroundColor: colors.blueAccent[500],
               color: colors.grey[100],
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              position: "relative", // To position the close icon correctly
-              top: 0, // Fill the top of the drawer
-              padding: "0 10px", // Added padding for left/right
+              position: "relative",
+              padding: "0 10px"
             }}
           >
             <IconButton
@@ -178,27 +199,22 @@ const RecipeInventory = () => {
               <MenuOutlinedIcon />
             </IconButton>
             <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
-              Bar Chart
+              Units in Stock Chart
             </Typography>
           </Box>
 
-          {/* BarChart inside the Drawer */}
           <Box
             display="flex"
             justifyContent="center"
             alignItems="center"
-            sx={{
-              width: "100%", // Full width
-              height: "70%", // Height for the bar chart
-              mt: 2, // Added margin-top for spacing between header and chart
-            }}
+            sx={{ width: "100%", height: "70%", mt: 2 }}
           >
             <BarChart
               data={barChartData}
-              keys={["quantity"]} // Change this key based on your bar chart data
-              indexBy="recipe" // Change this to match your data structure
-              height="500px" // Height for the bar chart
-              width="90%"    // Adjust width for a better fit
+              keys={["units"]}
+              indexBy="recipe"
+              height="500px"
+              width="90%"
             />
           </Box>
         </Box>
