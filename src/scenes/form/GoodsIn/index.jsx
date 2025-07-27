@@ -55,7 +55,7 @@ const GoodsInForm = () => {
   // Snackbar
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // Add-ingredient dialog
+  // Add‑ingredient dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
   const [adding, setAdding] = useState(false);
@@ -74,7 +74,7 @@ const GoodsInForm = () => {
       .finally(() => setLoadingMaster(false));
   };
 
-  // Fetch per-user custom list
+  // Fetch per‑user custom list
   const fetchCustom = () => {
     if (!cognitoId) return;
     setLoadingCustom(true);
@@ -220,60 +220,46 @@ const GoodsInForm = () => {
                 />
 
                 {/* Ingredient dropdown */}
-                <Autocomplete
-                  options={ingredients}
-                  getOptionLabel={opt => opt.name}
-                  loading={loadingMaster || loadingCustom}
-                  value={selected}
-                  onChange={(_, newVal) =>
-                    setFieldValue("ingredient", newVal ? newVal.id : "")
-                  }
-                  openOnFocus={false}
-                  filterSelectedOptions
-                  renderInput={params => (
-                    <TextField
-                      {...params}
-                      label="Ingredient"
-                      name="ingredient"
-                      onBlur={handleBlur}
-                      error={!!touched.ingredient && !!errors.ingredient}
-                      helperText={touched.ingredient && errors.ingredient}
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {(loadingMaster || loadingCustom) && (
-                              <CircularProgress color="inherit" size={20} />
-                            )}
-                            {params.InputProps.endAdornment}
-                          </>
-                        )
-                      }}
-                      sx={{ gridColumn: "span 2" }}
-                    />
-                  )}
-                  PaperComponent={({ children, ...props }) => (
-                    <Box
-                      component="ul"
-                      {...props}
-                      sx={{
-                        p: 0,
-                        m: 0,
-                        listStyle: "none",
-                        bgcolor: "background.paper",
-                        borderRadius: 1,
-                        boxShadow: 1
-                      }}
-                    >
-                      {children}
-                      <Box sx={{ borderTop: 1, borderColor: "divider", p: 1, textAlign: "center" }}>
-                        <Button size="small" onClick={openAddDialog}>
-                          Add Ingredient +
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                />
+                <Box sx={{ gridColumn: "span 2" }}>
+                  <Autocomplete
+                    options={ingredients}
+                    getOptionLabel={opt => opt.name}
+                    loading={loadingMaster || loadingCustom}
+                    value={selected}
+                    onChange={(_, newVal) =>
+                      setFieldValue("ingredient", newVal ? newVal.id : "")
+                    }
+                    openOnFocus={false}
+                    filterSelectedOptions
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label="Ingredient"
+                        name="ingredient"
+                        onBlur={handleBlur}
+                        error={!!touched.ingredient && !!errors.ingredient}
+                        helperText={touched.ingredient && errors.ingredient}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {(loadingMaster || loadingCustom) && (
+                                <CircularProgress color="inherit" size={20} />
+                              )}
+                              {params.InputProps.endAdornment}
+                            </>
+                          )
+                        }}
+                        sx={{ width: "100%" }}
+                      />
+                    )}
+                  />
+                  <Box textAlign="right" mt={1}>
+                    <Button size="small" onClick={openAddDialog}>
+                      Add Ingredient +
+                    </Button>
+                  </Box>
+                </Box>
 
                 {/* Stock Received */}
                 <TextField
