@@ -42,23 +42,23 @@ const ProductionLog = () => {
         const data = await response.json();
         console.log("Raw production log data:", data);
 
-        // Sanitize and enforce fields
         if (!Array.isArray(data)) {
           console.error("Expected an array of production logs, got:", data);
-        } else {
-          const sanitized = data.map((row, idx) => ({
-            date: row.date,
-            recipe: row.recipe,
-            batchesProduced: Number(row.batchesProduced) || 0,
-            batchRemaining: Number(row.batchRemaining) || 0,
-            batchCode: row.batchCode || `gen-${idx}`,
-            user_id: row.user_id || "",
-            id: row.batchCode || `gen-${idx}-${Date.now()}`,
-          }));
-          console.log("Sanitized production logs:", sanitized);
-          setProductionLogs(sanitized);
-          console.log("Set productionLogs state with sanitized data.");
+          return;
         }
+
+        // Sanitize and enforce fields
+        const sanitized = data.map((row, idx) => ({
+          date: row.date,
+          recipe: row.recipe,
+          batchesProduced: Number(row.batchesProduced) || 0,
+          batchRemaining: Number(row.batchRemaining) || 0,
+          batchCode: row.batchCode || `gen-${idx}`,
+          id: row.batchCode || `gen-${idx}-${Date.now()}`,
+        }));
+        console.log("Sanitized production logs:", sanitized);
+        setProductionLogs(sanitized);
+        console.log("Set productionLogs state with sanitized data.");
       } catch (error) {
         console.error("Error fetching production log:", error);
       }
@@ -74,15 +74,11 @@ const ProductionLog = () => {
 
   const handleDeleteSelectedRows = async () => {
     console.log("Attempting to delete selected rows:", selectedRows);
-    if (!cognitoId) {
-      console.error("Cognito ID is missing.");
-      return;
-    }
+    if (!cognitoId) return;
 
     const rowsToDelete = productionLogs.filter((row) =>
       selectedRows.includes(row.batchCode)
     );
-    console.log("Rows matching selection for deletion:", rowsToDelete);
 
     if (rowsToDelete.length === 0) {
       console.warn("No rows found to delete for selected codes.");
@@ -101,18 +97,13 @@ const ProductionLog = () => {
               body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
             }
           );
-          console.log(`Delete response for ${row.batchCode}:`, response.status);
-          if (!response.ok) {
-            throw new Error(`Failed to delete ${row.batchCode}`);
-          }
+          if (!response.ok) throw new Error(`Failed to delete ${row.batchCode}`);
         })
       );
 
-      const updated = productionLogs.filter(
-        (row) => !selectedRows.includes(row.batchCode)
+      setProductionLogs((prev) =>
+        prev.filter((row) => !selectedRows.includes(row.batchCode))
       );
-      console.log("Updated productionLogs after deletion:", updated);
-      setProductionLogs(updated);
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
@@ -126,10 +117,7 @@ const ProductionLog = () => {
 
       <Box sx={{ position: "relative", mb: 2, height: 2 }}>
         <IconButton
-          onClick={() => {
-            console.log("Opening delete confirmation dialog");
-            setOpenConfirmDialog(true);
-          }}
+          onClick={() => setOpenConfirmDialog(true)}
           color="error"
           sx={{ position: "absolute", top: 0, right: 0, color: colors.blueAccent[500], opacity: selectedRows.length === 0 ? 0.5 : 1 }}
           disabled={selectedRows.length === 0}
@@ -141,9 +129,7 @@ const ProductionLog = () => {
       <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete the selected row(s)?
-          </Typography>
+          <Typography>Are you sure you want to delete the selected row(s)?</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenConfirmDialog(false)} sx={{ color: colors.blueAccent[500] }}>
@@ -172,28 +158,12 @@ const ProductionLog = () => {
           columns={[
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
-            {
-              field: "batchesProduced",
-              headerName: "Batches Produced",
-              type: "number",
-              flex: 1,
-              editable: true,
-              align: "left",
-              valueGetter: (params) => params.row?.batchesProduced ?? 0,
-            },
-            {
-              field: "batchRemaining",
-              headerName: "Units Remaining",
-              type: "number",
-              flex: 1,
-              editable: true,
-              align: "left",
-              valueGetter: (params) => params.row?.batchRemaining ?? 0,
-            },
+            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
+            { field: "batchRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: true, align: "left" },
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
-          onRowSelectionModelChange={(newSelection) => handleRowSelection(newSelection)}
+          onRowSelectionModelChange={handleRowSelection}
           getRowId={(row) => row.id}
         />
       </Box>
