@@ -42,17 +42,23 @@ const ProductionLog = () => {
         const data = await response.json();
         console.log("Raw production log data:", data);
 
-        // Optionally validate structure
+        // Sanitize and enforce fields
         if (!Array.isArray(data)) {
           console.error("Expected an array of production logs, got:", data);
         } else {
-          data.forEach((row, idx) => {
-            console.log(`Row ${idx}:`, row);
-          });
+          const sanitized = data.map((row, idx) => ({
+            date: row.date,
+            recipe: row.recipe,
+            batchesProduced: Number(row.batchesProduced) || 0,
+            batchRemaining: Number(row.batchRemaining) || 0,
+            batchCode: row.batchCode || `gen-${idx}`,
+            user_id: row.user_id || "",
+            id: row.batchCode || `gen-${idx}-${Date.now()}`,
+          }));
+          console.log("Sanitized production logs:", sanitized);
+          setProductionLogs(sanitized);
+          console.log("Set productionLogs state with sanitized data.");
         }
-
-        setProductionLogs(data);
-        console.log("Set productionLogs state with fetched data.");
       } catch (error) {
         console.error("Error fetching production log:", error);
       }
@@ -162,15 +168,28 @@ const ProductionLog = () => {
         }}
       >
         <DataGrid
-          rows={productionLogs.map((row, idx) => ({
-            ...row,
-            id: row.batchCode || `generated-${idx}-${Date.now()}`
-          }))}
+          rows={productionLogs}
           columns={[
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
-            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
-            { field: "batchRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: true, align: "left" },
+            {
+              field: "batchesProduced",
+              headerName: "Batches Produced",
+              type: "number",
+              flex: 1,
+              editable: true,
+              align: "left",
+              valueGetter: (params) => params.row?.batchesProduced ?? 0,
+            },
+            {
+              field: "batchRemaining",
+              headerName: "Units Remaining",
+              type: "number",
+              flex: 1,
+              editable: true,
+              align: "left",
+              valueGetter: (params) => params.row?.batchRemaining ?? 0,
+            },
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
