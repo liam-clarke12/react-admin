@@ -36,23 +36,48 @@ const GoodsInForm = () => {
   // Fetch available ingredients for the dropdown
   useEffect(() => {
     if (!cognitoId) return;
+
+    console.log("[Ingredients] Fetch start for user:", cognitoId);
     setLoadingIngredients(true);
+
     fetch(
       `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients?cognito_id=${cognitoId}`
     )
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch ingredients");
+        console.log(
+          `[Ingredients] HTTP ${res.status} ${res.statusText}`,
+          res.headers.get("content-type")
+        );
+        if (!res.ok) {
+          // log the response body for more context
+          return res
+            .text()
+            .then((text) => {
+              console.error(
+                `[Ingredients] Server returned ${res.status}:`,
+                text
+              );
+              throw new Error(
+                `Failed to fetch ingredients (status ${res.status})`
+              );
+            });
+        }
         return res.json();
       })
       .then((data) => {
-        // assuming API returns array of { id: string, name: string }
+        console.log("[Ingredients] Response JSON:", data);
+        // you could also validate shape here, e.g. Array.isArray(data)
         setIngredients(data);
       })
       .catch((err) => {
-        console.error("Error loading ingredients:", err);
+        console.error("[Ingredients] Fetch error:", err);
       })
-      .finally(() => setLoadingIngredients(false));
+      .finally(() => {
+        console.log("[Ingredients] Fetch complete");
+        setLoadingIngredients(false);
+      });
   }, [cognitoId]);
+
 
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
