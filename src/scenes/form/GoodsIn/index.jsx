@@ -1,12 +1,24 @@
 // src/scenes/goods-in/GoodsInForm.jsx
-import { Box, TextField, Snackbar, Alert, Fab, MenuItem, FormControl, InputLabel, Select } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  TextField,
+  Snackbar,
+  Alert,
+  Fab,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  CircularProgress,
+  FormHelperText
+} from "@mui/material";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from "../../../components/Header";
-import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
-import { useAuth } from "../../../contexts/AuthContext"; // Import the useAuth hook
+import { useAuth } from "../../../contexts/AuthContext";
 
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
@@ -16,13 +28,34 @@ const unitOptions = [
 
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
+  const { cognitoId } = useAuth();
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const { cognitoId } = useAuth(); // Get cognitoId from context
+  const [ingredients, setIngredients] = useState([]);
+  const [loadingIngredients, setLoadingIngredients] = useState(false);
+
+  // Fetch available ingredients for the dropdown
+  useEffect(() => {
+    if (!cognitoId) return;
+    setLoadingIngredients(true);
+    fetch(
+      `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients?cognito_id=${cognitoId}`
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch ingredients");
+        return res.json();
+      })
+      .then((data) => {
+        // assuming API returns array of { id: string, name: string }
+        setIngredients(data);
+      })
+      .catch((err) => {
+        console.error("Error loading ingredients:", err);
+      })
+      .finally(() => setLoadingIngredients(false));
+  }, [cognitoId]);
 
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
-    console.log("📤 Sending payload:", JSON.stringify(payload, null, 2));
-
     try {
       const response = await fetch(
         "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit",
@@ -30,32 +63,41 @@ const GoodsInForm = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to submit data");
-      }
-
-      console.log("✅ Data successfully sent to the backend.");
+      if (!response.ok) throw new Error("Failed to submit data");
       resetForm();
       setOpenSnackbar(true);
     } catch (error) {
-      console.error("❌ CORS/Network Error:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-
-      if (error.message.includes("CORS") || error.name === "TypeError") {
-        alert("CORS error - Check console for details");
-      }
+      console.error("Submission error:", error);
+      alert("Submission failed. Check console for details.");
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
+  // Validation Schema
+  const goodsInSchema = yup.object().shape({
+    date: yup.string().required("Date is required"),
+    ingredient: yup.string().required("Ingredient is required"),
+    stockReceived: yup
+      .number()
+      .required("Stock amount is required")
+      .positive("Must be positive"),
+    unit: yup.string().required("Metric unit is required"),
+    barCode: yup.string().required("Bar Code is required"),
+    expiryDate: yup.string().required("Expiry Date is required"),
+    temperature: yup.string().required("Temperature is required"),
+  });
+
+  // Initial Values
+  const initialValues = {
+    date: new Date().toISOString().split("T")[0],
+    ingredient: "",
+    stockReceived: "",
+    unit: "grams",
+    barCode: "",
+    expiryDate: new Date().toISOString().split("T")[0],
+    temperature: "N/A",
   };
 
   return (
@@ -73,7 +115,7 @@ const GoodsInForm = () => {
           touched,
           handleBlur,
           handleChange,
-          handleSubmit
+          handleSubmit,
         }) => (
           <form onSubmit={handleSubmit}>
             <Box
@@ -81,9 +123,10 @@ const GoodsInForm = () => {
               gap="30px"
               gridTemplateColumns="repeat(4, minmax(0, 1fr))"
               sx={{
-                "& > div": { gridColumn: isNonMobile ? undefined : "span 4" }
+                "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
               }}
             >
+              {/* Date */}
               <TextField
                 fullWidth
                 variant="outlined"
@@ -97,19 +140,43 @@ const GoodsInForm = () => {
                 helperText={touched.date && errors.date}
                 sx={{ gridColumn: "span 2" }}
               />
-              <TextField
+
+              {/* Ingredient dropdown */}
+              <FormControl
                 fullWidth
-                variant="outlined"
-                type="text"
-                label="Ingredient"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.ingredient}
-                name="ingredient"
-                error={!!touched.ingredient && !!errors.ingredient}
-                helperText={touched.ingredient && errors.ingredient}
                 sx={{ gridColumn: "span 2" }}
-              />
+                error={!!touched.ingredient && !!errors.ingredient}
+              >
+                <InputLabel id="ingredient-label">
+                  {loadingIngredients ? "Loading…" : "Ingredient"}
+                </InputLabel>
+                <Select
+                  labelId="ingredient-label"
+                  id="ingredient"
+                  name="ingredient"
+                  value={values.ingredient}
+                  label="Ingredient"
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                >
+                  {loadingIngredients ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} />
+                    </MenuItem>
+                  ) : (
+                    ingredients.map(({ id, name }) => (
+                      <MenuItem key={id} value={id}>
+                        {name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+                {touched.ingredient && errors.ingredient && (
+                  <FormHelperText>{errors.ingredient}</FormHelperText>
+                )}
+              </FormControl>
+
+              {/* Stock Received */}
               <TextField
                 fullWidth
                 variant="outlined"
@@ -123,6 +190,8 @@ const GoodsInForm = () => {
                 helperText={touched.stockReceived && errors.stockReceived}
                 sx={{ gridColumn: "span 1" }}
               />
+
+              {/* Unit */}
               <FormControl fullWidth sx={{ gridColumn: "span 1" }}>
                 <InputLabel id="unit-label">Metric</InputLabel>
                 <Select
@@ -133,13 +202,15 @@ const GoodsInForm = () => {
                   label="Metric"
                   onChange={handleChange}
                 >
-                  {unitOptions.map(opt => (
+                  {unitOptions.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+
+              {/* Bar Code */}
               <TextField
                 fullWidth
                 variant="outlined"
@@ -153,6 +224,8 @@ const GoodsInForm = () => {
                 helperText={touched.barCode && errors.barCode}
                 sx={{ gridColumn: "span 2" }}
               />
+
+              {/* Expiry Date */}
               <TextField
                 fullWidth
                 variant="outlined"
@@ -166,6 +239,8 @@ const GoodsInForm = () => {
                 helperText={touched.expiryDate && errors.expiryDate}
                 sx={{ gridColumn: "span 2" }}
               />
+
+              {/* Temperature */}
               <TextField
                 fullWidth
                 variant="outlined"
@@ -193,40 +268,15 @@ const GoodsInForm = () => {
       <Snackbar
         open={openSnackbar}
         autoHideDuration={3000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setOpenSnackbar(false)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity="success">
+        <Alert onClose={() => setOpenSnackbar(false)} severity="success">
           Stock has been successfully recorded!
         </Alert>
       </Snackbar>
     </Box>
   );
-};
-
-// **Validation Schema**
-const goodsInSchema = yup.object().shape({
-  date: yup.string().required("Date is required"),
-  ingredient: yup.string().required("Ingredient is required"),
-  stockReceived: yup
-    .number()
-    .required("Stock amount is required")
-    .positive("Must be positive"),
-  unit: yup.string().required("Metric unit is required"),
-  barCode: yup.string().required("Bar Code is required"),
-  expiryDate: yup.string().required("Expiry Date is required"),
-  temperature: yup.string().required("Temperature is required")
-});
-
-// **Initial Values**
-const initialValues = {
-  date: new Date().toISOString().split("T")[0],
-  ingredient: "",
-  stockReceived: "",
-  unit: "grams",
-  barCode: "",
-  expiryDate: new Date().toISOString().split("T")[0],
-  temperature: "N/A"
 };
 
 export default GoodsInForm;
