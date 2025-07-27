@@ -1,4 +1,4 @@
-// src/scenes/goods-in/GoodsInForm.jsx
+// src/scenes/form/GoodsIn/index.jsx
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -6,7 +6,12 @@ import {
   Snackbar,
   Alert,
   Fab,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { Formik } from "formik";
@@ -31,10 +36,7 @@ const GoodsInForm = () => {
 
   // Fetch available ingredients for the dropdown
   useEffect(() => {
-    if (!cognitoId) return;
-
     setLoadingIngredients(true);
-
     fetch(
       `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients`
     )
@@ -45,7 +47,7 @@ const GoodsInForm = () => {
       .then((data) => setIngredients(data))
       .catch((err) => console.error("Error loading ingredients:", err))
       .finally(() => setLoadingIngredients(false));
-  }, [cognitoId]);
+  }, []);
 
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
@@ -111,7 +113,6 @@ const GoodsInForm = () => {
           handleSubmit,
           setFieldValue,
         }) => {
-          // find the selected ingredient object
           const selectedIngredient =
             ingredients.find((i) => i.id === values.ingredient) || null;
 
