@@ -61,28 +61,26 @@ const GoodsInForm = () => {
   const [adding, setAdding] = useState(false);
 
   // Fetch global master list
-  const fetchMaster = () => {
+  useEffect(() => {
     if (!cognitoId) return;
     setLoadingMaster(true);
     fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
       .then(res => {
-        if (!res.ok) throw new Error(res.status);
+        if (!res.ok) throw new Error("Failed to fetch ingredients");
         return res.json();
       })
       .then(data => setMasterIngredients(data))
       .catch(err => console.error("Error fetching master:", err))
       .finally(() => setLoadingMaster(false));
-  };
+  }, [cognitoId]);
 
   // Fetch per‑user custom list
-  const fetchCustom = () => {
+  useEffect(() => {
     if (!cognitoId) return;
     setLoadingCustom(true);
-    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`, {
-      credentials: "include"
-    })
+    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
       .then(res => {
-        if (!res.ok) throw new Error(res.status);
+        if (!res.ok) throw new Error("Failed to fetch custom ingredients");
         return res.json();
       })
       .then(data =>
@@ -92,11 +90,6 @@ const GoodsInForm = () => {
       )
       .catch(err => console.error("Error fetching custom:", err))
       .finally(() => setLoadingCustom(false));
-  };
-
-  useEffect(() => {
-    fetchMaster();
-    fetchCustom();
   }, [cognitoId]);
 
   // Dialog handlers
@@ -110,17 +103,23 @@ const GoodsInForm = () => {
     if (!newIngredient.trim() || !cognitoId) return;
     setAdding(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`,
+      const response = await fetch(
+        `${API_BASE}/custom-ingredients`,
         {
           method: "POST",
-          credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newIngredient.trim() })
+          body: JSON.stringify({
+            name: newIngredient.trim(),
+            cognito_id: cognitoId
+          }),
         }
       );
-      if (!res.ok) throw new Error(res.status);
-      await fetchCustom();
+      if (!response.ok) throw new Error("Failed to add ingredient");
+      // refresh custom list only
+      const updated = await fetch(
+        `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`
+      ).then(r => r.json());
+      setCustomIngredients(updated.map(ci => ({ id: `c-${ci.id}`, name: ci.name })));
       closeAddDialog();
     } catch (err) {
       console.error("Error adding custom ingredient:", err);
@@ -134,13 +133,15 @@ const GoodsInForm = () => {
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
     try {
-      const res = await fetch(`${API_BASE}/submit`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error(res.status);
+      const res = await fetch(
+        `${API_BASE}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error("Submit failed");
       resetForm();
       setOpenSnackbar(true);
     } catch (err) {
@@ -254,6 +255,7 @@ const GoodsInForm = () => {
                       />
                     )}
                   />
+                  {/* Moved the add button back outside the dropdown */}
                   <Box textAlign="right" mt={1}>
                     <Button size="small" onClick={openAddDialog}>
                       Add Ingredient +
