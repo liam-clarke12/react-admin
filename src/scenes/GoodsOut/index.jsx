@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import {
   Box,
   useTheme,
@@ -5,7 +6,6 @@ import {
   Typography,
   IconButton,
 } from "@mui/material";
-import React, { useState, useEffect } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../themes";
 import Header from "../../components/Header";
@@ -16,52 +16,74 @@ const GoodsOut = () => {
   const { cognitoId } = useAuth();
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const [GoodsOut, setGoodsOut] = useState([]);
+
+  const [goodsOut, setGoodsOut] = useState([]);
+  const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]);
 
+  // 1) Fetch recipes → build recipeName → units_per_batch map
   useEffect(() => {
+    if (!cognitoId) return;
+    const fetchRecipes = async () => {
+      try {
+        const res = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch recipes");
+        const data = await res.json();
+        const map = {};
+        data.forEach((r, idx) => {
+          const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
+          map[key] = Number(r.units_per_batch) || 0;
+        });
+        setRecipesMap(map);
+      } catch (err) {
+        console.error("Error fetching recipes:", err);
+      }
+    };
+    fetchRecipes();
+  }, [cognitoId]);
+
+  // 2) Fetch goods-out data
+  useEffect(() => {
+    if (!cognitoId) return;
     const fetchGoodsOutData = async () => {
       try {
-        if (!cognitoId) return;
-        const response = await fetch(`https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`);
-        if (!response.ok) throw new Error("Failed to fetch data");
+        const response = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch goods out");
         const data = await response.json();
-        
-        // Log the fetched data for inspection
-        console.log("Fetched Goods Out Data:", data);
-        
         setGoodsOut(data);
       } catch (error) {
         console.error("Error fetching goods out:", error);
       }
     };
-
-    if (cognitoId) fetchGoodsOutData();
+    fetchGoodsOutData();
   }, [cognitoId]);
 
   const handleDrawerOpen = (header, content) => {
     let formattedContent;
-  
+
     if (header === "Batchcodes") {
-      // Log the batchcodes to verify if the data is correctly received
-      console.log("Batchcodes content:", content);
-  
-      // Ensure batchcodes and quantitiesUsed are paired together
-      if (content.batchcodes && content.quantitiesUsed) {
-        formattedContent = content.batchcodes.map((batchCode, index) => (
-          <div key={index}>
-            {batchCode}: {content.quantitiesUsed[index]}
+      const { batchcodes, quantitiesUsed, recipe } = content;
+      const upb = recipesMap[recipe] || 0;
+
+      formattedContent = batchcodes.map((batchCode, idx) => {
+        const batches = quantitiesUsed[idx] || 0;
+        const units = batches * upb;
+        return (
+          <div key={idx}>
+            {batchCode}: {units.toLocaleString()} units
           </div>
-        ));
-      } else {
-        formattedContent = ["No batchcodes available"];
-      }
+        );
+      });
     } else {
       formattedContent = ["No data available"];
     }
-  
+
     setDrawerHeader(header);
     setDrawerContent(formattedContent);
     setDrawerOpen(true);
@@ -72,16 +94,15 @@ const GoodsOut = () => {
   };
 
   const columns = [
-    { field: "date", headerName: "Date", flex: 1, editable: false },
-    { field: "recipe", headerName: "Recipe Name", flex: 1, editable: false },
+    { field: "date", headerName: "Date", flex: 1 },
+    { field: "recipe", headerName: "Recipe Name", flex: 1 },
     {
       field: "stockAmount",
-      headerName: "Units going Out",
+      headerName: "Units Going Out",
       type: "number",
       flex: 1,
       headerAlign: "left",
       align: "left",
-      editable: false,
     },
     {
       field: "batchcodes",
@@ -95,7 +116,6 @@ const GoodsOut = () => {
           batchcodes = Array.isArray(params.row.batchcodes)
             ? params.row.batchcodes
             : JSON.parse(params.row.batchcodes || "[]");
-
           quantitiesUsed = Array.isArray(params.row.quantitiesUsed)
             ? params.row.quantitiesUsed
             : JSON.parse(params.row.quantitiesUsed || "[]");
@@ -107,7 +127,11 @@ const GoodsOut = () => {
           <span
             style={{ cursor: "pointer", color: colors.blueAccent[500] }}
             onClick={() =>
-              handleDrawerOpen("Batchcodes", { batchcodes, quantitiesUsed })
+              handleDrawerOpen("Batchcodes", {
+                batchcodes,
+                quantitiesUsed,
+                recipe: params.row.recipe,
+              })
             }
           >
             Show Batchcodes
@@ -121,7 +145,6 @@ const GoodsOut = () => {
       flex: 1,
       headerAlign: "left",
       align: "left",
-      editable: false,
     },
   ];
 
@@ -204,11 +227,11 @@ const GoodsOut = () => {
 
         <DataGrid
           rows={
-            Array.isArray(GoodsOut)
-              ? GoodsOut.map((row, index) => ({
+            Array.isArray(goodsOut)
+              ? goodsOut.map((row, idx) => ({
                   ...row,
-                  id: row.id || `${row.recipe}-${index}`,
-                  rowClassName: index % 2 === 0 ? "even-row" : "odd-row",
+                  id: row.id || `${row.recipe}-${idx}`,
+                  rowClassName: idx % 2 === 0 ? "even-row" : "odd-row",
                 }))
               : []
           }
