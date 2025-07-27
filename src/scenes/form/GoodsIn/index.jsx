@@ -1,5 +1,5 @@
 // src/scenes/form/GoodsIn/index.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   TextField,
@@ -11,7 +11,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormHelperText,
   Button,
   Dialog,
   DialogTitle,
@@ -35,85 +34,113 @@ const unitOptions = [
 const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [ingredients, setIngredients] = useState([]);
-  const [loadingIngredients, setLoadingIngredients] = useState(false);
 
-  // State for add-ingredient dialog
+  // Master vs custom
+  const [masterIngredients, setMasterIngredients] = useState([]);
+  const [customIngredients, setCustomIngredients] = useState([]);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [loadingCustom, setLoadingCustom] = useState(false);
+
+  // Combined for dropdown
+  const ingredients = useMemo(
+    () => [
+      ...masterIngredients.map(i => ({ ...i, source: "master" })),
+      ...customIngredients.map(i => ({ ...i, source: "custom" }))
+    ],
+    [masterIngredients, customIngredients]
+  );
+
+  // Snackbar
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  // Add‑ingredient dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const fetchIngredients = () => {
-    setLoadingIngredients(true);
-    fetch(
-      `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients`
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+  // Fetch master list
+  const fetchMaster = () => {
+    setLoadingMaster(true);
+    fetch("/api/ingredients")
+      .then(res => {
+        if (!res.ok) throw new Error(res.status);
         return res.json();
       })
-      .then((data) => setIngredients(data))
-      .catch((err) => console.error("Error loading ingredients:", err))
-      .finally(() => setLoadingIngredients(false));
+      .then(data => setMasterIngredients(data))
+      .catch(err => console.error("Error fetching master:", err))
+      .finally(() => setLoadingMaster(false));
+  };
+
+  // Fetch custom list
+  const fetchCustom = () => {
+    if (!cognitoId) return;
+    setLoadingCustom(true);
+    fetch("/api/custom-ingredients", { credentials: "include" })
+      .then(res => {
+        if (!res.ok) throw new Error(res.status);
+        return res.json();
+      })
+      .then(data =>
+        // prefix IDs so they don’t collide with master
+        setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name })))
+      )
+      .catch(err => console.error("Error fetching custom:", err))
+      .finally(() => setLoadingCustom(false));
   };
 
   useEffect(() => {
-    fetchIngredients();
-  }, []);
+    fetchMaster();
+    fetchCustom();
+  }, [cognitoId]);
 
-  // Handlers for add-ingredient dialog
+  // Add‑ingredient dialog handlers
   const openAddDialog = () => {
     setNewIngredient("");
     setAddDialogOpen(true);
   };
   const closeAddDialog = () => setAddDialogOpen(false);
+
   const handleAddIngredient = async () => {
-    if (!newIngredient.trim()) return;
+    if (!newIngredient.trim() || !cognitoId) return;
     setAdding(true);
     try {
-      const response = await fetch(
-        "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newIngredient.trim() }),
-        }
-      );
-      if (!response.ok) throw new Error(`Status ${response.status}`);
-      // refresh list
-      fetchIngredients();
+      const res = await fetch("/api/custom-ingredients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: newIngredient.trim() })
+      });
+      if (!res.ok) throw new Error(res.status);
+      await fetchCustom();
       closeAddDialog();
     } catch (err) {
-      console.error("Error adding ingredient:", err);
+      console.error("Error adding custom ingredient:", err);
       alert("Failed to add ingredient");
     } finally {
       setAdding(false);
     }
   };
 
+  // Form submission
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
     try {
-      const response = await fetch(
-        "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/submit",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        }
-      );
-      if (!response.ok) throw new Error("Failed to submit data");
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Submit failed");
       resetForm();
       setOpenSnackbar(true);
-    } catch (error) {
-      console.error("Submission error:", error);
-      alert("Submission failed. Check console for details.");
+    } catch (err) {
+      console.error("Submission error:", err);
+      alert("Submission failed. Check console.");
     }
   };
 
-  // Validation Schema
+  // Validation
   const goodsInSchema = yup.object().shape({
     date: yup.string().required("Date is required"),
     ingredient: yup.string().required("Ingredient is required"),
@@ -127,7 +154,7 @@ const GoodsInForm = () => {
     temperature: yup.string().required("Temperature is required"),
   });
 
-  // Initial Values
+  // Initial values
   const initialValues = {
     date: new Date().toISOString().split("T")[0],
     ingredient: "",
@@ -154,10 +181,9 @@ const GoodsInForm = () => {
           handleBlur,
           handleChange,
           handleSubmit,
-          setFieldValue,
+          setFieldValue
         }) => {
-          const selectedIngredient =
-            ingredients.find((i) => i.id === values.ingredient) || null;
+          const selected = ingredients.find(i => i.id === values.ingredient) || null;
 
           return (
             <form onSubmit={handleSubmit}>
@@ -175,69 +201,73 @@ const GoodsInForm = () => {
                   variant="outlined"
                   type="date"
                   label="Date"
+                  name="date"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.date}
-                  name="date"
                   error={!!touched.date && !!errors.date}
                   helperText={touched.date && errors.date}
                   sx={{ gridColumn: "span 2" }}
                 />
 
-                {/* Ingredient autocomplete */}
-                <Box sx={{ gridColumn: "span 2" }}>
-                  <Autocomplete
-                    options={ingredients}
-                    getOptionLabel={(opt) => opt.name}
-                    loading={loadingIngredients}
-                    value={selectedIngredient}
-                    onChange={(_, newVal) =>
-                      setFieldValue("ingredient", newVal ? newVal.id : "")
-                    }
-                    onBlur={handleBlur}
-                    openOnFocus={false}
-                    filterSelectedOptions
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Ingredient"
-                        name="ingredient"
-                        error={!!touched.ingredient && !!errors.ingredient}
-                        helperText={touched.ingredient && errors.ingredient}
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {loadingIngredients ? (
-                                <CircularProgress color="inherit" size={20} />
-                              ) : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
-                  />
-                  <Box textAlign="right" mt={1}>
-                    <Button size="small" onClick={openAddDialog}>
-                      Add Ingredient +
-                    </Button>
-                  </Box>
-                </Box>
+                {/* Ingredient */}
+                <Autocomplete
+                  options={ingredients}
+                  getOptionLabel={opt => opt.name}
+                  loading={loadingMaster || loadingCustom}
+                  value={selected}
+                  onChange={(_, newVal) =>
+                    setFieldValue("ingredient", newVal ? newVal.id : "")
+                  }
+                  openOnFocus={false}
+                  filterSelectedOptions
+                  renderInput={params => (
+                    <TextField
+                      {...params}
+                      label="Ingredient"
+                      name="ingredient"
+                      onBlur={handleBlur}
+                      error={!!touched.ingredient && !!errors.ingredient}
+                      helperText={touched.ingredient && errors.ingredient}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            { (loadingMaster || loadingCustom) && (
+                              <CircularProgress color="inherit" size={20} />
+                            )}
+                            {params.InputProps.endAdornment}
+                          </>
+                        )
+                      }}
+                      sx={{ gridColumn: "span 2" }}
+                    />
+                  )}
+                  PaperComponent={({ children, ...props }) => (
+                    <Box component="ul" {...props} sx={{ p: 0, m: 0, listStyle: "none", bgcolor: "background.paper", borderRadius: 1, boxShadow: 1 }}>
+                      {children}
+                      <Box sx={{ borderTop: 1, borderColor: "divider", p: 1, textAlign: "center" }}>
+                        <Button size="small" onClick={openAddDialog}>
+                          Add Ingredient +
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+                />
 
-                {/* Stock Received */}
+                {/* Stock */}
                 <TextField
                   fullWidth
                   variant="outlined"
                   type="number"
                   label="Stock Received"
+                  name="stockReceived"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.stockReceived}
-                  name="stockReceived"
                   error={!!touched.stockReceived && !!errors.stockReceived}
                   helperText={touched.stockReceived && errors.stockReceived}
-                  jsx={{ gridColumn: "span 1" }}
+                  sx={{ gridColumn: "span 1" }}
                 />
 
                 {/* Unit */}
@@ -251,39 +281,37 @@ const GoodsInForm = () => {
                     label="Metric"
                     onChange={handleChange}
                   >
-                    {unitOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
+                    {unitOptions.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
 
-                {/* Bar Code */}
+                {/* Bar code */}
                 <TextField
                   fullWidth
                   variant="outlined"
                   type="text"
                   label="Bar Code"
+                  name="barCode"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.barCode}
-                  name="barCode"
                   error={!!touched.barCode && !!errors.barCode}
                   helperText={touched.barCode && errors.barCode}
                   sx={{ gridColumn: "span 2" }}
                 />
 
-                {/* Expiry Date */}
+                {/* Expiry */}
                 <TextField
                   fullWidth
                   variant="outlined"
                   type="date"
                   label="Expiry Date"
+                  name="expiryDate"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.expiryDate}
-                  name="expiryDate"
                   error={!!touched.expiryDate && !!errors.expiryDate}
                   helperText={touched.expiryDate && errors.expiryDate}
                   sx={{ gridColumn: "span 2" }}
@@ -295,10 +323,10 @@ const GoodsInForm = () => {
                   variant="outlined"
                   type="text"
                   label="Temperature (℃)"
+                  name="temperature"
                   onBlur={handleBlur}
                   onChange={handleChange}
                   value={values.temperature}
-                  name="temperature"
                   error={!!touched.temperature && !!errors.temperature}
                   helperText={touched.temperature && errors.temperature}
                   sx={{ gridColumn: "span 2" }}
@@ -336,13 +364,11 @@ const GoodsInForm = () => {
             label="Ingredient Name"
             fullWidth
             value={newIngredient}
-            onChange={(e) => setNewIngredient(e.target.value)}
+            onChange={e => setNewIngredient(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeAddDialog} disabled={adding}>
-            Cancel
-          </Button>
+          <Button onClick={closeAddDialog} disabled={adding}>Cancel</Button>
           <Button onClick={handleAddIngredient} disabled={adding}>
             {adding ? <CircularProgress size={20} /> : "Add"}
           </Button>

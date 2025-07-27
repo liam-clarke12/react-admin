@@ -189,6 +189,35 @@ app.get("/api/ingredients", async (req, res) => {
   }
 });
 
+app.post("/api/custom-ingredients", async (req, res) => {
+  const userId = req.user?.cognitoId;
+  const { name } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Missing ingredient name" });
+  }
+
+  try {
+    // 1) Insert into custom_ingredients
+    await db
+      .promise()
+      .query(
+        `INSERT INTO custom_ingredients (user_id, name)
+         VALUES (?, ?)`,
+        [userId, name.trim()]
+      );
+      res.json(rows);
+  } catch (err) {
+    console.error("🔥 POST /api/custom-ingredients error:", err);
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to add custom ingredient" });
+  }
+});
+
 // Example root route
 app.get('/', (req, res) => {
   res.json({ message: 'Hello from Express + AWS Lambda!' });
