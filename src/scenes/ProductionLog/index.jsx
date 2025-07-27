@@ -183,6 +183,8 @@ const ProductionLog = () => {
           checkboxSelection
           onRowSelectionModelChange={handleRowSelection}
           columns={[
+            { field: "date", headerName: "Date", flex: 1, editable: true },
+            { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
             {
               field: "batchesProduced",
               headerName: "Batches Produced",
@@ -200,8 +202,6 @@ const ProductionLog = () => {
               align: "left",
               headerAlign: "left"
             },
-            { field: "date", headerName: "Date", flex: 1, editable: true },
-            { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
             { field: "batchCode", headerName: "Batch Code", flex: 1 }
           ]}
         />
