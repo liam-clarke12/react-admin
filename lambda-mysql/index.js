@@ -729,27 +729,47 @@ app.post("/api/add-goods-out", async (req, res) => {
     console.log("Starting database transaction...");
     await connection.beginTransaction();
 
+    // 0) Look up units_per_batch for this recipe
+    const [recipeRows] = await connection.execute(
+      `SELECT units_per_batch FROM recipes WHERE recipe_name = ? AND user_id = ?`,
+      [recipe, cognito_id]
+    );
+    if (recipeRows.length === 0) {
+      throw new Error(`Recipe '${recipe}' not found for user ${cognito_id}`);
+    }
+    const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
+    console.log(`Units per batch for '${recipe}':`, unitsPerBatch);
+
+    // Compute how many batches to deduct
+    const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
+    console.log(
+      `Stock amount ${stockAmount} yields ${batchesToDeduct} batch(es) to deduct`
+    );
+
     // 1. Insert into goods_out
-    const goodsoutQuery = `
+    const goodsOutQuery = `
       INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
       VALUES (?, ?, ?, ?, ?)
     `;
-    const [GoodsOutResult] = await connection.execute(goodsoutQuery, [
+    const [goodsOutResult] = await connection.execute(goodsOutQuery, [
       date,
       recipe,
       stockAmount,
       recipients,
       cognito_id,
     ]);
-
-    const goodsOutId = GoodsOutResult.insertId;
+    const goodsOutId = goodsOutResult.insertId;
     console.log("Inserted into goods_out. ID:", goodsOutId);
 
-    // 2. Deduct from production_log (starting from highest ID)
-    let remainingToDeduct = stockAmount;
+    // 2. Deduct from production_log in batch order
+    let remainingToDeduct = batchesToDeduct;
 
     const [productionRows] = await connection.execute(
-      `SELECT id, batchRemaining, batchCode FROM production_log WHERE recipe = ? AND batchRemaining > 0 ORDER BY id ASC`,
+      `SELECT id, batchRemaining, batchCode
+         FROM production_log
+        WHERE recipe = ? 
+          AND batchRemaining > 0
+        ORDER BY id ASC`,
       [recipe]
     );
 
@@ -758,29 +778,42 @@ app.post("/api/add-goods-out", async (req, res) => {
 
       const deductAmount = Math.min(row.batchRemaining, remainingToDeduct);
 
-      // Deduct batches
+      // a) Update production_log
       await connection.execute(
-        `UPDATE production_log SET batchRemaining = batchRemaining - ? WHERE id = ?`,
+        `UPDATE production_log
+            SET batchRemaining = batchRemaining - ?
+          WHERE id = ?`,
         [deductAmount, row.id]
       );
 
-      // Track which batch (production_log row) was used and the quantity
+      // b) Track usage per batch
       await connection.execute(
-        `INSERT INTO goods_out_batches (goods_out_id, production_log_id, quantity_used) VALUES (?, ?, ?)`,
-        [goodsOutId, row.id, deductAmount] // Insert quantity used here
+        `INSERT INTO goods_out_batches 
+           (goods_out_id, production_log_id, quantity_used)
+         VALUES (?, ?, ?)`,
+        [goodsOutId, row.id, deductAmount]
       );
 
-      console.log(`Deducted ${deductAmount} from production_log ID ${row.id}`);
+      console.log(
+        `Deducted ${deductAmount} batch(es) from production_log ID ${row.id}`
+      );
       remainingToDeduct -= deductAmount;
     }
 
     if (remainingToDeduct > 0) {
-      console.warn(`Warning: Not enough batches to cover stockAmount. ${remainingToDeduct} still unaccounted for.`);
-      // Optional: throw error or continue as partial
+      console.warn(
+        `Not enough batches to cover stockAmount; ${remainingToDeduct} batch(es) short.`
+      );
+      // You could choose to rollback here or proceed as a partial fill
     }
 
     await connection.commit();
-    res.status(200).json({ message: "Goods out added and production log updated with batch tracking." });
+    res
+      .status(200)
+      .json({
+        message:
+          "Goods out added; deducted from production_log based on recipe units_per_batch.",
+      });
   } catch (err) {
     await connection.rollback();
     console.error("Error processing transaction:", err);
