@@ -25,6 +25,8 @@ import Header from "../../../components/Header";
 import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../../contexts/AuthContext";
 
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -35,13 +37,13 @@ const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
 
-  // Master vs custom
+  // Master vs custom lists
   const [masterIngredients, setMasterIngredients] = useState([]);
   const [customIngredients, setCustomIngredients] = useState([]);
   const [loadingMaster, setLoadingMaster] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
 
-  // Combined for dropdown
+  // Combined array for dropdown
   const ingredients = useMemo(
     () => [
       ...masterIngredients.map(i => ({ ...i, source: "master" })),
@@ -53,15 +55,16 @@ const GoodsInForm = () => {
   // Snackbar
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // Add‑ingredient dialog
+  // Add-ingredient dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
   const [adding, setAdding] = useState(false);
 
-  // Fetch master list
+  // Fetch global master list
   const fetchMaster = () => {
+    if (!cognitoId) return;
     setLoadingMaster(true);
-    fetch("/api/ingredients")
+    fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
       .then(res => {
         if (!res.ok) throw new Error(res.status);
         return res.json();
@@ -71,18 +74,21 @@ const GoodsInForm = () => {
       .finally(() => setLoadingMaster(false));
   };
 
-  // Fetch custom list
+  // Fetch per-user custom list
   const fetchCustom = () => {
     if (!cognitoId) return;
     setLoadingCustom(true);
-    fetch("/api/custom-ingredients", { credentials: "include" })
+    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`, {
+      credentials: "include"
+    })
       .then(res => {
         if (!res.ok) throw new Error(res.status);
         return res.json();
       })
       .then(data =>
-        // prefix IDs so they don’t collide with master
-        setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name })))
+        setCustomIngredients(
+          data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))
+        )
       )
       .catch(err => console.error("Error fetching custom:", err))
       .finally(() => setLoadingCustom(false));
@@ -93,7 +99,7 @@ const GoodsInForm = () => {
     fetchCustom();
   }, [cognitoId]);
 
-  // Add‑ingredient dialog handlers
+  // Dialog handlers
   const openAddDialog = () => {
     setNewIngredient("");
     setAddDialogOpen(true);
@@ -104,12 +110,15 @@ const GoodsInForm = () => {
     if (!newIngredient.trim() || !cognitoId) return;
     setAdding(true);
     try {
-      const res = await fetch("/api/custom-ingredients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: newIngredient.trim() })
-      });
+      const res = await fetch(
+        `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newIngredient.trim() })
+        }
+      );
       if (!res.ok) throw new Error(res.status);
       await fetchCustom();
       closeAddDialog();
@@ -125,13 +134,13 @@ const GoodsInForm = () => {
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
     try {
-      const res = await fetch("/api/submit", {
+      const res = await fetch(`${API_BASE}/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error("Submit failed");
+      if (!res.ok) throw new Error(res.status);
       resetForm();
       setOpenSnackbar(true);
     } catch (err) {
@@ -140,7 +149,7 @@ const GoodsInForm = () => {
     }
   };
 
-  // Validation
+  // Validation schema
   const goodsInSchema = yup.object().shape({
     date: yup.string().required("Date is required"),
     ingredient: yup.string().required("Ingredient is required"),
@@ -154,7 +163,7 @@ const GoodsInForm = () => {
     temperature: yup.string().required("Temperature is required"),
   });
 
-  // Initial values
+  // Initial form values
   const initialValues = {
     date: new Date().toISOString().split("T")[0],
     ingredient: "",
@@ -210,7 +219,7 @@ const GoodsInForm = () => {
                   sx={{ gridColumn: "span 2" }}
                 />
 
-                {/* Ingredient */}
+                {/* Ingredient dropdown */}
                 <Autocomplete
                   options={ingredients}
                   getOptionLabel={opt => opt.name}
@@ -233,7 +242,7 @@ const GoodsInForm = () => {
                         ...params.InputProps,
                         endAdornment: (
                           <>
-                            { (loadingMaster || loadingCustom) && (
+                            {(loadingMaster || loadingCustom) && (
                               <CircularProgress color="inherit" size={20} />
                             )}
                             {params.InputProps.endAdornment}
@@ -244,7 +253,18 @@ const GoodsInForm = () => {
                     />
                   )}
                   PaperComponent={({ children, ...props }) => (
-                    <Box component="ul" {...props} sx={{ p: 0, m: 0, listStyle: "none", bgcolor: "background.paper", borderRadius: 1, boxShadow: 1 }}>
+                    <Box
+                      component="ul"
+                      {...props}
+                      sx={{
+                        p: 0,
+                        m: 0,
+                        listStyle: "none",
+                        bgcolor: "background.paper",
+                        borderRadius: 1,
+                        boxShadow: 1
+                      }}
+                    >
                       {children}
                       <Box sx={{ borderTop: 1, borderColor: "divider", p: 1, textAlign: "center" }}>
                         <Button size="small" onClick={openAddDialog}>
@@ -255,7 +275,7 @@ const GoodsInForm = () => {
                   )}
                 />
 
-                {/* Stock */}
+                {/* Stock Received */}
                 <TextField
                   fullWidth
                   variant="outlined"
@@ -275,19 +295,20 @@ const GoodsInForm = () => {
                   <InputLabel id="unit-label">Metric</InputLabel>
                   <Select
                     labelId="unit-label"
-                    id="unit"
                     name="unit"
                     value={values.unit}
                     label="Metric"
                     onChange={handleChange}
                   >
                     {unitOptions.map(opt => (
-                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
 
-                {/* Bar code */}
+                {/* Bar Code */}
                 <TextField
                   fullWidth
                   variant="outlined"
@@ -302,7 +323,7 @@ const GoodsInForm = () => {
                   sx={{ gridColumn: "span 2" }}
                 />
 
-                {/* Expiry */}
+                {/* Expiry Date */}
                 <TextField
                   fullWidth
                   variant="outlined"
@@ -368,7 +389,9 @@ const GoodsInForm = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeAddDialog} disabled={adding}>Cancel</Button>
+          <Button onClick={closeAddDialog} disabled={adding}>
+            Cancel
+          </Button>
           <Button onClick={handleAddIngredient} disabled={adding}>
             {adding ? <CircularProgress size={20} /> : "Add"}
           </Button>
