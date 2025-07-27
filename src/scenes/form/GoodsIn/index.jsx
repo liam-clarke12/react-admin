@@ -6,13 +6,9 @@ import {
   Snackbar,
   Alert,
   Fab,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  CircularProgress,
-  FormHelperText
+  CircularProgress
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -37,47 +33,19 @@ const GoodsInForm = () => {
   useEffect(() => {
     if (!cognitoId) return;
 
-    console.log("[Ingredients] Fetch start for user:", cognitoId);
     setLoadingIngredients(true);
 
     fetch(
-      `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients?cognito_id=${cognitoId}`
+      `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredients`
     )
       .then((res) => {
-        console.log(
-          `[Ingredients] HTTP ${res.status} ${res.statusText}`,
-          res.headers.get("content-type")
-        );
-        if (!res.ok) {
-          // log the response body for more context
-          return res
-            .text()
-            .then((text) => {
-              console.error(
-                `[Ingredients] Server returned ${res.status}:`,
-                text
-              );
-              throw new Error(
-                `Failed to fetch ingredients (status ${res.status})`
-              );
-            });
-        }
+        if (!res.ok) throw new Error(`Status ${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        console.log("[Ingredients] Response JSON:", data);
-        // you could also validate shape here, e.g. Array.isArray(data)
-        setIngredients(data);
-      })
-      .catch((err) => {
-        console.error("[Ingredients] Fetch error:", err);
-      })
-      .finally(() => {
-        console.log("[Ingredients] Fetch complete");
-        setLoadingIngredients(false);
-      });
+      .then((data) => setIngredients(data))
+      .catch((err) => console.error("Error loading ingredients:", err))
+      .finally(() => setLoadingIngredients(false));
   }, [cognitoId]);
-
 
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
@@ -141,153 +109,160 @@ const GoodsInForm = () => {
           handleBlur,
           handleChange,
           handleSubmit,
-        }) => (
-          <form onSubmit={handleSubmit}>
-            <Box
-              display="grid"
-              gap="30px"
-              gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-              sx={{
-                "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
-              }}
-            >
-              {/* Date */}
-              <TextField
-                fullWidth
-                variant="outlined"
-                type="date"
-                label="Date"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.date}
-                name="date"
-                error={!!touched.date && !!errors.date}
-                helperText={touched.date && errors.date}
-                sx={{ gridColumn: "span 2" }}
-              />
+          setFieldValue,
+        }) => {
+          // find the selected ingredient object
+          const selectedIngredient =
+            ingredients.find((i) => i.id === values.ingredient) || null;
 
-              {/* Ingredient dropdown */}
-              <FormControl
-                fullWidth
-                sx={{ gridColumn: "span 2" }}
-                error={!!touched.ingredient && !!errors.ingredient}
+          return (
+            <form onSubmit={handleSubmit}>
+              <Box
+                display="grid"
+                gap="30px"
+                gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                sx={{
+                  "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
+                }}
               >
-                <InputLabel id="ingredient-label">
-                  {loadingIngredients ? "Loading…" : "Ingredient"}
-                </InputLabel>
-                <Select
-                  labelId="ingredient-label"
-                  id="ingredient"
-                  name="ingredient"
-                  value={values.ingredient}
-                  label="Ingredient"
-                  onChange={handleChange}
+                {/* Date */}
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="date"
+                  label="Date"
                   onBlur={handleBlur}
-                >
-                  {loadingIngredients ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} />
-                    </MenuItem>
-                  ) : (
-                    ingredients.map(({ id, name }) => (
-                      <MenuItem key={id} value={id}>
-                        {name}
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-                {touched.ingredient && errors.ingredient && (
-                  <FormHelperText>{errors.ingredient}</FormHelperText>
-                )}
-              </FormControl>
-
-              {/* Stock Received */}
-              <TextField
-                fullWidth
-                variant="outlined"
-                type="number"
-                label="Stock Received"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.stockReceived}
-                name="stockReceived"
-                error={!!touched.stockReceived && !!errors.stockReceived}
-                helperText={touched.stockReceived && errors.stockReceived}
-                sx={{ gridColumn: "span 1" }}
-              />
-
-              {/* Unit */}
-              <FormControl fullWidth sx={{ gridColumn: "span 1" }}>
-                <InputLabel id="unit-label">Metric</InputLabel>
-                <Select
-                  labelId="unit-label"
-                  id="unit"
-                  name="unit"
-                  value={values.unit}
-                  label="Metric"
                   onChange={handleChange}
-                >
-                  {unitOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  value={values.date}
+                  name="date"
+                  error={!!touched.date && !!errors.date}
+                  helperText={touched.date && errors.date}
+                  sx={{ gridColumn: "span 2" }}
+                />
 
-              {/* Bar Code */}
-              <TextField
-                fullWidth
-                variant="outlined"
-                type="text"
-                label="Bar Code"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.barCode}
-                name="barCode"
-                error={!!touched.barCode && !!errors.barCode}
-                helperText={touched.barCode && errors.barCode}
-                sx={{ gridColumn: "span 2" }}
-              />
+                {/* Ingredient autocomplete */}
+                <Autocomplete
+                  options={ingredients}
+                  getOptionLabel={(opt) => opt.name}
+                  loading={loadingIngredients}
+                  value={selectedIngredient}
+                  onChange={(_, newVal) =>
+                    setFieldValue("ingredient", newVal ? newVal.id : "")
+                  }
+                  onBlur={handleBlur}
+                  openOnFocus={false}
+                  filterSelectedOptions
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Ingredient"
+                      name="ingredient"
+                      error={!!touched.ingredient && !!errors.ingredient}
+                      helperText={touched.ingredient && errors.ingredient}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingIngredients ? (
+                              <CircularProgress color="inherit" size={20} />
+                            ) : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  sx={{ gridColumn: "span 2" }}
+                />
 
-              {/* Expiry Date */}
-              <TextField
-                fullWidth
-                variant="outlined"
-                type="date"
-                label="Expiry Date"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.expiryDate}
-                name="expiryDate"
-                error={!!touched.expiryDate && !!errors.expiryDate}
-                helperText={touched.expiryDate && errors.expiryDate}
-                sx={{ gridColumn: "span 2" }}
-              />
+                {/* Stock Received */}
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="number"
+                  label="Stock Received"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.stockReceived}
+                  name="stockReceived"
+                  error={!!touched.stockReceived && !!errors.stockReceived}
+                  helperText={touched.stockReceived && errors.stockReceived}
+                  sx={{ gridColumn: "span 1" }}
+                />
 
-              {/* Temperature */}
-              <TextField
-                fullWidth
-                variant="outlined"
-                type="text"
-                label="Temperature (℃)"
-                onBlur={handleBlur}
-                onChange={handleChange}
-                value={values.temperature}
-                name="temperature"
-                error={!!touched.temperature && !!errors.temperature}
-                helperText={touched.temperature && errors.temperature}
-                sx={{ gridColumn: "span 2" }}
-              />
-            </Box>
+                {/* Unit */}
+                <FormControl fullWidth sx={{ gridColumn: "span 1" }}>
+                  <InputLabel id="unit-label">Metric</InputLabel>
+                  <Select
+                    labelId="unit-label"
+                    id="unit"
+                    name="unit"
+                    value={values.unit}
+                    label="Metric"
+                    onChange={handleChange}
+                  >
+                    {unitOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-            <Box display="flex" justifyContent="center" mt="20px">
-              <Fab color="secondary" onClick={handleSubmit}>
-                <AddIcon fontSize="large" />
-              </Fab>
-            </Box>
-          </form>
-        )}
+                {/* Bar Code */}
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="text"
+                  label="Bar Code"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.barCode}
+                  name="barCode"
+                  error={!!touched.barCode && !!errors.barCode}
+                  helperText={touched.barCode && errors.barCode}
+                  sx={{ gridColumn: "span 2" }}
+                />
+
+                {/* Expiry Date */}
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="date"
+                  label="Expiry Date"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.expiryDate}
+                  name="expiryDate"
+                  error={!!touched.expiryDate && !!errors.expiryDate}
+                  helperText={touched.expiryDate && errors.expiryDate}
+                  sx={{ gridColumn: "span 2" }}
+                />
+
+                {/* Temperature */}
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  type="text"
+                  label="Temperature (℃)"
+                  onBlur={handleBlur}
+                  onChange={handleChange}
+                  value={values.temperature}
+                  name="temperature"
+                  error={!!touched.temperature && !!errors.temperature}
+                  helperText={touched.temperature && errors.temperature}
+                  sx={{ gridColumn: "span 2" }}
+                />
+              </Box>
+
+              <Box display="flex" justifyContent="center" mt="20px">
+                <Fab color="secondary" onClick={handleSubmit}>
+                  <AddIcon fontSize="large" />
+                </Fab>
+              </Box>
+            </form>
+          );
+        }}
       </Formik>
 
       <Snackbar
