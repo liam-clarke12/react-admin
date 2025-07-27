@@ -186,8 +186,8 @@ const ProductionLog = () => {
           columns={[
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
-            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
-            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, align: "left" },
+            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true},
+            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1},
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
