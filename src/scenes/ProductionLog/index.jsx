@@ -29,25 +29,18 @@ const ProductionLog = () => {
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
-      console.log(`Fetching recipes for user ${cognitoId}`);
       try {
         const res = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
         );
-        console.log("Recipe fetch status:", res.status);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        console.log("Raw recipe data:", data);
-
         const map = {};
         data.forEach((r, idx) => {
-          // Determine the key for recipe name
           const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
           const upb = Number(r.units_per_batch) || 0;
-          console.log(`Mapping recipe[${idx}]: name='${key}', units_per_batch=${upb}`);
           map[key] = upb;
         });
-        console.log("Built recipes map:", map);
         setRecipesMap(map);
       } catch (err) {
         console.error("Error fetching recipes:", err);
@@ -59,31 +52,21 @@ const ProductionLog = () => {
   // Fetch production logs and compute unitsRemaining
   useEffect(() => {
     if (!cognitoId) return;
-    if (Object.keys(recipesMap).length === 0) {
-      console.warn("Recipes map is empty, waiting to fetch production logs...");
-      return;
-    }
+    if (Object.keys(recipesMap).length === 0) return;
     const fetchProductionLogData = async () => {
-      console.log(`Fetching production log for user: ${cognitoId}`);
       try {
         const response = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
         );
-        console.log("Production log fetch status:", response.status);
         if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
         const data = await response.json();
-        console.log("Raw production log data:", data);
-        if (!Array.isArray(data)) {
-          console.error("Expected array, got:", data);
-          return;
-        }
+        if (!Array.isArray(data)) return;
 
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0;
           const upb = recipesMap[row.recipe] ?? 0;
           const unitsRemaining = batchRemaining * upb;
-          console.log(`Row[${idx}]: recipe='${row.recipe}', batchRemaining=${batchRemaining}, upb=${upb}, unitsRemaining=${unitsRemaining}`);
           return {
             date: row.date,
             recipe: row.recipe,
@@ -94,7 +77,6 @@ const ProductionLog = () => {
             id: row.batchCode || `gen-${idx}-${Date.now()}`,
           };
         });
-        console.log("Sanitized logs with unitsRemaining:", sanitized);
         setProductionLogs(sanitized);
       } catch (error) {
         console.error("Error fetching production log:", error);
@@ -104,20 +86,16 @@ const ProductionLog = () => {
   }, [cognitoId, recipesMap]);
 
   const handleRowSelection = (selectedIds) => {
-    console.log("Selected rows:", selectedIds);
     setSelectedRows(selectedIds);
   };
 
   const handleDeleteSelectedRows = async () => {
-    console.log("Attempting to delete selected rows:", selectedRows);
     if (!cognitoId || selectedRows.length === 0) return;
     const rowsToDelete = productionLogs.filter((row) => selectedRows.includes(row.batchCode));
-    console.log("Rows matching selection for deletion:", rowsToDelete);
     if (rowsToDelete.length === 0) return;
     try {
       await Promise.all(
         rowsToDelete.map(async (row) => {
-          console.log("Deleting row with batchCode:", row.batchCode);
           const res = await fetch(
             "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log",
             {
@@ -126,13 +104,12 @@ const ProductionLog = () => {
               body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
             }
           );
-          console.log(`Delete response for ${row.batchCode}:`, res.status);
           if (!res.ok) throw new Error(`Failed to delete ${row.batchCode}`);
         })
       );
-      const updated = productionLogs.filter((row) => !selectedRows.includes(row.batchCode));
-      console.log("Updated productionLogs after deletion:", updated);
-      setProductionLogs(updated);
+      setProductionLogs((prev) =>
+        prev.filter((row) => !selectedRows.includes(row.batchCode))
+      );
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
@@ -147,7 +124,13 @@ const ProductionLog = () => {
         <IconButton
           onClick={() => setOpenConfirmDialog(true)}
           color="error"
-          sx={{ position: "absolute", top: 0, right: 0, color: colors.blueAccent[500], opacity: selectedRows.length === 0 ? 0.5 : 1 }}
+          sx={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            color: colors.blueAccent[500],
+            opacity: selectedRows.length === 0 ? 0.5 : 1
+          }}
           disabled={selectedRows.length === 0}
         >
           <DeleteIcon />
@@ -157,10 +140,15 @@ const ProductionLog = () => {
       <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete the selected row(s)?</Typography>
+          <Typography>
+            Are you sure you want to delete the selected row(s)?
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ color: colors.blueAccent[500] }}>
+          <Button
+            onClick={() => setOpenConfirmDialog(false)}
+            sx={{ color: colors.blueAccent[500] }}
+          >
             Cancel
           </Button>
           <Button onClick={handleDeleteSelectedRows} color="error">
@@ -176,23 +164,46 @@ const ProductionLog = () => {
           overflowX: "auto",
           "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
+          "& .MuiDataGrid-columnHeaders": {
+            backgroundColor: colors.blueAccent[700],
+            borderBottom: "none"
+          },
+          "& .MuiDataGrid-virtualScroller": {
+            backgroundColor: colors.primary[400]
+          },
+          "& .MuiDataGrid-footerContainer": {
+            borderTop: "none",
+            backgroundColor: colors.blueAccent[700]
+          }
         }}
       >
         <DataGrid
           rows={productionLogs}
-          columns={[
-            { field: "date", headerName: "Date", flex: 1, editable: true },
-            { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
-            { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true},
-            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1},
-            { field: "batchCode", headerName: "Batch Code", flex: 1 },
-          ]}
+          getRowId={(row) => row.id}
           checkboxSelection
           onRowSelectionModelChange={handleRowSelection}
-          getRowId={(row) => row.id}
+          columns={[
+            {
+              field: "batchesProduced",
+              headerName: "Batches Produced",
+              type: "number",
+              flex: 1,
+              editable: true,
+              align: "left",
+              headerAlign: "left"
+            },
+            {
+              field: "unitsRemaining",
+              headerName: "Units Remaining",
+              type: "number",
+              flex: 1,
+              align: "left",
+              headerAlign: "left"
+            },
+            { field: "date", headerName: "Date", flex: 1, editable: true },
+            { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
+            { field: "batchCode", headerName: "Batch Code", flex: 1 }
+          ]}
         />
       </Box>
     </Box>
