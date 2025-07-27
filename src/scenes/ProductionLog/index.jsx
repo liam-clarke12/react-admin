@@ -34,12 +34,18 @@ const ProductionLog = () => {
         const res = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
         );
+        console.log("Recipe fetch status:", res.status);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        // Assume data = [{ id, recipe_name, units_per_batch, user_id }, ...]
+        console.log("Raw recipe data:", data);
+
         const map = {};
-        data.forEach((r) => {
-          map[r.recipe_name] = Number(r.units_per_batch) || 0;
+        data.forEach((r, idx) => {
+          // Determine the key for recipe name
+          const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
+          const upb = Number(r.units_per_batch) || 0;
+          console.log(`Mapping recipe[${idx}]: name='${key}', units_per_batch=${upb}`);
+          map[key] = upb;
         });
         console.log("Built recipes map:", map);
         setRecipesMap(map);
@@ -53,29 +59,37 @@ const ProductionLog = () => {
   // Fetch production logs and compute unitsRemaining
   useEffect(() => {
     if (!cognitoId) return;
+    if (Object.keys(recipesMap).length === 0) {
+      console.warn("Recipes map is empty, waiting to fetch production logs...");
+      return;
+    }
     const fetchProductionLogData = async () => {
       console.log(`Fetching production log for user: ${cognitoId}`);
       try {
         const response = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
         );
+        console.log("Production log fetch status:", response.status);
         if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
         const data = await response.json();
+        console.log("Raw production log data:", data);
         if (!Array.isArray(data)) {
           console.error("Expected array, got:", data);
           return;
         }
-        // Sanitize and merge units_per_batch
+
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0;
-          const upb = recipesMap[row.recipe] || 0;
+          const upb = recipesMap[row.recipe] ?? 0;
+          const unitsRemaining = batchRemaining * upb;
+          console.log(`Row[${idx}]: recipe='${row.recipe}', batchRemaining=${batchRemaining}, upb=${upb}, unitsRemaining=${unitsRemaining}`);
           return {
             date: row.date,
             recipe: row.recipe,
             batchesProduced,
             batchRemaining,
-            unitsRemaining: batchRemaining * upb,
+            unitsRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
             id: row.batchCode || `gen-${idx}-${Date.now()}`,
           };
@@ -86,21 +100,24 @@ const ProductionLog = () => {
         console.error("Error fetching production log:", error);
       }
     };
-    // Only fetch logs once recipesMap is populated to ensure correct calculation
-    if (Object.keys(recipesMap).length > 0) {
-      fetchProductionLogData();
-    }
+    fetchProductionLogData();
   }, [cognitoId, recipesMap]);
 
-  const handleRowSelection = (selectedIds) => setSelectedRows(selectedIds);
+  const handleRowSelection = (selectedIds) => {
+    console.log("Selected rows:", selectedIds);
+    setSelectedRows(selectedIds);
+  };
 
   const handleDeleteSelectedRows = async () => {
+    console.log("Attempting to delete selected rows:", selectedRows);
     if (!cognitoId || selectedRows.length === 0) return;
     const rowsToDelete = productionLogs.filter((row) => selectedRows.includes(row.batchCode));
+    console.log("Rows matching selection for deletion:", rowsToDelete);
     if (rowsToDelete.length === 0) return;
     try {
       await Promise.all(
         rowsToDelete.map(async (row) => {
+          console.log("Deleting row with batchCode:", row.batchCode);
           const res = await fetch(
             "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log",
             {
@@ -109,14 +126,17 @@ const ProductionLog = () => {
               body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
             }
           );
+          console.log(`Delete response for ${row.batchCode}:`, res.status);
           if (!res.ok) throw new Error(`Failed to delete ${row.batchCode}`);
         })
       );
-      setProductionLogs((prev) => prev.filter((row) => !selectedRows.includes(row.batchCode)));
+      const updated = productionLogs.filter((row) => !selectedRows.includes(row.batchCode));
+      console.log("Updated productionLogs after deletion:", updated);
+      setProductionLogs(updated);
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
-      console.error(err);
+      console.error("Error deleting rows:", err);
     }
   };
 
@@ -167,7 +187,7 @@ const ProductionLog = () => {
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
             { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
-            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: false, align: "left" },
+            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, align: "left" },
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
