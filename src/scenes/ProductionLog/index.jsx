@@ -21,75 +21,87 @@ const ProductionLog = () => {
   const colors = tokens(theme.palette.mode);
   const { cognitoId } = useAuth();
   const [productionLogs, setProductionLogs] = useState([]);
+  const [recipesMap, setRecipesMap] = useState({});
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
+  // Fetch recipes to build a map of recipeName -> units_per_batch
   useEffect(() => {
-    if (!cognitoId) {
-      console.log("ProductionLog: No cognitoId available, skipping fetch.");
-      return;
-    }
+    if (!cognitoId) return;
+    const fetchRecipeData = async () => {
+      console.log(`Fetching recipes for user ${cognitoId}`);
+      try {
+        const res = await fetch(
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch recipes");
+        const data = await res.json();
+        // Assume data = [{ id, recipe_name, units_per_batch, user_id }, ...]
+        const map = {};
+        data.forEach((r) => {
+          map[r.recipe_name] = Number(r.units_per_batch) || 0;
+        });
+        console.log("Built recipes map:", map);
+        setRecipesMap(map);
+      } catch (err) {
+        console.error("Error fetching recipes:", err);
+      }
+    };
+    fetchRecipeData();
+  }, [cognitoId]);
 
+  // Fetch production logs and compute unitsRemaining
+  useEffect(() => {
+    if (!cognitoId) return;
     const fetchProductionLogData = async () => {
       console.log(`Fetching production log for user: ${cognitoId}`);
       try {
         const response = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
         );
-        console.log("Fetch status:", response.status);
         if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
-
         const data = await response.json();
-        console.log("Raw production log data:", data);
-
         if (!Array.isArray(data)) {
-          console.error("Expected an array of production logs, got:", data);
+          console.error("Expected array, got:", data);
           return;
         }
-
-        // Sanitize and enforce fields
-        const sanitized = data.map((row, idx) => ({
-          date: row.date,
-          recipe: row.recipe,
-          batchesProduced: Number(row.batchesProduced) || 0,
-          batchRemaining: Number(row.batchRemaining) || 0,
-          batchCode: row.batchCode || `gen-${idx}`,
-          id: row.batchCode || `gen-${idx}-${Date.now()}`,
-        }));
-        console.log("Sanitized production logs:", sanitized);
+        // Sanitize and merge units_per_batch
+        const sanitized = data.map((row, idx) => {
+          const batchesProduced = Number(row.batchesProduced) || 0;
+          const batchRemaining = Number(row.batchRemaining) || 0;
+          const upb = recipesMap[row.recipe] || 0;
+          return {
+            date: row.date,
+            recipe: row.recipe,
+            batchesProduced,
+            batchRemaining,
+            unitsRemaining: batchRemaining * upb,
+            batchCode: row.batchCode || `gen-${idx}`,
+            id: row.batchCode || `gen-${idx}-${Date.now()}`,
+          };
+        });
+        console.log("Sanitized logs with unitsRemaining:", sanitized);
         setProductionLogs(sanitized);
-        console.log("Set productionLogs state with sanitized data.");
       } catch (error) {
         console.error("Error fetching production log:", error);
       }
     };
+    // Only fetch logs once recipesMap is populated to ensure correct calculation
+    if (Object.keys(recipesMap).length > 0) {
+      fetchProductionLogData();
+    }
+  }, [cognitoId, recipesMap]);
 
-    fetchProductionLogData();
-  }, [cognitoId]);
-
-  const handleRowSelection = (selectedIds) => {
-    console.log("Selected rows:", selectedIds);
-    setSelectedRows(selectedIds);
-  };
+  const handleRowSelection = (selectedIds) => setSelectedRows(selectedIds);
 
   const handleDeleteSelectedRows = async () => {
-    console.log("Attempting to delete selected rows:", selectedRows);
-    if (!cognitoId) return;
-
-    const rowsToDelete = productionLogs.filter((row) =>
-      selectedRows.includes(row.batchCode)
-    );
-
-    if (rowsToDelete.length === 0) {
-      console.warn("No rows found to delete for selected codes.");
-      return;
-    }
-
+    if (!cognitoId || selectedRows.length === 0) return;
+    const rowsToDelete = productionLogs.filter((row) => selectedRows.includes(row.batchCode));
+    if (rowsToDelete.length === 0) return;
     try {
       await Promise.all(
         rowsToDelete.map(async (row) => {
-          console.log("Deleting row with batchCode:", row.batchCode);
-          const response = await fetch(
+          const res = await fetch(
             "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-production-log",
             {
               method: "POST",
@@ -97,25 +109,21 @@ const ProductionLog = () => {
               body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
             }
           );
-          if (!response.ok) throw new Error(`Failed to delete ${row.batchCode}`);
+          if (!res.ok) throw new Error(`Failed to delete ${row.batchCode}`);
         })
       );
-
-      setProductionLogs((prev) =>
-        prev.filter((row) => !selectedRows.includes(row.batchCode))
-      );
+      setProductionLogs((prev) => prev.filter((row) => !selectedRows.includes(row.batchCode)));
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
-      console.error("Error deleting rows:", err);
+      console.error(err);
     }
   };
 
   return (
     <Box m="20px">
       <Header title="DAILY PRODUCTION" subtitle="Track daily stock produced" />
-
-      <Box sx={{ position: "relative", mb: 2, height: 2 }}>
+      <Box sx={{ position: "relative", mb: 2 }}>
         <IconButton
           onClick={() => setOpenConfirmDialog(true)}
           color="error"
@@ -159,7 +167,7 @@ const ProductionLog = () => {
             { field: "date", headerName: "Date", flex: 1, editable: true },
             { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
             { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, editable: true, align: "left" },
-            { field: "batchRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: true, align: "left" },
+            { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, editable: false, align: "left" },
             { field: "batchCode", headerName: "Batch Code", flex: 1 },
           ]}
           checkboxSelection
