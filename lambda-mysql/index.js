@@ -156,36 +156,38 @@ app.post("/api/submit", async (req, res) => {
 app.get("/api/ingredients", async (req, res) => {
   try {
     // 🔍 Canary test: make sure the pool is responsive
-    const test = await pool.query(`SELECT 1 AS ok`);
-    console.log("[Ingredients] DB ping result:", test.rows);
+    db.getConnection((pingErr, conn) => {
+      if (pingErr) {
+        console.error("[Ingredients] DB ping failed:", pingErr);
+      } else {
+        console.log("[Ingredients] DB ping OK");
+        conn.release();
+      }
+    });
 
     // fetch every distinct ingredient name
-    const { rows } = await pool.query(`
-      SELECT DISTINCT name
-        FROM user_ingredients
-      ORDER BY name
-    `);
+    const [rows] = await db
+      .promise()
+      .query(`
+        SELECT DISTINCT name
+          FROM user_ingredients
+        ORDER BY name
+      `);
 
     // return as { id, name } objects
     const ingredients = rows.map(r => ({
-      id: r.name,
+      id:   r.name,
       name: r.name,
     }));
 
     return res.json(ingredients);
-
   } catch (err) {
-    // 1) Log the full error stack
     console.error("🔥 /api/ingredients error:", err.stack || err);
-
-    // 2) Return the real message in development so the front end can see it
-    //    (In production you might want to hide this detail.)
     return res
       .status(500)
       .json({ error: err.message || "Unknown server error" });
   }
 });
-
 
 // Example root route
 app.get('/', (req, res) => {
