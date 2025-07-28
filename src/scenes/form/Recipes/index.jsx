@@ -1,12 +1,33 @@
-import { Box, Button, TextField, Grid, Snackbar, Alert, Fab, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+// src/scenes/form/RecipeForm/index.jsx
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Box,
+  TextField,
+  Grid,
+  Snackbar,
+  Alert,
+  Fab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import { Formik, FieldArray } from "formik";
 import * as yup from "yup";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from "../../../components/Header";
-import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../../contexts/AuthContext";
 
-// Metric options
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -14,49 +35,143 @@ const unitOptions = [
 ];
 
 const RecipeForm = () => {
-  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
 
-  const handleFormSubmit = async (values, { resetForm }) => {
-    if (!cognitoId) {
-      console.error("Cognito ID is missing.");
-      return;
+  // master + custom ingredient lists
+  const [masterIngredients, setMasterIngredients] = useState([]);
+  const [customIngredients, setCustomIngredients] = useState([]);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [loadingCustom, setLoadingCustom] = useState(false);
+
+  // merge for dropdown
+  const allIngredients = useMemo(
+    () => [
+      ...masterIngredients.map(i => ({ ...i, source: "master" })),
+      ...customIngredients.map(i => ({ ...i, source: "custom" }))
+    ],
+    [masterIngredients, customIngredients]
+  );
+
+  // snackbar & add‑ingredient dialog state
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newIngredient, setNewIngredient] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  // fetch global master list
+  useEffect(() => {
+    if (!cognitoId) return;
+    setLoadingMaster(true);
+    fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch ingredients");
+        return res.json();
+      })
+      .then(data => setMasterIngredients(data))
+      .catch(err => console.error("Error fetching master ingredients:", err))
+      .finally(() => setLoadingMaster(false));
+  }, [cognitoId]);
+
+  // fetch user custom list
+  useEffect(() => {
+    if (!cognitoId) return;
+    setLoadingCustom(true);
+    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch custom ingredients");
+        return res.json();
+      })
+      .then(data =>
+        setCustomIngredients(
+          data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))
+        )
+      )
+      .catch(err => console.error("Error fetching custom ingredients:", err))
+      .finally(() => setLoadingCustom(false));
+  }, [cognitoId]);
+
+  // open/close add dialog
+  const openAddDialog = () => {
+    setNewIngredient("");
+    setAddDialogOpen(true);
+  };
+  const closeAddDialog = () => setAddDialogOpen(false);
+
+  // handle adding custom ingredient
+  const handleAddIngredient = async () => {
+    if (!newIngredient.trim() || !cognitoId) return;
+    setAdding(true);
+    try {
+      const res = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredient.trim() })
+      });
+      if (!res.ok) throw new Error("Failed to add ingredient");
+      // refresh custom list
+      const updated = await fetch(
+        `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`
+      ).then(r => {
+        if (!r.ok) throw new Error("Failed to fetch updated custom");
+        return r.json();
+      });
+      setCustomIngredients(updated.map(ci => ({ id: `c-${ci.id}`, name: ci.name })));
+      closeAddDialog();
+    } catch (err) {
+      console.error("Error adding custom ingredient:", err);
+      alert("Failed to add ingredient");
+    } finally {
+      setAdding(false);
     }
+  };
 
-    const ingredients = values.ingredients.map((ing) => ing.name);
-    const quantities = values.ingredients.map((ing) => ing.quantity);
-    const units = values.ingredients.map((ing) => ing.unit);
-
+  // form submit
+  const handleFormSubmit = async (values, { resetForm }) => {
     const payload = {
       recipe: values.recipe,
       upb: values.upb,
-      ingredients,
-      quantities,
-      units,
-      cognito_id: cognitoId,
+      ingredients: values.ingredients.map(i => i.name),
+      quantities: values.ingredients.map(i => i.quantity),
+      units: values.ingredients.map(i => i.unit),
+      cognito_id: cognitoId
     };
-
     try {
-      const response = await fetch(
-        "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/add-recipe",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to add recipe");
-      await response.json();
-
+      const res = await fetch(`${API_BASE}/add-recipe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to add recipe");
+      await res.json();
       resetForm();
       setOpenSnackbar(true);
-    } catch (error) {
-      console.error("Error submitting recipe:", error);
+    } catch (err) {
+      console.error("Error submitting recipe:", err);
+      alert("Recipe submission failed");
     }
   };
 
   const handleCloseSnackbar = () => setOpenSnackbar(false);
+
+  // validation
+  const RecipeSchema = yup.object().shape({
+    recipe: yup.string().required("Recipe is required"),
+    upb: yup.number().required("Units per Batch is required").positive("Must be positive"),
+    ingredients: yup.array().of(
+      yup.object().shape({
+        name: yup.string().required("Ingredient is required"),
+        quantity: yup.number().required("Quantity is required").positive("Must be positive"),
+        unit: yup.string().required("Unit is required")
+      })
+    )
+  });
+
+  const initialValues = {
+    recipe: "",
+    upb: "",
+    ingredients: [{ name: "", quantity: "", unit: "grams" }]
+  };
 
   return (
     <Box m="20px">
@@ -67,7 +182,7 @@ const RecipeForm = () => {
         initialValues={initialValues}
         validationSchema={RecipeSchema}
       >
-        {({ values, errors, touched, handleBlur, handleChange, handleSubmit }) => (
+        {({ values, errors, touched, handleBlur, handleChange, handleSubmit, setFieldValue }) => (
           <form onSubmit={handleSubmit}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
@@ -81,7 +196,6 @@ const RecipeForm = () => {
                   onChange={handleChange}
                   error={!!(touched.recipe && errors.recipe)}
                   helperText={touched.recipe && errors.recipe}
-                  sx={{ borderRadius: "8px" }}
                 />
                 <TextField
                   fullWidth
@@ -94,7 +208,7 @@ const RecipeForm = () => {
                   onChange={handleChange}
                   error={!!(touched.upb && errors.upb)}
                   helperText={touched.upb && errors.upb}
-                  sx={{ borderRadius: "8px", mt: 3 }}
+                  sx={{ mt: 2 }}
                 />
               </Grid>
 
@@ -102,20 +216,27 @@ const RecipeForm = () => {
                 <FieldArray name="ingredients">
                   {({ push, remove }) => (
                     <>
-                      {values.ingredients.map((ingredient, index) => (
-                        <Grid container spacing={2} key={index} alignItems="center" sx={{ mt: index > 0 ? 1 : 0 }}>
+                      {values.ingredients.map((ing, idx) => (
+                        <Grid container spacing={2} key={idx} alignItems="center" sx={{ mt: idx > 0 ? 1 : 0 }}>
                           <Grid item xs={12} sm={4}>
-                            <TextField
-                              fullWidth
-                              variant="outlined"
-                              label="Ingredient"
-                              name={`ingredients.${index}.name`}
-                              value={ingredient.name}
-                              onBlur={handleBlur}
-                              onChange={handleChange}
-                              error={!!(touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name)}
-                              helperText={touched.ingredients?.[index]?.name && errors.ingredients?.[index]?.name}
-                              sx={{ borderRadius: "8px" }}
+                            <Autocomplete
+                              options={allIngredients}
+                              getOptionLabel={opt => opt.name}
+                              loading={loadingMaster || loadingCustom}
+                              value={allIngredients.find(i => i.id === ing.name) || null}
+                              onChange={(_, newVal) =>
+                                setFieldValue(`ingredients.${idx}.name`, newVal ? newVal.id : "")
+                              }
+                              renderInput={params => (
+                                <TextField
+                                  {...params}
+                                  label="Ingredient"
+                                  name={`ingredients.${idx}.name`}
+                                  onBlur={handleBlur}
+                                  error={!!(touched.ingredients?.[idx]?.name && errors.ingredients?.[idx]?.name)}
+                                  helperText={touched.ingredients?.[idx]?.name && errors.ingredients?.[idx]?.name}
+                                />
+                              )}
                             />
                           </Grid>
                           <Grid item xs={12} sm={3}>
@@ -123,23 +244,22 @@ const RecipeForm = () => {
                               fullWidth
                               variant="outlined"
                               label="Quantity"
-                              name={`ingredients.${index}.quantity`}
+                              name={`ingredients.${idx}.quantity`}
                               type="number"
-                              value={ingredient.quantity}
+                              value={ing.quantity}
                               onBlur={handleBlur}
                               onChange={handleChange}
-                              error={!!(touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity)}
-                              helperText={touched.ingredients?.[index]?.quantity && errors.ingredients?.[index]?.quantity}
-                              sx={{ borderRadius: "8px" }}
+                              error={!!(touched.ingredients?.[idx]?.quantity && errors.ingredients?.[idx]?.quantity)}
+                              helperText={touched.ingredients?.[idx]?.quantity && errors.ingredients?.[idx]?.quantity}
                             />
                           </Grid>
                           <Grid item xs={12} sm={3}>
-                            <FormControl fullWidth sx={{ borderRadius: "8px" }}>
-                              <InputLabel id={`unit-label-${index}`}>Unit</InputLabel>
+                            <FormControl fullWidth>
+                              <InputLabel id={`unit-label-${idx}`}>Unit</InputLabel>
                               <Select
-                                labelId={`unit-label-${index}`}
-                                name={`ingredients.${index}.unit`}
-                                value={ingredient.unit}
+                                labelId={`unit-label-${idx}`}
+                                name={`ingredients.${idx}.unit`}
+                                value={ing.unit}
                                 label="Unit"
                                 onChange={handleChange}
                               >
@@ -152,7 +272,7 @@ const RecipeForm = () => {
                             </FormControl>
                           </Grid>
                           <Grid item xs={12} sm={2}>
-                            <Button variant="outlined" color="error" onClick={() => remove(index)}>
+                            <Button variant="outlined" color="error" onClick={() => remove(idx)}>
                               Remove
                             </Button>
                           </Grid>
@@ -164,26 +284,25 @@ const RecipeForm = () => {
                           color="secondary"
                           variant="text"
                           onClick={() => push({ name: "", quantity: "", unit: "grams" })}
-                          sx={{ display: "inline-flex", alignItems: "center" }}
+                          sx={{ mr: 2 }}
                         >
-                          <strong style={{ marginRight: "8px" }}>+</strong> Add Ingredient
+                          + Add Recipe Row
+                        </Button>
+                        <Button size="small" onClick={openAddDialog}>
+                          Add Ingredient +
                         </Button>
                       </Box>
                     </>
                   )}
                 </FieldArray>
               </Grid>
-
-              <Box display="flex" justifyContent="flex-end" mt="20px" width="100%">
-                <Fab
-                  color="secondary"
-                  onClick={handleSubmit}
-                  sx={{ position: "fixed", bottom: "20px", right: "20px", zIndex: 10 }}
-                >
-                  <AddIcon fontSize="large" />
-                </Fab>
-              </Box>
             </Grid>
+
+            <Box display="flex" justifyContent="flex-end" mt="20px">
+              <Fab color="secondary" onClick={handleSubmit}>
+                <AddIcon fontSize="large" />
+              </Fab>
+            </Box>
           </form>
         )}
       </Formik>
@@ -193,26 +312,30 @@ const RecipeForm = () => {
           Recipe has been successfully recorded!
         </Alert>
       </Snackbar>
+
+      <Dialog open={addDialogOpen} onClose={closeAddDialog} fullWidth>
+        <DialogTitle>Add New Ingredient</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Ingredient Name"
+            fullWidth
+            value={newIngredient}
+            onChange={e => setNewIngredient(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddDialog} disabled={adding}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddIngredient} disabled={adding}>
+            {adding ? <CircularProgress size={20} /> : "Add"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
-};
-
-const RecipeSchema = yup.object().shape({
-  recipe: yup.string().required("Recipe is required"),
-  upb: yup.number().required("Units per Batch is required").positive("Must be positive"),
-  ingredients: yup.array().of(
-    yup.object().shape({
-      name: yup.string().required("Ingredient is required"),
-      quantity: yup.number().required("Quantity is required").positive("Must be positive"),
-      unit: yup.string().required("Unit is required"),
-    })
-  ),
-});
-
-const initialValues = {
-  recipe: "",
-  upb: "",
-  ingredients: [{ name: "", quantity: "", unit: "grams" }],
 };
 
 export default RecipeForm;
