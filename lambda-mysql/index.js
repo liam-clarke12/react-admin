@@ -189,19 +189,40 @@ app.get("/api/ingredients", async (req, res) => {
   }
 });
 
-app.post("/api/custom-ingredients", async (req, res) => {
-  const userId = req.user?.cognitoId;
-  const { name } = req.body;
-
+app.get("/api/custom-ingredients", async (req, res) => {
+  const userId = req.query.cognito_id;
   if (!userId) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: "Missing ingredient name" });
+    return res.status(400).json({ error: "Missing cognito_id query parameter" });
   }
 
   try {
-    // 1) Insert into custom_ingredients
+    const [rows] = await db
+      .promise()
+      .query(
+        `SELECT id, name, created_at
+           FROM custom_ingredients
+          WHERE user_id = ?
+          ORDER BY created_at DESC`,
+        [userId]
+      );
+    res.json(rows);
+  } catch (err) {
+    console.error("🔥 GET /api/custom-ingredients error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch custom ingredients" });
+  }
+});
+
+app.post("/api/custom-ingredients", async (req, res) => {
+  const { cognito_id: userId, name } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "Missing cognito_id in request body" });
+  }
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Missing or empty name in request body" });
+  }
+
+  try {
+    // Insert new custom ingredient
     await db
       .promise()
       .query(
@@ -209,12 +230,21 @@ app.post("/api/custom-ingredients", async (req, res) => {
          VALUES (?, ?)`,
         [userId, name.trim()]
       );
-      res.json(rows);
+
+    // Return updated list
+    const [rows] = await db
+      .promise()
+      .query(
+        `SELECT id, name, created_at
+           FROM custom_ingredients
+          WHERE user_id = ?
+          ORDER BY created_at DESC`,
+        [userId]
+      );
+    res.json(rows);
   } catch (err) {
     console.error("🔥 POST /api/custom-ingredients error:", err);
-    res
-      .status(500)
-      .json({ error: err.message || "Failed to add custom ingredient" });
+    res.status(500).json({ error: err.message || "Failed to add custom ingredient" });
   }
 });
 

@@ -37,13 +37,13 @@ const GoodsInForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
 
-  // Master vs custom lists
+  // master and custom ingredient lists
   const [masterIngredients, setMasterIngredients] = useState([]);
   const [customIngredients, setCustomIngredients] = useState([]);
   const [loadingMaster, setLoadingMaster] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
 
-  // Combined array for dropdown
+  // merge for dropdown
   const ingredients = useMemo(
     () => [
       ...masterIngredients.map(i => ({ ...i, source: "master" })),
@@ -52,15 +52,13 @@ const GoodsInForm = () => {
     [masterIngredients, customIngredients]
   );
 
-  // Snackbar
+  // snackbar & dialog state
   const [openSnackbar, setOpenSnackbar] = useState(false);
-
-  // Add‑ingredient dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
   const [adding, setAdding] = useState(false);
 
-  // Fetch global master list
+  // fetch global ingredients
   useEffect(() => {
     if (!cognitoId) return;
     setLoadingMaster(true);
@@ -74,7 +72,7 @@ const GoodsInForm = () => {
       .finally(() => setLoadingMaster(false));
   }, [cognitoId]);
 
-  // Fetch per‑user custom list
+  // fetch user custom ingredients
   useEffect(() => {
     if (!cognitoId) return;
     setLoadingCustom(true);
@@ -84,15 +82,13 @@ const GoodsInForm = () => {
         return res.json();
       })
       .then(data =>
-        setCustomIngredients(
-          data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))
-        )
+        setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name })))
       )
       .catch(err => console.error("Error fetching custom:", err))
       .finally(() => setLoadingCustom(false));
   }, [cognitoId]);
 
-  // Dialog handlers
+  // dialog handlers
   const openAddDialog = () => {
     setNewIngredient("");
     setAddDialogOpen(true);
@@ -103,22 +99,19 @@ const GoodsInForm = () => {
     if (!newIngredient.trim() || !cognitoId) return;
     setAdding(true);
     try {
-      const response = await fetch(
-        `${API_BASE}/custom-ingredients`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: newIngredient.trim(),
-            cognito_id: cognitoId
-          }),
-        }
-      );
-      if (!response.ok) throw new Error("Failed to add ingredient");
-      // refresh custom list only
+      const res = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredient.trim() })
+      });
+      if (!res.ok) throw new Error("Failed to add ingredient");
+      // refresh custom list
       const updated = await fetch(
         `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`
-      ).then(r => r.json());
+      ).then(r => {
+        if (!r.ok) throw new Error("Failed to fetch updated custom");
+        return r.json();
+      });
       setCustomIngredients(updated.map(ci => ({ id: `c-${ci.id}`, name: ci.name })));
       closeAddDialog();
     } catch (err) {
@@ -129,18 +122,15 @@ const GoodsInForm = () => {
     }
   };
 
-  // Form submission
+  // form submit
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
     try {
-      const res = await fetch(
-        `${API_BASE}/submit`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API_BASE}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       if (!res.ok) throw new Error("Submit failed");
       resetForm();
       setOpenSnackbar(true);
@@ -150,7 +140,7 @@ const GoodsInForm = () => {
     }
   };
 
-  // Validation schema
+  // validation
   const goodsInSchema = yup.object().shape({
     date: yup.string().required("Date is required"),
     ingredient: yup.string().required("Ingredient is required"),
@@ -164,7 +154,6 @@ const GoodsInForm = () => {
     temperature: yup.string().required("Temperature is required"),
   });
 
-  // Initial form values
   const initialValues = {
     date: new Date().toISOString().split("T")[0],
     ingredient: "",
@@ -201,9 +190,7 @@ const GoodsInForm = () => {
                 display="grid"
                 gap="30px"
                 gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                sx={{
-                  "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
-                }}
+                sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
               >
                 {/* Date */}
                 <TextField
@@ -220,7 +207,7 @@ const GoodsInForm = () => {
                   sx={{ gridColumn: "span 2" }}
                 />
 
-                {/* Ingredient dropdown */}
+                {/* Ingredient */}
                 <Box sx={{ gridColumn: "span 2" }}>
                   <Autocomplete
                     options={ingredients}
@@ -255,7 +242,7 @@ const GoodsInForm = () => {
                       />
                     )}
                   />
-                  {/* Moved the add button back outside the dropdown */}
+                  {/* Add button below dropdown */}
                   <Box textAlign="right" mt={1}>
                     <Button size="small" onClick={openAddDialog}>
                       Add Ingredient +
