@@ -14,7 +14,7 @@ export default function AccountPage() {
   const { cognitoId, userProfile, updateProfile, loading } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({
-    name: '', phone_number: '', address: ''
+    name: '', company: '', jobTitle: ''
   });
   const [avatarUrl, setAvatarUrl] = useState('');
 
@@ -22,8 +22,8 @@ export default function AccountPage() {
     if (!loading && userProfile) {
       setForm({
         name: userProfile.name || '',
-        phone_number: userProfile.phone_number || '',
-        address: userProfile.address || ''
+        company: userProfile.company || '',
+        jobTitle: userProfile.jobTitle || ''
       });
       setAvatarUrl(userProfile.picture || '');
     }
@@ -45,16 +45,16 @@ export default function AccountPage() {
     setEditMode(false);
     setForm({
       name: userProfile.name || '',
-      phone_number: userProfile.phone_number || '',
-      address: userProfile.address || ''
+      phone_number: userProfile.company || '',
+      address: userProfile.jobTitle || ''
     });
     setAvatarUrl(userProfile.picture || '');
   };
   const onSave = async () => {
     const toUpdate = {
       name: form.name,
-      phone_number: form.phone_number,
-      address: form.address
+      company: form.company,
+      jobTitle: form.jobTitle
       // picture: avatarUrl
     };
     try {
@@ -100,14 +100,14 @@ export default function AccountPage() {
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Phone Number" fullWidth value={form.phone_number}
-                onChange={onChange('phone_number')} InputProps={{ readOnly:!editMode }}
+                label="Company" fullWidth value={form.phone_number}
+                onChange={onChange('company')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Address" fullWidth multiline rows={2}
-                value={form.address} onChange={onChange('address')}
+                label="Job Title" fullWidth multiline rows={2}
+                value={form.jobTitle} onChange={onChange('jobTitle')}
                 InputProps={{ readOnly:!editMode }}
               />
             </Grid>
