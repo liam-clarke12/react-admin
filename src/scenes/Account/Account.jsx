@@ -45,8 +45,8 @@ export default function AccountPage() {
     setEditMode(false);
     setForm({
       name: userProfile.name || '',
-      phone_number: userProfile.company || '',
-      address: userProfile.jobTitle || ''
+      company: userProfile.company || '',
+      jobTitle: userProfile.jobTitle || ''
     });
     setAvatarUrl(userProfile.picture || '');
   };
@@ -100,7 +100,7 @@ export default function AccountPage() {
             </Grid>
             <Grid item xs={12}>
               <TextField
-                label="Company" fullWidth value={form.phone_number}
+                label="Company" fullWidth value={form.company}
                 onChange={onChange('company')} InputProps={{ readOnly:!editMode }}
               />
             </Grid>
