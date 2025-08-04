@@ -20,35 +20,11 @@ const RecipeInventory = () => {
   const colors = tokens(theme.palette.mode);
   const { cognitoId } = useAuth();
   const { recipeInventory, setRecipeInventory } = useData();
-  const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // 1) Fetch recipes → build recipeName → units_per_batch map
+  // Fetch and process production log
   useEffect(() => {
     if (!cognitoId) return;
-    const fetchRecipes = async () => {
-      try {
-        const res = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch recipes");
-        const data = await res.json();
-        const map = {};
-        data.forEach((r, idx) => {
-          const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
-          map[key] = Number(r.units_per_batch) || 0;
-        });
-        setRecipesMap(map);
-      } catch (err) {
-        console.error("Error fetching recipes:", err);
-      }
-    };
-    fetchRecipes();
-  }, [cognitoId]);
-
-  // 2) Once recipesMap is ready, fetch production-log, group & compute unitsInStock
-  useEffect(() => {
-    if (!cognitoId || Object.keys(recipesMap).length === 0) return;
 
     const fetchAndProcess = async () => {
       try {
@@ -59,32 +35,30 @@ const RecipeInventory = () => {
         const data = await response.json();
         if (!Array.isArray(data)) return;
 
-        // filter out any zero-remaining batches
         const filtered = data.filter((row) => Number(row.batchRemaining) > 0);
 
-        // group by recipe, summing batchRemaining
         const grouped = filtered.reduce((acc, row) => {
           const rec = row.recipe;
           const rem = Number(row.batchRemaining) || 0;
+          const waste = Number(row.units_of_waste) || 0;
           if (!acc[rec]) {
             acc[rec] = {
               date: row.date,
               recipe: rec,
-              totalBatches: rem,
+              totalUnits: rem - waste,
               batchCode: row.batchCode
             };
           } else {
-            acc[rec].totalBatches += rem;
+            acc[rec].totalUnits += rem - waste;
           }
           return acc;
         }, {});
 
-        // build final array, computing unitsInStock
         const processed = Object.values(grouped).map((g) => ({
           id: g.batchCode,
           date: g.date,
           recipe: g.recipe,
-          unitsInStock: g.totalBatches * (recipesMap[g.recipe] || 0),
+          unitsInStock: g.totalUnits,
           batchCode: g.batchCode
         }));
 
@@ -95,9 +69,8 @@ const RecipeInventory = () => {
     };
 
     fetchAndProcess();
-  }, [cognitoId, recipesMap, setRecipeInventory]);
+  }, [cognitoId, setRecipeInventory]);
 
-  // define columns — no more batchesRemaining column
   const columns = [
     { field: "date", headerName: "Date", flex: 1 },
     { field: "recipe", headerName: "Recipe Name", flex: 1 },
@@ -112,7 +85,6 @@ const RecipeInventory = () => {
     { field: "batchCode", headerName: "Batch Code", flex: 1 }
   ];
 
-  // data for the bar chart
   const barChartData = recipeInventory.map((item) => ({
     recipe: item.recipe,
     units: item.unitsInStock
