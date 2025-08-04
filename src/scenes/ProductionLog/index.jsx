@@ -64,7 +64,7 @@ const ProductionLog = () => {
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0;
-          const unitsOfWaste = Number(row.unitsOfWaste) || 0;
+          const unitsOfWaste = Number(row.units_of_waste) || 0; // ✅ Fixed here
           const upb = recipesMap[row.recipe] ?? 0;
           const unitsRemaining = (batchRemaining * upb) - unitsOfWaste;
 
