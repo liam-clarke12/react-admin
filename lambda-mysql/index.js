@@ -525,7 +525,7 @@ app.post("/api/add-production-log", async (req, res) => {
 
   console.log("📥 Received /add-production-log request:", req.body);
 
-  // ✅ Allow unitsOfWaste = 0 by using null-safe checks
+  // ✅ Validate required fields (null-safe check to allow 0)
   if (
     date == null ||
     recipe == null ||
@@ -544,7 +544,19 @@ app.post("/api/add-production-log", async (req, res) => {
     console.log("🔄 Starting database transaction...");
     await connection.beginTransaction();
 
-    // ✅ Insert into production_log table with correct column name
+    const finalUnitsOfWaste = Number(unitsOfWaste); // Make sure it's a number
+
+    console.log("📤 Insert values:", {
+      date,
+      recipe,
+      batchesProduced,
+      batchRemaining: batchesProduced,
+      batchCode,
+      user_id: cognito_id,
+      units_of_waste: finalUnitsOfWaste
+    });
+
+    // ✅ Insert into production_log table
     const productionLogQuery = `
       INSERT INTO production_log 
         (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
@@ -555,15 +567,15 @@ app.post("/api/add-production-log", async (req, res) => {
       date,
       recipe,
       batchesProduced,
-      batchesProduced, // Assuming batchRemaining = batchesProduced initially
+      batchesProduced, // Assuming batchRemaining = batchesProduced
       batchCode,
       cognito_id,
-      unitsOfWaste
+      finalUnitsOfWaste
     ]);
 
     console.log("✅ Inserted production_log ID:", productionLogResult.insertId);
 
-    // 🔎 Get recipe ID
+    // 🔍 Get recipe ID
     const [recipeRows] = await connection.execute(
       `SELECT id FROM recipes WHERE recipe_name = ?`,
       [recipe]
@@ -649,7 +661,6 @@ app.post("/api/add-production-log", async (req, res) => {
     connection.release();
   }
 });
-
 
 app.get("/api/production-log", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
