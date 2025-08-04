@@ -858,7 +858,7 @@ app.post("/api/add-goods-out", async (req, res) => {
     console.log(`Units per batch for '${recipe}':`, unitsPerBatch);
 
     // Compute how many batches to deduct
-    const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
+    const batchesToDeduct = Math.ceil(Number(stockAmount));
     console.log(
       `Stock amount ${stockAmount} yields ${batchesToDeduct} batch(es) to deduct`
     );
