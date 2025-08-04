@@ -25,7 +25,7 @@ const ProductionLog = () => {
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
-  // Fetch recipes to build a map of recipeName -> units_per_batch
+  // Fetch recipe data
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
@@ -49,10 +49,9 @@ const ProductionLog = () => {
     fetchRecipeData();
   }, [cognitoId]);
 
-  // Fetch production logs and compute unitsRemaining
+  // Fetch production logs and compute updated fields
   useEffect(() => {
-    if (!cognitoId) return;
-    if (Object.keys(recipesMap).length === 0) return;
+    if (!cognitoId || Object.keys(recipesMap).length === 0) return;
     const fetchProductionLogData = async () => {
       try {
         const response = await fetch(
@@ -65,23 +64,28 @@ const ProductionLog = () => {
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0;
+          const unitsOfWaste = Number(row.unitsOfWaste) || 0;
           const upb = recipesMap[row.recipe] ?? 0;
-          const unitsRemaining = batchRemaining * upb;
+          const unitsRemaining = (batchRemaining * upb) - unitsOfWaste;
+
           return {
             date: row.date,
             recipe: row.recipe,
             batchesProduced,
             batchRemaining,
+            unitsOfWaste,
             unitsRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
-            id: row.batchCode || `gen-${idx}-${Date.now()}`,
+            id: row.batchCode || `gen-${idx}-${Date.now()}`
           };
         });
+
         setProductionLogs(sanitized);
       } catch (error) {
         console.error("Error fetching production log:", error);
       }
     };
+
     fetchProductionLogData();
   }, [cognitoId, recipesMap]);
 
@@ -93,6 +97,7 @@ const ProductionLog = () => {
     if (!cognitoId || selectedRows.length === 0) return;
     const rowsToDelete = productionLogs.filter((row) => selectedRows.includes(row.batchCode));
     if (rowsToDelete.length === 0) return;
+
     try {
       await Promise.all(
         rowsToDelete.map(async (row) => {
@@ -101,15 +106,13 @@ const ProductionLog = () => {
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
+              body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId })
             }
           );
           if (!res.ok) throw new Error(`Failed to delete ${row.batchCode}`);
         })
       );
-      setProductionLogs((prev) =>
-        prev.filter((row) => !selectedRows.includes(row.batchCode))
-      );
+      setProductionLogs((prev) => prev.filter((row) => !selectedRows.includes(row.batchCode)));
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
@@ -120,6 +123,7 @@ const ProductionLog = () => {
   return (
     <Box m="20px">
       <Header title="DAILY PRODUCTION" subtitle="Track daily stock produced" />
+
       <Box sx={{ position: "relative", mb: 2 }}>
         <IconButton
           onClick={() => setOpenConfirmDialog(true)}
@@ -162,7 +166,7 @@ const ProductionLog = () => {
         height="75vh"
         sx={{
           overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+          "& .MuiDataGrid-root": { border: "none", minWidth: "750px" },
           "& .MuiDataGrid-cell": { borderBottom: "none" },
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: colors.blueAccent[700],
@@ -183,14 +187,21 @@ const ProductionLog = () => {
           checkboxSelection
           onRowSelectionModelChange={handleRowSelection}
           columns={[
-            { field: "date", headerName: "Date", flex: 1, editable: true },
-            { field: "recipe", headerName: "Recipe Name", flex: 1, editable: true },
+            { field: "date", headerName: "Date", flex: 1 },
+            { field: "recipe", headerName: "Recipe Name", flex: 1 },
             {
               field: "batchesProduced",
               headerName: "Batches Produced",
               type: "number",
               flex: 1,
-              editable: true,
+              align: "left",
+              headerAlign: "left"
+            },
+            {
+              field: "unitsOfWaste",
+              headerName: "Units of Waste",
+              type: "number",
+              flex: 1,
               align: "left",
               headerAlign: "left"
             },

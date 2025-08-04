@@ -514,12 +514,12 @@ app.post('/dev/api/add-user', async (req, res) => {
 });
 
 app.post("/api/add-production-log", async (req, res) => {
-  const { date, recipe, batchesProduced, batchCode, cognito_id } = req.body;
+  const { date, recipe, batchesProduced, batchCode, unitsOfWaste, cognito_id } = req.body;
 
   console.log("Received /add-production-log request with:", req.body);
 
   // Validate input fields
-  if (!date || !recipe || !batchesProduced || !batchCode || !cognito_id) {
+  if (!date || !recipe || !batchesProduced || !batchCode || !unitsOfWaste || !cognito_id) {
     console.error("Missing fields in request:", req.body);
     return res.status(400).json({ error: "All fields are required, including cognito_id" });
   }
@@ -531,8 +531,8 @@ app.post("/api/add-production-log", async (req, res) => {
 
     // Insert into production_log table
     const productionLogQuery = `
-      INSERT INTO production_log (date, recipe, batchesProduced, batchRemaining, batchCode, user_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO production_log (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, unitsOfWaste)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     const [productionLogResult] = await connection.execute(productionLogQuery, [
       date,
@@ -541,6 +541,7 @@ app.post("/api/add-production-log", async (req, res) => {
       batchesProduced,  // Assuming batchRemaining is the same as batchesProduced initially
       batchCode,
       cognito_id,
+      unitsOfWaste
     ]);
 
     console.log("Inserted into production_log. ID:", productionLogResult.insertId);
