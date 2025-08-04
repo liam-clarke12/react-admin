@@ -108,12 +108,6 @@ const GoodsIn = () => {
       editable: true,
     },
     {
-      field: "expiryDate",
-      headerName: "Expiry Date",
-      flex: 1,
-      editable: true,
-    },
-    {
       field: "barCode",
       headerName: "Bar Code",
       flex: 1,
