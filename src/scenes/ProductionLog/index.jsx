@@ -66,7 +66,7 @@ const ProductionLog = () => {
           const batchRemaining = Number(row.batchRemaining) || 0;
           const unitsOfWaste = Number(row.units_of_waste) || 0; // ✅ Fixed here
           const upb = recipesMap[row.recipe] ?? 0;
-          const unitsRemaining = (batchRemaining * upb) - unitsOfWaste;
+          const unitsRemaining = Number(row.batchRemaining) - unitsOfWaste;
 
           return {
             date: row.date,

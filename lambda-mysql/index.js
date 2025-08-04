@@ -525,7 +525,6 @@ app.post("/api/add-production-log", async (req, res) => {
 
   console.log("📥 Received /add-production-log request:", req.body);
 
-  // ✅ Validate required fields (null-safe check to allow 0)
   if (
     date == null ||
     recipe == null ||
@@ -544,19 +543,33 @@ app.post("/api/add-production-log", async (req, res) => {
     console.log("🔄 Starting database transaction...");
     await connection.beginTransaction();
 
-    const finalUnitsOfWaste = Number(unitsOfWaste); // Make sure it's a number
+    // 🔍 Fetch units_per_batch from recipes table
+    const [recipeRows] = await connection.execute(
+      `SELECT id, units_per_batch FROM recipes WHERE recipe_name = ?`,
+      [recipe]
+    );
 
-    console.log("📤 Insert values:", {
+    if (recipeRows.length === 0) {
+      console.error(`❌ Recipe not found: ${recipe}`);
+      return res.status(400).json({ error: "Recipe not found" });
+    }
+
+    const recipeId = recipeRows[0].id;
+    const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
+    const batchRemaining = batchesProduced * unitsPerBatch;
+    const finalUnitsOfWaste = Number(unitsOfWaste);
+
+    console.log("📤 Inserting with values:", {
       date,
       recipe,
       batchesProduced,
-      batchRemaining: batchesProduced,
+      batchRemaining,
       batchCode,
       user_id: cognito_id,
       units_of_waste: finalUnitsOfWaste
     });
 
-    // ✅ Insert into production_log table
+    // ✅ Insert into production_log
     const productionLogQuery = `
       INSERT INTO production_log 
         (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
@@ -567,27 +580,13 @@ app.post("/api/add-production-log", async (req, res) => {
       date,
       recipe,
       batchesProduced,
-      batchesProduced, // Assuming batchRemaining = batchesProduced
+      batchRemaining,
       batchCode,
       cognito_id,
       finalUnitsOfWaste
     ]);
 
     console.log("✅ Inserted production_log ID:", productionLogResult.insertId);
-
-    // 🔍 Get recipe ID
-    const [recipeRows] = await connection.execute(
-      `SELECT id FROM recipes WHERE recipe_name = ?`,
-      [recipe]
-    );
-
-    if (recipeRows.length === 0) {
-      console.error(`❌ Recipe not found: ${recipe}`);
-      return res.status(400).json({ error: "Recipe not found" });
-    }
-
-    const recipeId = recipeRows[0].id;
-    console.log(`🔗 Found recipe ID: ${recipeId}`);
 
     // 🔄 Get ingredients for recipe
     const ingredientsQuery = `
@@ -600,8 +599,6 @@ app.post("/api/add-production-log", async (req, res) => {
       batchesProduced,
       recipeId
     ]);
-
-    console.log("📦 Ingredients required:", ingredients);
 
     if (ingredients.length === 0) {
       console.error("❌ No ingredients found for recipe ID:", recipeId);
@@ -628,16 +625,16 @@ app.post("/api/add-production-log", async (req, res) => {
           break;
         }
 
-        const { id: goodsInId, stockRemaining, barCode } = stockRows[0];
+        const { id: goodsInId, stockRemaining } = stockRows[0];
         const deduction = Math.min(amountNeeded, stockRemaining);
 
-        // 💥 Deduct stock
+        // Deduct stock
         await connection.execute(
           `UPDATE goods_in SET stockRemaining = stockRemaining - ? WHERE id = ?`,
           [deduction, goodsInId]
         );
 
-        // 📝 Track usage
+        // Track usage
         await connection.execute(
           `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
            VALUES (?, ?, ?)`,
@@ -648,7 +645,6 @@ app.post("/api/add-production-log", async (req, res) => {
       }
     }
 
-    // ✅ Commit transaction
     await connection.commit();
     console.log("✅ Transaction committed.");
     res.status(200).json({ message: "Production log saved successfully", id: productionLogResult.insertId });
