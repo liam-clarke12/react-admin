@@ -531,7 +531,7 @@ app.post("/api/add-production-log", async (req, res) => {
 
     // Insert into production_log table
     const productionLogQuery = `
-      INSERT INTO production_log (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, unitsOfWaste)
+      INSERT INTO production_log (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     const [productionLogResult] = await connection.execute(productionLogQuery, [
