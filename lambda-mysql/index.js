@@ -514,53 +514,70 @@ app.post('/dev/api/add-user', async (req, res) => {
 });
 
 app.post("/api/add-production-log", async (req, res) => {
-  const { date, recipe, batchesProduced, batchCode, unitsOfWaste, cognito_id } = req.body;
+  const {
+    date,
+    recipe,
+    batchesProduced,
+    batchCode,
+    unitsOfWaste,
+    cognito_id
+  } = req.body;
 
-  console.log("Received /add-production-log request with:", req.body);
+  console.log("📥 Received /add-production-log request:", req.body);
 
-  // Validate input fields
-  if (!date || !recipe || !batchesProduced || !batchCode || !unitsOfWaste || !cognito_id) {
-    console.error("Missing fields in request:", req.body);
+  // ✅ Allow unitsOfWaste = 0 by using null-safe checks
+  if (
+    date == null ||
+    recipe == null ||
+    batchesProduced == null ||
+    batchCode == null ||
+    unitsOfWaste == null ||
+    cognito_id == null
+  ) {
+    console.error("❌ Missing fields in request:", req.body);
     return res.status(400).json({ error: "All fields are required, including cognito_id" });
   }
 
   const connection = await db.promise().getConnection();
+
   try {
-    console.log("Starting database transaction...");
+    console.log("🔄 Starting database transaction...");
     await connection.beginTransaction();
 
-    // Insert into production_log table
+    // ✅ Insert into production_log table with correct column name
     const productionLogQuery = `
-      INSERT INTO production_log (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
+      INSERT INTO production_log 
+        (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
+
     const [productionLogResult] = await connection.execute(productionLogQuery, [
       date,
       recipe,
       batchesProduced,
-      batchesProduced,  // Assuming batchRemaining is the same as batchesProduced initially
+      batchesProduced, // Assuming batchRemaining = batchesProduced initially
       batchCode,
       cognito_id,
       unitsOfWaste
     ]);
 
-    console.log("Inserted into production_log. ID:", productionLogResult.insertId);
+    console.log("✅ Inserted production_log ID:", productionLogResult.insertId);
 
-    // Retrieve recipe ID from recipe name
+    // 🔎 Get recipe ID
     const [recipeRows] = await connection.execute(
       `SELECT id FROM recipes WHERE recipe_name = ?`,
       [recipe]
     );
 
     if (recipeRows.length === 0) {
-      console.error(`Recipe not found: ${recipe}`);
+      console.error(`❌ Recipe not found: ${recipe}`);
       return res.status(400).json({ error: "Recipe not found" });
     }
 
     const recipeId = recipeRows[0].id;
-    console.log(`Recipe ID for "${recipe}": ${recipeId}`);
+    console.log(`🔗 Found recipe ID: ${recipeId}`);
 
-    // Retrieve ingredients for the recipe
+    // 🔄 Get ingredients for recipe
     const ingredientsQuery = `
       SELECT i.id AS ingredient_id, i.ingredient_name, ri.quantity * ? AS total_needed
       FROM recipe_ingredients ri
@@ -569,73 +586,70 @@ app.post("/api/add-production-log", async (req, res) => {
     `;
     const [ingredients] = await connection.execute(ingredientsQuery, [
       batchesProduced,
-      recipeId,
+      recipeId
     ]);
 
-    console.log("Ingredients required for the recipe:", ingredients);
+    console.log("📦 Ingredients required:", ingredients);
 
     if (ingredients.length === 0) {
-      console.error("No ingredients found for recipe ID:", recipeId);
+      console.error("❌ No ingredients found for recipe ID:", recipeId);
       return res.status(400).json({ error: "No ingredients found for this recipe" });
     }
 
-    // Deduct stock from goods_in and track barcodes
-    console.log("Starting stock deduction from goods_in...");
+    // 📉 Deduct stock from goods_in
+    console.log("🔁 Deducting stock from goods_in...");
     for (const ingredient of ingredients) {
       let amountNeeded = ingredient.total_needed;
-      console.log(`Processing ingredient: ${ingredient.ingredient_name} with total needed: ${amountNeeded}`);
+      console.log(`▶ Processing ${ingredient.ingredient_name}: ${amountNeeded} needed`);
 
       while (amountNeeded > 0) {
-        // Query to match ingredient name in goods_in
         const [stockRows] = await connection.execute(
           `SELECT gi.id, gi.stockRemaining, gi.barCode
            FROM goods_in gi
            WHERE gi.ingredient = ? AND gi.stockRemaining > 0
            ORDER BY gi.id ASC LIMIT 1`,
-          [ingredient.ingredient_name]  // Use ingredient_name to find the correct stock entry
+          [ingredient.ingredient_name]
         );
-
-        console.log("Stock rows retrieved:", stockRows);
 
         if (stockRows.length === 0) {
-          console.warn(`Not enough stock for ingredient ${ingredient.ingredient_name}. Needed ${amountNeeded}.`);
-          break;  // Exit the while loop if there's not enough stock
+          console.warn(`⚠ Not enough stock for ${ingredient.ingredient_name}. Remaining: ${amountNeeded}`);
+          break;
         }
 
-        const { id: goodsInId, stockRemaining, barCode } = stockRows[0]; // Get the ID of the stock entry
+        const { id: goodsInId, stockRemaining, barCode } = stockRows[0];
         const deduction = Math.min(amountNeeded, stockRemaining);
-        console.log(`Deducting ${deduction} units from stock (ID: ${goodsInId}).`);
 
-        // Deduct stock
+        // 💥 Deduct stock
         await connection.execute(
           `UPDATE goods_in SET stockRemaining = stockRemaining - ? WHERE id = ?`,
-          [deduction, goodsInId]  // Deduct from the specific goods_in entry
+          [deduction, goodsInId]
         );
 
-        // Insert stock usage record
-        console.log(`Inserting into stock_usage: production_log_id=${productionLogResult.insertId}, goods_in_id=${goodsInId}, user_id=${cognito_id}`);
+        // 📝 Track usage
         await connection.execute(
           `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
            VALUES (?, ?, ?)`,
           [productionLogResult.insertId, goodsInId, cognito_id]
         );
 
-        console.log(`amountNeeded before: ${amountNeeded}`);
         amountNeeded -= deduction;
-        console.log(`amountNeeded after: ${amountNeeded}`);
       }
     }
 
+    // ✅ Commit transaction
     await connection.commit();
+    console.log("✅ Transaction committed.");
     res.status(200).json({ message: "Production log saved successfully", id: productionLogResult.insertId });
+
   } catch (err) {
     await connection.rollback();
-    console.error("Error processing transaction:", err);
+    console.error("❌ Error in transaction:", err);
     res.status(500).json({ error: err.message });
   } finally {
     connection.release();
   }
 });
+
 
 app.get("/api/production-log", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
