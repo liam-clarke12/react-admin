@@ -1015,6 +1015,88 @@ app.get('/dev/health', (req, res) => {
   });
 });
 
+// ─── Update a goods_in row ─────────────────────────────────────────────────────
+app.put("/api/goods-in/:barCode", async (req, res) => {
+  const { barCode } = req.params;
+  const {
+    date,
+    ingredient,
+    stockReceived,
+    stockRemaining,
+    unit,
+    expiryDate,
+    temperature,
+    cognito_id
+  } = req.body;
+
+  // Basic validation
+  if (
+    !barCode ||
+    !cognito_id ||
+    !date ||
+    !ingredient ||
+    stockReceived  == null ||
+    stockRemaining == null ||
+    !unit ||
+    !expiryDate    ||
+    temperature    == null
+  ) {
+    return res.status(400).json({
+      error: "barCode, cognito_id and all fields (date, ingredient, stockReceived, stockRemaining, unit, expiryDate, temperature) are required"
+    });
+  }
+
+  try {
+    const [result] = await db
+      .promise()
+      .execute(
+        `UPDATE goods_in
+            SET date           = ?,
+                ingredient     = ?,
+                stockReceived  = ?,
+                stockRemaining = ?,
+                unit           = ?,
+                expiryDate     = ?,
+                temperature    = ?
+          WHERE barCode = ?
+            AND user_id = ?`,
+        [
+          date,
+          ingredient,
+          stockReceived,
+          stockRemaining,
+          unit,
+          expiryDate,
+          temperature,
+          barCode,
+          cognito_id
+        ]
+      );
+
+    if (result.affectedRows === 0) {
+      return res
+        .status(404)
+        .json({ error: "No matching goods_in row found for that barCode/user" });
+    }
+
+    // Optionally: fetch and return the updated row
+    const [[updatedRow]] = await db
+      .promise()
+      .query(
+        `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ?`,
+        [barCode, cognito_id]
+      );
+
+    res.json({ success: true, updated: updatedRow });
+  } catch (err) {
+    console.error("Failed to update goods_in row:", err);
+    res.status(500).json({
+      error: "Database error updating goods_in row",
+      details: err.message
+    });
+  }
+});
+
 app.use((req, res) => {
   console.error('404 Not Found:', {
     method: req.method,
