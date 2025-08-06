@@ -14,7 +14,7 @@ import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useAuth } from "../../contexts/AuthContext"; // Import the useAuth hook
+import { useAuth } from "../../contexts/AuthContext";
 
 const GoodsIn = () => {
   const theme = useTheme();
@@ -91,7 +91,7 @@ const GoodsIn = () => {
       headerName: "Bar Code",
       flex: 1,
       cellClassName: "barCode-column--cell",
-      editable: false, // barCode should not be edited
+      editable: false,
     },
     { field: "processed", headerName: "Processed", flex: 1, editable: false },
     {
@@ -116,14 +116,12 @@ const GoodsIn = () => {
     },
   ];
 
-  // Persist both frontend and backend update
   const processRowUpdate = async (newRow) => {
     const updatedRow = {
       ...newRow,
       processed: newRow.stockRemaining === 0 ? "Yes" : "No",
     };
 
-    // Send to backend
     try {
       const response = await fetch(
         `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in/${encodeURIComponent(
@@ -149,11 +147,9 @@ const GoodsIn = () => {
       }
     } catch (error) {
       console.error('Backend update error:', error);
-      // Optionally: rollback local change or show notification
-      throw error; // Let DataGrid know update failed
+      throw error;
     }
 
-    // Update local state
     setGoodsInRows((prevRows) => {
       const updatedRows = prevRows.map((row) =>
         row.id === updatedRow.id ? updatedRow : row
@@ -214,10 +210,7 @@ const GoodsIn = () => {
   return (
     <Box m="20px">
       <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
-
-      {/* Delete button and confirmation dialog */}
-      {/* ...omitted for brevity; unchanged... */}
-
+      {/* Delete button and confirmation dialog (unchanged) */}
       <Box
         m="40px 0 0 0"
         sx={{
@@ -247,6 +240,8 @@ const GoodsIn = () => {
           pageSize={5}
           rowsPerPageOptions={[5]}
           checkboxSelection
+          editMode="row"
+          experimentalFeatures={{ newEditingApi: true }}
           onSelectionModelChange={(newSelection) =>
             setSelectedRows(newSelection.selectionModel)
           }
