@@ -1,31 +1,41 @@
 // src/scenes/inventory/IngredientsInventory.jsx
-import { 
-  Box, 
-  useTheme, 
-  Drawer, 
-  Typography, 
-  IconButton, 
-  Snackbar, 
-  useMediaQuery 
+import {
+  Box,
+  Drawer,
+  Typography,
+  IconButton,
+  Snackbar,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
-import { tokens } from "../../themes";
-import Header from "../../components/Header";
 import { useData } from "../../contexts/DataContext";
 import BarChart from "../../components/BarChart";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import { useState, useEffect } from "react";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+
+/** Nory-like brand tokens */
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
 
 const IngredientsInventory = () => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { ingredientInventory, setIngredientInventory } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage] = useState('');
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [snackbarMessage] = useState("");
   const { cognitoId } = useAuth();
 
   useEffect(() => {
@@ -50,11 +60,18 @@ const IngredientsInventory = () => {
   const aggregateByIngredient = (rows) => {
     const map = {};
     rows.forEach(({ ingredient, stockRemaining, barCode, unit, id }) => {
-      if (stockRemaining <= 0) return;
+      if (Number(stockRemaining) <= 0) return;
       if (!map[ingredient]) {
-        map[ingredient] = { ingredient, stockOnHand: 0, barcode: barCode, unit, firstId: id };
+        map[ingredient] = {
+          ingredient,
+          stockOnHand: 0,
+          barcode: barCode,
+          unit,
+          firstId: id,
+        };
       }
       map[ingredient].stockOnHand += Number(stockRemaining);
+      // keep earliest as representative
       if (id < map[ingredient].firstId) {
         map[ingredient].firstId = id;
         map[ingredient].barcode = barCode;
@@ -64,120 +81,156 @@ const IngredientsInventory = () => {
     return Object.values(map).map(({ firstId, ...item }) => item);
   };
 
-  const columns = [
-    { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
-    { field: "stockOnHand", headerName: "Stock on Hand", flex: 1, editable: false },
-    { field: "unit", headerName: "Unit", flex: 1, editable: false },
-    { 
-      field: "barcode", 
-      headerName: "Barcode", 
-      flex: 1, 
-      cellClassName: "barCode-column--cell", 
-      editable: false 
-    },
-  ];
+  const columns = useMemo(
+    () => [
+      { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
+      { field: "stockOnHand", headerName: "Stock on Hand", flex: 1, editable: false },
+      { field: "unit", headerName: "Unit", flex: 1, editable: false },
+      {
+        field: "barcode",
+        headerName: "Barcode",
+        flex: 1,
+        cellClassName: "barCode-column--cell",
+        editable: false,
+      },
+    ],
+    []
+  );
 
-  const barChartData = ingredientInventory.map(item => ({
+  const barChartData = ingredientInventory.map((item) => ({
     ingredient: item.ingredient,
-    amount: item.stockOnHand
+    amount: item.stockOnHand,
   }));
 
   return (
     <Box m="20px">
-      <Header title="INGREDIENT INVENTORY" subtitle="Stay on Top of your Stock Levels" />
+      {/* Scoped refinements */}
+      <style>{`
+        .inv-card {
+          border: 1px solid ${brand.border};
+          background: ${brand.surface};
+          border-radius: 16px;
+          box-shadow: ${brand.shadow};
+          overflow: hidden;
+        }
+        .inv-toolbar {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; border-bottom: 1px solid ${brand.border}; background: ${brand.surface};
+        }
+        .pill-icon {
+          background: #f1f5f9;
+          border: 1px solid ${brand.border};
+          width: 40px; height: 40px; border-radius: 999px;
+        }
+        .pill-icon:hover { background: #e2e8f0; }
+      `}</style>
 
-      {/* Bar Chart toggle */}
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <IconButton
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open Bar Chart"
+      <Box className="inv-card" mt={2}>
+        {/* Toolbar with Bar Chart toggle */}
+        <Box className="inv-toolbar">
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>
+            Inventory Table
+          </Typography>
+          <IconButton
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open Bar Chart"
+            className="pill-icon"
+            sx={{ color: brand.text }}
+          >
+            <BarChartOutlinedIcon />
+          </IconButton>
+        </Box>
+
+        {/* DataGrid */}
+        <Box
           sx={{
-            color: colors.blueAccent[300],
-            "&:hover": { backgroundColor: "transparent", color: colors.blueAccent[700] }
+            height: "70vh",
+            "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#fbfcfd",
+              color: brand.subtext,
+              borderBottom: `1px solid ${brand.border}`,
+              fontWeight: 800,
+            },
+            "& .MuiDataGrid-columnSeparator": { display: "none" },
+            "& .MuiDataGrid-cell": {
+              borderBottom: `1px solid ${brand.border}`,
+              color: brand.text,
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: brand.surfaceMuted,
+            },
+            "& .MuiDataGrid-footerContainer": {
+              borderTop: `1px solid ${brand.border}`,
+              background: brand.surface,
+            },
+            "& .barCode-column--cell": { color: brand.primary },
           }}
         >
-          <BarChartOutlinedIcon />
-        </IconButton>
+          <DataGrid
+            autoHeight={false}
+            getRowId={(row) => row.ingredient}
+            rows={ingredientInventory}
+            columns={columns}
+            pageSize={10}
+            rowsPerPageOptions={[5, 10, 20]}
+          />
+        </Box>
       </Box>
 
-      {/* Styled DataGrid */}
-      <Box
-        m="40px 0 0 0"
-        sx={{
-          height: "75vh",
-          overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .barCode-column--cell": { color: colors.blueAccent[300] },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-          },
-          "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-          "& .MuiDataGrid-footerContainer": {
-            backgroundColor: colors.blueAccent[700],
-            borderTop: "none",
-          },
-        }}
-      >
-        <DataGrid
-          autoHeight
-          checkboxSelection={false}
-          getRowId={(row) => row.ingredient}
-          rows={ingredientInventory}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[5, 10, 20]}
-        />
-      </Box>
-
-      {/* Drawer for Bar Chart */}
+      {/* Drawer with Bar Chart */}
       <Drawer
         anchor={isMobile ? "bottom" : "right"}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
-          sx: { width: isMobile ? "100%" : "90%", borderRadius: "20px 0 0 20px" },
+          sx: {
+            width: isMobile ? "100%" : "88%",
+            borderRadius: isMobile ? "20px 20px 0 0" : "20px 0 0 20px",
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+            overflow: "hidden",
+          },
         }}
       >
-        <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
-          <Box
-            sx={{
-              width: "100%",
-              height: "50px",
-              backgroundColor: colors.greenAccent[500],
-              color: colors.grey[100],
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-              padding: "0 10px",
-            }}
-          >
-            <IconButton 
-              onClick={() => setDrawerOpen(false)} 
-              sx={{ color: "white", position: "absolute", left: 10 }}
-            >
-              <MenuOutlinedIcon />
-            </IconButton>
-            <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
-              Bar Chart
-            </Typography>
-          </Box>
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            sx={{ width: "100%", height: "70%", mt: 2 }}
-          >
-            <BarChart
-              data={barChartData}
-              keys={["amount"]}
-              indexBy="ingredient"
-              height="500px"
-              width="90%"
-            />
-          </Box>
+        {/* Drawer header */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1.25,
+            color: "#fff",
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+          }}
+        >
+          <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "#fff" }}>
+            <MenuOutlinedIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+            Bar Chart
+          </Typography>
+        </Box>
+
+        {/* Drawer body */}
+        <Box
+          sx={{
+            background: brand.surface,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            px: 2,
+            py: 3,
+          }}
+        >
+          <BarChart
+            data={barChartData}
+            keys={["amount"]}
+            indexBy="ingredient"
+            height="500px"
+            width="95%"
+          />
         </Box>
       </Drawer>
 

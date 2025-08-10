@@ -11,7 +11,6 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import Header from "../../components/Header";
 import { tokens } from "../../themes";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useMemo, useState } from "react";
@@ -271,7 +270,6 @@ const GoodsIn = () => {
 
   return (
     <Box m="20px">
-      <Header title="GOODS IN" subtitle="Track the Goods coming into your Business" />
 
       {/* Card container */}
       <Box
