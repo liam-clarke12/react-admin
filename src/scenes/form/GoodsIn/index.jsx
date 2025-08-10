@@ -23,7 +23,6 @@ import Autocomplete from "@mui/material/Autocomplete";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import Header from "../../components/Header";
 import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../../contexts/AuthContext";
 
