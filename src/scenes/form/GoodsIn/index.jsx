@@ -25,7 +25,7 @@ import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from "../../components/Header";
 import AddIcon from "@mui/icons-material/Add";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -230,8 +230,6 @@ const GoodsInForm = () => {
 
   return (
     <Box m="20px">
-      <Header title="GOODS IN" subtitle="Record Stock Movement (Goods In)" />
-
       {/* Card container for a clean, app-like surface */}
       <Paper
         elevation={0}
