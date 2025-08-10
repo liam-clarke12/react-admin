@@ -1,9 +1,18 @@
-// src/scenes/goodsout/GoodsOut.jsx  (adjust the path/name to your project)
+// src/scenes/goodsout/GoodsOut.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Drawer, Typography, IconButton } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import {
+  Box,
+  Drawer,
+  Typography,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Nory-like brand tokens (scoped so theme overrides won’t fight these) */
@@ -20,14 +29,13 @@ const brand = {
 };
 
 const GoodsOut = () => {
-  const theme = useTheme();
   const { cognitoId } = useAuth();
 
   const [goodsOut, setGoodsOut] = useState([]);
   const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerContent, setDrawerContent] = useState([]);
+  const [drawerItems, setDrawerItems] = useState([]); // array of "CODE: 1,234 units"
 
   // 1) Fetch recipes → build recipeName → units_per_batch map
   useEffect(() => {
@@ -82,13 +90,13 @@ const GoodsOut = () => {
       });
 
       setDrawerHeader(header);
-      setDrawerContent(items);
+      setDrawerItems(items);
       setDrawerOpen(true);
       return;
     }
 
     setDrawerHeader(header);
-    setDrawerContent(["No data available"]);
+    setDrawerItems([]);
     setDrawerOpen(true);
   };
 
@@ -173,6 +181,7 @@ const GoodsOut = () => {
           background: ${brand.surface};
         }
       `}</style>
+
       <Box className="go-card" mt={2}>
         {/* Toolbar */}
         <Box className="go-toolbar">
@@ -220,14 +229,14 @@ const GoodsOut = () => {
         </Box>
       </Box>
 
-      {/* Drawer for batchcodes */}
+      {/* Drawer — minimal style checklist with units pill */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={handleDrawerClose}
         PaperProps={{
           sx: {
-            width: 320,
+            width: 360,
             borderRadius: "20px 0 0 20px",
             border: `1px solid ${brand.border}`,
             boxShadow: brand.shadow,
@@ -235,7 +244,7 @@ const GoodsOut = () => {
           },
         }}
       >
-        {/* Drawer header (gradient) */}
+        {/* Gradient header */}
         <Box
           sx={{
             display: "flex",
@@ -255,15 +264,71 @@ const GoodsOut = () => {
           </Typography>
         </Box>
 
-        {/* Drawer content */}
-        <Box p={2} sx={{ background: brand.surface }}>
-          <ul style={{ margin: 0, paddingInlineStart: 18 }}>
-            {drawerContent.map((item, index) => (
-              <li key={index} style={{ color: brand.text, marginBottom: 6 }}>
-                {item}
-              </li>
-            ))}
-          </ul>
+        {/* Drawer content: zebra rows, tick icon, units pill on the right */}
+        <Box sx={{ background: brand.surface, p: 2 }}>
+          {drawerItems.length === 0 ? (
+            <Typography sx={{ color: brand.subtext, px: 1 }}>
+              No data available
+            </Typography>
+          ) : (
+            <List disablePadding>
+              {drawerItems.map((raw, idx) => {
+                let code = raw;
+                let pill = null;
+                if (typeof raw === "string" && raw.includes(":")) {
+                  const [left, right] = raw.split(":");
+                  code = left.trim();
+                  pill = (right || "").trim();
+                }
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${brand.border}`,
+                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
+                      mb: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <ListItem
+                      secondaryAction={
+                        pill ? (
+                          <Box
+                            component="span"
+                            sx={{
+                              borderRadius: 999,
+                              border: `1px solid ${brand.border}`,
+                              background: "#f1f5f9",
+                              px: 1.25,
+                              py: 0.25,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: brand.text,
+                              maxWidth: 180,
+                              textAlign: "right",
+                            }}
+                          >
+                            {pill}
+                          </Box>
+                        ) : null
+                      }
+                    >
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <CheckRoundedIcon sx={{ color: brand.primary }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={code}
+                        primaryTypographyProps={{
+                          sx: { color: brand.text, fontWeight: 600 },
+                        }}
+                      />
+                    </ListItem>
+                  </Box>
+                );
+              })}
+            </List>
+          )}
         </Box>
       </Drawer>
     </Box>

@@ -1,4 +1,4 @@
-// src/scenes/usage/StockUsage.jsx  (adjust the path to your structure)
+// src/scenes/usage/StockUsage.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
@@ -6,11 +6,15 @@ import {
   Typography,
   IconButton,
   Button,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
 
@@ -33,13 +37,11 @@ const StockUsage = () => {
   const [stockUsage, setStockUsage] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerContent, setDrawerContent] = useState([]);
+  const [drawerItems, setDrawerItems] = useState([]); // array of strings
+  const [drawerMode, setDrawerMode] = useState("ingredients"); // 'ingredients' | 'barcodes'
 
   useEffect(() => {
-    if (!cognitoId) {
-      console.warn("[StockUsage] ❗ Cognito ID not available. Skipping fetch.");
-      return;
-    }
+    if (!cognitoId) return;
 
     const fetchStockUsage = async () => {
       try {
@@ -48,7 +50,7 @@ const StockUsage = () => {
         if (!Array.isArray(response.data)) return;
 
         const groupedData = {};
-        response.data.forEach((item, idx) => {
+        response.data.forEach((item) => {
           const key = `${item.recipe_name}-${item.production_log_date}-${item.batchCode}`;
           if (!groupedData[key]) {
             groupedData[key] = {
@@ -81,65 +83,28 @@ const StockUsage = () => {
 
         setStockUsage(formattedData);
       } catch (error) {
-        console.error("[StockUsage] ❌ Error fetching stock usage:", error.message);
-        if (error.response) {
-          console.error(
-            "[StockUsage] ❌ Backend returned error:",
-            error.response.status,
-            error.response.data
-          );
-        }
+        console.error("[StockUsage] Error fetching stock usage:", error.message);
       }
     };
 
     fetchStockUsage();
   }, [cognitoId]);
 
-  // Drawer helpers (same behavior, styled output)
+  // Drawer helpers (minimal style)
   const handleDrawerOpen = (header, content) => {
+    const mode = header.toLowerCase().includes("barcode")
+      ? "barcodes"
+      : "ingredients";
+    setDrawerMode(mode);
     setDrawerHeader(header);
 
-    if (header === "Barcodes") {
-      if (Array.isArray(content)) {
-        setDrawerContent(
-          content.length ? (
-            <ul style={{ margin: 0, paddingInlineStart: 18 }}>
-              {content.map((item, i) => (
-                <li key={i} style={{ color: brand.text, marginBottom: 6 }}>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ color: brand.subtext }}>No data available</p>
-          )
-        );
-      } else {
-        setDrawerContent(<p style={{ color: brand.subtext }}>Error: Invalid data</p>);
-      }
-    } else if (header === "Ingredients") {
-      if (Array.isArray(content)) {
-        setDrawerContent(
-          content.length ? (
-            <ul style={{ margin: 0, paddingInlineStart: 18 }}>
-              {content.map((item, i) => {
-                const [ingredientName, quantity] = item.split(": ");
-                return (
-                  <li key={i} style={{ color: brand.text, marginBottom: 6 }}>
-                    {ingredientName}: {quantity}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p style={{ color: brand.subtext }}>No data available</p>
-          )
-        );
-      } else {
-        setDrawerContent(<p style={{ color: brand.subtext }}>Error: Invalid data</p>);
-      }
+    let items = [];
+    if (Array.isArray(content)) {
+      items = content;
+    } else if (typeof content === "string" && content.length) {
+      items = content.split("; ").filter(Boolean);
     }
-
+    setDrawerItems(items);
     setDrawerOpen(true);
   };
 
@@ -162,7 +127,7 @@ const StockUsage = () => {
               "&:hover": { color: brand.primaryDark },
             }}
             onClick={() =>
-              handleDrawerOpen("Ingredients", params.row.ingredients.split("; "))
+              handleDrawerOpen("Ingredients", params.row.ingredients)
             }
           >
             Show Ingredients
@@ -182,9 +147,7 @@ const StockUsage = () => {
               fontWeight: 600,
               "&:hover": { color: brand.primaryDark },
             }}
-            onClick={() =>
-              handleDrawerOpen("Barcodes", params.row.barcodes.split("; "))
-            }
+            onClick={() => handleDrawerOpen("Barcodes", params.row.barcodes)}
           >
             Show Barcodes
           </Typography>
@@ -256,14 +219,14 @@ const StockUsage = () => {
         </Box>
       </Box>
 
-      {/* Drawer */}
+      {/* Drawer — minimal style */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={handleDrawerClose}
         PaperProps={{
           sx: {
-            width: 320,
+            width: 360,
             borderRadius: "20px 0 0 20px",
             border: `1px solid ${brand.border}`,
             boxShadow: brand.shadow,
@@ -271,7 +234,7 @@ const StockUsage = () => {
           },
         }}
       >
-        {/* Drawer header (gradient) */}
+        {/* Gradient header */}
         <Box
           sx={{
             display: "flex",
@@ -291,7 +254,79 @@ const StockUsage = () => {
           </Typography>
         </Box>
 
-        <Box p={2} sx={{ background: brand.surface }}>{drawerContent}</Box>
+        {/* Body: minimal list with ticks, + qty pill if "Ingredients" */}
+        <Box sx={{ background: brand.surface, p: 2 }}>
+          <List disablePadding>
+            {drawerItems.length === 0 ? (
+              <Typography sx={{ color: brand.subtext, px: 1 }}>
+                No data available
+              </Typography>
+            ) : (
+              drawerItems.map((raw, idx) => {
+                let primaryText = raw;
+                let secondary = null;
+                let pill = null;
+
+                if (drawerMode === "ingredients" && typeof raw === "string" && raw.includes(":")) {
+                  const [name, qty] = raw.split(":");
+                  primaryText = name.trim();
+                  pill = (qty || "").trim();
+                } else if (drawerMode === "barcodes" && typeof raw === "string" && raw.includes(":")) {
+                  const [name, codes] = raw.split(":");
+                  primaryText = name.trim();
+                  secondary = (codes || "").trim();
+                }
+
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${brand.border}`,
+                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
+                      mb: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <ListItem
+                      secondaryAction={
+                        pill ? (
+                          <Box
+                            component="span"
+                            sx={{
+                              borderRadius: 999,
+                              border: `1px solid ${brand.border}`,
+                              background: "#f1f5f9",
+                              px: 1.25,
+                              py: 0.25,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: brand.text,
+                              maxWidth: 160,
+                              textAlign: "right",
+                            }}
+                          >
+                            {pill}
+                          </Box>
+                        ) : null
+                      }
+                    >
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <CheckRoundedIcon sx={{ color: brand.primary }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={primaryText}
+                        secondary={secondary}
+                        primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }}
+                        secondaryTypographyProps={{ sx: { color: brand.subtext, mt: 0.5, wordBreak: "break-word" } }}
+                      />
+                    </ListItem>
+                  </Box>
+                );
+              })
+            )}
+          </List>
+        </Box>
       </Drawer>
     </Box>
   );
