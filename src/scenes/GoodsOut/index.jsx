@@ -35,7 +35,105 @@ const GoodsOut = () => {
   const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerItems, setDrawerItems] = useState([]); // array of "CODE: 1,234 units"
+  const [drawerItems, setDrawerItems] = useState([]); // array of {code, unitsLabel}
+
+  // --- helpers ---------------------------------------------------------------
+
+  // Safely JSON.parse values that might already be arrays/objects
+  const safeParse = (val, fallback) => {
+    if (val == null) return fallback;
+    if (Array.isArray(val) || typeof val === "object") return val;
+    try {
+      const parsed = JSON.parse(val);
+      return parsed == null ? fallback : parsed;
+    } catch {
+      return fallback;
+    }
+  };
+
+  // Normalize row batchcodes/quantities into [{ code, batches }]
+  const normalizeRowPairs = (row) => {
+    // Accept multiple possible field names just in case
+    const rawCodes =
+      row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes ?? null;
+    const rawQuantities =
+      row.quantitiesUsed ??
+      row.quantities ??
+      row.batchesUsed ??
+      row.quantities_used ??
+      null;
+
+    const codesParsed = safeParse(rawCodes, []);
+    const qtyParsed = safeParse(rawQuantities, []);
+
+    // Cases:
+    // 1) codesParsed = ['B1','B2'], qtyParsed = [2,1]
+    // 2) codesParsed = [{code:'B1', qty:2}, {code:'B2', qty:1}]
+    // 3) codesParsed is an object map: { B1:2, B2:1 } (rare but handle it)
+    // 4) qtyParsed is an object map keyed by code
+
+    const pairs = [];
+
+    if (Array.isArray(codesParsed) && codesParsed.length) {
+      // array of strings or objects
+      codesParsed.forEach((c, i) => {
+        if (typeof c === "string") {
+          const batches =
+            (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[c]) ?? 0;
+          pairs.push({ code: c, batches: Number(batches) || 0 });
+        } else if (c && typeof c === "object") {
+          // try common keys
+          const code = c.code ?? c.batchCode ?? c.id ?? String(i);
+          const batchesFromObj =
+            c.qty ?? c.batches ?? c.quantity ?? c.count ?? 0;
+          // fallback to qty array/object
+          const batchesFallback =
+            (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[code]) ?? 0;
+          const batches = Number(batchesFromObj || batchesFallback) || 0;
+          pairs.push({ code, batches });
+        }
+      });
+      return pairs;
+    }
+
+    if (codesParsed && typeof codesParsed === "object") {
+      // object map { code: qty }
+      Object.entries(codesParsed).forEach(([code, batches]) => {
+        // qtyParsed may override if present
+        const override =
+          (Array.isArray(qtyParsed) ? undefined : qtyParsed?.[code]) ?? undefined;
+        pairs.push({
+          code,
+          batches: Number(override ?? batches) || 0,
+        });
+      });
+      return pairs;
+    }
+
+    // If we only have quantities as an array (no codes), make a best-effort
+    if (Array.isArray(qtyParsed)) {
+      return qtyParsed.map((q, i) => ({
+        code: `Batch ${i + 1}`,
+        batches: Number(q) || 0,
+      }));
+    }
+
+    return [];
+  };
+
+  // Turn normalized pairs into display items with units computed from recipe map
+  const buildDrawerItems = (row, upb) => {
+    const pairs = normalizeRowPairs(row);
+    return pairs.map(({ code, batches }) => {
+      const units =
+        upb && Number.isFinite(upb) && upb > 0 ? batches * upb : null;
+      const unitsLabel =
+        units != null ? `${units.toLocaleString()} units` : `${batches} batch(es)`;
+      return { code, unitsLabel };
+    });
+  };
+
+  // --- effects ---------------------------------------------------------------
 
   // 1) Fetch recipes → build recipeName → units_per_batch map
   useEffect(() => {
@@ -50,7 +148,7 @@ const GoodsOut = () => {
         const map = {};
         data.forEach((r, idx) => {
           const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
-          map[key] = Number(r.units_per_batch) || 0;
+          map[String(key)] = Number(r.units_per_batch) || 0;
         });
         setRecipesMap(map);
       } catch (err) {
@@ -70,7 +168,7 @@ const GoodsOut = () => {
         );
         if (!response.ok) throw new Error("Failed to fetch goods out");
         const data = await response.json();
-        setGoodsOut(data);
+        setGoodsOut(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching goods out:", error);
       }
@@ -78,29 +176,20 @@ const GoodsOut = () => {
     fetchGoodsOutData();
   }, [cognitoId]);
 
-  const handleDrawerOpen = (header, content) => {
-    if (header === "Batchcodes") {
-      const { batchcodes, quantitiesUsed, recipe } = content;
-      const upb = recipesMap[recipe] || 0;
+  // --- drawer handlers -------------------------------------------------------
 
-      const items = (batchcodes || []).map((batchCode, idx) => {
-        const batches = (quantitiesUsed || [])[idx] || 0;
-        const units = batches * upb;
-        return `${batchCode}: ${units.toLocaleString()} units`;
-      });
-
-      setDrawerHeader(header);
-      setDrawerItems(items);
-      setDrawerOpen(true);
-      return;
-    }
-
-    setDrawerHeader(header);
-    setDrawerItems([]);
+  const handleDrawerOpenForRow = (row) => {
+    const recipeKey = String(row.recipe ?? "");
+    const upb = recipesMap[recipeKey] || 0;
+    const items = buildDrawerItems(row, upb);
+    setDrawerHeader("Batchcodes");
+    setDrawerItems(items);
     setDrawerOpen(true);
   };
 
   const handleDrawerClose = () => setDrawerOpen(false);
+
+  // --- table columns ---------------------------------------------------------
 
   const columns = useMemo(
     () => [
@@ -118,40 +207,21 @@ const GoodsOut = () => {
         field: "batchcodes",
         headerName: "Batchcodes",
         flex: 1,
-        renderCell: (params) => {
-          let batchcodes = [];
-          let quantitiesUsed = [];
-          try {
-            batchcodes = Array.isArray(params.row.batchcodes)
-              ? params.row.batchcodes
-              : JSON.parse(params.row.batchcodes || "[]");
-            quantitiesUsed = Array.isArray(params.row.quantitiesUsed)
-              ? params.row.quantitiesUsed
-              : JSON.parse(params.row.quantitiesUsed || "[]");
-          } catch (e) {
-            console.error("Failed to parse batchcodes:", e);
-          }
-
-          return (
-            <Typography
-              sx={{
-                cursor: "pointer",
-                color: brand.primary,
-                fontWeight: 600,
-                "&:hover": { color: brand.primaryDark },
-              }}
-              onClick={() =>
-                handleDrawerOpen("Batchcodes", {
-                  batchcodes,
-                  quantitiesUsed,
-                  recipe: params.row.recipe,
-                })
-              }
-            >
-              Show Batchcodes
-            </Typography>
-          );
-        },
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => (
+          <Typography
+            sx={{
+              cursor: "pointer",
+              color: brand.primary,
+              fontWeight: 600,
+              "&:hover": { color: brand.primaryDark },
+            }}
+            onClick={() => handleDrawerOpenForRow(params.row)}
+          >
+            Show Batchcodes
+          </Typography>
+        ),
       },
       {
         field: "recipients",
@@ -163,6 +233,8 @@ const GoodsOut = () => {
     ],
     [recipesMap]
   );
+
+  // --- render ----------------------------------------------------------------
 
   return (
     <Box m="20px">
@@ -272,61 +344,50 @@ const GoodsOut = () => {
             </Typography>
           ) : (
             <List disablePadding>
-              {drawerItems.map((raw, idx) => {
-                let code = raw;
-                let pill = null;
-                if (typeof raw === "string" && raw.includes(":")) {
-                  const [left, right] = raw.split(":");
-                  code = left.trim();
-                  pill = (right || "").trim();
-                }
-                return (
-                  <Box
-                    key={idx}
-                    sx={{
-                      borderRadius: 2,
-                      border: `1px solid ${brand.border}`,
-                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
-                      mb: 1,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <ListItem
-                      secondaryAction={
-                        pill ? (
-                          <Box
-                            component="span"
-                            sx={{
-                              borderRadius: 999,
-                              border: `1px solid ${brand.border}`,
-                              background: "#f1f5f9",
-                              px: 1.25,
-                              py: 0.25,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: brand.text,
-                              maxWidth: 180,
-                              textAlign: "right",
-                            }}
-                          >
-                            {pill}
-                          </Box>
-                        ) : null
-                      }
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <CheckRoundedIcon sx={{ color: brand.primary }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={code}
-                        primaryTypographyProps={{
-                          sx: { color: brand.text, fontWeight: 600 },
+              {drawerItems.map(({ code, unitsLabel }, idx) => (
+                <Box
+                  key={`${code}-${idx}`}
+                  sx={{
+                    borderRadius: 2,
+                    border: `1px solid ${brand.border}`,
+                    backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
+                    mb: 1,
+                    overflow: "hidden",
+                  }}
+                >
+                  <ListItem
+                    secondaryAction={
+                      <Box
+                        component="span"
+                        sx={{
+                          borderRadius: 999,
+                          border: `1px solid ${brand.border}`,
+                          background: "#f1f5f9",
+                          px: 1.25,
+                          py: 0.25,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: brand.text,
+                          maxWidth: 180,
+                          textAlign: "right",
                         }}
-                      />
-                    </ListItem>
-                  </Box>
-                );
-              })}
+                      >
+                        {unitsLabel}
+                      </Box>
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <CheckRoundedIcon sx={{ color: brand.primary }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={code}
+                      primaryTypographyProps={{
+                        sx: { color: brand.text, fontWeight: 600 },
+                      }}
+                    />
+                  </ListItem>
+                </Box>
+              ))}
             </List>
           )}
         </Box>
