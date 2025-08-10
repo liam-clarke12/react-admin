@@ -1,6 +1,11 @@
 // src/scenes/inventory/RecipeInventory.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Drawer, Typography, IconButton } from "@mui/material";
+import {
+  Box,
+  Drawer,
+  Typography,
+  IconButton,
+} from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
@@ -175,107 +180,59 @@ const RecipeInventory = () => {
         </Box>
       </Box>
 
-      {/* Drawer with Pro Nory style */}
+      {/* Drawer with Bar Chart */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
           sx: {
-            width: { xs: "100%", md: "82%" },
-            maxWidth: 1200,
-            borderRadius: { xs: 0, md: "20px 0 0 20px" },
+            width: "88%",
+            borderRadius: "20px 0 0 20px",
             border: `1px solid ${brand.border}`,
-            boxShadow:
-              "0 12px 24px rgba(15,23,42,0.14), 0 2px 6px rgba(15,23,42,0.08)",
+            boxShadow: brand.shadow,
             overflow: "hidden",
           },
         }}
       >
-        {/* Drawer container (muted background) */}
+        {/* Drawer header (gradient) */}
         <Box
           sx={{
-            background: brand.surfaceMuted,
-            height: "100%",
             display: "flex",
-            flexDirection: "column",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1.25,
+            color: "#fff",
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
           }}
         >
-          {/* Gradient header with subtitle */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.25,
-              px: 2,
-              py: 1.25,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-            }}
-          >
-            <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "#fff" }}>
-              <MenuOutlinedIcon />
-            </IconButton>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1, color: "#fff" }}>
-                Units in Stock
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
-                Live snapshot of current inventory
-              </Typography>
-            </Box>
-          </Box>
+          <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "#fff" }}>
+            <MenuOutlinedIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+            Units in Stock Chart
+          </Typography>
+        </Box>
 
-          {/* Body with framed chart card */}
-          <Box sx={{ p: 2, pt: 3, flex: 1, display: "flex", flexDirection: "column" }}>
-            <Box
-              sx={{
-                border: `1px solid ${brand.border}`,
-                borderRadius: 16,
-                background: brand.surface,
-                boxShadow: brand.shadow,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                flex: 1,
-              }}
-            >
-              {/* Slim sub-header bar inside the card */}
-              <Box
-                sx={{
-                  height: 48,
-                  display: "flex",
-                  alignItems: "center",
-                  px: 2,
-                  borderBottom: `1px solid ${brand.border}`,
-                  background: "#fbfcfd",
-                }}
-              >
-                <Typography sx={{ fontWeight: 700, color: brand.text }}>
-                  Inventory — Units in Stock
-                </Typography>
-              </Box>
-
-              {/* Chart area */}
-              <Box
-                sx={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  p: 2,
-                }}
-              >
-                <BarChart
-                  data={barChartData}
-                  keys={["units"]}
-                  indexBy="recipe"
-                  height="500px"
-                  width="95%"
-                />
-              </Box>
-            </Box>
-          </Box>
+        {/* Drawer body */}
+        <Box
+          sx={{
+            background: brand.surface,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            px: 2,
+            py: 3,
+          }}
+        >
+          <BarChart
+            data={barChartData}
+            keys={["units"]}
+            indexBy="recipe"
+            height="500px"
+            width="95%"
+          />
         </Box>
       </Drawer>
     </Box>

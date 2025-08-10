@@ -29,10 +29,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /**
- * Visual theme tokens for a Nory-like style:
- * - Clean white card, soft shadow, 16px+ radii
- * - Neutral slate text, subtle gray borders
- * - Vivid primary blue button with slight gradient and pill shape
+ * Nory-like tokens (Ruby/Rose)
  */
 const brand = {
   text: "#0f172a",
@@ -187,7 +184,17 @@ const GoodsInForm = () => {
 
   // form submit
   const handleFormSubmit = async (values, { resetForm }) => {
-    const payload = { ...values, cognito_id: cognitoId };
+    // Map selected ID -> name so we save the human-readable ingredient
+    const selectedOpt =
+      ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
+
+    const payload = {
+      ...values,
+      ingredient: selectedOpt ? selectedOpt.name : values.ingredient, // <-- save name, not "c-6"
+      ingredientId: selectedOpt ? String(selectedOpt.id) : null,      // optional: keep id too
+      cognito_id: cognitoId,
+    };
+
     try {
       const res = await fetch(`${API_BASE}/submit`, {
         method: "POST",
@@ -267,7 +274,7 @@ const GoodsInForm = () => {
             setFieldValue,
           }) => {
             const selected =
-              ingredients.find((i) => i.id === values.ingredient) || null;
+              ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
 
             return (
               <form onSubmit={handleSubmit}>
@@ -298,13 +305,17 @@ const GoodsInForm = () => {
                   <Box sx={{ gridColumn: "span 2" }}>
                     <Autocomplete
                       options={ingredients}
-                      getOptionLabel={(opt) => opt.name}
+                      getOptionLabel={(opt) =>
+                        typeof opt === "string" ? opt : opt?.name ?? ""
+                      }
                       loading={loadingMaster || loadingCustom}
                       value={selected}
                       onChange={(_, newVal) =>
                         setFieldValue("ingredient", newVal ? newVal.id : "")
                       }
-                      openOnFocus={false}
+                      isOptionEqualToValue={(opt, val) =>
+                        (opt?.id ?? opt) === (val?.id ?? val)
+                      }
                       filterSelectedOptions
                       renderInput={(params) => (
                         <TextField
