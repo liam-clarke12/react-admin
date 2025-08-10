@@ -1,3 +1,4 @@
+// src/components/Sidebar/index.jsx
 import { useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
@@ -18,21 +19,48 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import BakeryDiningOutlinedIcon from '@mui/icons-material/BakeryDiningOutlined';
 
+const brand = {
+  text: "#0f172a",
+  subtext: "#64748b",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  hover: "#f1f5f9",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
+
+// Single menu item component (keeps selected logic & routing)
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const active = selected === title;
+
   return (
     <MenuItem
-      active={selected === title}
-      style={{
-        color: colors.grey[100],
-        listStyleType: 'none', // Ensure no bullet points
-      }}
+      active={active}
+      style={{ listStyleType: "none" }}
       onClick={() => setSelected(title)}
       icon={icon}
     >
-      <Link to={to} style={{ textDecoration: 'none', color: colors.grey[100], width: '100%' }}>
-        <Typography>{title}</Typography>
+      <Link
+        to={to}
+        style={{
+          textDecoration: "none",
+          width: "100%",
+          color: active ? "#fff" : brand.text,
+        }}
+      >
+        <Typography
+          sx={{
+            fontWeight: active ? 800 : 600,
+            fontSize: 14,
+          }}
+        >
+          {title}
+        </Typography>
       </Link>
     </MenuItem>
   );
@@ -43,90 +71,135 @@ const Sidebar = () => {
   const colors = tokens(theme.palette.mode);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
-  
+
+  const COLLAPSED_W = 80;
+  const EXPANDED_W = 260;
 
   return (
-    <Box
-      sx={{
-        display: 'flex', // Use flex to align items
-      }}
-    >
+    <Box display="flex">
       <Box
         sx={{
-          width: isCollapsed ? '80px' : '150px',
-          position: 'fixed', // Fixed position for the sidebar
-          height: '100%', // Full height
-          zIndex: 1000, // Make sure it stays above other content
+          width: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
+          position: "fixed",
+          height: "100vh",
+          zIndex: 1000,
+
+          // --- Nory look & react-pro-sidebar overrides ---
+          borderRight: `1px solid ${brand.border}`,
+          background: brand.surfaceMuted,
+
           "& .pro-sidebar-inner": {
-            background: `${colors.primary[400]} !important`,
+            background: `${brand.surface} !important`,
+            boxShadow: "none",
           },
+          "& .pro-sidebar-layout": {
+            // remove default bg/borders
+            background: "transparent !important",
+          },
+          "& .pro-sidebar > .pro-sidebar-inner > .pro-sidebar-layout .pro-sidebar-header": {
+            border: "none",
+          },
+
+          // Icons container
           "& .pro-icon-wrapper": {
             backgroundColor: "transparent !important",
+            borderRadius: "999px !important",
           },
+
+          // Inner item area (text + icon alignment)
           "& .pro-inner-item": {
-            padding: "5px 35px 5px 20px !important",
+            padding: "10px 14px 10px 14px !important",
+            margin: "6px 10px",
+            borderRadius: "12px",
+            color: `${brand.text} !important`,
           },
+
+          // Link element
+          "& .pro-inner-item > a": {
+            color: `${brand.text} !important`,
+          },
+
+          // Hover
           "& .pro-inner-item:hover": {
-            color: "#868dfb !important",
+            background: `${brand.hover} !important`,
+            color: `${brand.text} !important`,
           },
-          "& .pro-menu-item.active": {
-            color: "#6870fa !important",
+
+          // Active state (gradient blue pill)
+          "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover": {
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
+            color: `#fff !important`,
+            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)",
           },
+          "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg": {
+            color: `#fff !important`,
+          },
+
+          // Section title spacing (we'll use Typography below)
         }}
       >
         <ProSidebar collapsed={isCollapsed}>
           <Menu iconShape="square">
-            {/* LOGO AND MENU ICON */}
+            {/* LOGO / BURGER */}
             <MenuItem
               onClick={() => setIsCollapsed(!isCollapsed)}
-              icon={isCollapsed ? <MenuOutlinedIcon /> : undefined}
+              icon={<MenuOutlinedIcon />}
               style={{
-                margin: "10px 0 20px 0",
-                color: colors.grey[100],
+                margin: "10px 10px 16px",
+                color: brand.text,
               }}
             >
               {!isCollapsed && (
                 <Box
                   display="flex"
-                  justifyContent="space-between"
-                  alignItems="right"
-                  ml="15px"
+                  justifyContent="flex-end"
+                  alignItems="center"
+                  ml="8px"
                 >
-                  <IconButton onClick={() => setIsCollapsed(!isCollapsed)}>
-                    <MenuOutlinedIcon />
+                  <IconButton
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    size="small"
+                    sx={{
+                      borderRadius: 999,
+                      background: brand.hover,
+                      border: `1px solid ${brand.border}`,
+                      "&:hover": { background: "#e2e8f0" },
+                    }}
+                  >
+                    <MenuOutlinedIcon fontSize="small" />
                   </IconButton>
                 </Box>
               )}
             </MenuItem>
 
+            {/* Optional profile when expanded */}
             {!isCollapsed && (
-              <Box mb="25px">
+              <Box mb="18px">
                 <Box display="flex" justifyContent="center" alignItems="center">
                   <img
                     alt="profile-user"
-                    width="100px"
-                    height="100px"
+                    width="88"
+                    height="88"
                     src={`../../assets/user.png`}
-                    style={{ cursor: "pointer", borderRadius: "50%" }}
+                    style={{ cursor: "pointer", borderRadius: "50%", border: `1px solid ${brand.border}` }}
                   />
                 </Box>
-                <Box textAlign="center">
+                <Box textAlign="center" mt={1}>
                   <Typography
-                    variant="h2"
-                    color={colors.grey[100]}
-                    fontWeight="bold"
-                    sx={{ m: "10px 0 0 0" }}
+                    variant="h6"
+                    sx={{ color: brand.text, fontWeight: 800, m: "6px 0 0" }}
                   >
                     Hupes
                   </Typography>
-                  <Typography variant="h5" color={colors.blueAccent[500]}>
+                  <Typography variant="body2" sx={{ color: brand.subtext }}>
                     Admin
                   </Typography>
                 </Box>
               </Box>
             )}
 
-            <Box paddingLeft={isCollapsed ? undefined : "10%"}>
+            {/* Items */}
+            <Box paddingLeft={isCollapsed ? undefined : "8px"}>
               <Item
                 title="Dashboard"
                 to="/"
@@ -135,13 +208,15 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
 
-              <Typography
-                variant="h6"
-                color={colors.grey[300]}
-                sx={{ m: "15px 0 5px 20px" }}
-              >
-                Forms
-              </Typography>
+              {/* Section: Forms */}
+              {!isCollapsed && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: brand.subtext, m: "10px 0 6px", px: "18px", display: "block" }}
+                >
+                  Forms
+                </Typography>
+              )}
               <Item
                 title="Goods In Form"
                 to="/GoodsInForm"
@@ -171,13 +246,15 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
 
-              <Typography
-                variant="h6"
-                color={colors.grey[300]}
-                sx={{ m: "15px 0 5px 20px" }}
-              >
-                Data
-              </Typography>
+              {/* Section: Data */}
+              {!isCollapsed && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: brand.subtext, m: "10px 0 6px", px: "18px", display: "block" }}
+                >
+                  Data
+                </Typography>
+              )}
               <Item
                 title="Goods In"
                 to="/GoodsIn"
@@ -235,12 +312,13 @@ const Sidebar = () => {
       {/* Main Content Area */}
       <Box
         sx={{
-          marginLeft: isCollapsed ? '80px' : '250px', // Adjust based on sidebar width
-          padding: isCollapsed ? '0px' : '12px',
-          width: 'calc(100% - (isCollapsed ? 80px : 250px))', // Adjust width to account for sidebar
-          height: '100vh',
-          overflowY: 'auto',
-          position: 'relative', // Ensure content is positioned correctly
+          marginLeft: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
+          padding: isCollapsed ? "0px" : "12px",
+          width: `calc(100% - ${isCollapsed ? COLLAPSED_W : EXPANDED_W}px)`,
+          minHeight: "100vh",
+          overflowY: "auto",
+          position: "relative",
+          background: brand.surfaceMuted,
         }}
       >
         {/* Your main content goes here */}
