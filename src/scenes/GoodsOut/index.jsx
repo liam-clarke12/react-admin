@@ -15,7 +15,7 @@ import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { useAuth } from "../../contexts/AuthContext";
 
-/** Nory-like brand tokens (scoped so theme overrides won’t fight these) */
+/** Nory-like brand tokens */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -28,12 +28,10 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-/** Toggle verbose logging here if needed */
+/** Toggle verbose logging */
 const DEBUG = true;
-const dlog = (...args) => {
-  if (DEBUG) console.log("[GoodsOut]", ...args);
-};
-const dgroup = (label) => DEBUG && console.groupCollapsed(label);
+const dlog = (...a) => DEBUG && console.log("[GoodsOut]", ...a);
+const dgroup = (l) => DEBUG && console.groupCollapsed(l);
 const dgroupEnd = () => DEBUG && console.groupEnd();
 
 const GoodsOut = () => {
@@ -43,34 +41,32 @@ const GoodsOut = () => {
   const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerItems, setDrawerItems] = useState([]); // array of { code, unitsLabel }
+  const [drawerItems, setDrawerItems] = useState([]); // [{ code, unitsLabel }]
 
-  // --- helpers ---------------------------------------------------------------
+  // ---- helpers --------------------------------------------------------------
 
-  // Safely JSON.parse values that might already be arrays/objects
   const safeParse = (val, fallback) => {
     if (val == null) return fallback;
     if (Array.isArray(val) || typeof val === "object") return val;
     try {
       const parsed = JSON.parse(val);
       return parsed == null ? fallback : parsed;
-    } catch (e) {
-      dlog("safeParse: value not JSON, returning fallback. Value:", val);
+    } catch {
       return fallback;
     }
   };
 
-  // Normalize row batchcodes/quantities into [{ code, batches }]
+  // Normalize into [{ code, units }] —> IMPORTANT: interpret quantities as UNITS
   const normalizeRowPairs = (row) => {
     dgroup("normalizeRowPairs()");
     dlog("Raw row snippet:", {
       date: row?.date,
       recipe: row?.recipe,
+      stockAmount: row?.stockAmount,
       batchcodes: row?.batchcodes,
       quantitiesUsed: row?.quantitiesUsed,
     });
 
-    // Accept multiple possible field names just in case
     const rawCodes =
       row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes ?? null;
     const rawQuantities =
@@ -89,30 +85,22 @@ const GoodsOut = () => {
     dlog("Parsed codes:", codesParsed);
     dlog("Parsed quantities:", qtyParsed);
 
-    // Cases we support:
-    // 1) codesParsed = ['B1','B2'], qtyParsed = [2,1]
-    // 2) codesParsed = [{code:'B1', qty:2}, {code:'B2', qty:1}]
-    // 3) codesParsed is an object map: { B1:2, B2:1 }
-    // 4) qtyParsed is an object map keyed by code (works with (1))
     const pairs = [];
 
     if (Array.isArray(codesParsed) && codesParsed.length) {
       dlog("Branch: codesParsed is Array");
       codesParsed.forEach((c, i) => {
         if (typeof c === "string") {
-          const batches =
+          const units =
             (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[c]) ?? 0;
-          pairs.push({ code: c, batches: Number(batches) || 0 });
+          pairs.push({ code: c, units: Number(units) || 0 });
         } else if (c && typeof c === "object") {
-          // try common keys
           const code = c.code ?? c.batchCode ?? c.id ?? String(i);
-          const batchesFromObj =
-            c.qty ?? c.batches ?? c.quantity ?? c.count ?? 0;
-          // fallback to qty array/object
-          const batchesFallback =
+          const unitsFromObj =
+            c.units ?? c.qty ?? c.quantity ?? c.count ?? 0; // accept common keys
+          const unitsFallback =
             (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[code]) ?? 0;
-          const batches = Number(batchesFromObj || batchesFallback) || 0;
-          pairs.push({ code, batches });
+          pairs.push({ code, units: Number(unitsFromObj || unitsFallback) || 0 });
         }
       });
       dlog("Normalized pairs (array branch):", pairs);
@@ -122,13 +110,12 @@ const GoodsOut = () => {
 
     if (codesParsed && typeof codesParsed === "object") {
       dlog("Branch: codesParsed is Object map");
-      Object.entries(codesParsed).forEach(([code, batches]) => {
-        // qtyParsed may override if present
+      Object.entries(codesParsed).forEach(([code, maybeUnits]) => {
         const override =
           (Array.isArray(qtyParsed) ? undefined : qtyParsed?.[code]) ?? undefined;
         pairs.push({
           code,
-          batches: Number(override ?? batches) || 0,
+          units: Number(override ?? maybeUnits) || 0,
         });
       });
       dlog("Normalized pairs (object map branch):", pairs);
@@ -140,7 +127,7 @@ const GoodsOut = () => {
       dlog("Branch: only quantities array present, synthesizing codes");
       const synthesized = qtyParsed.map((q, i) => ({
         code: `Batch ${i + 1}`,
-        batches: Number(q) || 0,
+        units: Number(q) || 0,
       }));
       dlog("Normalized pairs (synthesized):", synthesized);
       dgroupEnd();
@@ -152,26 +139,24 @@ const GoodsOut = () => {
     return [];
   };
 
-  // Turn normalized pairs into display items with units computed from recipe map
-  const buildDrawerItems = (row, upb) => {
+  // Build final drawer items using UNITS directly (no UPB multiply)
+  const buildDrawerItems = (row) => {
     dgroup("buildDrawerItems()");
-    dlog("Row recipe:", row?.recipe, "units_per_batch:", upb);
     const pairs = normalizeRowPairs(row);
-    const items = pairs.map(({ code, batches }) => {
-      const units =
-        upb && Number.isFinite(upb) && upb > 0 ? batches * upb : null;
-      const unitsLabel =
-        units != null ? `${units.toLocaleString()} units` : `${batches} batch(es)`;
-      return { code, unitsLabel };
-    });
+    const items = pairs.map(({ code, units }) => ({
+      code,
+      unitsLabel: `${Number(units || 0).toLocaleString()} units`,
+    }));
+    const sumUnits = pairs.reduce((t, p) => t + (Number(p.units) || 0), 0);
+    const stockAmountNum = Number(row?.stockAmount ?? 0);
+    dlog("Sum of units from drawer:", sumUnits, "Row stockAmount:", stockAmountNum);
     dlog("Drawer items to render:", items);
     dgroupEnd();
     return items;
   };
 
-  // --- effects ---------------------------------------------------------------
+  // ---- effects --------------------------------------------------------------
 
-  // 1) Fetch recipes → build recipeName → units_per_batch map
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipes = async () => {
@@ -191,7 +176,7 @@ const GoodsOut = () => {
           map[String(key)] = Number(r.units_per_batch) || 0;
         });
 
-        dlog("units_per_batch map:", map);
+        dlog("units_per_batch map (kept for reference):", map);
         setRecipesMap(map);
       } catch (err) {
         console.error("[GoodsOut] Error fetching recipes:", err);
@@ -202,7 +187,6 @@ const GoodsOut = () => {
     fetchRecipes();
   }, [cognitoId]);
 
-  // 2) Fetch goods-out data
   useEffect(() => {
     if (!cognitoId) return;
     const fetchGoodsOutData = async () => {
@@ -227,15 +211,12 @@ const GoodsOut = () => {
     fetchGoodsOutData();
   }, [cognitoId]);
 
-  // --- drawer handlers -------------------------------------------------------
+  // ---- drawer handlers ------------------------------------------------------
 
   const handleDrawerOpenForRow = (row) => {
     dgroup("handleDrawerOpenForRow()");
     dlog("Clicked row:", row);
-    const recipeKey = String(row.recipe ?? "");
-    const upb = recipesMap[recipeKey] || 0;
-    dlog("Resolved recipeKey:", recipeKey, "UPB:", upb);
-    const items = buildDrawerItems(row, upb);
+    const items = buildDrawerItems(row); // <- now uses UNITS directly
     setDrawerHeader("Batchcodes");
     setDrawerItems(items);
     setDrawerOpen(true);
@@ -247,7 +228,7 @@ const GoodsOut = () => {
     setDrawerOpen(false);
   };
 
-  // --- table columns ---------------------------------------------------------
+  // ---- table columns --------------------------------------------------------
 
   const columns = useMemo(
     () => [
@@ -289,14 +270,13 @@ const GoodsOut = () => {
         align: "left",
       },
     ],
-    [recipesMap]
+    []
   );
 
-  // --- render ----------------------------------------------------------------
+  // ---- render ---------------------------------------------------------------
 
   return (
     <Box m="20px">
-      {/* Scoped styles to lock in the Nory look */}
       <style>{`
         .go-card {
           border: 1px solid ${brand.border};
@@ -313,14 +293,12 @@ const GoodsOut = () => {
       `}</style>
 
       <Box className="go-card" mt={2}>
-        {/* Toolbar */}
         <Box className="go-toolbar">
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
             Goods Out
           </Typography>
         </Box>
 
-        {/* DataGrid */}
         <Box
           sx={{
             height: "70vh",
@@ -359,7 +337,7 @@ const GoodsOut = () => {
         </Box>
       </Box>
 
-      {/* Drawer — minimal style checklist with units pill */}
+      {/* Drawer */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -374,7 +352,6 @@ const GoodsOut = () => {
           },
         }}
       >
-        {/* Gradient header */}
         <Box
           sx={{
             display: "flex",
@@ -394,7 +371,6 @@ const GoodsOut = () => {
           </Typography>
         </Box>
 
-        {/* Drawer content: zebra rows, tick icon, units pill on the right */}
         <Box sx={{ background: brand.surface, p: 2 }}>
           {drawerItems.length === 0 ? (
             <Typography sx={{ color: brand.subtext, px: 1 }}>
