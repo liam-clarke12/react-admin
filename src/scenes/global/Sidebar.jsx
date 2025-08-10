@@ -25,10 +25,10 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#2563eb",
-  primaryDark: "#1d4ed8",
+  primary: "#e11d48",
+  primaryDark: "#be123c",
   hover: "#f1f5f9",
-  focusRing: "rgba(37, 99, 235, 0.35)",
+  focusRing: "rgba(225, 29, 72, 0.35)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 

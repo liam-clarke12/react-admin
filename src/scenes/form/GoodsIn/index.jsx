@@ -41,9 +41,9 @@ const brand = {
   inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#2563eb",
-  primaryDark: "#1d4ed8",
-  focusRing: "rgba(37, 99, 235, 0.35)",
+  primary: "#e11d48",
+  primaryDark: "#be123c",
+  focusRing: "rgba(225, 29, 72, 0.35)",
 };
 
 // shared input styling for TextField & Autocomplete
