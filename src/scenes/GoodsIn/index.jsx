@@ -294,7 +294,7 @@ const GoodsIn = () => {
           }}
         >
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Goods In Table
+            Goods In
           </Typography>
 
           <IconButton

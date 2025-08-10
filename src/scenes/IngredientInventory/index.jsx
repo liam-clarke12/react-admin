@@ -129,7 +129,7 @@ const IngredientsInventory = () => {
         {/* Toolbar with Bar Chart toggle */}
         <Box className="inv-toolbar">
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Inventory Table
+            Ingredient Inventory
           </Typography>
           <IconButton
             onClick={() => setDrawerOpen(true)}
