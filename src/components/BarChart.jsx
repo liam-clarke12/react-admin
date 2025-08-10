@@ -1,70 +1,161 @@
+// src/components/BarChart.jsx
 import { ResponsiveBar } from "@nivo/bar";
 import { useTheme } from "@mui/material";
-import { tokens } from "../themes"; // Ensure this imports your color tokens
 
-const BarChart = ({ data, keys, indexBy, height = "500px", width = "100%" }) => {
+// Nory / Ruby-Rose tokens (scoped here so app theme can’t override)
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#e11d48",
+  primaryDark: "#be123c",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
+
+const BarChart = ({
+  data,
+  keys,
+  indexBy,
+  height = "500px",
+  width = "100%",
+  yLegend = "Units",
+  valueFormat = ">,.0f", // d3-format string
+}) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode); // Get colors based on the current theme mode
+  const isDark = theme.palette.mode === "dark";
 
-  // Define the theme to change the axis label and tick colors
-  const customTheme = {
+  const colors = {
+    bg: isDark ? "#0b1220" : brand.surface,
+    card: isDark ? "#111827" : brand.surface,
+    border: isDark ? "rgba(148,163,184,0.25)" : brand.border,
+    text: isDark ? "#e5e7eb" : brand.text,
+    subtext: isDark ? "#cbd5e1" : brand.subtext,
+    primary: brand.primary,
+    primaryDark: brand.primaryDark,
+  };
+
+  const nivoTheme = {
+    background: colors.bg,
+    textColor: colors.text,
+    fontSize: 12,
     axis: {
+      domain: { line: { stroke: colors.border } },
       ticks: {
-        text: {
-          fill: theme.palette.mode === "dark" ? colors.grey[100] : "#000000", // Set to black in light mode
-        },
+        line: { stroke: colors.border },
+        text: { fill: colors.subtext, fontWeight: 600 },
       },
-      legend: {
-        text: {
-          fill: theme.palette.mode === "dark" ? colors.grey[100] : "#000000", // Set to black in light mode
-        },
+      legend: { text: { fill: colors.subtext, fontWeight: 700 } },
+    },
+    grid: { line: { stroke: colors.border } },
+    legends: { text: { fill: colors.subtext } },
+    tooltip: {
+      container: {
+        background: colors.card,
+        color: colors.text,
+        borderRadius: 12,
+        boxShadow:
+          "0 8px 16px rgba(15,23,42,0.12), 0 2px 4px rgba(15,23,42,0.06)",
+        border: `1px solid ${colors.border}`,
       },
     },
   };
 
+  // Single brand gradient for all bars
+  const defs = [
+    {
+      id: "rubyGrad",
+      type: "linearGradient",
+      colors: [
+        { offset: 0, color: colors.primary },
+        { offset: 100, color: colors.primaryDark },
+      ],
+    },
+  ];
+  const fills = [{ match: "*", id: "rubyGrad" }];
+
   return (
-    <div style={{ height, width }}>
+    <div
+      style={{
+        height,
+        width,
+        border: `1px solid ${colors.border}`,
+        borderRadius: 16,
+        background: colors.card,
+        boxShadow: brand.shadow,
+        padding: 8,
+      }}
+    >
       <ResponsiveBar
         data={data}
         keys={keys}
         indexBy={indexBy}
-        margin={{ top: 50, right: 50, bottom: 60, left: 60 }} // Adjust margins for bigger chart
-        padding={0.3}
+        margin={{ top: 28, right: 24, bottom: 56, left: 64 }}
+        padding={0.36}
         valueScale={{ type: "linear" }}
         indexScale={{ type: "band", round: true }}
-        colors={(bar) => "#6870fa"} // Set bars to the desired color
-        borderColor={{
-          from: "color",
-          modifiers: [["darker", 1.6]],
-        }}
+        colors={() => colors.primary}
+        defs={defs}
+        fill={fills}
+        borderRadius={6}
+        enableGridX={false}
+        enableGridY={true}
         axisTop={null}
         axisRight={null}
         axisBottom={{
           tickSize: 5,
-          tickPadding: 5,
+          tickPadding: 8,
           tickRotation: 0,
-          legend: indexBy, // Use index field as legend (Ingredient)
+          legend: indexBy,
           legendPosition: "middle",
           legendOffset: 40,
-          tickTextColor: theme.palette.mode === "dark" ? colors.grey[100] : "#000000", // Set to black in light mode
         }}
         axisLeft={{
           tickSize: 5,
-          tickPadding: 5,
+          tickPadding: 8,
           tickRotation: 0,
-          legend: "Stock on Hand",
+          legend: yLegend,
           legendPosition: "middle",
-          legendOffset: -40,
-          tickTextColor: theme.palette.mode === "dark" ? colors.grey[100] : "#000000", // Set to black in light mode
+          legendOffset: -48,
         }}
-        labelSkipWidth={12}
-        labelSkipHeight={12}
-        labelTextColor="#ffffff" // Numbers on the bars in white
-        legends={[]} // Remove legends
+        labelSkipWidth={16}
+        labelSkipHeight={16}
+        labelTextColor="#ffffff"
+        valueFormat={valueFormat}
+        legends={[]}
+        animate={true}
+        motionConfig="gentle"
         role="application"
-        ariaLabel="Nivo bar chart"
-        barAriaLabel={(e) => `${e.id}: ${e.value} in ${e.indexValue}`} // Keep it simple
-        theme={customTheme} // Apply custom theme
+        ariaLabel="Bar chart"
+        barAriaLabel={(e) => `${e.id}: ${e.formattedValue} in ${e.indexValue}`}
+        theme={nivoTheme}
+        tooltip={({ indexValue, value, color, id }) => (
+          <div
+            style={{
+              padding: "8px 10px",
+              borderRadius: 10,
+              border: `1px solid ${colors.border}`,
+              background: colors.card,
+              color: colors.text,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontWeight: 700,
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                background: color,
+              }}
+            />
+            {String(indexValue)} · {new Intl.NumberFormat().format(value)}
+          </div>
+        )}
       />
     </div>
   );
