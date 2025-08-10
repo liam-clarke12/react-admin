@@ -1,4 +1,4 @@
-// src/scenes/recipes/Recipes.jsx  (adjust the path/name to match your project)
+// src/scenes/recipes/Recipes.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
@@ -11,14 +11,20 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
-/** Nory-like brand tokens */
+/** Nory-like brand tokens (Ruby / Rose) */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -149,7 +155,7 @@ const Recipes = () => {
           const list = ingredients.map((ing, i) => {
             const q = quantities[i] ?? "N/A";
             const u = units[i] ? ` ${units[i]}` : "";
-            return `${ ing }: ${ q }${ u }`;
+            return `${ing}: ${q}${u}`;
           });
           return (
             <Typography
@@ -187,6 +193,7 @@ const Recipes = () => {
           background: ${brand.surface};
         }
       `}</style>
+
       <Box className="recipes-card" mt={2}>
         {/* Toolbar with delete button */}
         <Box className="recipes-toolbar">
@@ -248,14 +255,14 @@ const Recipes = () => {
         </Box>
       </Box>
 
-      {/* Drawer showing Ingredients/Quantities */}
+      {/* Drawer — Minimal style for both Ingredients & Quantities */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={handleDrawerClose}
         PaperProps={{
           sx: {
-            width: 320,
+            width: 360,
             borderRadius: "20px 0 0 20px",
             border: `1px solid ${brand.border}`,
             boxShadow: brand.shadow,
@@ -263,7 +270,7 @@ const Recipes = () => {
           },
         }}
       >
-        {/* Drawer header */}
+        {/* Gradient header */}
         <Box
           sx={{
             display: "flex",
@@ -283,15 +290,65 @@ const Recipes = () => {
           </Typography>
         </Box>
 
-        {/* Drawer list */}
-        <Box p={2}>
-          <ul style={{ margin: 0, paddingInlineStart: 18 }}>
-            {drawerContent.map((item, idx) => (
-              <li key={idx} style={{ color: brand.text, marginBottom: 6 }}>
-                {item}
-              </li>
-            ))}
-          </ul>
+        {/* Body: minimal list with subtle zebra, ticks & quantity pill */}
+        <Box sx={{ background: brand.surface, p: 2 }}>
+          <List disablePadding>
+            {drawerContent.map((raw, idx) => {
+              // If Quantities, format "Name: value" into pill on the right
+              const isQty = drawerHeader.toLowerCase().includes("quantit");
+              let primaryText = raw;
+              let qty = null;
+
+              if (isQty && typeof raw === "string" && raw.includes(":")) {
+                const [name, rest] = raw.split(":");
+                primaryText = name.trim();
+                qty = (rest || "").trim();
+              }
+
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    borderRadius: 2,
+                    border: `1px solid ${brand.border}`,
+                    backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
+                    mb: 1,
+                    overflow: "hidden",
+                  }}
+                >
+                  <ListItem
+                    secondaryAction={
+                      qty ? (
+                        <Box
+                          component="span"
+                          sx={{
+                            borderRadius: 999,
+                            border: `1px solid ${brand.border}`,
+                            background: "#f1f5f9",
+                            px: 1.25,
+                            py: 0.25,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: brand.text,
+                          }}
+                        >
+                          {qty}
+                        </Box>
+                      ) : null
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <CheckRoundedIcon sx={{ color: brand.primary }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={primaryText}
+                      primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }}
+                    />
+                  </ListItem>
+                </Box>
+              );
+            })}
+          </List>
         </Box>
       </Drawer>
 
