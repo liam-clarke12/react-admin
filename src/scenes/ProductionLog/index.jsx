@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/scenes/production/ProductionLog.jsx  (adjust the path/name to your project)
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   useTheme,
@@ -8,24 +9,35 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Typography
+  Typography,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { tokens } from "../../themes";
-import Header from "../../components/Header";
 import { useAuth } from "../../contexts/AuthContext";
+
+/** Nory-like brand tokens */
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
 
 const ProductionLog = () => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
   const { cognitoId } = useAuth();
+
   const [productionLogs, setProductionLogs] = useState([]);
   const [recipesMap, setRecipesMap] = useState({});
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
-  // Fetch recipe data
+  // Fetch recipe data (unchanged behavior)
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
@@ -49,7 +61,7 @@ const ProductionLog = () => {
     fetchRecipeData();
   }, [cognitoId]);
 
-  // Fetch production logs and compute updated fields
+  // Fetch production logs and compute fields (same logic)
   useEffect(() => {
     if (!cognitoId || Object.keys(recipesMap).length === 0) return;
     const fetchProductionLogData = async () => {
@@ -64,10 +76,9 @@ const ProductionLog = () => {
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0;
-          const unitsOfWaste = Number(row.units_of_waste) || 0; // ✅ Fixed here
+          const unitsOfWaste = Number(row.units_of_waste) || 0;
           const upb = recipesMap[row.recipe] ?? 0;
           const unitsRemaining = Number(row.batchRemaining) - unitsOfWaste;
-
           return {
             date: row.date,
             recipe: row.recipe,
@@ -76,7 +87,7 @@ const ProductionLog = () => {
             unitsOfWaste,
             unitsRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
-            id: row.batchCode || `gen-${idx}-${Date.now()}`
+            id: row.batchCode || `gen-${idx}-${Date.now()}`,
           };
         });
 
@@ -88,10 +99,6 @@ const ProductionLog = () => {
 
     fetchProductionLogData();
   }, [cognitoId, recipesMap]);
-
-  const handleRowSelection = (selectedIds) => {
-    setSelectedRows(selectedIds);
-  };
 
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
@@ -106,7 +113,7 @@ const ProductionLog = () => {
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId })
+              body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
             }
           );
           if (!res.ok) throw new Error(`Failed to delete ${row.batchCode}`);
@@ -120,103 +127,161 @@ const ProductionLog = () => {
     }
   };
 
+  // Columns (unchanged semantics)
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1 },
+      { field: "recipe", headerName: "Recipe Name", flex: 1 },
+      {
+        field: "batchesProduced",
+        headerName: "Batches Produced",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      {
+        field: "unitsOfWaste",
+        headerName: "Units of Waste",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      {
+        field: "unitsRemaining",
+        headerName: "Units Remaining",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      { field: "batchCode", headerName: "Batch Code", flex: 1 },
+    ],
+    []
+  );
+
   return (
     <Box m="20px">
-      <Header title="DAILY PRODUCTION" subtitle="Track daily stock produced" />
+      {/* Local scoped styles so global theme can't override */}
+      <style>{`
+        .pl-card {
+          border: 1px solid ${brand.border};
+          background: ${brand.surface};
+          border-radius: 16px;
+          box-shadow: ${brand.shadow};
+          overflow: hidden;
+        }
+        .pl-toolbar {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; border-bottom: 1px solid ${brand.border};
+          background: ${brand.surface};
+        }
+      `}</style>
+      <Box className="pl-card" mt={2}>
+        {/* Toolbar with gradient delete icon */}
+        <Box className="pl-toolbar">
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>
+            Production Log
+          </Typography>
 
-      <Box sx={{ position: "relative", mb: 2 }}>
-        <IconButton
-          onClick={() => setOpenConfirmDialog(true)}
-          color="error"
+          <IconButton
+            aria-label="Delete selected"
+            onClick={() => setOpenConfirmDialog(true)}
+            disabled={selectedRows.length === 0}
+            sx={{
+              color: "#fff",
+              borderRadius: 999,
+              width: 40,
+              height: 40,
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              boxShadow:
+                "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+              "&:hover": {
+                background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
+              },
+              opacity: selectedRows.length === 0 ? 0.5 : 1,
+            }}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </Box>
+
+        {/* DataGrid */}
+        <Box
           sx={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            color: colors.blueAccent[500],
-            opacity: selectedRows.length === 0 ? 0.5 : 1
+            height: "70vh",
+            "& .MuiDataGrid-root": { border: "none", minWidth: "750px" },
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#fbfcfd",
+              color: brand.subtext,
+              borderBottom: `1px solid ${brand.border}`,
+              fontWeight: 800,
+            },
+            "& .MuiDataGrid-columnSeparator": { display: "none" },
+            "& .MuiDataGrid-cell": {
+              borderBottom: `1px solid ${brand.border}`,
+              color: brand.text,
+            },
+            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+            "& .MuiDataGrid-footerContainer": {
+              borderTop: `1px solid ${brand.border}`,
+              background: brand.surface,
+            },
           }}
-          disabled={selectedRows.length === 0}
         >
-          <DeleteIcon />
-        </IconButton>
+          <DataGrid
+            rows={productionLogs}
+            getRowId={(row) => row.id}
+            checkboxSelection
+            // DataGrid returns an array of selected ids:
+            onRowSelectionModelChange={(model) => setSelectedRows(model)}
+            columns={columns}
+          />
+        </Box>
       </Box>
 
-      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={() => setOpenConfirmDialog(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 14,
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Confirm Deletion
+        </DialogTitle>
         <DialogContent>
-          <Typography>
+          <Typography sx={{ color: brand.subtext }}>
             Are you sure you want to delete the selected row(s)?
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setOpenConfirmDialog(false)}
-            sx={{ color: colors.blueAccent[500] }}
-          >
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>
             Cancel
           </Button>
-          <Button onClick={handleDeleteSelectedRows} color="error">
+          <Button
+            onClick={handleDeleteSelectedRows}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={<DeleteIcon />}
+          >
             Confirm
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Box
-        m="40px 0 0 0"
-        height="75vh"
-        sx={{
-          overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "750px" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none"
-          },
-          "& .MuiDataGrid-virtualScroller": {
-            backgroundColor: colors.primary[400]
-          },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700]
-          }
-        }}
-      >
-        <DataGrid
-          rows={productionLogs}
-          getRowId={(row) => row.id}
-          checkboxSelection
-          onRowSelectionModelChange={handleRowSelection}
-          columns={[
-            { field: "date", headerName: "Date", flex: 1 },
-            { field: "recipe", headerName: "Recipe Name", flex: 1 },
-            {
-              field: "batchesProduced",
-              headerName: "Batches Produced",
-              type: "number",
-              flex: 1,
-              align: "left",
-              headerAlign: "left"
-            },
-            {
-              field: "unitsOfWaste",
-              headerName: "Units of Waste",
-              type: "number",
-              flex: 1,
-              align: "left",
-              headerAlign: "left"
-            },
-            {
-              field: "unitsRemaining",
-              headerName: "Units Remaining",
-              type: "number",
-              flex: 1,
-              align: "left",
-              headerAlign: "left"
-            },
-            { field: "batchCode", headerName: "Batch Code", flex: 1 }
-          ]}
-        />
-      </Box>
     </Box>
   );
 };

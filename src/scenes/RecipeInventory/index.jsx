@@ -1,28 +1,39 @@
-import React, { useState, useEffect } from "react";
+// src/scenes/inventory/RecipeInventory.jsx
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
-  useTheme,
   Drawer,
   Typography,
-  IconButton
+  IconButton,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import { tokens } from "../../themes";
-import Header from "../../components/Header";
 import BarChart from "../../components/BarChart";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
 
+/** Nory-like brand tokens */
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
+
 const RecipeInventory = () => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
   const { cognitoId } = useAuth();
   const { recipeInventory, setRecipeInventory } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Fetch and process production log
+  // Fetch and process production log (same behavior)
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -46,7 +57,7 @@ const RecipeInventory = () => {
               date: row.date,
               recipe: rec,
               totalUnits: rem - waste,
-              batchCode: row.batchCode
+              batchCode: row.batchCode,
             };
           } else {
             acc[rec].totalUnits += rem - waste;
@@ -59,7 +70,7 @@ const RecipeInventory = () => {
           date: g.date,
           recipe: g.recipe,
           unitsInStock: g.totalUnits,
-          batchCode: g.batchCode
+          batchCode: g.batchCode,
         }));
 
         setRecipeInventory(processed);
@@ -71,124 +82,157 @@ const RecipeInventory = () => {
     fetchAndProcess();
   }, [cognitoId, setRecipeInventory]);
 
-  const columns = [
-    { field: "date", headerName: "Date", flex: 1 },
-    { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    {
-      field: "unitsInStock",
-      headerName: "Units in Stock",
-      type: "number",
-      align: "left",
-      headerAlign: "left",
-      flex: 1
-    },
-    { field: "batchCode", headerName: "Batch Code", flex: 1 }
-  ];
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1 },
+      { field: "recipe", headerName: "Recipe Name", flex: 1 },
+      {
+        field: "unitsInStock",
+        headerName: "Units in Stock",
+        type: "number",
+        align: "left",
+        headerAlign: "left",
+        flex: 1,
+      },
+      { field: "batchCode", headerName: "Batch Code", flex: 1 },
+    ],
+    []
+  );
 
   const barChartData = recipeInventory.map((item) => ({
     recipe: item.recipe,
-    units: item.unitsInStock
+    units: item.unitsInStock,
   }));
 
   return (
     <Box m="20px">
-      <Header
-        title="STOCK INVENTORY"
-        subtitle="Track Your Stock Based on Production"
-      />
+      {/* Scoped styling to prevent theme overrides */}
+      <style>{`
+        .ri-card {
+          border: 1px solid ${brand.border};
+          background: ${brand.surface};
+          border-radius: 16px;
+          box-shadow: ${brand.shadow};
+          overflow: hidden;
+        }
+        .ri-toolbar {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; border-bottom: 1px solid ${brand.border};
+          background: ${brand.surface};
+        }
+        .pill-icon {
+          background: #f1f5f9;
+          border: 1px solid ${brand.border};
+          width: 40px; height: 40px; border-radius: 999px;
+        }
+        .pill-icon:hover { background: #e2e8f0; }
+      `}</style>
 
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <IconButton
-          onClick={() => setDrawerOpen(true)}
+      {/* Card container */}
+      <Box className="ri-card" mt={2}>
+        {/* Toolbar with Bar Chart toggle */}
+        <Box className="ri-toolbar">
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>
+            Recipe Inventory
+          </Typography>
+          <IconButton
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open bar chart"
+            className="pill-icon"
+            sx={{ color: brand.text }}
+          >
+            <BarChartOutlinedIcon />
+          </IconButton>
+        </Box>
+
+        {/* DataGrid */}
+        <Box
           sx={{
-            color: colors.blueAccent[300],
-            "&:hover": { backgroundColor: "transparent", color: colors.blueAccent[700] }
+            height: "70vh",
+            "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#fbfcfd",
+              color: brand.subtext,
+              borderBottom: `1px solid ${brand.border}`,
+              fontWeight: 800,
+            },
+            "& .MuiDataGrid-columnSeparator": { display: "none" },
+            "& .MuiDataGrid-cell": {
+              borderBottom: `1px solid ${brand.border}`,
+              color: brand.text,
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: brand.surfaceMuted,
+            },
+            "& .MuiDataGrid-footerContainer": {
+              borderTop: `1px solid ${brand.border}`,
+              background: brand.surface,
+            },
           }}
         >
-          <BarChartOutlinedIcon />
-        </IconButton>
+          <DataGrid
+            rows={recipeInventory}
+            columns={columns}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50]}
+            getRowId={(row) => row.id}
+          />
+        </Box>
       </Box>
 
-      <Box
-        m="40px 0 0 0"
-        height="75vh"
-        sx={{
-          overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none"
-          },
-          "& .MuiDataGrid-virtualScroller": {
-            backgroundColor: colors.primary[400]
-          },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700]
-          }
-        }}
-      >
-        <DataGrid
-          rows={recipeInventory}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          getRowId={(row) => row.id}
-        />
-      </Box>
-
+      {/* Drawer with Bar Chart */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         PaperProps={{
           sx: {
-            width: "90%",
+            width: "88%",
             borderRadius: "20px 0 0 20px",
-            overflow: "hidden"
-          }
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+            overflow: "hidden",
+          },
         }}
       >
-        <Box sx={{ backgroundColor: colors.primary[400], height: "100%" }}>
-          <Box
-            sx={{
-              width: "100%",
-              height: "50px",
-              backgroundColor: colors.blueAccent[500],
-              color: colors.grey[100],
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-              padding: "0 10px"
-            }}
-          >
-            <IconButton
-              onClick={() => setDrawerOpen(false)}
-              sx={{ color: "white", position: "absolute", left: 10 }}
-            >
-              <MenuOutlinedIcon />
-            </IconButton>
-            <Typography variant="h6" sx={{ fontWeight: "bold", color: "white" }}>
-              Units in Stock Chart
-            </Typography>
-          </Box>
+        {/* Drawer header (gradient) */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1.25,
+            color: "#fff",
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+          }}
+        >
+          <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "#fff" }}>
+            <MenuOutlinedIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+            Units in Stock Chart
+          </Typography>
+        </Box>
 
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            sx={{ width: "100%", height: "70%", mt: 2 }}
-          >
-            <BarChart
-              data={barChartData}
-              keys={["units"]}
-              indexBy="recipe"
-              height="500px"
-              width="90%"
-            />
-          </Box>
+        {/* Drawer body */}
+        <Box
+          sx={{
+            background: brand.surface,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            px: 2,
+            py: 3,
+          }}
+        >
+          <BarChart
+            data={barChartData}
+            keys={["units"]}
+            indexBy="recipe"
+            height="500px"
+            width="95%"
+          />
         </Box>
       </Drawer>
     </Box>

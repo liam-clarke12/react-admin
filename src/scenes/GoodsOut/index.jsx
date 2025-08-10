@@ -1,21 +1,27 @@
-import React, { useState, useEffect } from "react";
-import {
-  Box,
-  useTheme,
-  Drawer,
-  Typography,
-  IconButton,
-} from "@mui/material";
+// src/scenes/goodsout/GoodsOut.jsx  (adjust the path/name to your project)
+import React, { useState, useEffect, useMemo } from "react";
+import { Box, Drawer, Typography, IconButton } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
-import { tokens } from "../../themes";
-import Header from "../../components/Header";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 
+/** Nory-like brand tokens (scoped so theme overrides won’t fight these) */
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+};
+
 const GoodsOut = () => {
-  const { cognitoId } = useAuth();
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
+  const { cognitoId } = useAuth();
 
   const [goodsOut, setGoodsOut] = useState([]);
   const [recipesMap, setRecipesMap] = useState({});
@@ -65,184 +71,201 @@ const GoodsOut = () => {
   }, [cognitoId]);
 
   const handleDrawerOpen = (header, content) => {
-    let formattedContent;
-
     if (header === "Batchcodes") {
       const { batchcodes, quantitiesUsed, recipe } = content;
       const upb = recipesMap[recipe] || 0;
 
-      formattedContent = batchcodes.map((batchCode, idx) => {
-        const batches = quantitiesUsed[idx] || 0;
+      const items = (batchcodes || []).map((batchCode, idx) => {
+        const batches = (quantitiesUsed || [])[idx] || 0;
         const units = batches * upb;
-        return (
-          <div key={idx}>
-            {batchCode}: {units.toLocaleString()} units
-          </div>
-        );
+        return `${batchCode}: ${units.toLocaleString()} units`;
       });
-    } else {
-      formattedContent = ["No data available"];
+
+      setDrawerHeader(header);
+      setDrawerContent(items);
+      setDrawerOpen(true);
+      return;
     }
 
     setDrawerHeader(header);
-    setDrawerContent(formattedContent);
+    setDrawerContent(["No data available"]);
     setDrawerOpen(true);
   };
 
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-  };
+  const handleDrawerClose = () => setDrawerOpen(false);
 
-  const columns = [
-    { field: "date", headerName: "Date", flex: 1 },
-    { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    {
-      field: "stockAmount",
-      headerName: "Units Going Out",
-      type: "number",
-      flex: 1,
-      headerAlign: "left",
-      align: "left",
-    },
-    {
-      field: "batchcodes",
-      headerName: "Batchcodes",
-      flex: 1,
-      renderCell: (params) => {
-        let batchcodes = [];
-        let quantitiesUsed = [];
-
-        try {
-          batchcodes = Array.isArray(params.row.batchcodes)
-            ? params.row.batchcodes
-            : JSON.parse(params.row.batchcodes || "[]");
-          quantitiesUsed = Array.isArray(params.row.quantitiesUsed)
-            ? params.row.quantitiesUsed
-            : JSON.parse(params.row.quantitiesUsed || "[]");
-        } catch (e) {
-          console.error("Failed to parse batchcodes:", e);
-        }
-
-        return (
-          <span
-            style={{ cursor: "pointer", color: colors.blueAccent[500] }}
-            onClick={() =>
-              handleDrawerOpen("Batchcodes", {
-                batchcodes,
-                quantitiesUsed,
-                recipe: params.row.recipe,
-              })
-            }
-          >
-            Show Batchcodes
-          </span>
-        );
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1 },
+      { field: "recipe", headerName: "Recipe Name", flex: 1 },
+      {
+        field: "stockAmount",
+        headerName: "Units Going Out",
+        type: "number",
+        flex: 1,
+        headerAlign: "left",
+        align: "left",
       },
-    },
-    {
-      field: "recipients",
-      headerName: "Recipients",
-      flex: 1,
-      headerAlign: "left",
-      align: "left",
-    },
-  ];
+      {
+        field: "batchcodes",
+        headerName: "Batchcodes",
+        flex: 1,
+        renderCell: (params) => {
+          let batchcodes = [];
+          let quantitiesUsed = [];
+          try {
+            batchcodes = Array.isArray(params.row.batchcodes)
+              ? params.row.batchcodes
+              : JSON.parse(params.row.batchcodes || "[]");
+            quantitiesUsed = Array.isArray(params.row.quantitiesUsed)
+              ? params.row.quantitiesUsed
+              : JSON.parse(params.row.quantitiesUsed || "[]");
+          } catch (e) {
+            console.error("Failed to parse batchcodes:", e);
+          }
+
+          return (
+            <Typography
+              sx={{
+                cursor: "pointer",
+                color: brand.primary,
+                fontWeight: 600,
+                "&:hover": { color: brand.primaryDark },
+              }}
+              onClick={() =>
+                handleDrawerOpen("Batchcodes", {
+                  batchcodes,
+                  quantitiesUsed,
+                  recipe: params.row.recipe,
+                })
+              }
+            >
+              Show Batchcodes
+            </Typography>
+          );
+        },
+      },
+      {
+        field: "recipients",
+        headerName: "Recipients",
+        flex: 1,
+        headerAlign: "left",
+        align: "left",
+      },
+    ],
+    [recipesMap]
+  );
 
   return (
     <Box m="20px">
-      <Header title="GOODS OUT" subtitle="Track Goods Out Information" />
+      {/* Scoped styles to lock in the Nory look */}
+      <style>{`
+        .go-card {
+          border: 1px solid ${brand.border};
+          background: ${brand.surface};
+          border-radius: 16px;
+          box-shadow: ${brand.shadow};
+          overflow: hidden;
+        }
+        .go-toolbar {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; border-bottom: 1px solid ${brand.border};
+          background: ${brand.surface};
+        }
+      `}</style>
+      <Box className="go-card" mt={2}>
+        {/* Toolbar */}
+        <Box className="go-toolbar">
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>
+            Goods Out
+          </Typography>
+        </Box>
 
-      <Box
-        m="40px 0 0 0"
-        height="75vh"
-        sx={{
-          overflowX: "auto",
-          "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
-          "& .MuiDataGrid-cell": { borderBottom: "none" },
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: "none",
-          },
-          "& .MuiDataGrid-virtualScroller": {
-            backgroundColor: colors.primary[400],
-          },
-          "& .MuiDataGrid-footerContainer": {
-            borderTop: "none",
-            backgroundColor: colors.blueAccent[700],
-          },
-          "& .even-row": {
-            backgroundColor: colors.primary[450],
-          },
-          "& .odd-row": {
-            backgroundColor: colors.primary[400],
-          },
-        }}
-      >
-        <Drawer
-          anchor="right"
-          open={drawerOpen}
-          onClose={handleDrawerClose}
+        {/* DataGrid */}
+        <Box
           sx={{
-            "& .MuiDrawer-paper": {
-              borderRadius: "20px 0 0 20px",
-              overflow: "hidden",
+            height: "70vh",
+            "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#fbfcfd",
+              color: brand.subtext,
+              borderBottom: `1px solid ${brand.border}`,
+              fontWeight: 800,
+            },
+            "& .MuiDataGrid-columnSeparator": { display: "none" },
+            "& .MuiDataGrid-cell": {
+              borderBottom: `1px solid ${brand.border}`,
+              color: brand.text,
+            },
+            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+            "& .MuiDataGrid-footerContainer": {
+              borderTop: `1px solid ${brand.border}`,
+              background: brand.surface,
             },
           }}
         >
-          <Box width="300px" p={0}>
-            <Box
-              sx={{
-                width: "100%",
-                backgroundColor: colors.blueAccent[500],
-                color: colors.grey[100],
-                padding: "10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <IconButton
-                onClick={handleDrawerClose}
-                sx={{ color: "white", position: "absolute", left: 10 }}
-              >
-                <MenuOutlinedIcon />
-              </IconButton>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "white" }}
-              >
-                {drawerHeader}
-              </Typography>
-            </Box>
-
-            <Box p={2}>
-              <ul>
-                {drawerContent.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </Box>
-          </Box>
-        </Drawer>
-
-        <DataGrid
-          rows={
-            Array.isArray(goodsOut)
-              ? goodsOut.map((row, idx) => ({
-                  ...row,
-                  id: row.id || `${row.recipe}-${idx}`,
-                  rowClassName: idx % 2 === 0 ? "even-row" : "odd-row",
-                }))
-              : []
-          }
-          columns={columns}
-          getRowId={(row) => row.id}
-          disableSelectionOnClick
-          getRowClassName={(params) =>
-            params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row"
-          }
-        />
+          <DataGrid
+            rows={
+              Array.isArray(goodsOut)
+                ? goodsOut.map((row, idx) => ({
+                    ...row,
+                    id: row.id || `${row.recipe}-${idx}`,
+                  }))
+                : []
+            }
+            columns={columns}
+            getRowId={(row) => row.id}
+            disableSelectionOnClick
+          />
+        </Box>
       </Box>
+
+      {/* Drawer for batchcodes */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        PaperProps={{
+          sx: {
+            width: 320,
+            borderRadius: "20px 0 0 20px",
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Drawer header (gradient) */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1.25,
+            color: "#fff",
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+          }}
+        >
+          <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
+            <MenuOutlinedIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+            {drawerHeader}
+          </Typography>
+        </Box>
+
+        {/* Drawer content */}
+        <Box p={2} sx={{ background: brand.surface }}>
+          <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+            {drawerContent.map((item, index) => (
+              <li key={index} style={{ color: brand.text, marginBottom: 6 }}>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Box>
+      </Drawer>
     </Box>
   );
 };
