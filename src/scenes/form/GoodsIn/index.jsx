@@ -15,17 +15,81 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Paper,
+  Typography,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { Formik } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import Header from "../../../components/Header";
+import Header from "../../components/Header";
 import AddIcon from "@mui/icons-material/Add";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+/**
+ * Visual theme tokens for a Nory-like style:
+ * - Clean white card, soft shadow, 16px+ radii
+ * - Neutral slate text, subtle gray borders
+ * - Vivid primary blue button with slight gradient and pill shape
+ */
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  inputBg: "#ffffff",
+  surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  primary: "#2563eb",
+  primaryDark: "#1d4ed8",
+  focusRing: "rgba(37, 99, 235, 0.35)",
+};
+
+// shared input styling for TextField & Autocomplete
+const inputSx = {
+  "& .MuiInputLabel-root": {
+    color: brand.subtext,
+    fontWeight: 600,
+    letterSpacing: 0.2,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: brand.primary,
+  },
+  "& .MuiOutlinedInput-root": {
+    backgroundColor: brand.inputBg,
+    borderRadius: 12,
+    "& fieldset": {
+      borderColor: brand.border,
+    },
+    "&:hover fieldset": {
+      borderColor: brand.primary,
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: brand.primary,
+      boxShadow: `0 0 0 4px ${brand.focusRing}`,
+    },
+    "& input, & textarea": {
+      paddingTop: "14px",
+      paddingBottom: "14px",
+    },
+  },
+};
+
+// select styling to match textfields
+const selectSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 12,
+    "& fieldset": { borderColor: brand.border },
+    "&:hover fieldset": { borderColor: brand.primary },
+    "&.Mui-focused fieldset": {
+      borderColor: brand.primary,
+      boxShadow: `0 0 0 4px ${brand.focusRing}`,
+    },
+  },
+  "& .MuiInputLabel-root.Mui-focused": { color: brand.primary },
+};
 
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
@@ -46,8 +110,8 @@ const GoodsInForm = () => {
   // merge for dropdown
   const ingredients = useMemo(
     () => [
-      ...masterIngredients.map(i => ({ ...i, source: "master" })),
-      ...customIngredients.map(i => ({ ...i, source: "custom" }))
+      ...masterIngredients.map((i) => ({ ...i, source: "master" })),
+      ...customIngredients.map((i) => ({ ...i, source: "custom" })),
     ],
     [masterIngredients, customIngredients]
   );
@@ -63,12 +127,12 @@ const GoodsInForm = () => {
     if (!cognitoId) return;
     setLoadingMaster(true);
     fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
-      .then(res => {
+      .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch ingredients");
         return res.json();
       })
-      .then(data => setMasterIngredients(data))
-      .catch(err => console.error("Error fetching master:", err))
+      .then((data) => setMasterIngredients(data))
+      .catch((err) => console.error("Error fetching master:", err))
       .finally(() => setLoadingMaster(false));
   }, [cognitoId]);
 
@@ -77,14 +141,14 @@ const GoodsInForm = () => {
     if (!cognitoId) return;
     setLoadingCustom(true);
     fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
-      .then(res => {
+      .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch custom ingredients");
         return res.json();
       })
-      .then(data =>
-        setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name })))
+      .then((data) =>
+        setCustomIngredients(data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })))
       )
-      .catch(err => console.error("Error fetching custom:", err))
+      .catch((err) => console.error("Error fetching custom:", err))
       .finally(() => setLoadingCustom(false));
   }, [cognitoId]);
 
@@ -102,17 +166,17 @@ const GoodsInForm = () => {
       const res = await fetch(`${API_BASE}/custom-ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredient.trim() })
+        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredient.trim() }),
       });
       if (!res.ok) throw new Error("Failed to add ingredient");
       // refresh custom list
       const updated = await fetch(
         `${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`
-      ).then(r => {
+      ).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch updated custom");
         return r.json();
       });
-      setCustomIngredients(updated.map(ci => ({ id: `c-${ci.id}`, name: ci.name })));
+      setCustomIngredients(updated.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })));
       closeAddDialog();
     } catch (err) {
       console.error("Error adding custom ingredient:", err);
@@ -129,7 +193,7 @@ const GoodsInForm = () => {
       const res = await fetch(`${API_BASE}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Submit failed");
       resetForm();
@@ -168,176 +232,231 @@ const GoodsInForm = () => {
     <Box m="20px">
       <Header title="GOODS IN" subtitle="Record Stock Movement (Goods In)" />
 
-      <Formik
-        onSubmit={handleFormSubmit}
-        initialValues={initialValues}
-        validationSchema={goodsInSchema}
+      {/* Card container for a clean, app-like surface */}
+      <Paper
+        elevation={0}
+        sx={{
+          mt: 2,
+          p: { xs: 2, sm: 3 },
+          borderRadius: 16,
+          border: `1px solid ${brand.border}`,
+          background: brand.surface,
+          boxShadow:
+            "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+        }}
       >
-        {({
-          values,
-          errors,
-          touched,
-          handleBlur,
-          handleChange,
-          handleSubmit,
-          setFieldValue
-        }) => {
-          const selected = ingredients.find(i => i.id === values.ingredient) || null;
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 800, color: brand.text, mb: 1 }}
+        >
+          Record Goods In
+        </Typography>
+        <Typography variant="body2" sx={{ color: brand.subtext, mb: 3 }}>
+          Fill out the details below and hit Record.
+        </Typography>
 
-          return (
-            <form onSubmit={handleSubmit}>
-              <Box
-                display="grid"
-                gap="30px"
-                gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
-              >
-                {/* Date */}
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  type="date"
-                  label="Date"
-                  name="date"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.date}
-                  error={!!touched.date && !!errors.date}
-                  helperText={touched.date && errors.date}
-                  sx={{ gridColumn: "span 2" }}
-                />
+        <Formik
+          onSubmit={handleFormSubmit}
+          initialValues={initialValues}
+          validationSchema={goodsInSchema}
+        >
+          {({
+            values,
+            errors,
+            touched,
+            handleBlur,
+            handleChange,
+            handleSubmit,
+            setFieldValue,
+          }) => {
+            const selected =
+              ingredients.find((i) => i.id === values.ingredient) || null;
 
-                {/* Ingredient */}
-                <Box sx={{ gridColumn: "span 2" }}>
-                  <Autocomplete
-                    options={ingredients}
-                    getOptionLabel={opt => opt.name}
-                    loading={loadingMaster || loadingCustom}
-                    value={selected}
-                    onChange={(_, newVal) =>
-                      setFieldValue("ingredient", newVal ? newVal.id : "")
-                    }
-                    openOnFocus={false}
-                    filterSelectedOptions
-                    renderInput={params => (
-                      <TextField
-                        {...params}
-                        label="Ingredient"
-                        name="ingredient"
-                        onBlur={handleBlur}
-                        error={!!touched.ingredient && !!errors.ingredient}
-                        helperText={touched.ingredient && errors.ingredient}
-                        InputProps={{
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {(loadingMaster || loadingCustom) && (
-                                <CircularProgress color="inherit" size={20} />
-                              )}
-                              {params.InputProps.endAdornment}
-                            </>
-                          )
-                        }}
-                        sx={{ width: "100%" }}
-                      />
-                    )}
+            return (
+              <form onSubmit={handleSubmit}>
+                <Box
+                  display="grid"
+                  gap="20px"
+                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                  sx={{
+                    "& > div": { gridColumn: isNonMobile ? undefined : "span 4" },
+                  }}
+                >
+                  {/* Date */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="date"
+                    label="Date"
+                    name="date"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.date}
+                    error={!!touched.date && !!errors.date}
+                    helperText={touched.date && errors.date}
+                    sx={{ gridColumn: "span 2", ...inputSx }}
                   />
-                  {/* Add button below dropdown */}
-                  <Box textAlign="right" mt={1}>
-                    <Button size="small" onClick={openAddDialog}>
-                      Add Ingredient +
-                    </Button>
+
+                  {/* Ingredient */}
+                  <Box sx={{ gridColumn: "span 2" }}>
+                    <Autocomplete
+                      options={ingredients}
+                      getOptionLabel={(opt) => opt.name}
+                      loading={loadingMaster || loadingCustom}
+                      value={selected}
+                      onChange={(_, newVal) =>
+                        setFieldValue("ingredient", newVal ? newVal.id : "")
+                      }
+                      openOnFocus={false}
+                      filterSelectedOptions
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Ingredient"
+                          name="ingredient"
+                          onBlur={handleBlur}
+                          error={!!touched.ingredient && !!errors.ingredient}
+                          helperText={touched.ingredient && errors.ingredient}
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {(loadingMaster || loadingCustom) && (
+                                  <CircularProgress color="inherit" size={20} />
+                                )}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                          sx={inputSx}
+                        />
+                      )}
+                    />
+                    <Box textAlign="right" mt={1}>
+                      <Button
+                        size="small"
+                        onClick={openAddDialog}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 700,
+                          color: brand.primary,
+                          "&:hover": { color: brand.primaryDark, bgColor: "transparent" },
+                        }}
+                      >
+                        Add Ingredient +
+                      </Button>
+                    </Box>
                   </Box>
+
+                  {/* Stock Received */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="number"
+                    label="Stock Received"
+                    name="stockReceived"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.stockReceived}
+                    error={!!touched.stockReceived && !!errors.stockReceived}
+                    helperText={touched.stockReceived && errors.stockReceived}
+                    sx={{ gridColumn: "span 1", ...inputSx }}
+                  />
+
+                  {/* Unit */}
+                  <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                    <InputLabel id="unit-label">Metric</InputLabel>
+                    <Select
+                      labelId="unit-label"
+                      name="unit"
+                      value={values.unit}
+                      label="Metric"
+                      onChange={handleChange}
+                    >
+                      {unitOptions.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* Bar Code */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="text"
+                    label="Bar Code"
+                    name="barCode"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.barCode}
+                    error={!!touched.barCode && !!errors.barCode}
+                    helperText={touched.barCode && errors.barCode}
+                    sx={{ gridColumn: "span 2", ...inputSx }}
+                  />
+
+                  {/* Expiry Date */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="date"
+                    label="Expiry Date"
+                    name="expiryDate"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.expiryDate}
+                    error={!!touched.expiryDate && !!errors.expiryDate}
+                    helperText={touched.expiryDate && errors.expiryDate}
+                    sx={{ gridColumn: "span 2", ...inputSx }}
+                  />
+
+                  {/* Temperature */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="text"
+                    label="Temperature (℃)"
+                    name="temperature"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.temperature}
+                    error={!!touched.temperature && !!errors.temperature}
+                    helperText={touched.temperature && errors.temperature}
+                    sx={{ gridColumn: "span 2", ...inputSx }}
+                  />
                 </Box>
 
-                {/* Stock Received */}
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  type="number"
-                  label="Stock Received"
-                  name="stockReceived"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.stockReceived}
-                  error={!!touched.stockReceived && !!errors.stockReceived}
-                  helperText={touched.stockReceived && errors.stockReceived}
-                  sx={{ gridColumn: "span 1" }}
-                />
-
-                {/* Unit */}
-                <FormControl fullWidth sx={{ gridColumn: "span 1" }}>
-                  <InputLabel id="unit-label">Metric</InputLabel>
-                  <Select
-                    labelId="unit-label"
-                    name="unit"
-                    value={values.unit}
-                    label="Metric"
-                    onChange={handleChange}
+                {/* Primary action: Extended FAB styled as a pill primary button */}
+                <Box display="flex" justifyContent="center" mt={3}>
+                  <Fab
+                    variant="extended"
+                    onClick={handleSubmit}
+                    sx={{
+                      px: 4,
+                      py: 1.25,
+                      gap: 1,
+                      borderRadius: 999,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      boxShadow:
+                        "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                      background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                      color: "#fff",
+                      "&:hover": {
+                        background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
+                      },
+                    }}
                   >
-                    {unitOptions.map(opt => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                {/* Bar Code */}
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  type="text"
-                  label="Bar Code"
-                  name="barCode"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.barCode}
-                  error={!!touched.barCode && !!errors.barCode}
-                  helperText={touched.barCode && errors.barCode}
-                  sx={{ gridColumn: "span 2" }}
-                />
-
-                {/* Expiry Date */}
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  type="date"
-                  label="Expiry Date"
-                  name="expiryDate"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.expiryDate}
-                  error={!!touched.expiryDate && !!errors.expiryDate}
-                  helperText={touched.expiryDate && errors.expiryDate}
-                  sx={{ gridColumn: "span 2" }}
-                />
-
-                {/* Temperature */}
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  type="text"
-                  label="Temperature (℃)"
-                  name="temperature"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  value={values.temperature}
-                  error={!!touched.temperature && !!errors.temperature}
-                  helperText={touched.temperature && errors.temperature}
-                  sx={{ gridColumn: "span 2" }}
-                />
-              </Box>
-
-              <Box display="flex" justifyContent="center" mt="20px">
-                <Fab color="secondary" onClick={handleSubmit}>
-                  <AddIcon fontSize="large" />
-                </Fab>
-              </Box>
-            </form>
-          );
-        }}
-      </Formik>
+                    <AddIcon />
+                    Record Stock
+                  </Fab>
+                </Box>
+              </form>
+            );
+          }}
+        </Formik>
+      </Paper>
 
       <Snackbar
         open={openSnackbar}
@@ -345,14 +464,34 @@ const GoodsInForm = () => {
         onClose={() => setOpenSnackbar(false)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert onClose={() => setOpenSnackbar(false)} severity="success">
+        <Alert
+          onClose={() => setOpenSnackbar(false)}
+          severity="success"
+          sx={{
+            fontWeight: 700,
+            borderRadius: 2,
+            "& .MuiAlert-icon": { color: brand.primary },
+          }}
+        >
           Stock has been successfully recorded!
         </Alert>
       </Snackbar>
 
       {/* Add Ingredient Dialog */}
-      <Dialog open={addDialogOpen} onClose={closeAddDialog} fullWidth>
-        <DialogTitle>Add New Ingredient</DialogTitle>
+      <Dialog
+        open={addDialogOpen}
+        onClose={closeAddDialog}
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 14,
+            border: `1px solid ${brand.border}`,
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Add New Ingredient
+        </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -360,15 +499,32 @@ const GoodsInForm = () => {
             label="Ingredient Name"
             fullWidth
             value={newIngredient}
-            onChange={e => setNewIngredient(e.target.value)}
+            onChange={(e) => setNewIngredient(e.target.value)}
+            sx={inputSx}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeAddDialog} disabled={adding}>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={closeAddDialog}
+            disabled={adding}
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleAddIngredient} disabled={adding}>
-            {adding ? <CircularProgress size={20} /> : "Add"}
+          <Button
+            onClick={handleAddIngredient}
+            disabled={adding}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 3,
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+          >
+            {adding ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Add"}
           </Button>
         </DialogActions>
       </Dialog>
