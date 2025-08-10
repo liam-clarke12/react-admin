@@ -28,6 +28,14 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+/** Toggle verbose logging here if needed */
+const DEBUG = true;
+const dlog = (...args) => {
+  if (DEBUG) console.log("[GoodsOut]", ...args);
+};
+const dgroup = (label) => DEBUG && console.groupCollapsed(label);
+const dgroupEnd = () => DEBUG && console.groupEnd();
+
 const GoodsOut = () => {
   const { cognitoId } = useAuth();
 
@@ -35,7 +43,7 @@ const GoodsOut = () => {
   const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerItems, setDrawerItems] = useState([]); // array of {code, unitsLabel}
+  const [drawerItems, setDrawerItems] = useState([]); // array of { code, unitsLabel }
 
   // --- helpers ---------------------------------------------------------------
 
@@ -46,13 +54,22 @@ const GoodsOut = () => {
     try {
       const parsed = JSON.parse(val);
       return parsed == null ? fallback : parsed;
-    } catch {
+    } catch (e) {
+      dlog("safeParse: value not JSON, returning fallback. Value:", val);
       return fallback;
     }
   };
 
   // Normalize row batchcodes/quantities into [{ code, batches }]
   const normalizeRowPairs = (row) => {
+    dgroup("normalizeRowPairs()");
+    dlog("Raw row snippet:", {
+      date: row?.date,
+      recipe: row?.recipe,
+      batchcodes: row?.batchcodes,
+      quantitiesUsed: row?.quantitiesUsed,
+    });
+
     // Accept multiple possible field names just in case
     const rawCodes =
       row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes ?? null;
@@ -63,19 +80,24 @@ const GoodsOut = () => {
       row.quantities_used ??
       null;
 
+    dlog("Raw codes field:", rawCodes);
+    dlog("Raw quantities field:", rawQuantities);
+
     const codesParsed = safeParse(rawCodes, []);
     const qtyParsed = safeParse(rawQuantities, []);
 
-    // Cases:
+    dlog("Parsed codes:", codesParsed);
+    dlog("Parsed quantities:", qtyParsed);
+
+    // Cases we support:
     // 1) codesParsed = ['B1','B2'], qtyParsed = [2,1]
     // 2) codesParsed = [{code:'B1', qty:2}, {code:'B2', qty:1}]
-    // 3) codesParsed is an object map: { B1:2, B2:1 } (rare but handle it)
-    // 4) qtyParsed is an object map keyed by code
-
+    // 3) codesParsed is an object map: { B1:2, B2:1 }
+    // 4) qtyParsed is an object map keyed by code (works with (1))
     const pairs = [];
 
     if (Array.isArray(codesParsed) && codesParsed.length) {
-      // array of strings or objects
+      dlog("Branch: codesParsed is Array");
       codesParsed.forEach((c, i) => {
         if (typeof c === "string") {
           const batches =
@@ -93,11 +115,13 @@ const GoodsOut = () => {
           pairs.push({ code, batches });
         }
       });
+      dlog("Normalized pairs (array branch):", pairs);
+      dgroupEnd();
       return pairs;
     }
 
     if (codesParsed && typeof codesParsed === "object") {
-      // object map { code: qty }
+      dlog("Branch: codesParsed is Object map");
       Object.entries(codesParsed).forEach(([code, batches]) => {
         // qtyParsed may override if present
         const override =
@@ -107,30 +131,42 @@ const GoodsOut = () => {
           batches: Number(override ?? batches) || 0,
         });
       });
+      dlog("Normalized pairs (object map branch):", pairs);
+      dgroupEnd();
       return pairs;
     }
 
-    // If we only have quantities as an array (no codes), make a best-effort
     if (Array.isArray(qtyParsed)) {
-      return qtyParsed.map((q, i) => ({
+      dlog("Branch: only quantities array present, synthesizing codes");
+      const synthesized = qtyParsed.map((q, i) => ({
         code: `Batch ${i + 1}`,
         batches: Number(q) || 0,
       }));
+      dlog("Normalized pairs (synthesized):", synthesized);
+      dgroupEnd();
+      return synthesized;
     }
 
+    dlog("No recognizable codes/quantities; returning empty array.");
+    dgroupEnd();
     return [];
   };
 
   // Turn normalized pairs into display items with units computed from recipe map
   const buildDrawerItems = (row, upb) => {
+    dgroup("buildDrawerItems()");
+    dlog("Row recipe:", row?.recipe, "units_per_batch:", upb);
     const pairs = normalizeRowPairs(row);
-    return pairs.map(({ code, batches }) => {
+    const items = pairs.map(({ code, batches }) => {
       const units =
         upb && Number.isFinite(upb) && upb > 0 ? batches * upb : null;
       const unitsLabel =
         units != null ? `${units.toLocaleString()} units` : `${batches} batch(es)`;
       return { code, unitsLabel };
     });
+    dlog("Drawer items to render:", items);
+    dgroupEnd();
+    return items;
   };
 
   // --- effects ---------------------------------------------------------------
@@ -139,20 +175,28 @@ const GoodsOut = () => {
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipes = async () => {
+      dgroup("fetchRecipes()");
       try {
         const res = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
         );
+        dlog("HTTP status:", res.status);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
+        dlog("Raw recipes length:", Array.isArray(data) ? data.length : "n/a");
+
         const map = {};
-        data.forEach((r, idx) => {
+        (Array.isArray(data) ? data : []).forEach((r, idx) => {
           const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
           map[String(key)] = Number(r.units_per_batch) || 0;
         });
+
+        dlog("units_per_batch map:", map);
         setRecipesMap(map);
       } catch (err) {
-        console.error("Error fetching recipes:", err);
+        console.error("[GoodsOut] Error fetching recipes:", err);
+      } finally {
+        dgroupEnd();
       }
     };
     fetchRecipes();
@@ -162,15 +206,22 @@ const GoodsOut = () => {
   useEffect(() => {
     if (!cognitoId) return;
     const fetchGoodsOutData = async () => {
+      dgroup("fetchGoodsOutData()");
       try {
         const response = await fetch(
           `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`
         );
+        dlog("HTTP status:", response.status);
         if (!response.ok) throw new Error("Failed to fetch goods out");
         const data = await response.json();
-        setGoodsOut(Array.isArray(data) ? data : []);
+        const arr = Array.isArray(data) ? data : [];
+        dlog("Goods-out rows:", arr.length);
+        dlog("Preview first 3 rows:", arr.slice(0, 3));
+        setGoodsOut(arr);
       } catch (error) {
-        console.error("Error fetching goods out:", error);
+        console.error("[GoodsOut] Error fetching goods out:", error);
+      } finally {
+        dgroupEnd();
       }
     };
     fetchGoodsOutData();
@@ -179,15 +230,22 @@ const GoodsOut = () => {
   // --- drawer handlers -------------------------------------------------------
 
   const handleDrawerOpenForRow = (row) => {
+    dgroup("handleDrawerOpenForRow()");
+    dlog("Clicked row:", row);
     const recipeKey = String(row.recipe ?? "");
     const upb = recipesMap[recipeKey] || 0;
+    dlog("Resolved recipeKey:", recipeKey, "UPB:", upb);
     const items = buildDrawerItems(row, upb);
     setDrawerHeader("Batchcodes");
     setDrawerItems(items);
     setDrawerOpen(true);
+    dgroupEnd();
   };
 
-  const handleDrawerClose = () => setDrawerOpen(false);
+  const handleDrawerClose = () => {
+    dlog("Drawer closed");
+    setDrawerOpen(false);
+  };
 
   // --- table columns ---------------------------------------------------------
 
