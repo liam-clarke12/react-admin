@@ -244,9 +244,10 @@ const Dashboard = () => {
     const activeBarcodes = new Set(inventory.map((r) => r.barcode).filter(Boolean)).size;
     const lowStockCount = inventory.filter((r) => (Number(r.stockOnHand) || 0) <= 10).length;
 
+    // ⬇️ Top 4 by stock
     const topIngredients = [...inventory]
       .sort((a, b) => (b.stockOnHand || 0) - (a.stockOnHand || 0))
-      .slice(0, 12)
+      .slice(0, 4)
       .map((r) => ({ ingredient: r.ingredient, amount: Number(r.stockOnHand) || 0 }));
 
     const nextToRunList = [...inventory]
@@ -395,7 +396,7 @@ const Dashboard = () => {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <BarChartOutlinedIcon sx={{ color: brand.primary }} />
             <Typography sx={{ fontWeight: 800, color: brand.text }}>
-              Inventory (Top 12 by stock)
+              Inventory (Top 4 by stock)
             </Typography>
           </Box>
           <Box sx={{ flex: 1, minHeight: 260, display: "grid", placeItems: "center" }}>
