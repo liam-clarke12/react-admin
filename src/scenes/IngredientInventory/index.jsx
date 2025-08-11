@@ -93,14 +93,10 @@ const IngredientsInventory = () => {
         type: "number",
         flex: 1,
         editable: false,
-        // Ensure the grid always receives a number:
-        valueGetter: (params) => {
-          const raw = params?.row?.stockOnHand ?? params?.row?.totalRemaining ?? 0;
-          const n = Number(raw);
-          return Number.isFinite(n) ? n : 0;
+        renderCell: (params) => {
+          const v = Number(params.row?.stockOnHand ?? params.value ?? 0);
+          return Number.isFinite(v) ? v.toLocaleString() : "";
         },
-        valueFormatter: ({ value }) =>
-          Number.isFinite(Number(value)) ? Number(value).toLocaleString() : "",
       },
       {
         field: "unit",
