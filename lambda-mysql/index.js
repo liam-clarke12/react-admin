@@ -271,26 +271,71 @@ app.get("/api/goods-in", async (req, res) => {
   }
 });
 
+// GET only active goods_in rows (soft-delete aware)
+app.get("/api/goods-in/active", async (req, res) => {
+  const { cognito_id } = req.query;
+
+  if (!cognito_id) {
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  try {
+    const query = `
+      SELECT *
+      FROM goods_in
+      WHERE user_id = ?
+        AND deleted_at IS NULL
+      ORDER BY date DESC, id DESC
+    `;
+    const [results] = await db.promise().query(query, [cognito_id]);
+    res.json(results);
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 app.post("/api/delete-row", async (req, res) => {
-  const { barCode, cognito_id } = req.body; // Use barCode instead of id
+  const { barCode, cognito_id } = req.body;
 
   if (!barCode || !cognito_id) {
     return res.status(400).json({ error: "barCode and cognito_id are required" });
   }
 
   try {
-    const [result] = await db
+    // Ensure the row exists and is not already soft-deleted
+    const [existing] = await db
       .promise()
-      .query("DELETE FROM goods_in WHERE barCode = ? AND user_id = ?", [barCode, cognito_id]); // Match barCode and cognito_id
+      .query(
+        `SELECT id FROM goods_in
+         WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL
+         LIMIT 1`,
+        [barCode, cognito_id]
+      );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Row not found or does not belong to the user" });
+    if (existing.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Row not found, not yours, or already deleted" });
     }
 
-    res.json({ message: "Row deleted successfully" });
+    // Soft delete (UTC for consistency)
+    const [result] = await db
+      .promise()
+      .query(
+        `UPDATE goods_in
+           SET deleted_at = UTC_TIMESTAMP()
+         WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL`,
+        [barCode, cognito_id]
+      );
+
+    return res.json({
+      message: "Row soft-deleted successfully",
+      barCode,
+    });
   } catch (err) {
-    console.error("Failed to delete row:", err);
-    res.status(500).json({ error: "Failed to delete row" });
+    console.error("Failed to soft-delete row:", err);
+    res.status(500).json({ error: "Failed to soft-delete row" });
   }
 });
 
@@ -543,23 +588,26 @@ app.post("/api/add-production-log", async (req, res) => {
     console.log("🔄 Starting database transaction...");
     await connection.beginTransaction();
 
-    // 🔍 Fetch units_per_batch from recipes table
+    // 🔍 Fetch recipe (scoped to user) and its UPB
     const [recipeRows] = await connection.execute(
-      `SELECT id, units_per_batch FROM recipes WHERE recipe_name = ?`,
-      [recipe]
+      `SELECT id, units_per_batch
+         FROM recipes
+        WHERE recipe_name = ? AND user_id = ?`,
+      [recipe, cognito_id]
     );
 
     if (recipeRows.length === 0) {
-      console.error(`❌ Recipe not found: ${recipe}`);
+      console.error(`❌ Recipe not found for user: ${recipe} / ${cognito_id}`);
+      await connection.rollback();
       return res.status(400).json({ error: "Recipe not found" });
     }
 
     const recipeId = recipeRows[0].id;
     const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
-    const batchRemaining = batchesProduced * unitsPerBatch;
-    const finalUnitsOfWaste = Number(unitsOfWaste);
+    const batchRemaining = Number(batchesProduced) * unitsPerBatch;
+    const finalUnitsOfWaste = Number(unitsOfWaste) || 0;
 
-    console.log("📤 Inserting with values:", {
+    console.log("📤 Inserting production_log:", {
       date,
       recipe,
       batchesProduced,
@@ -569,86 +617,112 @@ app.post("/api/add-production-log", async (req, res) => {
       units_of_waste: finalUnitsOfWaste
     });
 
-    // ✅ Insert into production_log
-    const productionLogQuery = `
-      INSERT INTO production_log 
+    // ✅ Insert production log
+    const [productionLogResult] = await connection.execute(
+      `
+      INSERT INTO production_log
         (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+      `,
+      [
+        date,
+        recipe,
+        batchesProduced,
+        batchRemaining,
+        batchCode,
+        cognito_id,
+        finalUnitsOfWaste
+      ]
+    );
 
-    const [productionLogResult] = await connection.execute(productionLogQuery, [
-      date,
-      recipe,
-      batchesProduced,
-      batchRemaining,
-      batchCode,
-      cognito_id,
-      finalUnitsOfWaste
-    ]);
+    const productionLogId = productionLogResult.insertId;
+    console.log("✅ Inserted production_log ID:", productionLogId);
 
-    console.log("✅ Inserted production_log ID:", productionLogResult.insertId);
-
-    // 🔄 Get ingredients for recipe
-    const ingredientsQuery = `
-      SELECT i.id AS ingredient_id, i.ingredient_name, ri.quantity * ? AS total_needed
+    // 🔄 Pull recipe ingredients WITH UNIT and compute total needed
+    const [ingredients] = await connection.execute(
+      `
+      SELECT
+        i.id AS ingredient_id,
+        i.ingredient_name,
+        ri.unit AS unit,
+        (ri.quantity * ?) AS total_needed
       FROM recipe_ingredients ri
       JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE ri.recipe_id = ?
-    `;
-    const [ingredients] = await connection.execute(ingredientsQuery, [
-      batchesProduced,
-      recipeId
-    ]);
+      `,
+      [batchesProduced, recipeId]
+    );
 
     if (ingredients.length === 0) {
       console.error("❌ No ingredients found for recipe ID:", recipeId);
+      await connection.rollback();
       return res.status(400).json({ error: "No ingredients found for this recipe" });
     }
 
-    // 📉 Deduct stock from goods_in
-    console.log("🔁 Deducting stock from goods_in...");
-    for (const ingredient of ingredients) {
-      let amountNeeded = ingredient.total_needed;
-      console.log(`▶ Processing ${ingredient.ingredient_name}: ${amountNeeded} needed`);
+    // 📉 Deduct from ACTIVE goods_in (FIFO by date,id), matching unit and user, skipping soft-deleted rows
+    console.log("🔁 Deducting stock from goods_in (FIFO, active lots only)...");
+    for (const ing of ingredients) {
+      let amountNeeded = Number(ing.total_needed) || 0;
+      const ingName = ing.ingredient_name;
+      const ingUnit = ing.unit;
+
+      console.log(`▶ ${ingName} (${ingUnit}): need ${amountNeeded}`);
 
       while (amountNeeded > 0) {
         const [stockRows] = await connection.execute(
-          `SELECT gi.id, gi.stockRemaining, gi.barCode
-           FROM goods_in gi
-           WHERE gi.ingredient = ? AND gi.stockRemaining > 0
-           ORDER BY gi.id ASC LIMIT 1`,
-          [ingredient.ingredient_name]
+          `
+          SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date
+            FROM goods_in gi
+           WHERE gi.user_id = ?
+             AND gi.ingredient = ?
+             AND gi.unit = ?
+             AND gi.deleted_at IS NULL
+             AND gi.stockRemaining > 0
+           ORDER BY gi.date ASC, gi.id ASC
+           LIMIT 1
+          `,
+          [cognito_id, ingName, ingUnit]
         );
 
         if (stockRows.length === 0) {
-          console.warn(`⚠ Not enough stock for ${ingredient.ingredient_name}. Remaining: ${amountNeeded}`);
-          break;
+          console.warn(
+            `⚠ Not enough stock for ${ingName} (${ingUnit}). Remaining shortfall: ${amountNeeded}`
+          );
+          break; // continue with other ingredients; partial fulfillment
         }
 
         const { id: goodsInId, stockRemaining } = stockRows[0];
-        const deduction = Math.min(amountNeeded, stockRemaining);
+        const deduction = Math.min(amountNeeded, Number(stockRemaining) || 0);
 
-        // Deduct stock
+        // Deduct from the lot
         await connection.execute(
           `UPDATE goods_in SET stockRemaining = stockRemaining - ? WHERE id = ?`,
           [deduction, goodsInId]
         );
 
-        // Track usage
+        // Track which lot (barcode) was used for this production
+        // (If you later add a "quantity_used" column, include it here.)
         await connection.execute(
-          `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
-           VALUES (?, ?, ?)`,
-          [productionLogResult.insertId, goodsInId, cognito_id]
+          `
+          INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
+          VALUES (?, ?, ?)
+          `,
+          [productionLogId, goodsInId, cognito_id]
         );
 
         amountNeeded -= deduction;
+        console.log(
+          `   • Used ${deduction} from goods_in.id=${goodsInId}; still need ${amountNeeded}`
+        );
       }
     }
 
     await connection.commit();
     console.log("✅ Transaction committed.");
-    res.status(200).json({ message: "Production log saved successfully", id: productionLogResult.insertId });
-
+    res.status(200).json({
+      message: "Production log saved successfully",
+      id: productionLogId
+    });
   } catch (err) {
     await connection.rollback();
     console.error("❌ Error in transaction:", err);
@@ -691,6 +765,58 @@ app.get("/api/production-log", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+// GET /api/ingredient-inventory/active?cognito_id=...
+app.get("/api/ingredient-inventory/active", async (req, res) => {
+  const { cognito_id } = req.query;
+  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+
+  try {
+    const [rows] = await db.promise().query(
+      `
+      SELECT
+        gi.ingredient,
+        gi.unit,
+        SUM(gi.stockRemaining) AS totalRemaining,
+        (
+          SELECT gi2.barCode
+          FROM goods_in gi2
+          WHERE gi2.ingredient = gi.ingredient
+            AND gi2.unit = gi.unit
+            AND gi2.user_id = gi.user_id
+            AND gi2.deleted_at IS NULL
+            AND gi2.stockRemaining > 0
+          ORDER BY gi2.date ASC, gi2.id ASC
+          LIMIT 1
+        ) AS activeBarcode,
+        (
+          SELECT gi2.expiryDate
+          FROM goods_in gi2
+          WHERE gi2.ingredient = gi.ingredient
+            AND gi2.unit = gi.unit
+            AND gi2.user_id = gi.user_id
+            AND gi2.deleted_at IS NULL
+            AND gi2.stockRemaining > 0
+          ORDER BY gi2.date ASC, gi2.id ASC
+          LIMIT 1
+        ) AS activeExpiry
+      FROM goods_in gi
+      WHERE gi.user_id = ?
+        AND gi.deleted_at IS NULL
+        AND gi.stockRemaining > 0
+      GROUP BY gi.ingredient, gi.unit
+      ORDER BY gi.ingredient
+      `,
+      [cognito_id]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Error building ingredient inventory:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 
 // Only return non–soft-deleted rows
 app.get("/api/production-log/active", async (req, res) => {

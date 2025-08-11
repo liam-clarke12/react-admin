@@ -16,6 +16,9 @@ import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
 /** Nory-like brand tokens */
 const brand = {
   text: "#0f172a",
@@ -38,67 +41,77 @@ const IngredientsInventory = () => {
   const [snackbarMessage] = useState("");
   const { cognitoId } = useAuth();
 
+  // Fetch ACTIVE ingredient inventory from backend (already aggregates & filters)
   useEffect(() => {
     if (!cognitoId) return;
-    const fetchGoodsInData = async () => {
+
+    const fetchInventory = async () => {
       try {
-        const response = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`
+        const res = await fetch(
+          `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
         );
-        if (!response.ok) throw new Error("Failed to fetch Goods In data");
-        const data = await response.json();
-        const aggregated = aggregateByIngredient(data);
-        setIngredientInventory(aggregated);
+        if (!res.ok) throw new Error("Failed to fetch active ingredient inventory");
+        const data = await res.json();
+
+        // Map API fields → UI shape
+        const rows = (Array.isArray(data) ? data : []).map((r) => ({
+          ingredient: r.ingredient,
+          unit: r.unit,
+          stockOnHand: Number(r.totalRemaining) || 0,
+          barcode: r.activeBarcode || "",
+          expiryDate: r.activeExpiry || "",
+        }));
+
+        setIngredientInventory(rows);
       } catch (err) {
-        console.error("Error fetching Goods In data:", err);
+        console.error("Error fetching ingredient inventory:", err);
       }
     };
-    fetchGoodsInData();
-  }, [cognitoId, setIngredientInventory]);
 
-  // Aggregates raw goods-in rows into per-ingredient totals
-  const aggregateByIngredient = (rows) => {
-    const map = {};
-    rows.forEach(({ ingredient, stockRemaining, barCode, unit, id }) => {
-      if (Number(stockRemaining) <= 0) return;
-      if (!map[ingredient]) {
-        map[ingredient] = {
-          ingredient,
-          stockOnHand: 0,
-          barcode: barCode,
-          unit,
-          firstId: id,
-        };
-      }
-      map[ingredient].stockOnHand += Number(stockRemaining);
-      // keep earliest as representative
-      if (id < map[ingredient].firstId) {
-        map[ingredient].firstId = id;
-        map[ingredient].barcode = barCode;
-        map[ingredient].unit = unit;
-      }
-    });
-    return Object.values(map).map(({ firstId, ...item }) => item);
-  };
+    fetchInventory();
+  }, [cognitoId, setIngredientInventory]);
 
   const columns = useMemo(
     () => [
       { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
-      { field: "stockOnHand", headerName: "Stock on Hand", flex: 1, editable: false },
+      {
+        field: "stockOnHand",
+        headerName: "Stock on Hand",
+        flex: 1,
+        type: "number",
+        editable: false,
+      },
       { field: "unit", headerName: "Unit", flex: 1, editable: false },
       {
         field: "barcode",
-        headerName: "Barcode",
+        headerName: "Active Barcode",
         flex: 1,
         cellClassName: "barCode-column--cell",
         editable: false,
+      },
+      {
+        field: "expiryDate",
+        headerName: "Active Expiry",
+        flex: 1,
+        editable: false,
+        valueFormatter: (params) => {
+          const v = params.value;
+          if (!v) return "";
+          // format as YYYY-MM-DD if possible
+          const d = new Date(v);
+          if (isNaN(d.getTime())) return v;
+          return d.toISOString().slice(0, 10);
+        },
       },
     ],
     []
   );
 
+  // Chart data (separate bars per ingredient+unit to avoid merging)
   const barChartData = ingredientInventory.map((item) => ({
-    ingredient: item.ingredient,
+    ingredientLabel: item.unit ? `${item.ingredient} (${item.unit})` : item.ingredient,
     amount: item.stockOnHand,
   }));
 
@@ -169,7 +182,7 @@ const IngredientsInventory = () => {
         >
           <DataGrid
             autoHeight={false}
-            getRowId={(row) => row.ingredient}
+            getRowId={(row) => `${row.ingredient}__${row.unit || ""}`}
             rows={ingredientInventory}
             columns={columns}
             pageSize={10}
@@ -209,7 +222,7 @@ const IngredientsInventory = () => {
             <MenuOutlinedIcon />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-            Bar Chart
+            Stock on Hand Chart
           </Typography>
         </Box>
 
@@ -227,7 +240,7 @@ const IngredientsInventory = () => {
           <BarChart
             data={barChartData}
             keys={["amount"]}
-            indexBy="ingredient"
+            indexBy="ingredientLabel"
             height="500px"
             width="95%"
           />

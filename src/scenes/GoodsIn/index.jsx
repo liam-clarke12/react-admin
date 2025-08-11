@@ -1,7 +1,6 @@
 // src/scenes/data/GoodsIn/index.jsx
 import {
   Box,
-  useTheme,
   IconButton,
   Button,
   Dialog,
@@ -11,12 +10,14 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { tokens } from "../../themes";
 import { useData } from "../../contexts/DataContext";
 import { useEffect, useMemo, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../../contexts/AuthContext";
 
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+/** Nory-like brand tokens */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -31,29 +32,30 @@ const brand = {
 };
 
 const GoodsIn = () => {
-  const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
-
-  const [selectedRows, setSelectedRows] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]); // array of row ids
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const { cognitoId } = useAuth();
 
+  // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
       try {
         if (!cognitoId) return;
         const response = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in?cognito_id=${cognitoId}`
+          `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
         );
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
-        setGoodsInRows(
-          data.map((row) => ({
-            ...row,
-            processed: row.processed || (row.stockRemaining === 0 ? "Yes" : "No"),
-          }))
-        );
+
+        // Normalize + compute processed flag from stockRemaining
+        const normalized = (Array.isArray(data) ? data : []).map((row) => ({
+          ...row,
+          processed: Number(row.stockRemaining) === 0 ? "Yes" : "No",
+        }));
+
+        setGoodsInRows(normalized);
+        updateIngredientInventory(normalized);
       } catch (error) {
         console.error("Error fetching Goods In data:", error);
       }
@@ -61,38 +63,9 @@ const GoodsIn = () => {
     if (cognitoId) fetchGoodsInData();
   }, [cognitoId, setGoodsInRows]);
 
-  const handleDeleteIconClick = (row) => {
-    // Select only this row and open the confirm dialog
-    setSelectedRows([row.id]);
-    setOpenConfirmDialog(true);
-  };
-
+  // Columns (no row-level delete column; use checkboxSelection)
   const columns = useMemo(
     () => [
-      {
-        field: "select",
-        headerName: "Select",
-        sortable: false,
-        filterable: false,
-        width: 90,
-        renderCell: (params) => {
-          const isSelected = selectedRows.includes(params.row.id);
-          return (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={() => handleRowSelection(params.row)}
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 4,
-                cursor: "pointer",
-                accentColor: brand.primary,
-              }}
-            />
-          );
-        },
-      },
       { field: "date", headerName: "Date", flex: 1, editable: true },
       { field: "ingredient", headerName: "Ingredient", flex: 1, editable: true },
       { field: "temperature", headerName: "Temperature", flex: 1, editable: true },
@@ -155,42 +128,20 @@ const GoodsIn = () => {
           );
         },
       },
-      // NEW: per-row delete icon
-      {
-        field: "actions",
-        headerName: "",
-        width: 64,
-        sortable: false,
-        filterable: false,
-        align: "center",
-        renderCell: (params) => (
-          <IconButton
-            aria-label="Delete row"
-            onClick={() => handleDeleteIconClick(params.row)}
-            sx={{
-              color: brand.danger,
-              "&:hover": { background: brand.surfaceMuted },
-            }}
-          >
-            <DeleteIcon />
-          </IconButton>
-        ),
-      },
     ],
-    [selectedRows]
+    []
   );
 
+  // Save edits (still allowed for active rows)
   const processRowUpdate = async (newRow) => {
     const updatedRow = {
       ...newRow,
-      processed: newRow.stockRemaining === 0 ? "Yes" : "No",
+      processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
     };
 
     try {
       const response = await fetch(
-        `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-in/${encodeURIComponent(
-          updatedRow.barCode
-        )}`,
+        `${API_BASE}/goods-in/${encodeURIComponent(updatedRow.barCode)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -206,62 +157,81 @@ const GoodsIn = () => {
           }),
         }
       );
-      if (!response.ok) {
-        throw new Error("Failed to update on server");
-      }
+      if (!response.ok) throw new Error("Failed to update on server");
     } catch (error) {
       console.error("Backend update error:", error);
       throw error;
     }
 
-    setGoodsInRows((prevRows) => {
-      const updatedRows = prevRows.map((row) =>
-        row.id === updatedRow.id ? updatedRow : row
-      );
-      localStorage.setItem("goodsInRows", JSON.stringify(updatedRows));
-      updateIngredientInventory(updatedRows);
-      return updatedRows;
-    });
+    // Update local rows + inventory
+    const nextRows = goodsInRows.map((r) => (r.id === updatedRow.id ? updatedRow : r));
+    setGoodsInRows(nextRows);
+    updateIngredientInventory(nextRows);
 
     return updatedRow;
   };
 
-  const updateIngredientInventory = (updatedRows) => {
-    const updatedInventory = [];
-    const nextBarcodeMap = {};
+  // Inventory: sum ACTIVE stockRemaining; earliest active barcode per ingredient
+  const updateIngredientInventory = (rows) => {
+    const active = rows.filter((r) => Number(r.stockRemaining) > 0);
 
-    updatedRows.forEach((row) => {
-      if (row.processed === "No" && !nextBarcodeMap[row.ingredient]) {
-        nextBarcodeMap[row.ingredient] = row.barCode;
+    const map = new Map();
+    for (const r of active) {
+      const key = r.ingredient;
+      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+      const amount = prev.amount + Number(r.stockRemaining || 0);
+
+      // choose earliest date as the "next" barcode
+      let nextBarcode = prev.barcode;
+      let nextDate = prev._date;
+      try {
+        const prevTime = new Date(prev._date).getTime() || Infinity;
+        const curTime = new Date(r.date).getTime() || Infinity;
+        if (curTime < prevTime) {
+          nextBarcode = r.barCode;
+          nextDate = r.date;
+        }
+      } catch {
+        // if dates are malformed, keep existing
       }
-    });
 
-    updatedRows.forEach((row) => {
-      const existing = updatedInventory.find((i) => i.ingredient === row.ingredient);
-      if (existing) {
-        existing.amount += row.stockReceived;
-        if (row.processed === "Yes") delete nextBarcodeMap[row.ingredient];
-      } else {
-        updatedInventory.push({
-          ingredient: row.ingredient,
-          amount: row.stockReceived,
-          barcode: nextBarcodeMap[row.ingredient] || row.barCode,
-        });
-      }
-    });
+      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+    }
 
-    setIngredientInventory(updatedInventory);
+    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+    setIngredientInventory(inventory);
   };
 
-  const handleRowSelection = (row) => {
-    setSelectedRows((prev) =>
-      prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]
-    );
-  };
-
+  // Bulk soft delete (Production Log style)
   const handleDeleteSelectedRows = async () => {
-    // Your existing delete logic here (batch delete using selectedRows).
-    // If you want me to wire this to your API, tell me the endpoint and payload shape.
+    if (!cognitoId || selectedRows.length === 0) return;
+
+    try {
+      // Map selected row ids → barCodes for API payload
+      const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r.id));
+      const barCodes = rowsToDelete.map((r) => r.barCode);
+
+      const resp = await fetch(`${API_BASE}/goods-in/soft-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barCodes, cognito_id: cognitoId }),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        throw new Error(txt || "Soft delete failed");
+      }
+
+      // Remove from local state and refresh inventory
+      const remaining = goodsInRows.filter((r) => !selectedRows.includes(r.id));
+      setGoodsInRows(remaining);
+      updateIngredientInventory(remaining);
+
+      setSelectedRows([]);
+      setOpenConfirmDialog(false);
+    } catch (err) {
+      console.error("Soft delete error:", err);
+      alert("Could not delete selected records. Check console for details.");
+    }
   };
 
   const handleOpenConfirmDialog = () => setOpenConfirmDialog(true);
@@ -270,7 +240,6 @@ const GoodsIn = () => {
 
   return (
     <Box m="20px">
-
       {/* Card container */}
       <Box
         sx={{
@@ -282,7 +251,7 @@ const GoodsIn = () => {
           overflow: "hidden",
         }}
       >
-        {/* Toolbar with Delete icon */}
+        {/* Toolbar with bulk Delete */}
         <Box
           sx={{
             display: "flex",
@@ -293,9 +262,7 @@ const GoodsIn = () => {
             borderBottom: `1px solid ${brand.border}`,
           }}
         >
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Goods In
-          </Typography>
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>Goods In</Typography>
 
           <IconButton
             aria-label="Delete selected"
@@ -351,18 +318,20 @@ const GoodsIn = () => {
           <DataGrid
             rows={goodsInRows.map((row) => ({
               ...row,
-              id: `${row.barCode}-${row.ingredient}`,
-              processed: row.processed || "No",
+              // ensure a stable numeric/string id for selection
+              id: row.id ?? `${row.barCode}-${row.ingredient}`,
+              processed: row.processed || (Number(row.stockRemaining) === 0 ? "Yes" : "No"),
             }))}
             columns={columns}
-            pageSize={5}
-            rowsPerPageOptions={[5]}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50]}
+            checkboxSelection
+            disableRowSelectionOnClick
             editMode="row"
             experimentalFeatures={{ newEditingApi: true }}
             processRowUpdate={processRowUpdate}
-            onProcessRowUpdateError={(error) =>
-              console.error("Row update failed:", error)
-            }
+            onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
+            onRowSelectionModelChange={(model) => setSelectedRows(model)}
           />
         </Box>
       </Box>
