@@ -3,7 +3,6 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Amplify } from "aws-amplify";
 import {
-  AmplifyProvider,
   Authenticator,
   CheckboxField,
   useAuthenticator,
@@ -13,12 +12,13 @@ import {
   View,
   Image,
   Button,
+  ThemeProvider as AmplifyThemeProvider, // ✅ use Amplify UI ThemeProvider
 } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
 import awsExports from "./aws-exports";
 
 import { ColorModeContext, useMode } from "./themes";
-import { CssBaseline, ThemeProvider } from "@mui/material";
+import { CssBaseline, ThemeProvider as MuiThemeProvider } from "@mui/material"; // ✅ alias MUI ThemeProvider
 
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
@@ -58,13 +58,12 @@ const noryTheme = {
         primary: { value: "#e5e7eb" },
       },
       brand: {
-        // These brand scales are used by primary buttons/links
         primary: {
           10: { value: "#ffe4ea" },
           20: { value: "#fecdd3" },
           60: { value: "#fb7185" },
           80: { value: "#e11d48" }, // main
-          90: { value: "#be123c" }, // darker hover
+          90: { value: "#be123c" }, // hover
         },
       },
     },
@@ -80,7 +79,6 @@ const noryTheme = {
       },
     },
     components: {
-      // Authenticator outer container
       authenticator: {
         router: {
           backgroundColor: { value: "{colors.background.primary}" },
@@ -91,7 +89,6 @@ const noryTheme = {
           boxShadow: { value: "{shadows.small}" },
         },
       },
-      // Inputs
       fieldcontrol: {
         borderColor: { value: "{colors.border.primary}" },
         borderRadius: { value: "{radii.medium}" },
@@ -100,17 +97,13 @@ const noryTheme = {
           boxShadow: { value: "0 0 0 4px rgba(225,29,72,0.35)" },
         },
       },
-      // Primary Button
       button: {
         primary: {
           backgroundColor: { value: "{colors.brand.primary.80}" },
           borderRadius: { value: "999px" },
-          _hover: {
-            backgroundColor: { value: "{colors.brand.primary.90}" },
-          },
+          _hover: { backgroundColor: { value: "{colors.brand.primary.90}" } },
         },
       },
-      // Tabs (Sign in / Create account)
       tabs: {
         item: {
           color: { value: "{colors.font.secondary}" },
@@ -143,9 +136,7 @@ const components = {
     const { tokens } = useTheme();
     return (
       <View textAlign="center" padding={tokens.space.large}>
-        <Text color={tokens.colors.neutral[80]}>
-          &copy; All Rights Reserved
-        </Text>
+        <Text color={tokens.colors.neutral[80]}>&copy; All Rights Reserved</Text>
       </View>
     );
   },
@@ -154,10 +145,7 @@ const components = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading
-          padding={`${tokens.space.xl} 0 0 ${tokens.space.xl}`}
-          level={3}
-        >
+        <Heading padding={`${tokens.space.xl} 0 0 ${tokens.space.xl}`} level={3}>
           Sign in to your account
         </Heading>
       );
@@ -183,10 +171,7 @@ const components = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading
-          padding={`${tokens.space.xl} 0 0 ${tokens.space.xl}`}
-          level={3}
-        >
+        <Heading padding={`${tokens.space.xl} 0 0 ${tokens.space.xl}`} level={3}>
           Create a new account
         </Heading>
       );
@@ -195,18 +180,12 @@ const components = {
       const { toSignIn } = useAuthenticator();
       return (
         <View textAlign="center">
-          <Button
-            fontWeight="normal"
-            onClick={toSignIn}
-            size="small"
-            variation="link"
-          >
+          <Button fontWeight="normal" onClick={toSignIn} size="small" variation="link">
             Back to Sign In
           </Button>
         </View>
       );
     },
-    // Keep your T&C checkbox
     FormFields() {
       const { validationErrors } = useAuthenticator();
       return (
@@ -229,8 +208,8 @@ function App() {
 
   return (
     <AuthProvider>
-      <AmplifyProvider theme={noryTheme}>
-        {/* Global auth background + center */}
+      <AmplifyThemeProvider theme={noryTheme}>
+        {/* Auth screens background */}
         <style>{`
           .auth-shell {
             min-height: 100dvh;
@@ -251,7 +230,7 @@ function App() {
           {({ user }) =>
             user ? (
               <ColorModeContext.Provider value={colorMode}>
-                <ThemeProvider theme={theme}>
+                <MuiThemeProvider theme={theme}>
                   <CssBaseline />
                   <DataProvider>
                     <div className="app">
@@ -265,18 +244,9 @@ function App() {
                           <Route path="/recipeform" element={<RecipeForm />} />
                           <Route path="/recipes" element={<Recipes />} />
                           <Route path="/account" element={<AccountPage />} />
-                          <Route
-                            path="/IngredientsInventory"
-                            element={<IngredientsInventory />}
-                          />
-                          <Route
-                            path="/daily_production"
-                            element={<ProductionLog />}
-                          />
-                          <Route
-                            path="/recipe_production"
-                            element={<ProductionLogForm />}
-                          />
+                          <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
+                          <Route path="/daily_production" element={<ProductionLog />} />
+                          <Route path="/recipe_production" element={<ProductionLogForm />} />
                           <Route path="/stock_inventory" element={<RecipeInventory />} />
                           <Route path="/stock_usage" element={<StockUsage />} />
                           <Route path="/goods_out_form" element={<GoodsOutForm />} />
@@ -286,15 +256,14 @@ function App() {
                       </main>
                     </div>
                   </DataProvider>
-                </ThemeProvider>
+                </MuiThemeProvider>
               </ColorModeContext.Provider>
             ) : (
-              // When not signed in, show the Amplify screens centered on the gradient background
               <div className="auth-shell" />
             )
           }
         </Authenticator>
-      </AmplifyProvider>
+      </AmplifyThemeProvider>
     </AuthProvider>
   );
 }
