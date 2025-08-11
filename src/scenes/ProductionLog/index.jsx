@@ -61,13 +61,13 @@ const ProductionLog = () => {
     fetchRecipeData();
   }, [cognitoId]);
 
-  // Fetch production logs and compute fields (same logic)
+  // Fetch production logs (only active / not soft-deleted)
   useEffect(() => {
     if (!cognitoId || Object.keys(recipesMap).length === 0) return;
     const fetchProductionLogData = async () => {
       try {
         const response = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log/active?cognito_id=${cognitoId}`
         );
         if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
         const data = await response.json();

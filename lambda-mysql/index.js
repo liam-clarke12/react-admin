@@ -692,37 +692,92 @@ app.get("/api/production-log", async (req, res) => {
   }
 });
 
+// Only return non–soft-deleted rows
+app.get("/api/production-log/active", async (req, res) => {
+  const { cognito_id } = req.query; // Get cognito_id from query parameters
+
+  // Log the incoming request
+  console.log("Received /api/production-log/active request with query:", req.query);
+
+  // Ensure cognito_id is provided
+  if (!cognito_id) {
+    console.error("Missing cognito_id in request:", req.query);
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  console.log("Cognito ID provided:", cognito_id);
+
+  try {
+    // Log the SQL query before execution
+    console.log("Executing query to fetch non-deleted production_log rows filtered by user_id (cognito_id):");
+    const query = "SELECT * FROM production_log WHERE user_id = ? AND deleted_at IS NULL";
+    console.log("SQL Query:", query);
+    console.log("Query Parameters:", [cognito_id]);
+
+    // Query table filtered by user_id (cognito_id) and not soft-deleted
+    const [results] = await db.promise().query(query, [cognito_id]);
+
+    // Log the results of the query
+    console.log("Query successful. Results fetched:", results);
+
+    res.json(results);
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 app.post("/api/delete-production-log", async (req, res) => {
-  console.log("Received delete request:", req.body); // Debugging log
+  console.log("[/api/delete-production-log] Received:", req.body);
   const { batchCode, cognito_id } = req.body;
 
   if (!batchCode || !cognito_id) {
-    console.error("Missing batchCode or cognito_id");
+    console.error("[/api/delete-production-log] Missing batchCode or cognito_id");
     return res.status(400).json({ error: "batchCode and cognito_id are required" });
   }
 
   try {
-    // Check if row exists before deleting
+    // 1) Ensure the row exists and isn't already soft-deleted
     const [existingRows] = await db
       .promise()
-      .query("SELECT * FROM production_log WHERE LOWER(batchCode) = LOWER(?) AND user_id = ?", [batchCode, cognito_id]);
-    
+      .query(
+        `SELECT id, batchCode, deleted_at
+           FROM production_log
+          WHERE LOWER(batchCode) = LOWER(?)
+            AND user_id = ?
+            AND deleted_at IS NULL`,
+        [batchCode, cognito_id]
+      );
+
     if (existingRows.length === 0) {
-      console.error("Row not found or does not belong to the user");
-      return res.status(404).json({ error: "Row not found or does not belong to the user" });
+      console.warn("[/api/delete-production-log] Not found or already deleted:", { batchCode, cognito_id });
+      return res.status(404).json({ error: "Row not found, already deleted, or not owned by this user" });
     }
 
-    // Delete the production log row
+    // 2) Soft delete (requires columns: deleted_at DATETIME NULL, deleted_by VARCHAR(64) NULL)
     const [result] = await db
       .promise()
-      .query("DELETE FROM production_log WHERE LOWER(batchCode) = LOWER(?) AND user_id = ?", [batchCode, cognito_id]);
+      .query(
+        `UPDATE production_log
+            SET deleted_at = NOW(),
+                deleted_by = ?
+          WHERE LOWER(batchCode) = LOWER(?)
+            AND user_id = ?
+            AND deleted_at IS NULL`,
+        [cognito_id, batchCode, cognito_id]
+      );
 
-    console.log("Delete result:", result); // Log SQL result
+    console.log("[/api/delete-production-log] Soft delete result:", result);
 
-    res.json({ message: "Row deleted successfully" });
+    if (result.affectedRows === 0) {
+      // Race condition safety: someone may have deleted it between SELECT and UPDATE
+      return res.status(409).json({ error: "Row was modified concurrently; please refresh" });
+    }
+
+    return res.json({ message: "Row soft-deleted" });
   } catch (err) {
-    console.error("Failed to delete row:", err);
-    res.status(500).json({ error: "Failed to delete row" });
+    console.error("[/api/delete-production-log] Failed:", err);
+    return res.status(500).json({ error: "Failed to soft-delete row" });
   }
 });
 
