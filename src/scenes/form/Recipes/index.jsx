@@ -71,7 +71,14 @@ function Modal({ open, title, onClose, children, footer }) {
 }
 
 /** Lightweight Combobox for ingredient search/selection */
-function ComboBox({ options, value, onChange, placeholder = "Search or select…", disabled = false, loading = false }) {
+function ComboBox({
+  options,
+  value, // <-- expects the option id
+  onChange,
+  placeholder = "Search or select…",
+  disabled = false,
+  loading = false,
+}) {
   const containerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -83,7 +90,9 @@ function ComboBox({ options, value, onChange, placeholder = "Search or select…
 
   const filtered = !q.trim()
     ? options.slice(0, 50)
-    : options.filter((o) => o.name.toLowerCase().includes(q.toLowerCase())).slice(0, 50);
+    : options
+        .filter((o) => o.name.toLowerCase().includes(q.toLowerCase()))
+        .slice(0, 50);
 
   // close on outside click
   useEffect(() => {
@@ -174,10 +183,11 @@ const RecipeForm = () => {
     [masterIngredients, customIngredients]
   );
 
-  // snackbar & add-ingredient dialog state
+  // toast & add-ingredient dialog state
   const [openToast, setOpenToast] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
+  the
   const [adding, setAdding] = useState(false);
 
   // fetch global master list
@@ -245,11 +255,12 @@ const RecipeForm = () => {
     }
   };
 
-  // form submit
+  // submit
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = {
       recipe: values.recipe,
       upb: values.upb,
+      // send the NAME strings to the backend (it looks up ingredient ids by name)
       ingredients: values.ingredients.map((i) => i.name),
       quantities: values.ingredients.map((i) => i.quantity),
       units: values.ingredients.map((i) => i.unit),
@@ -281,6 +292,7 @@ const RecipeForm = () => {
       .positive("Must be positive"),
     ingredients: yup.array().of(
       yup.object().shape({
+        // we validate the NAME, which we now set when an option is picked
         name: yup.string().required("Ingredient is required"),
         quantity: yup
           .number()
@@ -295,7 +307,8 @@ const RecipeForm = () => {
   const initialValues = {
     recipe: "",
     upb: "",
-    ingredients: [{ name: "", quantity: "", unit: "grams" }],
+    // keep both id and name so display & payload are correct
+    ingredients: [{ id: "", name: "", quantity: "", unit: "grams" }],
   };
 
   return (
@@ -421,7 +434,8 @@ const RecipeForm = () => {
           initialValues={{
             recipe: "",
             upb: "",
-            ingredients: [{ name: "", quantity: "", unit: "grams" }],
+            // keep both fields: id (for ComboBox) and name (for payload)
+            ingredients: [{ id: "", name: "", quantity: "", unit: "grams" }],
           }}
           validationSchema={RecipeSchema}
         >
@@ -472,8 +486,13 @@ const RecipeForm = () => {
                                 <label className="rf-label">Ingredient</label>
                                 <ComboBox
                                   options={allIngredients}
-                                  value={ing.name}
-                                  onChange={(id) => setFieldValue(`ingredients.${idx}.name`, id)}
+                                  value={ing.id} // << use id for selection
+                                  onChange={(id) => {
+                                    // set id and the human-readable name so payload is correct
+                                    setFieldValue(`ingredients.${idx}.id`, id);
+                                    const pick = allIngredients.find((o) => o.id === id);
+                                    setFieldValue(`ingredients.${idx}.name`, pick?.name || "");
+                                  }}
                                   loading={loadingMaster || loadingCustom}
                                   placeholder="Search or select ingredient…"
                                 />
@@ -529,7 +548,7 @@ const RecipeForm = () => {
                           <button
                             type="button"
                             className="rf-btn rf-link"
-                            onClick={() => push({ name: "", quantity: "", unit: "grams" })}
+                            onClick={() => push({ id: "", name: "", quantity: "", unit: "grams" })}
                             style={{ marginRight: 16 }}
                           >
                             + Add Recipe Row
