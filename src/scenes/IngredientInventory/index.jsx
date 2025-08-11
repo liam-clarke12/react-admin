@@ -50,15 +50,22 @@ const IngredientsInventory = () => {
         if (!res.ok) throw new Error(`Failed to fetch active inventory (${res.status})`);
         const data = await res.json();
 
-        // Map API -> grid rows (defensive)
-        const mapped = (Array.isArray(data) ? data : []).map((r, idx) => ({
-          ingredient: r?.ingredient ?? "",
-          unit: r?.unit ?? "",
-          stockOnHand: Number(r?.totalRemaining) || 0,
-          barcode: r?.activeBarcode ?? "",
-          _id: `${r?.ingredient ?? "row"}-${r?.unit ?? "unit"}-${idx}`,
-        }));
+        // 🔎 Debug: confirm what API returns
+        console.log("[IngredientsInventory] /ingredient-inventory/active response:", data);
 
+        // Map API -> grid rows (defensive)
+        const mapped = (Array.isArray(data) ? data : []).map((r, idx) => {
+          const stockNum = Number(r?.totalRemaining);
+          return {
+            ingredient: r?.ingredient ?? "",
+            unit: r?.unit ?? "",
+            stockOnHand: Number.isFinite(stockNum) ? stockNum : 0,
+            barcode: r?.activeBarcode ?? "",
+            _id: `${r?.ingredient ?? "row"}-${r?.unit ?? "unit"}-${idx}`,
+          };
+        });
+
+        console.log("[IngredientsInventory] mapped rows:", mapped);
         setIngredientInventory(mapped);
       } catch (err) {
         console.error("Error fetching active ingredient inventory:", err);
@@ -86,10 +93,14 @@ const IngredientsInventory = () => {
         type: "number",
         flex: 1,
         editable: false,
-        valueFormatter: (params) => {
-          const n = Number(params?.value);
-          return Number.isFinite(n) ? n.toLocaleString() : "";
+        // Ensure the grid always receives a number:
+        valueGetter: (params) => {
+          const raw = params?.row?.stockOnHand ?? params?.row?.totalRemaining ?? 0;
+          const n = Number(raw);
+          return Number.isFinite(n) ? n : 0;
         },
+        valueFormatter: ({ value }) =>
+          Number.isFinite(Number(value)) ? Number(value).toLocaleString() : "",
       },
       {
         field: "unit",
