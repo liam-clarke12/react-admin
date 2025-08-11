@@ -1,5 +1,5 @@
 // src/scenes/form/RecipeProduction/index.jsx
-// Nory-styled, MUI-free version with pre-submit stock check + serious confirm modal.
+// Nory-styled, MUI-free version with ACTIVE-inventory precheck + serious confirm modal.
 import React, { useState, useEffect, useMemo } from "react";
 import { Formik } from "formik";
 import * as yup from "yup";
@@ -7,7 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-// ===== Brand tokens (Nory-like) =====
+/* ===== Brand tokens (Nory-like) ===== */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -19,13 +19,11 @@ const brand = {
   primaryDark: "#be123c",
   focusRing: "rgba(225, 29, 72, 0.35)",
   danger: "#dc2626",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  warnBg: "#fff7ed",
-  warnBorder: "#fdba74",
-  warnText: "#9a3412",
+  shadow:
+    "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-// ===== Validation schema =====
+/* ===== Validation schema ===== */
 const productionLogSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe Name is required"),
@@ -42,7 +40,7 @@ const productionLogSchema = yup.object().shape({
   batchCode: yup.string().required("Batch Code is required"),
 });
 
-// ===== Initial values =====
+/* ===== Initial values ===== */
 const initialValues = {
   date: new Date().toISOString().split("T")[0],
   recipe: "",
@@ -51,7 +49,7 @@ const initialValues = {
   batchCode: "",
 };
 
-// ===== Tiny toast =====
+/* ===== Tiny toast ===== */
 function Toast({ open, onClose, children }) {
   React.useEffect(() => {
     if (!open) return;
@@ -59,74 +57,102 @@ function Toast({ open, onClose, children }) {
     return () => clearTimeout(t);
   }, [open, onClose]);
   return (
-    <div aria-live="polite" className={`plf-toast ${open ? "show" : ""}`} role="status">
+    <div
+      aria-live="polite"
+      className={`plf-toast ${open ? "show" : ""}`}
+      role="status"
+    >
       <div className="plf-toast-inner">{children}</div>
     </div>
   );
 }
 
-// ===== Modal =====
-function Modal({ open, title, children, footer, onClose }) {
+/* ===== Serious confirm modal ===== */
+function ConfirmModal({ open, onCancel, onProceed, deficits }) {
   if (!open) return null;
   return (
-    <div className="plf-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="plf-modal-backdrop" onClick={onCancel}>
       <div
         className="plf-modal"
         onClick={(e) => e.stopPropagation()}
-        role="document"
-        aria-label={title}
+        role="dialog"
+        aria-modal="true"
       >
         <div className="plf-modal-header">
-          <h3>{title}</h3>
-          <button
-            type="button"
-            className="plf-btn-ghost"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ✕
+          <h3>Insufficient / Missing Ingredients</h3>
+        </div>
+        <div className="plf-modal-body">
+          <p className="plf-warning">
+            You are about to record production that uses ingredients you do not
+            currently have enough of in <strong>active stock</strong>. This can
+            lead to negative or inconsistent inventory.
+          </p>
+          <div className="plf-deficits">
+            {deficits.map((d, i) => (
+              <div key={i} className="plf-deficit-row">
+                <div className="left">
+                  <div className="name">{d.ingredient}</div>
+                  {d.unit ? <div className="unit">Unit: {d.unit}</div> : null}
+                </div>
+                <div className="right">
+                  <div className="need">
+                    Need: <strong>{d.need}</strong>
+                  </div>
+                  <div className="have">
+                    Have: <strong>{d.have}</strong>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="plf-callout">
+            Do you want to continue anyway? This will deduct stock and may
+            create negative balances or rely on future Goods In.
+          </p>
+        </div>
+        <div className="plf-modal-footer">
+          <button type="button" className="btn ghost" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn danger" onClick={onProceed}>
+            Proceed anyway
           </button>
         </div>
-        <div className="plf-modal-body">{children}</div>
-        <div className="plf-modal-footer">{footer}</div>
       </div>
     </div>
   );
 }
 
+/* ===== Utils ===== */
+const normalizeName = (s) =>
+  (s || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    // collapse whitespace + remove punctuation so "Test 10" == "Test-10" == "Test10"
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const keyNameUnit = (name, unit) => `${normalizeName(name)}|${(unit || "").toLowerCase()}`;
+
 const ProductionLogForm = () => {
   const { cognitoId } = useAuth();
 
-  // Recipes (full objects) + names list for the select
-  const [recipes, setRecipes] = useState([]);
-  const recipeNames = useMemo(() => {
-    return recipes.map((r) => r.recipe_name ?? r.recipe ?? r.name ?? "");
-  }, [recipes]);
-
+  /* Recipes */
+  const [recipeNames, setRecipeNames] = useState([]); // for select
+  const [recipesIndex, setRecipesIndex] = useState({}); // recipeName -> [{ingredient, quantity, unit}]
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Active inventory from API: [{ ingredient, unit, totalRemaining, activeBarcode }]
-  const [inventory, setInventory] = useState([]);
-  // Also keep a map for quick lookups
-  const inventoryMap = useMemo(() => {
-    const m = new Map();
-    for (const r of inventory) {
-      const key = `${(r.ingredient || "").toLowerCase()}|||${(r.unit || "").toLowerCase()}`;
-      const v = Number(r.totalRemaining) || 0;
-      m.set(key, (m.get(key) || 0) + v);
-    }
-    return m;
-  }, [inventory]);
-
-  // Serious confirm modal state
+  /* Confirm modal state */
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [shortages, setShortages] = useState([]); // [{ ingredient, unit, have, need }]
-  const [pendingSubmit, setPendingSubmit] = useState(null); // store last form values to submit if proceed
-  const [openToast, setOpenToast] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [deficits, setDeficits] = useState([]);
+  const [pendingPayload, setPendingPayload] = useState(null);
 
-  // --- Fetch recipes by cognitoId ---
+  /* Toast */
+  const [openToast, setOpenToast] = useState(false);
+
+  // --- Fetch recipes (FULL rows) and build index ---
   useEffect(() => {
     const fetchRecipes = async () => {
       if (!cognitoId) return;
@@ -135,25 +161,32 @@ const ProductionLogForm = () => {
       setFetchError(null);
 
       try {
-        const response = await fetch(
+        const res = await fetch(
           `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
         );
-        if (!response.ok) throw new Error("Failed to fetch recipes");
+        if (!res.ok) throw new Error("Failed to fetch recipes");
+        const rows = await res.json();
 
-        const data = await response.json();
-        // Expecting objects that include: recipe_name, units_per_batch (upb), ingredients[], quantities[], units[]
-        const normalized = (Array.isArray(data) ? data : []).map((r) => ({
-          recipe_name: r.recipe_name ?? r.recipe ?? r.name ?? "",
-          upb: Number(r.units_per_batch ?? r.upb ?? r.unitsPerBatch ?? 1) || 1,
-          ingredients: r.ingredients || [],
-          quantities: r.quantities || [],
-          units: r.units || [],
-        }));
-        setRecipes(normalized);
+        // rows look like: { recipe, units_per_batch, ingredient, quantity }
+        // Build: recipe -> array of { ingredient, quantity, unit? (if present) }
+        const index = {};
+        for (const r of Array.isArray(rows) ? rows : []) {
+          const recipeName = r.recipe_name ?? r.recipe ?? "";
+          if (!recipeName) continue;
+          if (!index[recipeName]) index[recipeName] = [];
+          index[recipeName].push({
+            ingredient: r.ingredient ?? r.ingredient_name ?? "",
+            quantity: Number(r.quantity) || 0,
+            unit: r.unit ?? "", // recipe_ingredients.unit if you store it; ok if empty
+          });
+        }
+        setRecipesIndex(index);
+        setRecipeNames(Object.keys(index).sort());
       } catch (err) {
         console.error("Error fetching recipes:", err);
         setFetchError("Error fetching recipes");
-        setRecipes([]);
+        setRecipeNames([]);
+        setRecipesIndex({});
       } finally {
         setLoadingRecipes(false);
       }
@@ -162,120 +195,117 @@ const ProductionLogForm = () => {
     fetchRecipes();
   }, [cognitoId]);
 
-  // --- Fetch ACTIVE inventory upfront ---
-  useEffect(() => {
-    const fetchActiveInventory = async () => {
-      if (!cognitoId) return;
-      try {
-        const res = await fetch(
-          `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
-        );
-        if (!res.ok) throw new Error(`Failed to fetch active inventory (${res.status})`);
-        const data = await res.json();
-        setInventory(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Error fetching active inventory:", err);
-        setInventory([]);
-      }
-    };
-    fetchActiveInventory();
-  }, [cognitoId]);
+  // --- Availability check against ACTIVE inventory ---
+  const checkAvailability = async (recipeName, batchesProduced) => {
+    // 1) Get the list of ingredients/quantities for this recipe
+    const lines = recipesIndex[recipeName] || [];
 
-  // --- Preflight check for stock; returns array of shortages ---
-  const computeShortages = (formValues) => {
-    const { recipe, batchesProduced } = formValues;
-    const bp = Number(batchesProduced) || 0;
+    // If we have no lines, we cannot check; treat as no deficits
+    if (!lines.length) return [];
 
-    // find selected recipe details
-    const r = recipes.find(
-      (x) => (x.recipe_name || "").toLowerCase() === (recipe || "").toLowerCase()
+    // Compute required map per ingredient+unit
+    const requiredMap = new Map(); // key -> { ingredient, unit, need }
+    for (const line of lines) {
+      const ing = (line.ingredient || "").toString();
+      const unit = (line.unit || "").toString();
+      const need = (Number(line.quantity) || 0) * (Number(batchesProduced) || 0);
+      const key = keyNameUnit(ing, unit);
+      const prev = requiredMap.get(key) || { ingredient: ing, unit, need: 0 };
+      requiredMap.set(key, { ...prev, need: prev.need + need });
+    }
+
+    // 2) Fetch ACTIVE inventory snapshot
+    const invRes = await fetch(
+      `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+        cognitoId
+      )}`
     );
-    if (!r) return []; // no data -> skip check
+    const invRows = invRes.ok ? await invRes.json() : [];
+    // Build available map per ingredient+unit
+    const availableMap = new Map(); // key -> have
+    for (const r of Array.isArray(invRows) ? invRows : []) {
+      const ing = r?.ingredient ?? "";
+      const unit = r?.unit ?? "";
+      const have = Number(r?.totalRemaining) || 0;
+      const key = keyNameUnit(ing, unit);
+      availableMap.set(key, (availableMap.get(key) || 0) + have);
+    }
 
-    const need = [];
-    const len = Math.max(r.ingredients.length, r.quantities.length, r.units.length);
-    for (let i = 0; i < len; i++) {
-      const ing = (r.ingredients[i] || "").trim();
-      const unit = (r.units[i] || "").trim();
-      const perBatchQty = Number(r.quantities[i]) || 0;
-      if (!ing || !unit || perBatchQty <= 0) continue;
-
-      const totalNeeded = perBatchQty * bp; // quantities are per BATCH, multiply by batches
-      const key = `${ing.toLowerCase()}|||${unit.toLowerCase()}`;
-      const available = Number(inventoryMap.get(key)) || 0;
-
-      if (totalNeeded > available) {
-        need.push({
-          ingredient: ing,
+    // 3) Compare
+    const problems = [];
+    for (const { ingredient, unit, need } of requiredMap.values()) {
+      const key = keyNameUnit(ingredient, unit);
+      const have = availableMap.get(key) ?? 0;
+      if (need > have) {
+        problems.push({
+          ingredient,
           unit,
-          have: available,
-          need: totalNeeded,
+          need,
+          have,
         });
       }
     }
-    return need;
+
+    return problems;
   };
 
-  // --- Submit handler with preflight ---
-  const handleFormSubmit = async (values, { resetForm }) => {
-    // If inventory unknown, try a quick refresh before computing
-    setChecking(true);
+  // --- Final submit to API ---
+  const submitToServer = async (payload, resetForm) => {
     try {
-      if (inventory.length === 0 && cognitoId) {
-        const res = await fetch(
-          `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setInventory(Array.isArray(data) ? data : []);
-        }
-      }
-    } catch {
-      // ignore refresh error; we'll compute with what we have
-    } finally {
-      setChecking(false);
-    }
-
-    const shortagesFound = computeShortages(values);
-    if (shortagesFound.length > 0) {
-      setShortages(shortagesFound);
-      setPendingSubmit({ values, resetForm });
-      setConfirmOpen(true);
-      return; // do not submit yet
-    }
-
-    // No shortages -> submit immediately
-    await actuallySubmit(values, resetForm);
-  };
-
-  const actuallySubmit = async (values, resetForm) => {
-    const payload = { ...values, cognito_id: cognitoId };
-    try {
-      const response = await fetch(`${API_BASE}/add-production-log`, {
+      const res = await fetch(`${API_BASE}/add-production-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error("Failed to submit data");
-      await response.json().catch(() => null);
+      if (!res.ok) throw new Error("Failed to submit data");
+      await res.json().catch(() => null);
       resetForm();
       setOpenToast(true);
-    } catch (error) {
-      console.error("Error submitting data:", error);
+    } catch (err) {
+      console.error("Error submitting data:", err);
       alert("Submission failed. Check console.");
     }
   };
 
-  const proceedAfterWarning = async () => {
+  // --- Form submit with precheck ---
+  const handleFormSubmit = async (values, { resetForm }) => {
+    const payload = { ...values, cognito_id: cognitoId };
+
+    // Availability precheck (ACTIVE inventory only)
+    try {
+      const problems = await checkAvailability(values.recipe, values.batchesProduced);
+
+      if (problems.length > 0) {
+        setDeficits(problems);
+        setPendingPayload({ payload, resetForm });
+        setConfirmOpen(true);
+        return; // stop here, wait for user decision
+      }
+
+      // All good → submit
+      await submitToServer(payload, resetForm);
+    } catch (err) {
+      console.error("Availability check failed:", err);
+      // If the check fails, safest is to BLOCK submit
+      alert("Could not verify inventory availability. Please try again.");
+    }
+  };
+
+  // --- Confirm handlers ---
+  const handleCancel = () => {
     setConfirmOpen(false);
-    if (!pendingSubmit) return;
-    const { values, resetForm } = pendingSubmit;
-    setPendingSubmit(null);
-    await actuallySubmit(values, resetForm);
+    setDeficits([]);
+    setPendingPayload(null);
+  };
+
+  const handleProceedAnyway = async () => {
+    const pp = pendingPayload;
+    setConfirmOpen(false);
+    setDeficits([]);
+    setPendingPayload(null);
+    if (pp) {
+      await submitToServer(pp.payload, pp.resetForm);
+    }
   };
 
   return (
@@ -332,46 +362,37 @@ const ProductionLogForm = () => {
           display: flex; align-items: center; justify-content: center; z-index: 70;
         }
         .plf-modal {
-          width: min(640px, 92vw); background: ${brand.surface};
+          width: min(640px, 94vw); background: ${brand.surface};
           border: 1px solid ${brand.border}; border-radius: 14px; box-shadow: ${brand.shadow}; overflow: hidden;
         }
         .plf-modal-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 16px; border-bottom: 1px solid ${brand.border};
+          padding: 14px 16px;
+          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
+          color: #fff; font-weight: 800;
         }
-        .plf-modal-header h3 { margin: 0; font-weight: 800; }
         .plf-modal-body { padding: 16px; }
-        .plf-modal-footer { padding: 12px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid ${brand.border}; }
-        .plf-btn-ghost { background: transparent; color: ${brand.text}; border: 0; cursor: pointer; font-weight: 800; }
-        .plf-btn-primary { color: #fff; background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); border-radius: 10px; padding: 10px 14px; border: 0; cursor: pointer; font-weight: 800; }
-        .plf-btn-primary:disabled { opacity: .6; cursor: default; }
-
+        .plf-modal-footer {
+          padding: 12px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid ${brand.border};
+        }
+        .plf-warning {
+          color: ${brand.danger}; font-weight: 800; margin-bottom: 12px;
+        }
+        .plf-deficits { display: grid; gap: 10px; margin-bottom: 12px; }
+        .plf-deficit-row {
+          display: flex; align-items: center; justify-content: space-between;
+          border: 1px solid ${brand.border}; border-radius: 10px; padding: 10px 12px; background: ${brand.surfaceMuted};
+        }
+        .plf-deficit-row .name { font-weight: 800; color: ${brand.text}; }
+        .plf-deficit-row .unit { font-size: 12px; color: ${brand.subtext}; }
+        .plf-deficit-row .right { display: flex; gap: 14px; font-size: 14px; color: ${brand.text}; }
         .plf-callout {
-          background: ${brand.warnBg};
-          border: 1px solid ${brand.warnBorder};
-          color: ${brand.warnText};
-          padding: 10px 12px;
-          border-radius: 10px;
-          margin-bottom: 12px;
-          font-weight: 700;
+          background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+          padding: 10px 12px; border-radius: 8px; font-weight: 700;
         }
-        .plf-shortage-row {
-          display: grid;
-          grid-template-columns: 1.2fr .6fr .6fr .6fr;
-          gap: 10px;
-          padding: 10px 12px;
-          border: 1px solid ${brand.border};
-          border-radius: 10px;
-          background: ${brand.surfaceMuted};
-        }
-        .plf-shortage-head {
-          display: grid;
-          grid-template-columns: 1.2fr .6fr .6fr .6fr;
-          gap: 10px;
-          margin-bottom: 6px;
-          font-weight: 800;
-          color: ${brand.subtext};
-        }
+        .btn { border: 0; cursor: pointer; font-weight: 800; padding: 10px 14px; border-radius: 10px; }
+        .btn.ghost { background: transparent; color: ${brand.text}; border: 1px solid ${brand.border}; }
+        .btn.danger { color: #fff; background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); }
+        .btn.danger:hover { background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
       `}</style>
 
       <div className="plf-card">
@@ -398,7 +419,9 @@ const ProductionLogForm = () => {
                     onChange={handleChange}
                     value={values.date}
                   />
-                  {touched.date && errors.date && <div className="plf-error">{errors.date}</div>}
+                  {touched.date && errors.date && (
+                    <div className="plf-error">{errors.date}</div>
+                  )}
                 </div>
 
                 {/* Recipe */}
@@ -427,7 +450,9 @@ const ProductionLogForm = () => {
                       <option value="" disabled>No recipes available</option>
                     )}
                   </select>
-                  {touched.recipe && errors.recipe && <div className="plf-error">{errors.recipe}</div>}
+                  {touched.recipe && errors.recipe && (
+                    <div className="plf-error">{errors.recipe}</div>
+                  )}
                 </div>
 
                 {/* Batches Produced */}
@@ -489,83 +514,28 @@ const ProductionLogForm = () => {
               </div>
 
               {/* Fixed gradient pill action */}
-              <button
-                type="submit"
-                className="plf-fab"
-                aria-label="Record production"
-                disabled={checking}
-                title={checking ? "Checking stock…" : "Record production"}
-              >
+              <button type="submit" className="plf-fab" aria-label="Record production">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                {checking ? "Checking…" : "Record Production"}
+                Record Production
               </button>
             </form>
           )}
         </Formik>
       </div>
 
-      {/* Serious confirmation modal */}
-      <Modal
+      {/* Serious confirm modal */}
+      <ConfirmModal
         open={confirmOpen}
-        onClose={() => {
-          setConfirmOpen(false);
-          setPendingSubmit(null);
-          setShortages([]);
-        }}
-        title="Insufficient Stock Detected"
-        footer={
-          <>
-            <button
-              type="button"
-              className="plf-btn-ghost"
-              onClick={() => {
-                setConfirmOpen(false);
-                setPendingSubmit(null);
-                setShortages([]);
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="plf-btn-primary"
-              onClick={proceedAfterWarning}
-            >
-              Proceed Anyway
-            </button>
-          </>
-        }
-      >
-        <div className="plf-callout">
-          You’re about to log production that uses more stock than you currently have.
-          This may leave **negative stock** and break FIFO barcode tracking.
-        </div>
-
-        <div className="plf-shortage-head">
-          <div>Ingredient</div>
-          <div>Unit</div>
-          <div>Available</div>
-          <div>Required</div>
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {shortages.map((s, i) => (
-            <div className="plf-shortage-row" key={`${s.ingredient}-${s.unit}-${i}`}>
-              <div style={{ fontWeight: 800 }}>{s.ingredient}</div>
-              <div>{s.unit}</div>
-              <div>{(Number(s.have) || 0).toLocaleString()}</div>
-              <div style={{ color: brand.danger, fontWeight: 800 }}>
-                {(Number(s.need) || 0).toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Modal>
+        deficits={deficits}
+        onCancel={handleCancel}
+        onProceed={handleProceedAnyway}
+      />
 
       {/* Success Toast */}
       <Toast open={openToast} onClose={() => setOpenToast(false)}>
-        Production log has been successfully recorded!
+        Production log has been recorded!
       </Toast>
     </div>
   );
