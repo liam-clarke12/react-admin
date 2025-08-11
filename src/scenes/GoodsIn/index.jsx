@@ -33,7 +33,7 @@ const brand = {
 
 const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
-  const [selectedRows, setSelectedRows] = useState([]); // array of row ids
+  const [selectedRows, setSelectedRows] = useState([]); // array of selected barCodes
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const { cognitoId } = useAuth();
 
@@ -63,7 +63,7 @@ const GoodsIn = () => {
     if (cognitoId) fetchGoodsInData();
   }, [cognitoId, setGoodsInRows]);
 
-  // Columns (no row-level delete column; use checkboxSelection)
+  // Columns (no per-row delete; we use checkboxSelection + toolbar)
   const columns = useMemo(
     () => [
       { field: "date", headerName: "Date", flex: 1, editable: true },
@@ -132,7 +132,7 @@ const GoodsIn = () => {
     []
   );
 
-  // Save edits (still allowed for active rows)
+  // Save edits (still allowed for active rows) — key by barCode
   const processRowUpdate = async (newRow) => {
     const updatedRow = {
       ...newRow,
@@ -163,8 +163,10 @@ const GoodsIn = () => {
       throw error;
     }
 
-    // Update local rows + inventory
-    const nextRows = goodsInRows.map((r) => (r.id === updatedRow.id ? updatedRow : r));
+    // Update local rows + inventory by barCode
+    const nextRows = goodsInRows.map((r) =>
+      r.barCode === updatedRow.barCode ? updatedRow : r
+    );
     setGoodsInRows(nextRows);
     updateIngredientInventory(nextRows);
 
@@ -178,7 +180,8 @@ const GoodsIn = () => {
     const map = new Map();
     for (const r of active) {
       const key = r.ingredient;
-      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+      const prev =
+        map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
       const amount = prev.amount + Number(r.stockRemaining || 0);
 
       // choose earliest date as the "next" barcode
@@ -192,7 +195,7 @@ const GoodsIn = () => {
           nextDate = r.date;
         }
       } catch {
-        // if dates are malformed, keep existing
+        // ignore date parsing errors
       }
 
       map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
@@ -202,27 +205,28 @@ const GoodsIn = () => {
     setIngredientInventory(inventory);
   };
 
-  // Bulk soft delete (Production Log style)
+  // Bulk soft delete — loop over selected barCodes to match /api/delete-row
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
 
     try {
-      // Map selected row ids → barCodes for API payload
-      const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r.id));
-      const barCodes = rowsToDelete.map((r) => r.barCode);
+      await Promise.all(
+        selectedRows.map((barCode) =>
+          fetch(`${API_BASE}/delete-row`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ barCode, cognito_id: cognitoId }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const t = await res.text().catch(() => "");
+              throw new Error(t || `Soft delete failed for ${barCode}`);
+            }
+          })
+        )
+      );
 
-      const resp = await fetch(`${API_BASE}/delete-row`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barCodes, cognito_id: cognitoId }),
-      });
-      if (!resp.ok) {
-        const txt = await resp.text().catch(() => "");
-        throw new Error(txt || "Soft delete failed");
-      }
-
-      // Remove from local state and refresh inventory
-      const remaining = goodsInRows.filter((r) => !selectedRows.includes(r.id));
+      // Remove from local state (by barCode) and refresh inventory
+      const remaining = goodsInRows.filter((r) => !selectedRows.includes(r.barCode));
       setGoodsInRows(remaining);
       updateIngredientInventory(remaining);
 
@@ -316,12 +320,8 @@ const GoodsIn = () => {
           }}
         >
           <DataGrid
-            rows={goodsInRows.map((row) => ({
-              ...row,
-              // ensure a stable numeric/string id for selection
-              id: row.id ?? `${row.barCode}-${row.ingredient}`,
-              processed: row.processed || (Number(row.stockRemaining) === 0 ? "Yes" : "No"),
-            }))}
+            rows={goodsInRows}
+            getRowId={(row) => row.barCode} // <- use barCode as the ID
             columns={columns}
             pageSize={10}
             rowsPerPageOptions={[10, 25, 50]}
@@ -331,7 +331,7 @@ const GoodsIn = () => {
             experimentalFeatures={{ newEditingApi: true }}
             processRowUpdate={processRowUpdate}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
-            onRowSelectionModelChange={(model) => setSelectedRows(model)}
+            onRowSelectionModelChange={(model) => setSelectedRows(model)} // model is array of barCodes
           />
         </Box>
       </Box>
