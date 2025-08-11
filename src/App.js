@@ -241,9 +241,7 @@ function LoginLayout({ children }) {
       </div>
 
       {/* Right auth card */}
-      <div className="auth-right">
-        {children}
-      </div>
+      <div className="auth-right">{children}</div>
 
       {/* Scoped styles for the split page */}
       <style>{`
@@ -254,11 +252,8 @@ function LoginLayout({ children }) {
           background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
         @media (max-width: 1000px) {
-          .auth-split {
-            grid-template-columns: 1fr;
-          }
+          .auth-split { grid-template-columns: 1fr; }
         }
-
         .auth-left {
           position: relative;
           overflow: hidden;
@@ -273,11 +268,7 @@ function LoginLayout({ children }) {
         @media (max-width: 1000px) {
           .auth-left { display: none; }
         }
-
-        .hero-inner {
-          width: min(560px, 90%);
-          color: ${brand.text};
-        }
+        .hero-inner { width: min(560px, 90%); color: ${brand.text}; }
         .logo-row img {
           width: 90px; height: 90px; object-fit: contain;
           filter: drop-shadow(0 1px 2px rgba(16,24,40,0.06));
@@ -289,42 +280,17 @@ function LoginLayout({ children }) {
           font-weight: 900;
           color: ${brand.text};
         }
-        .hero-inner p {
-          margin: 0 0 16px;
-          color: ${brand.subtext};
-          font-size: 16px;
-        }
+        .hero-inner p { margin: 0 0 16px; color: ${brand.subtext}; font-size: 16px; }
         .hero-inner ul {
-          margin: 8px 0 0;
-          padding: 0;
-          list-style: none;
-          display: grid;
-          gap: 10px;
+          margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px;
         }
         .hero-inner li {
-          display: grid;
-          grid-template-columns: 18px 1fr;
-          align-items: start;
-          gap: 10px;
-          color: ${brand.text};
-          font-weight: 700;
+          display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 10px;
+          color: ${brand.text}; font-weight: 700;
         }
-        .hero-inner li::before {
-          content: "✓";
-          color: ${brand.primary};
-          font-weight: 900;
-          line-height: 1.2;
-        }
-
-        .auth-right {
-          display: grid;
-          place-items: center;
-          padding: clamp(16px, 4vw, 40px);
-        }
-        /* Center the Amplify card and add subtle offset from right edge */
-        .auth-right .amplify-authenticator {
-          margin-left: auto;
-        }
+        .hero-inner li::before { content: "✓"; color: ${brand.primary}; font-weight: 900; line-height: 1.2; }
+        .auth-right { display: grid; place-items: center; padding: clamp(16px, 4vw, 40px); }
+        .auth-right .amplify-authenticator { margin-left: auto; }
       `}</style>
     </div>
   );
@@ -368,6 +334,7 @@ function MainApp() {
 
 /** Gate that decides: show login layout or the app */
 function AuthGate() {
+  // ✅ This hook now runs inside <Authenticator.Provider>
   const { user } = useAuthenticator((ctx) => [ctx.user]);
   if (user) return <MainApp />;
 
@@ -382,7 +349,10 @@ function App() {
   return (
     <AuthProvider>
       <AmplifyThemeProvider theme={noryTheme}>
-        <AuthGate />
+        {/* ✅ Provide context so useAuthenticator works anywhere below */}
+        <Authenticator.Provider>
+          <AuthGate />
+        </Authenticator.Provider>
       </AmplifyThemeProvider>
     </AuthProvider>
   );
