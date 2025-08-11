@@ -211,7 +211,7 @@ const GoodsIn = () => {
       const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r.id));
       const barCodes = rowsToDelete.map((r) => r.barCode);
 
-      const resp = await fetch(`${API_BASE}/goods-in/soft-delete`, {
+      const resp = await fetch(`${API_BASE}/delete-row`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ barCodes, cognito_id: cognitoId }),
