@@ -1,4 +1,5 @@
 // src/scenes/inventory/IngredientsInventory.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Drawer,
@@ -9,15 +10,11 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
-import { useData } from "../../contexts/DataContext";
-import BarChart from "../../components/BarChart";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import { useState, useEffect, useMemo } from "react";
+import BarChart from "../../components/BarChart";
 import { useAuth } from "../../contexts/AuthContext";
-
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+import { useData } from "../../contexts/DataContext";
 
 /** Nory-like brand tokens */
 const brand = {
@@ -36,84 +33,90 @@ const IngredientsInventory = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { ingredientInventory, setIngredientInventory } = useData();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage] = useState("");
   const { cognitoId } = useAuth();
 
-  // Fetch ACTIVE ingredient inventory from backend (already aggregates & filters)
-  useEffect(() => {
-    if (!cognitoId) return;
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
-    const fetchInventory = async () => {
+  // Fetch ACTIVE inventory (soft-deleted/zero-remaining excluded)
+  useEffect(() => {
+    const fetchActiveInventory = async () => {
+      if (!cognitoId) return;
       try {
         const res = await fetch(
-          `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredient-inventory/active?cognito_id=${cognitoId}`
         );
-        if (!res.ok) throw new Error("Failed to fetch active ingredient inventory");
+        if (!res.ok) throw new Error(`Failed to fetch active inventory (${res.status})`);
         const data = await res.json();
 
-        // Map API fields → UI shape
-        const rows = (Array.isArray(data) ? data : []).map((r) => ({
-          ingredient: r.ingredient,
-          unit: r.unit,
-          stockOnHand: Number(r.totalRemaining) || 0,
-          barcode: r.activeBarcode || "",
-          expiryDate: r.activeExpiry || "",
+        // Map API -> grid rows (defensive)
+        const mapped = (Array.isArray(data) ? data : []).map((r, idx) => ({
+          ingredient: r?.ingredient ?? "",
+          unit: r?.unit ?? "",
+          stockOnHand: Number(r?.totalRemaining) || 0,
+          barcode: r?.activeBarcode ?? "",
+          _id: `${r?.ingredient ?? "row"}-${r?.unit ?? "unit"}-${idx}`,
         }));
 
-        setIngredientInventory(rows);
+        setIngredientInventory(mapped);
       } catch (err) {
-        console.error("Error fetching ingredient inventory:", err);
+        console.error("Error fetching active ingredient inventory:", err);
+        setSnackbarMessage("Failed to load ingredient inventory");
+        setOpenSnackbar(true);
+        setIngredientInventory([]);
       }
     };
 
-    fetchInventory();
+    fetchActiveInventory();
   }, [cognitoId, setIngredientInventory]);
 
+  // Columns (no expiry column)
   const columns = useMemo(
     () => [
-      { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
+      {
+        field: "ingredient",
+        headerName: "Ingredient",
+        flex: 1,
+        editable: false,
+      },
       {
         field: "stockOnHand",
         headerName: "Stock on Hand",
-        flex: 1,
         type: "number",
+        flex: 1,
+        editable: false,
+        valueFormatter: (params) => {
+          const n = Number(params?.value);
+          return Number.isFinite(n) ? n.toLocaleString() : "";
+        },
+      },
+      {
+        field: "unit",
+        headerName: "Unit",
+        flex: 1,
         editable: false,
       },
-      { field: "unit", headerName: "Unit", flex: 1, editable: false },
       {
         field: "barcode",
         headerName: "Active Barcode",
         flex: 1,
+        editable: false,
         cellClassName: "barCode-column--cell",
-        editable: false,
-      },
-      {
-        field: "expiryDate",
-        headerName: "Active Expiry",
-        flex: 1,
-        editable: false,
-        valueFormatter: (params) => {
-          const v = params.value;
-          if (!v) return "";
-          // format as YYYY-MM-DD if possible
-          const d = new Date(v);
-          if (isNaN(d.getTime())) return v;
-          return d.toISOString().slice(0, 10);
-        },
       },
     ],
     []
   );
 
-  // Chart data (separate bars per ingredient+unit to avoid merging)
-  const barChartData = ingredientInventory.map((item) => ({
-    ingredientLabel: item.unit ? `${item.ingredient} (${item.unit})` : item.ingredient,
-    amount: item.stockOnHand,
-  }));
+  // Bar chart data
+  const barChartData = useMemo(
+    () =>
+      (ingredientInventory || []).map((item) => ({
+        ingredient: item.ingredient,
+        amount: Number(item.stockOnHand) || 0,
+      })),
+    [ingredientInventory]
+  );
 
   return (
     <Box m="20px">
@@ -170,9 +173,7 @@ const IngredientsInventory = () => {
               borderBottom: `1px solid ${brand.border}`,
               color: brand.text,
             },
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: brand.surfaceMuted,
-            },
+            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
             "& .MuiDataGrid-footerContainer": {
               borderTop: `1px solid ${brand.border}`,
               background: brand.surface,
@@ -182,8 +183,8 @@ const IngredientsInventory = () => {
         >
           <DataGrid
             autoHeight={false}
-            getRowId={(row) => `${row.ingredient}__${row.unit || ""}`}
-            rows={ingredientInventory}
+            getRowId={(row) => row._id || `${row.ingredient}-${row.unit}`}
+            rows={ingredientInventory || []}
             columns={columns}
             pageSize={10}
             rowsPerPageOptions={[5, 10, 20]}
@@ -222,7 +223,7 @@ const IngredientsInventory = () => {
             <MenuOutlinedIcon />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-            Stock on Hand Chart
+            Bar Chart
           </Typography>
         </Box>
 
@@ -240,7 +241,7 @@ const IngredientsInventory = () => {
           <BarChart
             data={barChartData}
             keys={["amount"]}
-            indexBy="ingredientLabel"
+            indexBy="ingredient"
             height="500px"
             width="95%"
           />
