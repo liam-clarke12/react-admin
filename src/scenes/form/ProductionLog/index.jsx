@@ -106,8 +106,8 @@ function ConfirmModal({ open, onCancel, onProceed, deficits }) {
             ))}
           </div>
           <p className="plf-callout">
-            Do you want to continue anyway? This will deduct stock and may
-            create negative balances or rely on future Goods In.
+            Do you want to continue anyway? This will deduct current insufficient stock to 0 and
+            the remaining deduction will be excused .
           </p>
         </div>
         <div className="plf-modal-footer">
