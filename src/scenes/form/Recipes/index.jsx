@@ -187,7 +187,6 @@ const RecipeForm = () => {
   const [openToast, setOpenToast] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIngredient, setNewIngredient] = useState("");
-  the
   const [adding, setAdding] = useState(false);
 
   // fetch global master list
