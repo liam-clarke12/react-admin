@@ -1,6 +1,6 @@
 // src/scenes/form/RecipeProduction/index.jsx
 // Nory-styled, MUI-free version with ACTIVE-inventory precheck + serious confirm modal.
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Formik } from "formik";
 import * as yup from "yup";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -19,8 +19,7 @@ const brand = {
   primaryDark: "#be123c",
   focusRing: "rgba(225, 29, 72, 0.35)",
   danger: "#dc2626",
-  shadow:
-    "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
 /* ===== Validation schema ===== */
@@ -57,11 +56,7 @@ function Toast({ open, onClose, children }) {
     return () => clearTimeout(t);
   }, [open, onClose]);
   return (
-    <div
-      aria-live="polite"
-      className={`plf-toast ${open ? "show" : ""}`}
-      role="status"
-    >
+    <div aria-live="polite" className={`plf-toast ${open ? "show" : ""}`} role="status">
       <div className="plf-toast-inner">{children}</div>
     </div>
   );
@@ -83,9 +78,9 @@ function ConfirmModal({ open, onCancel, onProceed, deficits }) {
         </div>
         <div className="plf-modal-body">
           <p className="plf-warning">
-            You are about to record production that uses ingredients you do not
-            currently have enough of in <strong>active stock</strong>. This can
-            lead to negative or inconsistent inventory.
+            You are about to record production that uses ingredients you do not currently have
+            enough of in <strong>active stock</strong>. This can lead to negative or inconsistent
+            inventory.
           </p>
           <div className="plf-deficits">
             {deficits.map((d, i) => (
@@ -106,8 +101,8 @@ function ConfirmModal({ open, onCancel, onProceed, deficits }) {
             ))}
           </div>
           <p className="plf-callout">
-            Do you want to continue anyway? This will deduct current insufficient stock to 0 and
-            the remaining deduction will be excused .
+            Do you want to continue anyway? This will deduct current stock down to 0, and any
+            remaining shortfall will be excused in this log.
           </p>
         </div>
         <div className="plf-modal-footer">
@@ -129,17 +124,28 @@ const normalizeName = (s) =>
     .toString()
     .trim()
     .toLowerCase()
-    // collapse whitespace + remove punctuation so "Test 10" == "Test-10" == "Test10"
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/\s+/g, "") // collapse whitespace
+    .replace(/[^a-z0-9]/g, ""); // drop punctuation
 
-const keyNameUnit = (name, unit) => `${normalizeName(name)}|${(unit || "").toLowerCase()}`;
+// Canonicalize units + treat N/A/blank as empty (wildcard for recipe-only)
+const normalizeUnit = (u) => {
+  const raw = (u || "").toString().trim().toLowerCase();
+  if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+  if (["g", "gram", "grams"].includes(raw)) return "g";
+  if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+  if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
+  if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+  if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
+  return raw; // fallback to provided string
+};
+
+const keyNameUnit = (name, unit) => `${normalizeName(name)}|${normalizeUnit(unit)}`;
 
 const ProductionLogForm = () => {
   const { cognitoId } = useAuth();
 
   /* Recipes */
-  const [recipeNames, setRecipeNames] = useState([]); // for select
+  const [recipeNames, setRecipeNames] = useState([]); // select options
   const [recipesIndex, setRecipesIndex] = useState({}); // recipeName -> [{ingredient, quantity, unit}]
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [fetchError, setFetchError] = useState(null);
@@ -167,8 +173,7 @@ const ProductionLogForm = () => {
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const rows = await res.json();
 
-        // rows look like: { recipe, units_per_batch, ingredient, quantity }
-        // Build: recipe -> array of { ingredient, quantity, unit? (if present) }
+        // Build: recipe -> array of { ingredient, quantity, unit? }
         const index = {};
         for (const r of Array.isArray(rows) ? rows : []) {
           const recipeName = r.recipe_name ?? r.recipe ?? "";
@@ -177,7 +182,7 @@ const ProductionLogForm = () => {
           index[recipeName].push({
             ingredient: r.ingredient ?? r.ingredient_name ?? "",
             quantity: Number(r.quantity) || 0,
-            unit: r.unit ?? "", // recipe_ingredients.unit if you store it; ok if empty
+            unit: r.unit ?? "", // if recipe_ingredients has a unit; may be empty or "N/A"
           });
         }
         setRecipesIndex(index);
@@ -197,21 +202,19 @@ const ProductionLogForm = () => {
 
   // --- Availability check against ACTIVE inventory ---
   const checkAvailability = async (recipeName, batchesProduced) => {
-    // 1) Get the list of ingredients/quantities for this recipe
     const lines = recipesIndex[recipeName] || [];
-
-    // If we have no lines, we cannot check; treat as no deficits
     if (!lines.length) return [];
 
-    // Compute required map per ingredient+unit
-    const requiredMap = new Map(); // key -> { ingredient, unit, need }
+    // 1) Compute required per (ingredient, unit)
+    const required = []; // keep array to preserve each line
+    const requiredMap = new Map(); // key -> aggregated need (in same canonical unit key)
     for (const line of lines) {
       const ing = (line.ingredient || "").toString();
-      const unit = (line.unit || "").toString();
+      const uCanon = normalizeUnit(line.unit);
       const need = (Number(line.quantity) || 0) * (Number(batchesProduced) || 0);
-      const key = keyNameUnit(ing, unit);
-      const prev = requiredMap.get(key) || { ingredient: ing, unit, need: 0 };
-      requiredMap.set(key, { ...prev, need: prev.need + need });
+      const k = `${normalizeName(ing)}|${uCanon}`;
+      required.push({ ingredient: ing, unit: uCanon, need });
+      requiredMap.set(k, (requiredMap.get(k) || 0) + need);
     }
 
     // 2) Fetch ACTIVE inventory snapshot
@@ -221,21 +224,41 @@ const ProductionLogForm = () => {
       )}`
     );
     const invRows = invRes.ok ? await invRes.json() : [];
-    // Build available map per ingredient+unit
-    const availableMap = new Map(); // key -> have
+
+    // Build two maps:
+    //  - availableByIU: name+unit (canonical)
+    //  - availableByI:  name only (sum of all units) — used ONLY when recipe unit is empty
+    const availableByIU = new Map();
+    const availableByI = new Map();
+
     for (const r of Array.isArray(invRows) ? invRows : []) {
-      const ing = r?.ingredient ?? "";
-      const unit = r?.unit ?? "";
+      const nameCanon = normalizeName(r?.ingredient ?? "");
+      const unitCanon = normalizeUnit(r?.unit ?? "");
       const have = Number(r?.totalRemaining) || 0;
-      const key = keyNameUnit(ing, unit);
-      availableMap.set(key, (availableMap.get(key) || 0) + have);
+
+      // per unit
+      const kIU = `${nameCanon}|${unitCanon}`;
+      availableByIU.set(kIU, (availableByIU.get(kIU) || 0) + have);
+
+      // per ingredient (for wildcard recipe unit ONLY)
+      availableByI.set(nameCanon, (availableByI.get(nameCanon) || 0) + have);
     }
 
     // 3) Compare
     const problems = [];
-    for (const { ingredient, unit, need } of requiredMap.values()) {
-      const key = keyNameUnit(ingredient, unit);
-      const have = availableMap.get(key) ?? 0;
+    for (const { ingredient, unit, need } of required) {
+      const nameCanon = normalizeName(ingredient);
+      let have = 0;
+
+      if (unit) {
+        // unit specified: require exact canonical unit match
+        const k = `${nameCanon}|${unit}`;
+        have = availableByIU.get(k) ?? 0;
+      } else {
+        // unit not specified (or "N/A"): compare to total across units for that ingredient
+        have = availableByI.get(nameCanon) ?? 0;
+      }
+
       if (need > have) {
         problems.push({
           ingredient,
@@ -271,7 +294,6 @@ const ProductionLogForm = () => {
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
 
-    // Availability precheck (ACTIVE inventory only)
     try {
       const problems = await checkAvailability(values.recipe, values.batchesProduced);
 
@@ -279,14 +301,13 @@ const ProductionLogForm = () => {
         setDeficits(problems);
         setPendingPayload({ payload, resetForm });
         setConfirmOpen(true);
-        return; // stop here, wait for user decision
+        return;
       }
 
       // All good → submit
       await submitToServer(payload, resetForm);
     } catch (err) {
       console.error("Availability check failed:", err);
-      // If the check fails, safest is to BLOCK submit
       alert("Could not verify inventory availability. Please try again.");
     }
   };
@@ -419,9 +440,7 @@ const ProductionLogForm = () => {
                     onChange={handleChange}
                     value={values.date}
                   />
-                  {touched.date && errors.date && (
-                    <div className="plf-error">{errors.date}</div>
-                  )}
+                  {touched.date && errors.date && <div className="plf-error">{errors.date}</div>}
                 </div>
 
                 {/* Recipe */}
@@ -450,9 +469,7 @@ const ProductionLogForm = () => {
                       <option value="" disabled>No recipes available</option>
                     )}
                   </select>
-                  {touched.recipe && errors.recipe && (
-                    <div className="plf-error">{errors.recipe}</div>
-                  )}
+                  {touched.recipe && errors.recipe && <div className="plf-error">{errors.recipe}</div>}
                 </div>
 
                 {/* Batches Produced */}
