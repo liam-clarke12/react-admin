@@ -235,7 +235,7 @@ function LoginLayout({ children }) {
           <ul>
             <li>Real-time stock & barcodes</li>
             <li>Recipe-driven production</li>
-            <li>Soft deletes & audit-safe logs</li>
+            <li>Focused on product tracebility</li>
           </ul>
         </div>
       </div>
