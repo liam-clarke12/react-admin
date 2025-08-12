@@ -18,7 +18,7 @@ import "@aws-amplify/ui-react/styles.css";
 import awsExports from "./aws-exports";
 
 import { ColorModeContext, useMode } from "./themes";
-import { CssBaseline, ThemeProvider as MuiThemeProvider } from "@mui/material";
+import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
@@ -48,8 +48,8 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",     // main
-  primaryDark: "#be123c", // hover
+  primary: "#e11d48",
+  primaryDark: "#be123c",
   focusRing: "rgba(225, 29, 72, 0.35)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
@@ -97,7 +97,7 @@ const noryTheme = {
           borderStyle: { value: "solid" },
           borderRadius: { value: "{radii.large}" },
           boxShadow: { value: "{shadows.small}" },
-          maxWidth: { value: "420px" }, // card width
+          maxWidth: { value: "420px" },
         },
       },
       fieldcontrol: {
@@ -128,13 +128,12 @@ const noryTheme = {
   },
 };
 
-/** Reuse your Amplify component overrides (headings, extra checkbox, etc.) */
+/** Amplify component overrides (headings, extra checkbox, etc.) */
 const amplifyComponents = {
   Header() {
     const { tokens } = useTheme();
     return (
       <View textAlign="center" padding={`${tokens.space.medium} 0 0 0`}>
-        {/* Small logo in the card header (right side) */}
         <Image
           alt="Logo"
           src="/user.png"
@@ -155,11 +154,7 @@ const amplifyComponents = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading
-          padding={`${tokens.space.medium} 0 0 0`}
-          level={4}
-          style={{ textAlign: "center" }}
-        >
+        <Heading padding={`${tokens.space.medium} 0 0 0`} level={4} style={{ textAlign: "center" }}>
           Welcome back
         </Heading>
       );
@@ -168,12 +163,7 @@ const amplifyComponents = {
       const { toForgotPassword } = useAuthenticator();
       return (
         <View textAlign="center">
-          <Button
-            fontWeight="normal"
-            onClick={toForgotPassword}
-            size="small"
-            variation="link"
-          >
+          <Button fontWeight="normal" onClick={toForgotPassword} size="small" variation="link">
             Reset Password
           </Button>
         </View>
@@ -184,11 +174,7 @@ const amplifyComponents = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading
-          padding={`${tokens.space.medium} 0 0 0`}
-          level={4}
-          style={{ textAlign: "center" }}
-        >
+        <Heading padding={`${tokens.space.medium} 0 0 0`} level={4} style={{ textAlign: "center" }}>
           Create your account
         </Heading>
       );
@@ -220,11 +206,10 @@ const amplifyComponents = {
   },
 };
 
-/** Right-side card + left-side hero split, Hunter-style */
+/** Left hero + right auth card (Hunter-style) */
 function LoginLayout({ children }) {
   return (
     <div className="auth-split">
-      {/* Left hero panel */}
       <div className="auth-left">
         <div className="hero-inner">
           <div className="logo-row">
@@ -240,10 +225,8 @@ function LoginLayout({ children }) {
         </div>
       </div>
 
-      {/* Right auth card */}
       <div className="auth-right">{children}</div>
 
-      {/* Scoped styles for the split page */}
       <style>{`
         .auth-split {
           min-height: 100dvh;
@@ -251,9 +234,7 @@ function LoginLayout({ children }) {
           grid-template-columns: minmax(320px, 46%) 1fr;
           background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
-        @media (max-width: 1000px) {
-          .auth-split { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 1000px) { .auth-split { grid-template-columns: 1fr; } }
         .auth-left {
           position: relative;
           overflow: hidden;
@@ -265,25 +246,15 @@ function LoginLayout({ children }) {
           place-items: center;
           padding: 32px;
         }
-        @media (max-width: 1000px) {
-          .auth-left { display: none; }
-        }
+        @media (max-width: 1000px) { .auth-left { display: none; } }
         .hero-inner { width: min(560px, 90%); color: ${brand.text}; }
         .logo-row img {
           width: 90px; height: 90px; object-fit: contain;
           filter: drop-shadow(0 1px 2px rgba(16,24,40,0.06));
         }
-        .hero-inner h1 {
-          margin: 16px 0 8px;
-          font-size: clamp(26px, 4vw, 36px);
-          line-height: 1.1;
-          font-weight: 900;
-          color: ${brand.text};
-        }
+        .hero-inner h1 { margin: 16px 0 8px; font-size: clamp(26px, 4vw, 36px); line-height: 1.1; font-weight: 900; color: ${brand.text}; }
         .hero-inner p { margin: 0 0 16px; color: ${brand.subtext}; font-size: 16px; }
-        .hero-inner ul {
-          margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px;
-        }
+        .hero-inner ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
         .hero-inner li {
           display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 10px;
           color: ${brand.text}; font-weight: 700;
@@ -296,7 +267,7 @@ function LoginLayout({ children }) {
   );
 }
 
-/** App content when authenticated (your existing providers/routes) */
+/** App content when authenticated */
 function MainApp() {
   const [theme, colorMode] = useMode();
   return (
@@ -332,29 +303,79 @@ function MainApp() {
   );
 }
 
-/** Gate that decides: show login layout or the app */
-function AuthGate() {
-  // ✅ This hook now runs inside <Authenticator.Provider>
-  const { user } = useAuthenticator((ctx) => [ctx.user]);
-  if (user) return <MainApp />;
-
+/** Extract Cognito sub from Amplify user object */
+function getCognitoSub(user) {
+  // Amplify UI's user can expose sub at different props depending on config
   return (
-    <LoginLayout>
-      <Authenticator components={amplifyComponents} />
-    </LoginLayout>
+    user?.userId ||
+    user?.username || // often the Cognito sub
+    user?.attributes?.sub ||
+    null
+  );
+}
+
+/** Gate that decides: show login layout OR mount providers with a ready cognitoId */
+function AuthGate() {
+  const { user } = useAuthenticator((ctx) => [ctx.user]);
+
+  if (!user) {
+    // Not signed in → show the split login layout
+    return (
+      <LoginLayout>
+        <Authenticator components={amplifyComponents} />
+      </LoginLayout>
+    );
+  }
+
+  // Signed in; derive Cognito sub immediately
+  const sub = getCognitoSub(user);
+
+  if (!sub) {
+    // Extremely rare/transient; show tiny brand loader until user object has sub
+    return (
+      <Box
+        sx={{
+          minHeight: "100dvh",
+          display: "grid",
+          placeItems: "center",
+          background: `linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
+        }}
+      >
+        <Box
+          sx={{
+            p: 3,
+            borderRadius: 2,
+            border: `1px solid ${brand.border}`,
+            background: brand.surface,
+            boxShadow: brand.shadow,
+            display: "grid",
+            placeItems: "center",
+            gap: 1,
+          }}
+        >
+          <CircularProgress />
+          <Text style={{ color: brand.subtext, fontWeight: 600 }}>Preparing your workspace…</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ✅ Mount AuthProvider keyed by sub so it initializes for this user
+  return (
+    <AuthProvider key={sub} initialCognitoId={sub}>
+      <MainApp />
+    </AuthProvider>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AmplifyThemeProvider theme={noryTheme}>
-        {/* ✅ Provide context so useAuthenticator works anywhere below */}
-        <Authenticator.Provider>
-          <AuthGate />
-        </Authenticator.Provider>
-      </AmplifyThemeProvider>
-    </AuthProvider>
+    <AmplifyThemeProvider theme={noryTheme}>
+      {/* Provide Amplify auth context to the whole tree */}
+      <Authenticator.Provider>
+        <AuthGate />
+      </Authenticator.Provider>
+    </AmplifyThemeProvider>
   );
 }
 
