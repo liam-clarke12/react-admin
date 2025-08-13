@@ -32,7 +32,6 @@ const LandingPage = () => {
             alt="Logo"
             style={{ height: 40, marginRight: 8 }}
           />
-          <Typography variant="h6">LOGO</Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 3 }}>
           <Typography sx={{ cursor: "pointer" }}>Home</Typography>
@@ -140,12 +139,25 @@ const LandingPage = () => {
         </Box>
 
         {/* Right Hero Image */}
-        <Box sx={{ display: { xs: "none", md: "block" }, overflow: "hidden" }}>
-          <img
-            src="/assets/pexels-shvetsa-5953694.jpg" // <-- public folder path
+        <Box
+        sx={{
+            display: { xs: "none", md: "block" },
+            overflow: "hidden",
+            maxWidth: "80%",       // make it a bit smaller
+            margin: "auto",        // center it horizontally
+            borderRadius: 16,
+        }}
+        >
+        <img
+            src="/assets/pexels-shvetsa-5953694.jpg"
             alt="Warehouse"
-            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }}
-          />
+            style={{
+            width: "100%",
+            height: "auto",      // maintain aspect ratio
+            objectFit: "cover",
+            borderRadius: 16,
+            }}
+        />
         </Box>
       </Box>
 
