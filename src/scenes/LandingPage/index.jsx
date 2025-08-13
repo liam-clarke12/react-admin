@@ -2,7 +2,6 @@
 import React from "react";
 import { Box, Button, Typography, Container, Grid } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import WarehouseImage from "../assets/pexels-shvetsa-5953694.jpg"; // replace with your image path
 import CheckIcon from "@mui/icons-material/Check";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
@@ -28,7 +27,11 @@ const LandingPage = () => {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center" }}>
-          <img src="/user.png" alt="Logo" style={{ height: 40, marginRight: 8 }} />
+          <img
+            src="/user.png"
+            alt="Logo"
+            style={{ height: 40, marginRight: 8 }}
+          />
           <Typography variant="h6">LOGO</Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 3 }}>
@@ -61,7 +64,12 @@ const LandingPage = () => {
           <img
             src="/user.png"
             alt="Logo"
-            style={{ width: 90, height: 90, objectFit: "contain", marginBottom: 16 }}
+            style={{
+              width: 90,
+              height: 90,
+              objectFit: "contain",
+              marginBottom: 16,
+            }}
           />
           <Typography
             variant="h2"
@@ -70,17 +78,49 @@ const LandingPage = () => {
             Efficient <br /> Inventory <br /> Management
           </Typography>
           <Typography sx={{ mb: 4, color: "#334155", fontSize: 16 }}>
-            Track ingredients, plan production, and keep waste in check — all in one place.
+            Track ingredients, plan production, and keep waste in check — all in
+            one place.
           </Typography>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-            <li style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <li
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontWeight: 700,
+              }}
+            >
               <CheckIcon sx={{ color: "#e11d48" }} /> Real-time stock & barcodes
             </li>
-            <li style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
-              <ShowChartIcon sx={{ color: "#e11d48" }} /> Recipe-driven production
+            <li
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontWeight: 700,
+              }}
+            >
+              <ShowChartIcon sx={{ color: "#e11d48" }} /> Recipe-driven
+              production
             </li>
-            <li style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
-              <Inventory2Icon sx={{ color: "#e11d48" }} /> Focused on product traceability
+            <li
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontWeight: 700,
+              }}
+            >
+              <Inventory2Icon sx={{ color: "#e11d48" }} /> Focused on product
+              traceability
             </li>
           </ul>
           <Button
@@ -102,7 +142,7 @@ const LandingPage = () => {
         {/* Right Hero Image */}
         <Box sx={{ display: { xs: "none", md: "block" }, overflow: "hidden" }}>
           <img
-            src={WarehouseImage}
+            src="/assets/pexels-shvetsa-5953694.jpg" // <-- public folder path
             alt="Warehouse"
             style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }}
           />
