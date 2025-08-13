@@ -2,7 +2,7 @@
 import React from "react";
 import { Box, Button, Typography, Container, Grid } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import WarehouseImage from "../public/pexels-shvetsa-5953694.jpg"; // replace with your image path
+import WarehouseImage from "../assets/pexels-shvetsa-5953694.jpg"; // replace with your image path
 import CheckIcon from "@mui/icons-material/Check";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
