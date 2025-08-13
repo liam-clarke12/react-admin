@@ -20,6 +20,7 @@ import awsExports from "./aws-exports";
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
+import LandingPage from "./components/LandingPage";
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
@@ -54,22 +55,14 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-/** Amplify UI theme overrides to match the card + pill buttons look */
+/** Amplify UI theme overrides (unchanged from your original) */
 const noryTheme = {
   name: "nory",
   tokens: {
     colors: {
-      background: {
-        primary: { value: "#ffffff" },
-        secondary: { value: "#f8fafc" },
-      },
-      font: {
-        primary: { value: brand.text },
-        secondary: { value: brand.subtext },
-      },
-      border: {
-        primary: { value: brand.border },
-      },
+      background: { primary: { value: "#ffffff" }, secondary: { value: "#f8fafc" } },
+      font: { primary: { value: brand.text }, secondary: { value: brand.subtext } },
+      border: { primary: { value: brand.border } },
       brand: {
         primary: {
           10: { value: "#ffe4ea" },
@@ -80,14 +73,8 @@ const noryTheme = {
         },
       },
     },
-    radii: {
-      small: { value: "10px" },
-      medium: { value: "12px" },
-      large: { value: "16px" },
-    },
-    shadows: {
-      small: { value: brand.shadow },
-    },
+    radii: { small: { value: "10px" }, medium: { value: "12px" }, large: { value: "16px" } },
+    shadows: { small: { value: brand.shadow } },
     components: {
       authenticator: {
         router: {
@@ -128,7 +115,7 @@ const noryTheme = {
   },
 };
 
-/** Amplify component overrides (headings, extra checkbox, etc.) */
+/** Amplify component overrides (unchanged from your original) */
 const amplifyComponents = {
   Header() {
     const { tokens } = useTheme();
@@ -305,21 +292,14 @@ function MainApp() {
 
 /** Extract Cognito sub from Amplify user object */
 function getCognitoSub(user) {
-  // Amplify UI's user can expose sub at different props depending on config
-  return (
-    user?.userId ||
-    user?.username || // often the Cognito sub
-    user?.attributes?.sub ||
-    null
-  );
+  return user?.userId || user?.username || user?.attributes?.sub || null;
 }
 
-/** Gate that decides: show login layout OR mount providers with a ready cognitoId */
+/** Gate that decides: show login layout OR mount providers */
 function AuthGate() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
 
   if (!user) {
-    // Not signed in → show the split login layout
     return (
       <LoginLayout>
         <Authenticator components={amplifyComponents} />
@@ -327,11 +307,8 @@ function AuthGate() {
     );
   }
 
-  // Signed in; derive Cognito sub immediately
   const sub = getCognitoSub(user);
-
   if (!sub) {
-    // Extremely rare/transient; show tiny brand loader until user object has sub
     return (
       <Box
         sx={{
@@ -360,7 +337,6 @@ function AuthGate() {
     );
   }
 
-  // ✅ Mount AuthProvider keyed by sub so it initializes for this user
   return (
     <AuthProvider key={sub} initialCognitoId={sub}>
       <MainApp />
@@ -368,12 +344,16 @@ function AuthGate() {
   );
 }
 
+/** Root App */
 function App() {
   return (
     <AmplifyThemeProvider theme={noryTheme}>
-      {/* Provide Amplify auth context to the whole tree */}
       <Authenticator.Provider>
-        <AuthGate />
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<AuthGate />} />
+          <Route path="/*" element={<Navigate to="/" />} />
+        </Routes>
       </Authenticator.Provider>
     </AmplifyThemeProvider>
   );
