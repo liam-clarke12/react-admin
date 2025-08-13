@@ -51,7 +51,7 @@ function HardBlockModal({ open, onClose, recipe, need, have }) {
         </div>
         <div className="gof-modal-body">
           <p className="gof-warning">
-            You’re trying to send out more <strong>{recipe || "this recipe"}</strong> units than are currently available in your Production Log.
+            You’re trying to send out more <strong>{recipe || "this recipe"}</strong> units than are currently available in your Recipe Inventory.
           </p>
           <div className="gof-block-stats">
             <div className="stat">
