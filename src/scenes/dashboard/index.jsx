@@ -171,7 +171,7 @@ const Dashboard = () => {
   }, [cognitoId]);
 
   // Derived chart data
-  const { totalStock, lowStockCount, ringData, barData, lineData } = useMemo(() => {
+  const { totalStock, lowStockCount, recentProduction, ringData, barData, lineData } = useMemo(() => {
     const totalStock = inventory.reduce(
       (sum, r) => sum + (Number(r.stockOnHand) || 0),
       0
@@ -179,6 +179,21 @@ const Dashboard = () => {
     const lowStockCount = inventory.filter(
       (r) => (Number(r.stockOnHand) || 0) <= 10
     ).length;
+
+    // Last 7 days window
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+
+    const recentLogs = prodLogs.filter((row) => {
+      const d = new Date(row?.date || row?.production_log_date || "");
+      return !isNaN(d) && d >= start;
+    });
+
+    const recentProduction = recentLogs.reduce(
+      (sum, r) => sum + (Number(r.batchesProduced) || 0),
+      0
+    );
 
     // Ring chart → top ingredients by stock
     const ringData = [...inventory]
@@ -191,13 +206,6 @@ const Dashboard = () => {
       }));
 
     // Bar chart → batches produced per recipe (last 7 days)
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - 6);
-    const recentLogs = prodLogs.filter((row) => {
-      const d = new Date(row?.date || row?.production_log_date || "");
-      return !isNaN(d) && d >= start;
-    });
     const byRecipe = {};
     recentLogs.forEach((r) => {
       const name = r.recipe || r.recipe_name || "Unknown";
@@ -223,7 +231,7 @@ const Dashboard = () => {
       return { day: key.slice(5), waste: wasteByDay.get(key) || 0 };
     });
 
-    return { totalStock, lowStockCount, ringData, barData, lineData };
+    return { totalStock, lowStockCount, recentProduction, ringData, barData, lineData };
   }, [inventory, prodLogs]);
 
   return (
@@ -246,6 +254,7 @@ const Dashboard = () => {
           <Box className="grid" sx={{ mb: 2 }}>
             <KpiCard label="Total Stock" value={totalStock.toLocaleString()} />
             <KpiCard label="Low Stock (≤ 10)" value={lowStockCount} />
+            <KpiCard label="Production (Last 7 Days)" value={recentProduction} />
           </Box>
 
           {/* Charts */}
