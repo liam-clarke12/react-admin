@@ -143,7 +143,7 @@ const LandingPage = () => {
         sx={{
             display: { xs: "none", md: "block" },
             overflow: "hidden",
-            maxWidth: "80%",       // make it a bit smaller
+            maxWidth: "50%",       // make it a bit smaller
             margin: "auto",        // center it horizontally
             borderRadius: 16,
         }}
