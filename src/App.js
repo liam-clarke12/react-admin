@@ -20,7 +20,7 @@ import awsExports from "./aws-exports";
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
-import LandingPage from "./components/LandingPage";
+import LandingPage from "./scenes/LandingPage";
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
