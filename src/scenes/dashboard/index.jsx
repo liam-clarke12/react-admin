@@ -3,16 +3,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
-  IconButton,
   CircularProgress,
-  Tooltip,
 } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
-import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
-import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
-import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import { ResponsivePie } from "@nivo/pie";
+import { ResponsiveLine } from "@nivo/line";
 import { useAuth } from "../../contexts/AuthContext";
 import BarChart from "../../components/BarChart";
 
@@ -31,107 +25,92 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-function KpiCard({ icon, label, value, hint }) {
+// Minimal KPI card
+function KpiCard({ label, value }) {
   return (
     <Box
-      className="card"
       sx={{
         p: 2,
-        display: "flex",
-        alignItems: "center",
-        gap: 2,
         border: `1px solid ${brand.border}`,
         background: brand.surface,
         borderRadius: 16,
         boxShadow: brand.shadow,
+        textAlign: "center",
       }}
     >
-      <Box
-        sx={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          display: "grid",
-          placeItems: "center",
-          background: "#f1f5f9",
-          border: `1px solid ${brand.border}`,
-        }}
-      >
-        {icon}
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 12 }}>
-          {label}
-        </Typography>
-        <Typography sx={{ color: brand.text, fontWeight: 900, fontSize: 22, lineHeight: 1.15 }}>
-          {value}
-        </Typography>
-      </Box>
-      {hint && (
-        <Tooltip title={hint} arrow>
-          <IconButton size="small">
-            <InfoOutlinedIcon sx={{ color: brand.subtext }} />
-          </IconButton>
-        </Tooltip>
-      )}
+      <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 12 }}>
+        {label}
+      </Typography>
+      <Typography sx={{ color: brand.text, fontWeight: 900, fontSize: 22, mt: 0.5 }}>
+        {value}
+      </Typography>
     </Box>
   );
 }
 
-function ListCard({ title, items }) {
+// Ring Chart Component
+function RingChart({ data, height = "260px" }) {
   return (
-    <Box
-      className="card"
-      sx={{
-        p: 2,
-        border: `1px solid ${brand.border}`,
-        background: brand.surface,
-        borderRadius: 16,
-        boxShadow: brand.shadow,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 0,
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          mb: 1,
-          justifyContent: "space-between",
+    <Box sx={{ height }}>
+      <ResponsivePie
+        data={data}
+        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+        innerRadius={0.6}
+        padAngle={1}
+        cornerRadius={3}
+        colors={{ scheme: "pink_yellowGreen" }}
+        borderWidth={1}
+        borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
+        enableArcLabels={false}
+        arcLinkLabelsSkipAngle={10}
+        arcLinkLabelsTextColor={brand.subtext}
+        arcLinkLabelsThickness={2}
+        arcLinkLabelsColor={{ from: "color" }}
+      />
+    </Box>
+  );
+}
+
+// Line Chart Component
+function LineChart({ data, height = "260px" }) {
+  return (
+    <Box sx={{ height }}>
+      <ResponsiveLine
+        data={[
+          {
+            id: "Waste",
+            data: data.map((d) => ({ x: d.day, y: d.waste })),
+          },
+        ]}
+        margin={{ top: 20, right: 20, bottom: 40, left: 50 }}
+        xScale={{ type: "point" }}
+        yScale={{
+          type: "linear",
+          min: "auto",
+          max: "auto",
+          stacked: false,
+          reverse: false,
         }}
-      >
-        <Typography sx={{ fontWeight: 800, color: brand.text }}>{title}</Typography>
-      </Box>
-      <Box sx={{ display: "grid", gap: 1, overflow: "auto" }}>
-        {items.length === 0 ? (
-          <Typography sx={{ color: brand.subtext, fontSize: 14 }}>No data</Typography>
-        ) : (
-          items.map((row, i) => (
-            <Box
-              key={i}
-              sx={{
-                border: `1px solid ${brand.border}`,
-                background: i % 2 ? brand.surfaceMuted : brand.surface,
-                borderRadius: 12,
-                px: 1.25,
-                py: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 1,
-              }}
-            >
-              <Typography sx={{ color: brand.text, fontWeight: 600, fontSize: 14, mr: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {row.left}
-              </Typography>
-              <Typography sx={{ color: brand.subtext, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {row.right}
-              </Typography>
-            </Box>
-          ))
-        )}
-      </Box>
+        axisBottom={{
+          orient: "bottom",
+          tickSize: 5,
+          tickPadding: 5,
+          tickRotation: 0,
+        }}
+        axisLeft={{
+          orient: "left",
+          tickSize: 5,
+          tickPadding: 5,
+          tickRotation: 0,
+        }}
+        colors={[brand.primary]}
+        pointSize={6}
+        pointColor={{ theme: "background" }}
+        pointBorderWidth={2}
+        pointBorderColor={{ from: "serieColor" }}
+        enableArea={true}
+        areaOpacity={0.15}
+      />
     </Box>
   );
 }
@@ -141,11 +120,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   // data
-  const [inventory, setInventory] = useState([]); // [{ ingredient, unit, stockOnHand, barcode }]
-  const [goodsOut, setGoodsOut] = useState([]);   // recent goods out
-  const [prodLogs, setProdLogs] = useState([]);   // production logs (active if possible)
+  const [inventory, setInventory] = useState([]);
+  const [prodLogs, setProdLogs] = useState([]);
 
-  // fetch all
   useEffect(() => {
     if (!cognitoId) return;
     let mounted = true;
@@ -153,7 +130,7 @@ const Dashboard = () => {
     async function load() {
       setLoading(true);
       try {
-        // Inventory (active)
+        // Inventory
         const invRes = await fetch(
           `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
             cognitoId
@@ -165,56 +142,22 @@ const Dashboard = () => {
           unit: r?.unit ?? "",
           stockOnHand: Number(r?.totalRemaining) || 0,
           barcode: r?.activeBarcode ?? "",
-          _id: `${r?.ingredient ?? "row"}-${r?.unit ?? "unit"}-${idx}`,
+          _id: `${r?.ingredient ?? "row"}-${idx}`,
         }));
 
-        // Goods out (recent)
-        const goRes = await fetch(
-          `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
+        // Production logs
+        const plRes = await fetch(
+          `${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`
         );
-        const goJson = goRes.ok ? await goRes.json() : [];
-        const go = (Array.isArray(goJson) ? goJson : [])
-          .map((r) => ({
-            date: r?.date ?? "",
-            recipe: r?.recipe ?? "",
-            stockAmount: Number(r?.stockAmount) || 0,
-            recipients: r?.recipients ?? "",
-          }))
-          .sort((a, b) => new Date(b.date) - new Date(a.date))
-          .slice(0, 6);
-
-        // Production logs (prefer /active)
-        let pl = [];
-        try {
-          const plResActive = await fetch(
-            `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
-              cognitoId
-            )}`
-          );
-          if (plResActive.ok) {
-            pl = await plResActive.json();
-          } else {
-            const plRes = await fetch(
-              `${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`
-            );
-            pl = plRes.ok ? await plRes.json() : [];
-          }
-        } catch {
-          const fallback = await fetch(
-            `${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`
-          );
-          pl = fallback.ok ? await fallback.json() : [];
-        }
+        const plJson = plRes.ok ? await plRes.json() : [];
 
         if (!mounted) return;
         setInventory(inv);
-        setGoodsOut(go);
-        setProdLogs(Array.isArray(pl) ? pl : []);
+        setProdLogs(Array.isArray(plJson) ? plJson : []);
       } catch (err) {
         console.error("[Dashboard] Failed to load data:", err);
         if (!mounted) return;
         setInventory([]);
-        setGoodsOut([]);
         setProdLogs([]);
       } finally {
         if (mounted) setLoading(false);
@@ -227,277 +170,143 @@ const Dashboard = () => {
     };
   }, [cognitoId]);
 
-  // derived KPIs
-  const {
-    totalStock,
-    totalIngredients,
-    activeBarcodes,
-    lowStockCount,
-    topIngredients,
-    nextToRunList,
-    recentGoodsOutList,
-    wasteChartData,
-    prodSummary,
-  } = useMemo(() => {
-    const totalStock = inventory.reduce((sum, r) => sum + (Number(r.stockOnHand) || 0), 0);
-    const totalIngredients = inventory.length;
-    const activeBarcodes = new Set(inventory.map((r) => r.barcode).filter(Boolean)).size;
-    const lowStockCount = inventory.filter((r) => (Number(r.stockOnHand) || 0) <= 10).length;
+  // Derived chart data
+  const { totalStock, lowStockCount, ringData, barData, lineData } = useMemo(() => {
+    const totalStock = inventory.reduce(
+      (sum, r) => sum + (Number(r.stockOnHand) || 0),
+      0
+    );
+    const lowStockCount = inventory.filter(
+      (r) => (Number(r.stockOnHand) || 0) <= 10
+    ).length;
 
-    // ⬇️ Top 4 by stock
-    const topIngredients = [...inventory]
+    // Ring chart → top ingredients by stock
+    const ringData = [...inventory]
       .sort((a, b) => (b.stockOnHand || 0) - (a.stockOnHand || 0))
-      .slice(0, 4)
-      .map((r) => ({ ingredient: r.ingredient, amount: Number(r.stockOnHand) || 0 }));
-
-    const nextToRunList = [...inventory]
-      .sort((a, b) => a.ingredient.localeCompare(b.ingredient))
-      .slice(0, 6)
+      .slice(0, 5)
       .map((r) => ({
-        left: r.ingredient,
-        right: r.barcode ? `Next: ${r.barcode}` : "—",
+        id: r.ingredient,
+        label: r.ingredient,
+        value: r.stockOnHand,
       }));
 
-    const recentGoodsOutList = goodsOut.map((g) => ({
-      left: g.recipe || "—",
-      right:
-        `${(g.stockAmount || 0).toLocaleString()} units` +
-        (g.recipients ? ` · ${g.recipients}` : ""),
-    }));
-
-    // Waste last 7 days
-    const byDay = new Map();
+    // Bar chart → batches produced per recipe (last 7 days)
     const now = new Date();
     const start = new Date(now);
-    start.setDate(now.getDate() - 6); // include today -> 7 days
+    start.setDate(now.getDate() - 6);
+    const recentLogs = prodLogs.filter((row) => {
+      const d = new Date(row?.date || row?.production_log_date || "");
+      return !isNaN(d) && d >= start;
+    });
+    const byRecipe = {};
+    recentLogs.forEach((r) => {
+      const name = r.recipe || r.recipe_name || "Unknown";
+      byRecipe[name] = (byRecipe[name] || 0) + (Number(r.batchesProduced) || 0);
+    });
+    const barData = Object.entries(byRecipe).map(([recipe, batches]) => ({
+      recipe,
+      batches,
+    }));
 
-    (Array.isArray(prodLogs) ? prodLogs : []).forEach((row) => {
+    // Line chart → waste trend over last 7 days
+    const wasteByDay = new Map();
+    recentLogs.forEach((row) => {
       const d = new Date(row?.date || row?.production_log_date || "");
       if (isNaN(d)) return;
-      if (d < start) return;
       const key = d.toISOString().slice(0, 10);
-      const w = Number(row?.units_of_waste) || 0;
-      byDay.set(key, (byDay.get(key) || 0) + w);
+      wasteByDay.set(key, (wasteByDay.get(key) || 0) + (Number(row?.units_of_waste) || 0));
     });
-
-    const wasteChartData = Array.from({ length: 7 }, (_, i) => {
+    const lineData = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       const key = d.toISOString().slice(0, 10);
-      return { day: key.slice(5), waste: byDay.get(key) || 0 }; // show MM-DD
+      return { day: key.slice(5), waste: wasteByDay.get(key) || 0 };
     });
 
-    // Production summary (last 7 days)
-    let batches = 0;
-    let recipes = new Set();
-    let runs = 0;
-    (Array.isArray(prodLogs) ? prodLogs : []).forEach((row) => {
-      const d = new Date(row?.date || row?.production_log_date || "");
-      if (isNaN(d)) return;
-      if (d < start) return;
-      runs += 1;
-      batches += Number(row?.batchesProduced) || 0;
-      if (row?.recipe) recipes.add(row.recipe);
-      else if (row?.recipe_name) recipes.add(row.recipe_name);
-    });
-
-    const prodSummary = {
-      batches,
-      recipes: recipes.size,
-      runs,
-    };
-
-    return {
-      totalStock,
-      totalIngredients,
-      activeBarcodes,
-      lowStockCount,
-      topIngredients,
-      nextToRunList,
-      recentGoodsOutList,
-      wasteChartData,
-      prodSummary,
-    };
-  }, [inventory, goodsOut, prodLogs]);
+    return { totalStock, lowStockCount, ringData, barData, lineData };
+  }, [inventory, prodLogs]);
 
   return (
     <Box m="20px">
-      {/* Scoped styles */}
       <style>{`
         .grid {
           display: grid;
-          grid-template-columns: 1fr 2fr 1fr;
+          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
           gap: 16px;
-        }
-        .grid-rows {
-          display: grid;
-          grid-template-rows: auto auto;
-          gap: 16px;
-        }
-        .kpis {
-          display: grid;
-          gap: 12px;
-        }
-        @media (max-width: 1100px) {
-          .grid { grid-template-columns: 1fr; }
-        }
-        .card h3 {
-          margin: 0 0 6px 0;
-          font-weight: 800;
-          color: ${brand.text};
         }
       `}</style>
 
-      {/* Top row */}
-      <Box className="grid">
-        {/* Left column: KPIs */}
-        <Box className="kpis">
-          <KpiCard
-            icon={<LayersOutlinedIcon sx={{ color: brand.primary }} />}
-            label="Total Stock (all ingredients)"
-            value={totalStock.toLocaleString()}
-            hint="Sum of active stock across all ingredients and units"
-          />
-          <KpiCard
-            icon={<ListAltOutlinedIcon sx={{ color: brand.primary }} />}
-            label="Active Ingredients"
-            value={totalIngredients}
-            hint="Distinct ingredients currently in stock"
-          />
-          <KpiCard
-            icon={<QrCode2OutlinedIcon sx={{ color: brand.primary }} />}
-            label="Active Barcodes"
-            value={activeBarcodes}
-            hint="Distinct barcodes currently usable (FIFO)"
-          />
-          <KpiCard
-            icon={<WarningAmberOutlinedIcon sx={{ color: brand.primary }} />}
-            label="Low Stock (≤ 10)"
-            value={lowStockCount}
-            hint="Ingredients at or below 10 (by their unit)"
-          />
-        </Box>
+      <Typography variant="h4" sx={{ fontWeight: 800, color: brand.text, mb: 2 }}>
+        Dashboard Overview
+      </Typography>
 
-        {/* Middle: Inventory chart */}
-        <Box
-          className="card"
-          sx={{
-            border: `1px solid ${brand.border}`,
-            background: brand.surface,
-            borderRadius: 16,
-            boxShadow: brand.shadow,
-            p: 2,
-            minHeight: 320,
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <BarChartOutlinedIcon sx={{ color: brand.primary }} />
-            <Typography sx={{ fontWeight: 800, color: brand.text }}>
-              Inventory (Top 4 by stock)
-            </Typography>
+      {loading ? (
+        <Box sx={{ display: "grid", placeItems: "center", height: "300px" }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
+          {/* KPIs */}
+          <Box className="grid" sx={{ mb: 2 }}>
+            <KpiCard label="Total Stock" value={totalStock.toLocaleString()} />
+            <KpiCard label="Low Stock (≤ 10)" value={lowStockCount} />
           </Box>
-          <Box sx={{ flex: 1, minHeight: 260, display: "grid", placeItems: "center" }}>
-            {loading ? (
-              <CircularProgress />
-            ) : (
+
+          {/* Charts */}
+          <Box className="grid">
+            <Box
+              sx={{
+                border: `1px solid ${brand.border}`,
+                background: brand.surface,
+                borderRadius: 16,
+                boxShadow: brand.shadow,
+                p: 2,
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
+                Stock Distribution
+              </Typography>
+              <RingChart data={ringData} />
+            </Box>
+
+            <Box
+              sx={{
+                border: `1px solid ${brand.border}`,
+                background: brand.surface,
+                borderRadius: 16,
+                boxShadow: brand.shadow,
+                p: 2,
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
+                Batches Produced (Last 7 Days)
+              </Typography>
               <BarChart
-                data={topIngredients}
-                keys={["amount"]}
-                indexBy="ingredient"
+                data={barData}
+                keys={["batches"]}
+                indexBy="recipe"
                 height="260px"
                 width="95%"
               />
-            )}
-          </Box>
-        </Box>
-
-        {/* Right: two lists */}
-        <Box className="grid-rows">
-          <ListCard title="Next to run" items={nextToRunList} />
-          <ListCard title="Recent Goods Out" items={recentGoodsOutList} />
-        </Box>
-      </Box>
-
-      {/* Bottom row: two wide cards */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
-          mt: 2,
-        }}
-      >
-        <Box
-          className="card"
-          sx={{
-            border: `1px solid ${brand.border}`,
-            background: brand.surface,
-            borderRadius: 16,
-            boxShadow: brand.shadow,
-            p: 2,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-            <Typography sx={{ fontWeight: 800, color: brand.text }}>
-              Production (Last 7 days)
-            </Typography>
-          </Box>
-          {loading ? (
-            <CircularProgress />
-          ) : (
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <KpiCard
-                icon={<LayersOutlinedIcon sx={{ color: brand.primary }} />}
-                label="Batches Produced"
-                value={prodSummary.batches.toLocaleString()}
-              />
-              <KpiCard
-                icon={<ListAltOutlinedIcon sx={{ color: brand.primary }} />}
-                label="Recipes"
-                value={prodSummary.recipes}
-              />
-              <KpiCard
-                icon={<BarChartOutlinedIcon sx={{ color: brand.primary }} />}
-                label="Runs Logged"
-                value={prodSummary.runs}
-              />
             </Box>
-          )}
-        </Box>
 
-        <Box
-          className="card"
-          sx={{
-            border: `1px solid ${brand.border}`,
-            background: brand.surface,
-            borderRadius: 16,
-            boxShadow: brand.shadow,
-            p: 2,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-            <Typography sx={{ fontWeight: 800, color: brand.text }}>
-              Wastage (Last 7 days)
-            </Typography>
+            <Box
+              sx={{
+                border: `1px solid ${brand.border}`,
+                background: brand.surface,
+                borderRadius: 16,
+                boxShadow: brand.shadow,
+                p: 2,
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
+                Waste Trend (Last 7 Days)
+              </Typography>
+              <LineChart data={lineData} />
+            </Box>
           </Box>
-          <Box sx={{ minHeight: 240, display: "grid", placeItems: "center" }}>
-            {loading ? (
-              <CircularProgress />
-            ) : (
-              <BarChart
-                data={wasteChartData}
-                keys={["waste"]}
-                indexBy="day"
-                height="220px"
-                width="95%"
-              />
-            )}
-          </Box>
-        </Box>
-      </Box>
+        </>
+      )}
     </Box>
   );
 };
