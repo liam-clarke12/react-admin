@@ -236,10 +236,6 @@ const Dashboard = () => {
         }
       `}</style>
 
-      <Typography variant="h4" sx={{ fontWeight: 800, color: brand.text, mb: 2 }}>
-        Dashboard Overview
-      </Typography>
-
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", height: "300px" }}>
           <CircularProgress />
