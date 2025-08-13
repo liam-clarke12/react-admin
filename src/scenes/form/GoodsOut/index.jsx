@@ -1,9 +1,12 @@
-// src/scenes/form/GoodsOut/index.jsx  (rename as needed)
-// Nory-styled, MUI-free version with identical behavior.
+// src/scenes/form/GoodsOut/index.jsx
+// Nory-styled, MUI-free form with a HARD precheck against Production Log units.
+
 import React, { useState, useEffect } from "react";
 import { Formik } from "formik";
 import * as yup from "yup";
 import { useAuth } from "../../../contexts/AuthContext";
+
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 // Brand tokens (Nory-like)
 const brand = {
@@ -20,26 +23,87 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-// Validation Schema (same rules)
+// Validation Schema
 const goodsOutSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
   stockAmount: yup
     .number()
     .typeError("Must be a number")
-    .required("Stock amount is required")
+    .required("Amount of units is required")
     .positive("Must be positive"),
   recipients: yup.string().required("Recipient is required"),
 });
 
+/** Serious “insufficient units” modal with NO proceed option */
+function HardBlockModal({ open, onClose, recipe, need, have }) {
+  if (!open) return null;
+  return (
+    <div className="gof-modal-backdrop" onClick={onClose}>
+      <div
+        className="gof-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="gof-modal-header">
+          <h3>Insufficient Finished Units</h3>
+        </div>
+        <div className="gof-modal-body">
+          <p className="gof-warning">
+            You’re trying to send out more <strong>{recipe || "this recipe"}</strong> units than are currently available in your Production Log.
+          </p>
+          <div className="gof-block-stats">
+            <div className="stat">
+              <div className="label">Requested</div>
+              <div className="value">{Number(need || 0).toLocaleString()}</div>
+            </div>
+            <div className="stat">
+              <div className="label">Available</div>
+              <div className="value">{Number(have || 0).toLocaleString()}</div>
+            </div>
+          </div>
+          <p className="gof-callout">
+            Please produce more of <strong>{recipe || "this recipe"}</strong> before recording these goods out.
+          </p>
+        </div>
+        <div className="gof-modal-footer">
+          <button type="button" className="btn danger" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tiny Toast
+function Toast({ open, onClose, children }) {
+  React.useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [open, onClose]);
+  return (
+    <div aria-live="polite" className={`gof-toast ${open ? "show" : ""}`} role="status">
+      <div className="gof-toast-inner">{children}</div>
+    </div>
+  );
+}
+
 const GoodsOutForm = () => {
   const { cognitoId } = useAuth();
+
   const [openToast, setOpenToast] = useState(false);
   const [filteredRecipes, setFilteredRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchErr, setFetchErr] = useState(null);
 
-  // Keep your "reset after success" approach via local initialValues + enableReinitialize
+  // Hard-block modal state
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockInfo, setBlockInfo] = useState({ recipe: "", need: 0, have: 0 });
+
+  // Re-init values after success
   const [initialValues, setInitialValues] = useState({
     date: new Date().toISOString().split("T")[0],
     recipe: "",
@@ -47,7 +111,7 @@ const GoodsOutForm = () => {
     recipients: "",
   });
 
-  // Fetch recipes (unchanged logic)
+  // Fetch recipes
   useEffect(() => {
     const fetchRecipes = async () => {
       if (!cognitoId) return;
@@ -55,11 +119,14 @@ const GoodsOutForm = () => {
       setFetchErr(null);
       try {
         const res = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
+          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        setFilteredRecipes(Array.isArray(data) ? data.map((r) => r.recipe) : []);
+        const names = Array.isArray(data)
+          ? data.map((r) => r.recipe_name ?? r.recipe ?? r.name).filter(Boolean)
+          : [];
+        setFilteredRecipes([...new Set(names)]);
       } catch (err) {
         console.error("Error fetching recipes:", err);
         setFetchErr("Error fetching recipes");
@@ -71,7 +138,7 @@ const GoodsOutForm = () => {
     fetchRecipes();
   }, [cognitoId]);
 
-  // When toast opens (success), refresh initial values (like your original)
+  // Reset initial values when success toast opens
   useEffect(() => {
     if (openToast) {
       setInitialValues({
@@ -83,18 +150,72 @@ const GoodsOutForm = () => {
     }
   }, [openToast]);
 
-  // Submit (same endpoint & payload)
+  // ---- Availability check against Production Log (ACTIVE only)
+  // Sums units remaining for the chosen recipe.
+  const fetchAvailableUnitsForRecipe = async (recipeName) => {
+    if (!cognitoId || !recipeName) return 0;
+    try {
+      const res = await fetch(
+        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch production log");
+      const rows = await res.json();
+
+      let total = 0;
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        const rName = r.recipe ?? r.recipe_name ?? r.name ?? "";
+        if ((rName || "").toString().trim() !== recipeName.toString().trim()) return;
+
+        // Accept several possible field names; fallback calculation if needed:
+        const br = Number(
+          r.batchRemaining ?? r.batch_remaining ?? r.units_per_batch_total ?? 0
+        );
+        const waste = Number(r.units_of_waste ?? r.unitsOfWaste ?? 0);
+        const out = Number(r.units_out ?? r.unitsOut ?? 0);
+        const apiUnitsRemaining = Number(
+          r.units_remaining ?? r.unitsRemaining ?? NaN
+        );
+
+        let remain;
+        if (Number.isFinite(apiUnitsRemaining)) {
+          remain = apiUnitsRemaining;
+        } else {
+          // Defensive fallback: unitsRemaining = batchRemaining - waste - unitsOut
+          remain = Math.max(0, br - waste - out);
+        }
+
+        if (Number.isFinite(remain)) total += remain;
+      });
+
+      return total;
+    } catch (err) {
+      console.error("[GoodsOut] Availability check failed:", err);
+      // If we can't verify, safest is to block by returning 0
+      return 0;
+    }
+  };
+
+  // Submit with HARD precheck
   const handleFormSubmit = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId };
+    const need = Number(values.stockAmount) || 0;
+
     try {
-      const response = await fetch(
-        "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/add-goods-out",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const have = await fetchAvailableUnitsForRecipe(values.recipe);
+
+      if (need > have) {
+        // Hard block — show modal, do NOT submit
+        setBlockInfo({ recipe: values.recipe, need, have });
+        setBlockOpen(true);
+        return;
+      }
+
+      // OK: submit
+      const response = await fetch(`${API_BASE}/add-goods-out`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!response.ok) {
         let errMsg = "Failed to submit data";
         try {
@@ -103,6 +224,7 @@ const GoodsOutForm = () => {
         } catch {}
         throw new Error(errMsg);
       }
+
       await response.json().catch(() => null);
       resetForm();
       setOpenToast(true);
@@ -140,7 +262,7 @@ const GoodsOutForm = () => {
         .gof-input:focus, .gof-select:focus { border-color: ${brand.primary}; box-shadow: 0 0 0 4px ${brand.focusRing}; }
         .gof-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
 
-        /* Submit pill button (replaces MUI Fab) */
+        /* Submit pill button */
         .gof-pill {
           position: fixed; right: 20px; bottom: 20px; z-index: 10;
           display: inline-flex; align-items: center; gap: 8px;
@@ -161,17 +283,54 @@ const GoodsOutForm = () => {
           background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
           padding: 10px 12px; border-radius: 10px; font-weight: 700; box-shadow: ${brand.shadow};
         }
+
+        /* Modal (hard block) */
+        .gof-modal-backdrop {
+          position: fixed; inset: 0; background: rgba(15,23,42,.55);
+          display: flex; align-items: center; justify-content: center; z-index: 70;
+        }
+        .gof-modal {
+          width: min(560px, 94vw); background: ${brand.surface};
+          border: 1px solid ${brand.border}; border-radius: 14px; box-shadow: ${brand.shadow}; overflow: hidden;
+        }
+        .gof-modal-header {
+          padding: 14px 16px;
+          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
+          color: #fff; font-weight: 800;
+        }
+        .gof-modal-body { padding: 16px; }
+        .gof-modal-footer {
+          padding: 12px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid ${brand.border};
+        }
+        .gof-warning { color: ${brand.danger}; font-weight: 800; margin-bottom: 12px; }
+        .gof-block-stats {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 14px;
+        }
+        .gof-block-stats .stat {
+          border: 1px solid ${brand.border}; background: ${brand.surfaceMuted};
+          border-radius: 12px; padding: 10px 12px;
+        }
+        .gof-block-stats .label { color: ${brand.subtext}; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+        .gof-block-stats .value { color: ${brand.text}; font-size: 18px; font-weight: 900; }
+        .gof-callout {
+          background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+          padding: 10px 12px; border-radius: 8px; font-weight: 700;
+        }
+        .btn { border: 0; cursor: pointer; font-weight: 800; padding: 10px 14px; border-radius: 10px; }
+        .btn.danger { color: #fff; background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); }
+        .btn.danger:hover { background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
       `}</style>
+
       <div className="gof-card">
         <h2 className="gof-title">Goods Out Form</h2>
         <p className="gof-sub">Fill out the details and click Record.</p>
 
         <Formik
-          key={initialValues.date}              // keep your re-init behavior
+          key={initialValues.date}
           initialValues={initialValues}
           validationSchema={goodsOutSchema}
           onSubmit={handleFormSubmit}
-          enableReinitialize={true}
+          enableReinitialize
         >
           {({ values, errors, touched, handleBlur, handleChange, handleSubmit }) => (
             <form onSubmit={handleSubmit} noValidate>
@@ -250,7 +409,7 @@ const GoodsOutForm = () => {
                     onBlur={handleBlur}
                     onChange={handleChange}
                     value={values.recipients}
-                    placeholder="e.g., Customer/Store/Dept"
+                    placeholder="e.g., Customer / Store / Dept"
                   />
                   {touched.recipients && errors.recipients && (
                     <div className="gof-error">{errors.recipients}</div>
@@ -258,7 +417,7 @@ const GoodsOutForm = () => {
                 </div>
               </div>
 
-              {/* Fixed gradient pill submit (replaces MUI Fab) */}
+              {/* Fixed gradient pill submit */}
               <button type="submit" className="gof-pill" aria-label="Record goods out">
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -270,26 +429,21 @@ const GoodsOutForm = () => {
         </Formik>
       </div>
 
-      {/* Success Toast (replaces MUI Snackbar) */}
+      {/* Hard-block modal (no proceed) */}
+      <HardBlockModal
+        open={blockOpen}
+        onClose={() => setBlockOpen(false)}
+        recipe={blockInfo.recipe}
+        need={blockInfo.need}
+        have={blockInfo.have}
+      />
+
+      {/* Success Toast */}
       <Toast open={openToast} onClose={() => setOpenToast(false)}>
         Goods Out has been successfully recorded!
       </Toast>
     </div>
   );
 };
-
-// Tiny Toast component used above
-function Toast({ open, onClose, children }) {
-  React.useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [open, onClose]);
-  return (
-    <div aria-live="polite" className={`gof-toast ${open ? "show" : ""}`} role="status">
-      <div className="gof-toast-inner">{children}</div>
-    </div>
-  );
-}
 
 export default GoodsOutForm;
