@@ -98,16 +98,7 @@ const LandingPage = () => {
             px: { xs: 3, md: 8 },
           }}
         >
-          <img
-            src="/user.png"
-            alt="Logo"
-            style={{
-              width: 90,
-              height: 90,
-              objectFit: "contain",
-              marginBottom: 16,
-            }}
-          />
+
           <Typography
             variant="h2"
             sx={{
@@ -121,7 +112,7 @@ const LandingPage = () => {
             Efficient <br /> Inventory <br /> Management
           </Typography>
           <Typography sx={{ mb: 4, color: "#334155", fontSize: 16 }}>
-            Track ingredients, plan production, and keep waste in check — all in
+            Track ingredients, plan production, and keep waste in check all in
             one place.
           </Typography>
           <ul
