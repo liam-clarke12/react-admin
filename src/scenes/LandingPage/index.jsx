@@ -50,7 +50,7 @@ const LandingPage = () => {
 
         {/* Navigation + Sign In Button */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-          {["Home", "Features", "About", "Contact"].map((item) => (
+          {["Features", "About", "Contact"].map((item) => (
             <Typography
               key={item}
               sx={{
