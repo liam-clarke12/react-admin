@@ -117,8 +117,7 @@ const noryTheme = {
 /** Amplify component overrides */
 const amplifyComponents = {
   Header() {
-    // Removed logo
-    return null;
+    return null; // removed logo
   },
   Footer() {
     const { tokens } = useTheme();
@@ -184,11 +183,16 @@ const amplifyComponents = {
   },
 };
 
-/** Left hero + right auth card (Hunter-style) */
+/** Left hero + right auth card */
 function LoginLayout({ children }) {
   return (
     <div className="auth-split">
       <div className="auth-left">
+        <Link to="/" className="back-arrow-left">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </Link>
         <div className="hero-inner">
           <h1>Welcome to your kitchen command center</h1>
           <p>Track ingredients, plan production, and keep waste in check — all in one place.</p>
@@ -201,11 +205,6 @@ function LoginLayout({ children }) {
       </div>
 
       <div className="auth-right">
-        <Link to="/" className="back-arrow">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </Link>
         {children}
       </div>
 
@@ -239,8 +238,7 @@ function LoginLayout({ children }) {
         }
         .hero-inner li::before { content: "✓"; color: ${brand.primary}; font-weight: 900; line-height: 1.2; }
         .auth-right { display: grid; place-items: center; padding: clamp(16px, 4vw, 40px); position: relative; }
-        .auth-right .amplify-authenticator { margin-left: auto; }
-        .back-arrow {
+        .back-arrow-left {
           position: absolute;
           top: 16px;
           left: 16px;
@@ -253,8 +251,9 @@ function LoginLayout({ children }) {
           box-shadow: ${brand.shadow};
           border: 1px solid ${brand.border};
           transition: background 0.2s ease;
+          z-index: 10;
         }
-        .back-arrow:hover {
+        .back-arrow-left:hover {
           background: ${brand.surfaceMuted};
         }
       `}</style>
