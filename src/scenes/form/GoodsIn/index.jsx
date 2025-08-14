@@ -184,14 +184,13 @@ const GoodsInForm = () => {
 
   // form submit
   const handleFormSubmit = async (values, { resetForm }) => {
-    // Map selected ID -> name so we save the human-readable ingredient
     const selectedOpt =
       ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
 
     const payload = {
       ...values,
-      ingredient: selectedOpt ? selectedOpt.name : values.ingredient, // <-- save name, not "c-6"
-      ingredientId: selectedOpt ? String(selectedOpt.id) : null,      // optional: keep id too
+      ingredient: selectedOpt ? selectedOpt.name : values.ingredient,
+      ingredientId: selectedOpt ? String(selectedOpt.id) : null,
       cognito_id: cognitoId,
     };
 
@@ -236,7 +235,6 @@ const GoodsInForm = () => {
 
   return (
     <Box m="20px">
-      {/* Card container for a clean, app-like surface */}
       <Paper
         elevation={0}
         sx={{
@@ -435,8 +433,8 @@ const GoodsInForm = () => {
                   />
                 </Box>
 
-                {/* Primary action: Extended FAB styled as a pill primary button */}
-                <Box display="flex" justifyContent="center" mt={3}>
+                {/* Primary action: FAB aligned to the right */}
+                <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
                     onClick={handleSubmit}
