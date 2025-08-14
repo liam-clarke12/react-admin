@@ -18,7 +18,12 @@ import "@aws-amplify/ui-react/styles.css";
 import awsExports from "./aws-exports";
 
 import { ColorModeContext, useMode } from "./themes";
-import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
+import {
+  CssBaseline,
+  ThemeProvider as MuiThemeProvider,
+  CircularProgress,
+  Box,
+} from "@mui/material";
 
 import LandingPage from "./scenes/LandingPage";
 import AccountPage from "./scenes/Account/Account";
@@ -52,16 +57,23 @@ const brand = {
   primary: "#e11d48",
   primaryDark: "#be123c",
   focusRing: "rgba(225, 29, 72, 0.35)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  shadow:
+    "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-/** Amplify UI theme overrides (unchanged from your original) */
+/** Amplify UI theme overrides */
 const noryTheme = {
   name: "nory",
   tokens: {
     colors: {
-      background: { primary: { value: "#ffffff" }, secondary: { value: "#f8fafc" } },
-      font: { primary: { value: brand.text }, secondary: { value: brand.subtext } },
+      background: {
+        primary: { value: "#ffffff" },
+        secondary: { value: "#f8fafc" },
+      },
+      font: {
+        primary: { value: brand.text },
+        secondary: { value: brand.subtext },
+      },
       border: { primary: { value: brand.border } },
       brand: {
         primary: {
@@ -73,7 +85,11 @@ const noryTheme = {
         },
       },
     },
-    radii: { small: { value: "10px" }, medium: { value: "12px" }, large: { value: "16px" } },
+    radii: {
+      small: { value: "10px" },
+      medium: { value: "12px" },
+      large: { value: "16px" },
+    },
     shadows: { small: { value: brand.shadow } },
     components: {
       authenticator: {
@@ -92,14 +108,18 @@ const noryTheme = {
         borderRadius: { value: "{radii.medium}" },
         _focus: {
           borderColor: { value: "{colors.brand.primary.80}" },
-          boxShadow: { value: "0 0 0 4px rgba(225,29,72,0.35)" },
+          boxShadow: {
+            value: "0 0 0 4px rgba(225,29,72,0.35)",
+          },
         },
       },
       button: {
         primary: {
           backgroundColor: { value: "{colors.brand.primary.80}" },
           borderRadius: { value: "999px" },
-          _hover: { backgroundColor: { value: "{colors.brand.primary.90}" } },
+          _hover: {
+            backgroundColor: { value: "{colors.brand.primary.90}" },
+          },
         },
       },
       tabs: {
@@ -115,16 +135,24 @@ const noryTheme = {
   },
 };
 
-/** Amplify component overrides (unchanged from your original) */
+/** Amplify component overrides */
 const amplifyComponents = {
   Header() {
     const { tokens } = useTheme();
     return (
-      <View textAlign="center" padding={`${tokens.space.medium} 0 0 0`}>
+      <View
+        textAlign="center"
+        padding={`${tokens.space.medium} 0 0 0`}
+      >
         <Image
           alt="Logo"
           src="/user.png"
-          style={{ width: 60, height: 60, objectFit: "contain", margin: "0 auto" }}
+          style={{
+            width: 60,
+            height: 60,
+            objectFit: "contain",
+            margin: "0 auto",
+          }}
         />
       </View>
     );
@@ -133,7 +161,9 @@ const amplifyComponents = {
     const { tokens } = useTheme();
     return (
       <View textAlign="center" padding={tokens.space.large}>
-        <Text color={tokens.colors.neutral[80]}>&copy; All Rights Reserved</Text>
+        <Text color={tokens.colors.neutral[80]}>
+          &copy; All Rights Reserved
+        </Text>
       </View>
     );
   },
@@ -141,7 +171,11 @@ const amplifyComponents = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading padding={`${tokens.space.medium} 0 0 0`} level={4} style={{ textAlign: "center" }}>
+        <Heading
+          padding={`${tokens.space.medium} 0 0 0`}
+          level={4}
+          style={{ textAlign: "center" }}
+        >
           Welcome back
         </Heading>
       );
@@ -150,7 +184,12 @@ const amplifyComponents = {
       const { toForgotPassword } = useAuthenticator();
       return (
         <View textAlign="center">
-          <Button fontWeight="normal" onClick={toForgotPassword} size="small" variation="link">
+          <Button
+            fontWeight="normal"
+            onClick={toForgotPassword}
+            size="small"
+            variation="link"
+          >
             Reset Password
           </Button>
         </View>
@@ -161,7 +200,11 @@ const amplifyComponents = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading padding={`${tokens.space.medium} 0 0 0`} level={4} style={{ textAlign: "center" }}>
+        <Heading
+          padding={`${tokens.space.medium} 0 0 0`}
+          level={4}
+          style={{ textAlign: "center" }}
+        >
           Create your account
         </Heading>
       );
@@ -170,7 +213,12 @@ const amplifyComponents = {
       const { toSignIn } = useAuthenticator();
       return (
         <View textAlign="center">
-          <Button fontWeight="normal" onClick={toSignIn} size="small" variation="link">
+          <Button
+            fontWeight="normal"
+            onClick={toSignIn}
+            size="small"
+            variation="link"
+          >
             Back to Sign In
           </Button>
         </View>
@@ -193,7 +241,7 @@ const amplifyComponents = {
   },
 };
 
-/** Left hero + right auth card (Hunter-style) */
+/** Left hero + right auth card */
 function LoginLayout({ children }) {
   return (
     <div className="auth-split">
@@ -203,7 +251,10 @@ function LoginLayout({ children }) {
             <img src="/user.png" alt="Logo" />
           </div>
           <h1>Welcome to your kitchen command center</h1>
-          <p>Track ingredients, plan production, and keep waste in check — all in one place.</p>
+          <p>
+            Track ingredients, plan production, and keep waste in check —
+            all in one place.
+          </p>
           <ul>
             <li>Real-time stock & barcodes</li>
             <li>Recipe-driven production</li>
@@ -211,9 +262,7 @@ function LoginLayout({ children }) {
           </ul>
         </div>
       </div>
-
       <div className="auth-right">{children}</div>
-
       <style>{`
         .auth-split {
           min-height: 100dvh;
@@ -254,6 +303,13 @@ function LoginLayout({ children }) {
   );
 }
 
+/** Extract Cognito sub */
+function getCognitoSub(user) {
+  return (
+    user?.userId || user?.username || user?.attributes?.sub || null
+  );
+}
+
 /** App content when authenticated */
 function MainApp() {
   const [theme, colorMode] = useMode();
@@ -267,20 +323,36 @@ function MainApp() {
             <main className="content">
               <Topbar />
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/GoodsIn" element={<GoodsIn />} />
                 <Route path="/GoodsInForm" element={<GoodsInForm />} />
                 <Route path="/recipeform" element={<RecipeForm />} />
                 <Route path="/recipes" element={<Recipes />} />
                 <Route path="/account" element={<AccountPage />} />
-                <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
-                <Route path="/daily_production" element={<ProductionLog />} />
-                <Route path="/recipe_production" element={<ProductionLogForm />} />
-                <Route path="/stock_inventory" element={<RecipeInventory />} />
+                <Route
+                  path="/IngredientsInventory"
+                  element={<IngredientsInventory />}
+                />
+                <Route
+                  path="/daily_production"
+                  element={<ProductionLog />}
+                />
+                <Route
+                  path="/recipe_production"
+                  element={<ProductionLogForm />}
+                />
+                <Route
+                  path="/stock_inventory"
+                  element={<RecipeInventory />}
+                />
                 <Route path="/stock_usage" element={<StockUsage />} />
-                <Route path="/goods_out_form" element={<GoodsOutForm />} />
+                <Route
+                  path="/goods_out_form"
+                  element={<GoodsOutForm />}
+                />
                 <Route path="/goods_out" element={<GoodsOut />} />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="/" element={<Navigate to="/dashboard" />} />
+                <Route path="*" element={<Navigate to="/dashboard" />} />
               </Routes>
             </main>
           </div>
@@ -290,12 +362,7 @@ function MainApp() {
   );
 }
 
-/** Extract Cognito sub from Amplify user object */
-function getCognitoSub(user) {
-  return user?.userId || user?.username || user?.attributes?.sub || null;
-}
-
-/** Gate that decides: show login layout OR mount providers */
+/** Gate for authentication */
 function AuthGate() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
 
@@ -331,7 +398,14 @@ function AuthGate() {
           }}
         >
           <CircularProgress />
-          <Text style={{ color: brand.subtext, fontWeight: 600 }}>Preparing your workspace…</Text>
+          <Text
+            style={{
+              color: brand.subtext,
+              fontWeight: 600,
+            }}
+          >
+            Preparing your workspace…
+          </Text>
         </Box>
       </Box>
     );
@@ -350,9 +424,15 @@ function App() {
     <AmplifyThemeProvider theme={noryTheme}>
       <Authenticator.Provider>
         <Routes>
+          {/* Public */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<AuthGate />} />
-          <Route path="/*" element={<Navigate to="/" />} />
+
+          {/* Private */}
+          <Route path="/app/*" element={<AuthGate />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Authenticator.Provider>
     </AmplifyThemeProvider>
