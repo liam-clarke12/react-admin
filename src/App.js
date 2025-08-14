@@ -1,6 +1,6 @@
 // App.jsx
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Link } from "react-router-dom";
 import { Amplify } from "aws-amplify";
 import {
   Authenticator,
@@ -10,7 +10,6 @@ import {
   Heading,
   Text,
   View,
-  Image,
   Button,
   ThemeProvider as AmplifyThemeProvider,
 } from "@aws-amplify/ui-react";
@@ -118,12 +117,8 @@ const noryTheme = {
 /** Amplify component overrides */
 const amplifyComponents = {
   Header() {
-    const { tokens } = useTheme();
-    return (
-      <View textAlign="center" padding={`${tokens.space.medium} 0 0 0`}>
-        <Image alt="Logo" src="/user.png" style={{ width: 60, height: 60, objectFit: "contain", margin: "0 auto" }} />
-      </View>
-    );
+    // Removed logo
+    return null;
   },
   Footer() {
     const { tokens } = useTheme();
@@ -195,9 +190,6 @@ function LoginLayout({ children }) {
     <div className="auth-split">
       <div className="auth-left">
         <div className="hero-inner">
-          <div className="logo-row">
-            <img src="/user.png" alt="Logo" />
-          </div>
           <h1>Welcome to your kitchen command center</h1>
           <p>Track ingredients, plan production, and keep waste in check — all in one place.</p>
           <ul>
@@ -208,7 +200,14 @@ function LoginLayout({ children }) {
         </div>
       </div>
 
-      <div className="auth-right">{children}</div>
+      <div className="auth-right">
+        <Link to="/" className="back-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </Link>
+        {children}
+      </div>
 
       <style>{`
         .auth-split {
@@ -231,10 +230,6 @@ function LoginLayout({ children }) {
         }
         @media (max-width: 1000px) { .auth-left { display: none; } }
         .hero-inner { width: min(560px, 90%); color: ${brand.text}; }
-        .logo-row img {
-          width: 90px; height: 90px; object-fit: contain;
-          filter: drop-shadow(0 1px 2px rgba(16,24,40,0.06));
-        }
         .hero-inner h1 { margin: 16px 0 8px; font-size: clamp(26px, 4vw, 36px); line-height: 1.1; font-weight: 900; color: ${brand.text}; }
         .hero-inner p { margin: 0 0 16px; color: ${brand.subtext}; font-size: 16px; }
         .hero-inner ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
@@ -243,8 +238,25 @@ function LoginLayout({ children }) {
           color: ${brand.text}; font-weight: 700;
         }
         .hero-inner li::before { content: "✓"; color: ${brand.primary}; font-weight: 900; line-height: 1.2; }
-        .auth-right { display: grid; place-items: center; padding: clamp(16px, 4vw, 40px); }
+        .auth-right { display: grid; place-items: center; padding: clamp(16px, 4vw, 40px); position: relative; }
         .auth-right .amplify-authenticator { margin-left: auto; }
+        .back-arrow {
+          position: absolute;
+          top: 16px;
+          left: 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: ${brand.surface};
+          border-radius: 50%;
+          padding: 6px;
+          box-shadow: ${brand.shadow};
+          border: 1px solid ${brand.border};
+          transition: background 0.2s ease;
+        }
+        .back-arrow:hover {
+          background: ${brand.surfaceMuted};
+        }
       `}</style>
     </div>
   );
@@ -255,7 +267,6 @@ function getCognitoSub(user) {
   return user?.userId || user?.username || user?.attributes?.sub || null;
 }
 
-/** App content when authenticated */
 function MainApp() {
   const [theme, colorMode] = useMode();
   return (
@@ -268,7 +279,6 @@ function MainApp() {
             <main className="content">
               <Topbar />
               <Routes>
-                {/* Private pages (keep absolute paths to match sidebar links) */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/GoodsIn" element={<GoodsIn />} />
                 <Route path="/GoodsInForm" element={<GoodsInForm />} />
@@ -282,8 +292,6 @@ function MainApp() {
                 <Route path="/stock_usage" element={<StockUsage />} />
                 <Route path="/goods_out_form" element={<GoodsOutForm />} />
                 <Route path="/goods_out" element={<GoodsOut />} />
-
-                {/* Default when inside the app shell */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
@@ -295,7 +303,6 @@ function MainApp() {
   );
 }
 
-/** Login screen only (public). If already signed in, go to dashboard. */
 function LoginScreen() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
   if (user) return <Navigate to="/dashboard" replace />;
@@ -306,13 +313,11 @@ function LoginScreen() {
   );
 }
 
-/** Public landing that redirects to dashboard when signed in */
 function PublicLanding() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
   return user ? <Navigate to="/dashboard" replace /> : <LandingPage />;
 }
 
-/** Protected wrapper for the app area */
 function ProtectedApp() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
 
@@ -357,17 +362,13 @@ function ProtectedApp() {
   );
 }
 
-/** Root App */
 function App() {
   return (
     <AmplifyThemeProvider theme={noryTheme}>
       <Authenticator.Provider>
         <Routes>
-          {/* Public routes */}
           <Route path="/" element={<PublicLanding />} />
           <Route path="/login" element={<LoginScreen />} />
-
-          {/* Private shell catches everything else */}
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>
       </Authenticator.Provider>
