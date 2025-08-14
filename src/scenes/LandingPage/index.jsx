@@ -13,6 +13,10 @@ const LandingPage = () => {
     navigate("/login"); // redirect to login / Authenticator
   };
 
+  const handleSignIn = () => {
+    navigate("/login");
+  };
+
   return (
     <Box sx={{ fontFamily: "Roboto, sans-serif" }}>
       {/* Header */}
@@ -26,14 +30,26 @@ const LandingPage = () => {
           backgroundColor: "#fff",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        {/* Logo & Brand Name */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography
+            sx={{
+              fontWeight: "bold",
+              fontSize: "1.25rem",
+              color: "#0f172a",
+            }}
+          >
+            Hupes
+          </Typography>
           <img
             src="/user.png"
             alt="Logo"
             style={{ height: 40, marginRight: 8 }}
           />
         </Box>
-        <Box sx={{ display: "flex", gap: 3 }}>
+
+        {/* Navigation + Sign In Button */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
           {["Home", "Features", "About", "Contact"].map((item) => (
             <Typography
               key={item}
@@ -46,6 +62,20 @@ const LandingPage = () => {
               {item}
             </Typography>
           ))}
+          <Button
+            variant="contained"
+            sx={{
+              borderRadius: "999px",
+              padding: "6px 20px",
+              fontWeight: 600,
+              backgroundColor: "#e11d48",
+              "&:hover": { backgroundColor: "#be123c" },
+              textTransform: "none",
+            }}
+            onClick={handleSignIn}
+          >
+            Sign In
+          </Button>
         </Box>
       </Box>
 
@@ -85,7 +115,7 @@ const LandingPage = () => {
               mb: 3,
               lineHeight: 1.2,
               color: "#0f172a",
-              fontSize: { xs: "2rem", md: "2.8rem" }, // smaller heading
+              fontSize: { xs: "2rem", md: "2.8rem" },
             }}
           >
             Efficient <br /> Inventory <br /> Management
@@ -157,8 +187,8 @@ const LandingPage = () => {
           sx={{
             display: { xs: "none", md: "block" },
             overflow: "hidden",
-            maxWidth: "60%", // make it a bit smaller
-            margin: "auto", // center it horizontally
+            maxWidth: "60%",
+            margin: "auto",
             borderRadius: 16,
           }}
         >
@@ -167,7 +197,7 @@ const LandingPage = () => {
             alt="Warehouse"
             style={{
               width: "100%",
-              height: "auto", // maintain aspect ratio
+              height: "auto",
               objectFit: "cover",
               borderRadius: 16,
             }}
