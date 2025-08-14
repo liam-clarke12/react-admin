@@ -34,10 +34,18 @@ const LandingPage = () => {
           />
         </Box>
         <Box sx={{ display: "flex", gap: 3 }}>
-          <Typography sx={{ cursor: "pointer" }}>Home</Typography>
-          <Typography sx={{ cursor: "pointer" }}>Features</Typography>
-          <Typography sx={{ cursor: "pointer" }}>About</Typography>
-          <Typography sx={{ cursor: "pointer" }}>Contact</Typography>
+          {["Home", "Features", "About", "Contact"].map((item) => (
+            <Typography
+              key={item}
+              sx={{
+                cursor: "pointer",
+                fontWeight: "bold",
+                color: "#e11d48", // brand color
+              }}
+            >
+              {item}
+            </Typography>
+          ))}
         </Box>
       </Box>
 
@@ -72,7 +80,13 @@ const LandingPage = () => {
           />
           <Typography
             variant="h2"
-            sx={{ fontWeight: 900, mb: 3, lineHeight: 1.2, color: "#0f172a" }}
+            sx={{
+              fontWeight: 900,
+              mb: 3,
+              lineHeight: 1.2,
+              color: "#0f172a",
+              fontSize: { xs: "2rem", md: "2.8rem" }, // smaller heading
+            }}
           >
             Efficient <br /> Inventory <br /> Management
           </Typography>
@@ -140,24 +154,24 @@ const LandingPage = () => {
 
         {/* Right Hero Image */}
         <Box
-        sx={{
+          sx={{
             display: { xs: "none", md: "block" },
             overflow: "hidden",
-            maxWidth: "60%",       // make it a bit smaller
-            margin: "auto",        // center it horizontally
+            maxWidth: "60%", // make it a bit smaller
+            margin: "auto", // center it horizontally
             borderRadius: 16,
-        }}
+          }}
         >
-        <img
+          <img
             src="/assets/pexels-shvetsa-5953694.jpg"
             alt="Warehouse"
             style={{
-            width: "100%",
-            height: "auto",      // maintain aspect ratio
-            objectFit: "cover",
-            borderRadius: 16,
+              width: "100%",
+              height: "auto", // maintain aspect ratio
+              objectFit: "cover",
+              borderRadius: 16,
             }}
-        />
+          />
         </Box>
       </Box>
 
