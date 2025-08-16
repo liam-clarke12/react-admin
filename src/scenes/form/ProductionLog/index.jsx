@@ -357,13 +357,24 @@ const ProductionLogForm = () => {
         .plf-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
 
         .plf-fab {
-          position: fixed; right: 20px; bottom: 20px; z-index: 10;
-          display: inline-flex; align-items: center; gap: 8px;
-          border-radius: 999px; padding: 12px 18px; border: 0; cursor: pointer; font-weight: 800; color: #fff;
+          position: relative; /* or just remove position */
+          margin-top: 20px;
+          float: right; /* stick to bottom-right inside container */
+          display: inline-flex; 
+          align-items: center; 
+          gap: 8px;
+          border-radius: 999px; 
+          padding: 12px 18px; 
+          border: 0; 
+          cursor: pointer; 
+          font-weight: 800; 
+          color: #fff;
           background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
           box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
           transition: transform .2s ease;
         }
+        .plf-fab:hover { transform: scale(1.06); background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
+
         .plf-fab:hover { transform: scale(1.06); background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
 
         /* Toast */
