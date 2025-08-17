@@ -41,7 +41,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 
 Amplify.configure(awsExports);
 
-/** Brand tokens used for both Amplify UI and the hero panel */
+/** Brand tokens */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -117,7 +117,7 @@ const noryTheme = {
 /** Amplify component overrides */
 const amplifyComponents = {
   Header() {
-    return null; // removed logo
+    return null;
   },
   Footer() {
     const { tokens } = useTheme();
@@ -189,7 +189,16 @@ function LoginLayout({ children }) {
     <div className="auth-split">
       <div className="auth-left">
         <Link to="/" className="back-arrow-left">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            fill="none"
+            stroke={brand.primary}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </Link>
@@ -204,9 +213,7 @@ function LoginLayout({ children }) {
         </div>
       </div>
 
-      <div className="auth-right">
-        {children}
-      </div>
+      <div className="auth-right">{children}</div>
 
       <style>{`
         .auth-split {
@@ -253,9 +260,7 @@ function LoginLayout({ children }) {
           transition: background 0.2s ease;
           z-index: 10;
         }
-        .back-arrow-left:hover {
-          background: ${brand.surfaceMuted};
-        }
+        .back-arrow-left:hover { background: ${brand.surfaceMuted}; }
       `}</style>
     </div>
   );
@@ -305,9 +310,47 @@ function MainApp() {
 function LoginScreen() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
   if (user) return <Navigate to="/dashboard" replace />;
+
   return (
     <LoginLayout>
-      <Authenticator components={amplifyComponents} />
+      <Authenticator
+        components={amplifyComponents}
+        loginMechanisms={["email"]}
+        // Standard attributes to collect & store
+        signUpAttributes={["given_name", "family_name"]}
+        // Custom attributes: use the exact API names configured in your pool
+        formFields={{
+          signUp: {
+            given_name: {
+              label: "First name",
+              placeholder: "Jane",
+              isRequired: true,
+              order: 1,
+            },
+            family_name: {
+              label: "Last name",
+              placeholder: "Doe",
+              isRequired: true,
+              order: 2,
+            },
+            "custom:Company": {
+              label: "Company",
+              placeholder: "Acme Foods",
+              isRequired: true, // set false if optional
+              order: 3,
+            },
+            "custom:jobTitle": {
+              label: "Job title",
+              placeholder: "Operations Manager",
+              isRequired: true, // set false if optional
+              order: 4,
+            },
+            email: { order: 5 },
+            password: { order: 6 },
+            confirm_password: { order: 7 },
+          },
+        }}
+      />
     </LoginLayout>
   );
 }
@@ -348,7 +391,9 @@ function ProtectedApp() {
           }}
         >
           <CircularProgress />
-          <Text style={{ color: brand.subtext, fontWeight: 600 }}>Preparing your workspace…</Text>
+          <Text style={{ color: brand.subtext, fontWeight: 600 }}>
+            Preparing your workspace…
+          </Text>
         </Box>
       </Box>
     );
