@@ -21,7 +21,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import UploadIcon from "@mui/icons-material/Upload";
 import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
-import { Auth } from "aws-amplify";
+// ✅ Amplify v6 modular auth API (no Auth class)
+import { updatePassword } from "aws-amplify/auth";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Nory-like brand tokens */
@@ -108,7 +109,6 @@ export default function AccountPage() {
   };
 
   const onSave = async () => {
-    // basic client-side checks
     if (!form.firstName.trim()) {
       return setSnack({ open: true, severity: "warning", message: "First name is required." });
     }
@@ -156,9 +156,8 @@ export default function AccountPage() {
 
     setPwBusy(true);
     try {
-      // Standard Amplify flow
-      const user = await Auth.currentAuthenticatedUser();
-      await Auth.changePassword(user, current, next);
+      // ✅ Amplify v6 modular API
+      await updatePassword({ oldPassword: current, newPassword: next });
 
       setPwBusy(false);
       setPwOpen(false);
@@ -166,13 +165,12 @@ export default function AccountPage() {
     } catch (err) {
       console.error("Change password failed:", err);
       setPwBusy(false);
-      setSnack({
-        open: true,
-        severity: "error",
-        message:
-          err?.message ||
-          "Failed to change password. Check your current password and try again.",
-      });
+      // Many Amplify auth errors put a message on err.name/err.message
+      const message =
+        err?.message ||
+        err?.toString?.() ||
+        "Failed to change password. Check your current password and try again.";
+      setSnack({ open: true, severity: "error", message });
     }
   };
 
