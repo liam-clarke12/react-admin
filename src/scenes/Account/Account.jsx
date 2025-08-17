@@ -21,9 +21,12 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import UploadIcon from "@mui/icons-material/Upload";
 import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
-// ✅ Amplify v6 modular auth API (no Auth class)
-import { updatePassword } from "aws-amplify/auth";
-import { useAuth } from "../../contexts/AuthContext";
+// ✅ Amplify v6 modular auth APIs
+import {
+  fetchUserAttributes,
+  updateUserAttributes,
+  updatePassword,
+} from "aws-amplify/auth";
 
 /** Nory-like brand tokens */
 const brand = {
@@ -51,42 +54,54 @@ function joinName(first = "", last = "") {
 }
 
 export default function AccountPage() {
-  const { userProfile, updateProfile, loading } = useAuth();
+  // Loading gate for initial fetch
+  const [loading, setLoading] = useState(true);
 
-  // --- edit state
-  const [editMode, setEditMode] = useState(false);
+  // Profile form
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     company: "",
     jobTitle: "",
   });
+  const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
 
-  // --- password dialog state
+  // Edit state
+  const [editMode, setEditMode] = useState(false);
+
+  // Password dialog state
   const [pwOpen, setPwOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [pwBusy, setPwBusy] = useState(false);
 
-  // --- feedback
+  // Feedback
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
-  // derive email from profile (read-only)
-  const email = useMemo(() => userProfile?.email || "", [userProfile]);
-
-  // hydrate form from profile
+  // Fetch from Cognito on mount
   useEffect(() => {
-    if (!loading && userProfile) {
-      const { firstName, lastName } = splitName(userProfile.name || "");
-      setForm({
-        firstName,
-        lastName,
-        company: userProfile.company || "",
-        jobTitle: userProfile.jobTitle || "",
-      });
-      setAvatarUrl(userProfile.picture || "");
-    }
-  }, [loading, userProfile]);
+    (async () => {
+      try {
+        const attrs = await fetchUserAttributes();
+        // attrs is an object like: { email, name, given_name, family_name, "custom:Company", "custom:jobTitle", picture?, ... }
+        const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
+        const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
+        setForm({
+          firstName: first || "",
+          lastName: last || "",
+          company: attrs?.["custom:Company"] || "",
+          jobTitle: attrs?.["custom:jobTitle"] || "",
+        });
+        setEmail(attrs?.email || "");
+        setAvatarUrl(attrs?.picture || "");
+      } catch (err) {
+        console.error("[AccountPage] Failed to fetch user attributes:", err);
+        setSnack({ open: true, severity: "error", message: "Failed to load profile." });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const onChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -95,17 +110,24 @@ export default function AccountPage() {
     if (file) setAvatarUrl(URL.createObjectURL(file));
   };
 
-  const onCancel = () => {
-    setEditMode(false);
-    if (!userProfile) return;
-    const { firstName, lastName } = splitName(userProfile.name || "");
-    setForm({
-      firstName,
-      lastName,
-      company: userProfile.company || "",
-      jobTitle: userProfile.jobTitle || "",
-    });
-    setAvatarUrl(userProfile.picture || "");
+  const onCancel = async () => {
+    // Re-fetch to reset fields back to server state
+    try {
+      const attrs = await fetchUserAttributes();
+      const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
+      const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
+      setForm({
+        firstName: first || "",
+        lastName: last || "",
+        company: attrs?.["custom:Company"] || "",
+        jobTitle: attrs?.["custom:jobTitle"] || "",
+      });
+      setAvatarUrl(attrs?.picture || "");
+    } catch (err) {
+      console.error("[AccountPage] Failed to refresh attributes:", err);
+    } finally {
+      setEditMode(false);
+    }
   };
 
   const onSave = async () => {
@@ -116,23 +138,32 @@ export default function AccountPage() {
       return setSnack({ open: true, severity: "warning", message: "Last name is required." });
     }
 
-    const toUpdate = {
-      name: joinName(form.firstName, form.lastName),
-      company: form.company,
-      jobTitle: form.jobTitle,
-      // picture: avatarUrl, // uncomment if your updateProfile handles picture
-    };
     try {
-      await updateProfile(toUpdate);
-      setEditMode(false);
+      await updateUserAttributes({
+        // Standard attributes (all optional, but we set them for completeness)
+        given_name: form.firstName,
+        family_name: form.lastName,
+        name: joinName(form.firstName, form.lastName),
+        // ✅ Custom attributes must use the "custom:" prefix and correct case
+        "custom:Company": form.company || "",
+        "custom:jobTitle": form.jobTitle || "",
+        // If you want to support avatar later:
+        // picture: avatarUrl || ""
+      });
+
       setSnack({ open: true, severity: "success", message: "Profile updated." });
+      setEditMode(false);
     } catch (err) {
-      console.error("Failed to update profile:", err);
-      setSnack({ open: true, severity: "error", message: "Failed to update profile." });
+      console.error("[AccountPage] Failed to update attributes:", err);
+      // Cognito returns InvalidParameterException if the custom attrs aren't in the pool schema
+      const msg =
+        err?.message ||
+        "Failed to update profile. Please ensure custom attributes exist in your user pool.";
+      setSnack({ open: true, severity: "error", message: msg });
     }
   };
 
-  // password handlers
+  // Password handlers
   const openPwDialog = () => {
     setPwForm({ current: "", next: "", confirm: "" });
     setPwOpen(true);
@@ -156,19 +187,15 @@ export default function AccountPage() {
 
     setPwBusy(true);
     try {
-      // ✅ Amplify v6 modular API
       await updatePassword({ oldPassword: current, newPassword: next });
-
       setPwBusy(false);
       setPwOpen(false);
       setSnack({ open: true, severity: "success", message: "Password changed successfully." });
     } catch (err) {
-      console.error("Change password failed:", err);
+      console.error("[AccountPage] Change password failed:", err);
       setPwBusy(false);
-      // Many Amplify auth errors put a message on err.name/err.message
       const message =
         err?.message ||
-        err?.toString?.() ||
         "Failed to change password. Check your current password and try again.";
       setSnack({ open: true, severity: "error", message });
     }
@@ -178,13 +205,6 @@ export default function AccountPage() {
     return (
       <Box p={4} display="grid" placeItems="center">
         <CircularProgress />
-      </Box>
-    );
-  }
-  if (!userProfile) {
-    return (
-      <Box p={4}>
-        <Typography color="error">Failed to load profile.</Typography>
       </Box>
     );
   }
@@ -259,11 +279,7 @@ export default function AccountPage() {
         <Box className="acct-header">
           <Typography className="acct-title" variant="h5">My Account</Typography>
           {!editMode ? (
-            <Button
-              onClick={() => setEditMode(true)}
-              startIcon={<EditIcon />}
-              className="pill"
-            >
+            <Button onClick={() => setEditMode(true)} startIcon={<EditIcon />} className="pill">
               Edit Profile
             </Button>
           ) : (
@@ -326,12 +342,7 @@ export default function AccountPage() {
               </Grid>
 
               <Grid item xs={12} md={6} display="flex" alignItems="stretch">
-                <Button
-                  onClick={openPwDialog}
-                  startIcon={<KeyOutlinedIcon />}
-                  className="pill"
-                  sx={{ width: "100%" }}
-                >
+                <Button onClick={openPwDialog} startIcon={<KeyOutlinedIcon />} className="pill" sx={{ width: "100%" }}>
                   Change Password
                 </Button>
               </Grid>
