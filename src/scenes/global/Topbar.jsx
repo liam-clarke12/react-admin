@@ -14,7 +14,8 @@ import {
   Button,
   TextField,
   Snackbar,
-  Alert
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -85,6 +86,8 @@ export default function Topbar() {
 
   // snackbar for logout feedback
   const [snack, setSnack] = useState({ open: false, severity: "info", message: "" });
+  // logout loading flag
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const seen = new Set(notifications.map((n) => n.barcode));
@@ -134,6 +137,7 @@ export default function Topbar() {
     setLogoutDialogOpen(false);
     // close profile popover immediately
     setProfileAnchor(null);
+    setLoggingOut(true);
 
     try {
       console.log("[Topbar] Starting signOut()");
@@ -160,26 +164,34 @@ export default function Topbar() {
       try {
         // clear notifications we store
         localStorage.removeItem("notifications");
-        // remove any other likely local keys used for auth/session
-        // (add keys your app uses, e.g. tokens, amplify state, etc.)
+        // remove other likely local keys used for auth/session
         localStorage.removeItem("amplify-authenticator"); // example; add your keys if present
-        // If you know the exact keys (e.g. 'CognitoIdentityServiceProvider.*'), remove them here.
+        // remove Cognito prefixed keys (best-effort)
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith("CognitoIdentityServiceProvider") || k.startsWith("aws-amplify"))
+            localStorage.removeItem(k);
+        });
       } catch (e) {
         console.warn("[Topbar] error clearing localStorage during logout cleanup", e);
       }
 
-      // Navigate to login and force a hard reload so any in-memory state is reset.
-      // Using location.replace ensures no back-navigation to an authenticated page.
+      // Try client-side navigation first
       try {
-        // Prefer client-side navigation first
         navigate("/login");
       } catch (navErr) {
         console.warn("[Topbar] navigate('/login') failed:", navErr);
       }
 
-      // Force a hard redirect (this guarantees a full reload and cleared runtime state)
-      // This is the fallback that ensures the user is taken to the login page with a fresh JS runtime.
-      window.location.replace("/login");
+      // Force a hard redirect so in-memory state is cleared
+      try {
+        window.location.replace("/login");
+      } catch (replaceErr) {
+        // very unlikely, but log and fallback to location.href
+        console.warn("[Topbar] window.location.replace failed:", replaceErr);
+        window.location.href = "/login";
+      } finally {
+        setLoggingOut(false); // in case redirect didn't happen immediately (dev)
+      }
     }
   };
 
@@ -460,17 +472,37 @@ export default function Topbar() {
             Account ID: {cognitoId || "Not available"}
           </Typography>
           <Box height="1px" bgcolor={brand.border} my={1} />
-          <MenuItem onClick={() => { handleCloseProfile(); navigate("/account"); }}>
+          <MenuItem
+            onClick={() => {
+              handleCloseProfile();
+              navigate("/account");
+            }}
+          >
             <AccountCircleOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>Account</Box>
+            <Box component="span" ml={1}>
+              Account
+            </Box>
           </MenuItem>
-          <MenuItem onClick={() => { handleCloseProfile(); navigate("/settings"); }}>
+          <MenuItem
+            onClick={() => {
+              handleCloseProfile();
+              navigate("/settings");
+            }}
+          >
             <SettingsOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>Settings</Box>
+            <Box component="span" ml={1}>
+              Settings
+            </Box>
           </MenuItem>
-          <MenuItem onClick={handleLogoutClick} sx={{ color: brand.red }}>
+          <MenuItem
+            onClick={handleLogoutClick}
+            sx={{ color: brand.red }}
+            disabled={loggingOut}
+          >
             <LogoutOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>Logout</Box>
+            <Box component="span" ml={1}>
+              Logout
+            </Box>
           </MenuItem>
         </Box>
       </Popover>
@@ -499,6 +531,7 @@ export default function Topbar() {
           <Button
             onClick={() => setLogoutDialogOpen(false)}
             sx={{ textTransform: "none", fontWeight: 700 }}
+            disabled={loggingOut}
           >
             Cancel
           </Button>
@@ -511,8 +544,10 @@ export default function Topbar() {
               borderRadius: 999,
               px: 2,
             }}
+            disabled={loggingOut}
+            startIcon={loggingOut ? <CircularProgress size={18} /> : null}
           >
-            Logout
+            {loggingOut ? "Logging out…" : "Logout"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -524,7 +559,10 @@ export default function Topbar() {
         onClose={() => setSnack((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+        <Alert
+          severity={snack.severity}
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        >
           {snack.message}
         </Alert>
       </Snackbar>
