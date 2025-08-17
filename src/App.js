@@ -170,7 +170,9 @@ const amplifyComponents = {
       const { validationErrors } = useAuthenticator();
       return (
         <>
+          {/* Renders all fields defined via Authenticator's `formFields` prop */}
           <Authenticator.SignUp.FormFields />
+          {/* Required Terms & Conditions checkbox (enforced via services.validateCustomSignUp) */}
           <CheckboxField
             name="acknowledgement"
             label="I agree to the Terms and Conditions"
@@ -318,7 +320,7 @@ function LoginScreen() {
         loginMechanisms={["email"]}
         // Standard attributes to collect & store
         signUpAttributes={["given_name", "family_name"]}
-        // Custom attributes: use the exact API names configured in your pool
+        // Custom attributes: exact API names as configured in your pool
         formFields={{
           signUp: {
             given_name: {
@@ -336,18 +338,46 @@ function LoginScreen() {
             "custom:Company": {
               label: "Company",
               placeholder: "Acme Foods",
-              isRequired: true, // set false if optional
+              isRequired: true,
               order: 3,
             },
             "custom:jobTitle": {
               label: "Job title",
               placeholder: "Operations Manager",
-              isRequired: true, // set false if optional
+              isRequired: true,
               order: 4,
             },
-            email: { order: 5 },
-            password: { order: 6 },
-            confirm_password: { order: 7 },
+            email: { order: 5, isRequired: true },
+            password: { order: 6, isRequired: true },
+            confirm_password: { order: 7, isRequired: true },
+          },
+        }}
+        // Enforce T&Cs and double-validate all required fields (incl. custom attrs)
+        services={{
+          validateCustomSignUp: async (formData) => {
+            const errors = {};
+            const attrs = formData?.attributes || {};
+            const isBlank = (v) => !v || String(v).trim() === "";
+
+            // Require acknowledgement
+            if (!formData?.acknowledgement) {
+              errors.acknowledgement = "You must accept the Terms and Conditions.";
+            }
+
+            // Require all attributes
+            if (isBlank(attrs["given_name"])) errors["given_name"] = "First name is required.";
+            if (isBlank(attrs["family_name"])) errors["family_name"] = "Last name is required.";
+            if (isBlank(attrs["custom:Company"])) errors["custom:Company"] = "Company is required.";
+            if (isBlank(attrs["custom:jobTitle"])) errors["custom:jobTitle"] = "Job title is required.";
+
+            // Email/password are already required via isRequired, but you can enforce here too:
+            if (isBlank(formData?.username) && isBlank(attrs?.email)) {
+              // Depending on Amplify version, the email might be in `username` or `attributes.email`
+              errors["email"] = "Email is required.";
+            }
+            if (isBlank(formData?.password)) errors["password"] = "Password is required.";
+
+            return errors;
           },
         }}
       />
