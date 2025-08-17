@@ -1,5 +1,5 @@
 // src/scenes/account/AccountPage.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -21,7 +21,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import UploadIcon from "@mui/icons-material/Upload";
 import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
-// ✅ Amplify v6 modular auth APIs
+// Amplify v6 modular auth APIs
 import {
   fetchUserAttributes,
   updateUserAttributes,
@@ -83,7 +83,7 @@ export default function AccountPage() {
     (async () => {
       try {
         const attrs = await fetchUserAttributes();
-        // attrs is an object like: { email, name, given_name, family_name, "custom:Company", "custom:jobTitle", picture?, ... }
+        // attrs: { email, name, given_name, family_name, "custom:Company", "custom:jobTitle", picture?, ... }
         const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
         const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
         setForm({
@@ -139,23 +139,23 @@ export default function AccountPage() {
     }
 
     try {
+      // ✅ v6 signature requires { userAttributes: { ... } }
       await updateUserAttributes({
-        // Standard attributes (all optional, but we set them for completeness)
-        given_name: form.firstName,
-        family_name: form.lastName,
-        name: joinName(form.firstName, form.lastName),
-        // ✅ Custom attributes must use the "custom:" prefix and correct case
-        "custom:Company": form.company || "",
-        "custom:jobTitle": form.jobTitle || "",
-        // If you want to support avatar later:
-        // picture: avatarUrl || ""
+        userAttributes: {
+          given_name: form.firstName,
+          family_name: form.lastName,
+          name: joinName(form.firstName, form.lastName),
+          // Custom attributes must use the exact keys configured in your pool:
+          "custom:Company": form.company || "",
+          "custom:jobTitle": form.jobTitle || "",
+          // picture: avatarUrl || "" // enable if you store avatars in Cognito
+        },
       });
 
       setSnack({ open: true, severity: "success", message: "Profile updated." });
       setEditMode(false);
     } catch (err) {
       console.error("[AccountPage] Failed to update attributes:", err);
-      // Cognito returns InvalidParameterException if the custom attrs aren't in the pool schema
       const msg =
         err?.message ||
         "Failed to update profile. Please ensure custom attributes exist in your user pool.";
