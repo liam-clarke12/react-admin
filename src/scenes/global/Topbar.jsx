@@ -1,4 +1,4 @@
-// src/components/Topbar/index.jsx (or wherever your Topbar lives)
+// src/components/Topbar/index.jsx
 import {
   Box,
   IconButton,
@@ -13,6 +13,8 @@ import {
   DialogTitle,
   Button,
   TextField,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -28,7 +30,7 @@ import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-// --- Nory-like brand tokens ---
+// --- brand tokens (unchanged) ---
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -59,7 +61,6 @@ const pageOptions = [
   { label: "Account", path: "/account" },
 ];
 
-// Only show suggestions when input has at least 1 character
 const filterOptions = createFilterOptions({
   matchFrom: "start",
   stringify: (option) => option.label,
@@ -71,9 +72,9 @@ export default function Topbar() {
   const { cognitoId, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // state for autocomplete input
+  // autocomplete state
   const [inputValue, setInputValue] = useState("");
-  // state for notifications
+  // notifications
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem("notifications");
     return saved ? JSON.parse(saved) : [];
@@ -82,7 +83,9 @@ export default function Topbar() {
   const [profileAnchor, setProfileAnchor] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
-  // update notifications every 5s
+  // snackbar for logout feedback
+  const [snack, setSnack] = useState({ open: false, severity: "info", message: "" });
+
   useEffect(() => {
     const seen = new Set(notifications.map((n) => n.barcode));
     const check = () => {
@@ -121,10 +124,63 @@ export default function Topbar() {
   const handleProfileClick = (e) => setProfileAnchor(e.currentTarget);
   const handleCloseProfile = () => setProfileAnchor(null);
   const handleLogoutClick = () => setLogoutDialogOpen(true);
+
+  // Robust logout flow:
+  //  - call signOut() if present
+  //  - if it throws, log error
+  //  - clear common local storage keys we know about (notifications etc)
+  //  - navigate to /login and force a full reload to clear any in-memory state
   const handleConfirmLogout = async () => {
     setLogoutDialogOpen(false);
-    await signOut();
-    navigate("/login");
+    // close profile popover immediately
+    setProfileAnchor(null);
+
+    try {
+      console.log("[Topbar] Starting signOut()");
+      if (signOut && typeof signOut === "function") {
+        // call your app's signOut
+        await signOut();
+        console.log("[Topbar] signOut() completed (useAuth)");
+      } else if (window && window.Auth && typeof window.Auth.signOut === "function") {
+        // fallback for aws-amplify if exposed globally (rare)
+        await window.Auth.signOut();
+        console.log("[Topbar] signOut() completed (window.Auth)");
+      } else {
+        console.warn("[Topbar] No signOut function available on useAuth or window.Auth — continuing with local cleanup");
+      }
+
+      // Success message to user
+      setSnack({ open: true, severity: "success", message: "Logged out successfully" });
+    } catch (err) {
+      // If signOut throws, log it and still perform cleanup
+      console.error("[Topbar] signOut failed:", err);
+      setSnack({ open: true, severity: "warning", message: "Logout encountered an error, clearing local state" });
+    } finally {
+      // Defensive cleanup
+      try {
+        // clear notifications we store
+        localStorage.removeItem("notifications");
+        // remove any other likely local keys used for auth/session
+        // (add keys your app uses, e.g. tokens, amplify state, etc.)
+        localStorage.removeItem("amplify-authenticator"); // example; add your keys if present
+        // If you know the exact keys (e.g. 'CognitoIdentityServiceProvider.*'), remove them here.
+      } catch (e) {
+        console.warn("[Topbar] error clearing localStorage during logout cleanup", e);
+      }
+
+      // Navigate to login and force a hard reload so any in-memory state is reset.
+      // Using location.replace ensures no back-navigation to an authenticated page.
+      try {
+        // Prefer client-side navigation first
+        navigate("/login");
+      } catch (navErr) {
+        console.warn("[Topbar] navigate('/login') failed:", navErr);
+      }
+
+      // Force a hard redirect (this guarantees a full reload and cleared runtime state)
+      // This is the fallback that ensures the user is taken to the login page with a fresh JS runtime.
+      window.location.replace("/login");
+    }
   };
 
   // when Enter pressed in the textfield
@@ -241,8 +297,6 @@ export default function Topbar() {
 
         {/* Icons */}
         <Box display="flex" alignItems="center" gap={1}>
-          {/* Removed dark/light mode toggle as requested */}
-
           <IconButton
             onClick={handleNotifClick}
             sx={{
@@ -406,23 +460,17 @@ export default function Topbar() {
             Account ID: {cognitoId || "Not available"}
           </Typography>
           <Box height="1px" bgcolor={brand.border} my={1} />
-          <MenuItem onClick={() => navigate("/account")}>
+          <MenuItem onClick={() => { handleCloseProfile(); navigate("/account"); }}>
             <AccountCircleOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
-              Account
-            </Box>
+            <Box component="span" ml={1}>Account</Box>
           </MenuItem>
-          <MenuItem onClick={() => navigate("/settings")}>
+          <MenuItem onClick={() => { handleCloseProfile(); navigate("/settings"); }}>
             <SettingsOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
-              Settings
-            </Box>
+            <Box component="span" ml={1}>Settings</Box>
           </MenuItem>
           <MenuItem onClick={handleLogoutClick} sx={{ color: brand.red }}>
             <LogoutOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
-              Logout
-            </Box>
+            <Box component="span" ml={1}>Logout</Box>
           </MenuItem>
         </Box>
       </Popover>
@@ -468,6 +516,18 @@ export default function Topbar() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snack for logout feedback */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3500}
+        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
