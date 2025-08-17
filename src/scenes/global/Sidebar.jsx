@@ -1,5 +1,5 @@
 // src/components/Sidebar/index.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
@@ -18,6 +18,9 @@ import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlin
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import BakeryDiningOutlinedIcon from '@mui/icons-material/BakeryDiningOutlined';
+
+// ✅ Amplify v6 modular auth API
+import { fetchUserAttributes } from "aws-amplify/auth";
 
 const brand = {
   text: "#0f172a",
@@ -72,6 +75,50 @@ const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
 
+  // 👇 Fetch profile from Cognito
+  const [profile, setProfile] = useState({
+    firstName: "",
+    lastName: "",
+    jobTitle: "",
+    company: "",
+  });
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const attrs = await fetchUserAttributes();
+        if (!mounted) return;
+        const firstName =
+          attrs?.given_name ||
+          (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(0, -1).join(" ") : "");
+        const lastName =
+          attrs?.family_name ||
+          (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(-1)[0] : "");
+        const jobTitle = attrs?.["custom:jobTitle"] || "";
+        const company = attrs?.["custom:Company"] || "";
+        setProfile({ firstName, lastName, jobTitle, company });
+      } catch (e) {
+        console.warn("[Sidebar] Failed to fetch user attributes:", e);
+        setProfile({ firstName: "", lastName: "", jobTitle: "", company: "" });
+      } finally {
+        if (mounted) setProfileLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const fullName =
+    [profile.firstName, profile.lastName].filter(Boolean).join(" ") || (profileLoading ? "Loading…" : "—");
+  const subtitle = profileLoading
+    ? "Loading…"
+    : [profile.jobTitle, profile.company ? `at ${profile.company}` : ""]
+        .filter(Boolean)
+        .join(" ") || "—";
+
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
 
@@ -93,39 +140,29 @@ const Sidebar = () => {
             boxShadow: "none",
           },
           "& .pro-sidebar-layout": {
-            // remove default bg/borders
             background: "transparent !important",
           },
           "& .pro-sidebar > .pro-sidebar-inner > .pro-sidebar-layout .pro-sidebar-header": {
             border: "none",
           },
 
-          // Icons container
           "& .pro-icon-wrapper": {
             backgroundColor: "transparent !important",
             borderRadius: "999px !important",
           },
-
-          // Inner item area (text + icon alignment)
           "& .pro-inner-item": {
             padding: "10px 14px 10px 14px !important",
             margin: "6px 10px",
             borderRadius: "12px",
             color: `${brand.text} !important`,
           },
-
-          // Link element
           "& .pro-inner-item > a": {
             color: `${brand.text} !important`,
           },
-
-          // Hover
           "& .pro-inner-item:hover": {
             background: `${brand.hover} !important`,
             color: `${brand.text} !important`,
           },
-
-          // Active state (gradient blue pill)
           "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover": {
             background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
             color: `#fff !important`,
@@ -134,8 +171,6 @@ const Sidebar = () => {
           "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg": {
             color: `#fff !important`,
           },
-
-          // Section title spacing (we'll use Typography below)
         }}
       >
         <ProSidebar collapsed={isCollapsed}>
@@ -172,7 +207,7 @@ const Sidebar = () => {
               )}
             </MenuItem>
 
-            {/* Optional profile when expanded */}
+            {/* Profile (expanded only) */}
             {!isCollapsed && (
               <Box mb="18px">
                 <Box display="flex" justifyContent="center" alignItems="center">
@@ -181,7 +216,11 @@ const Sidebar = () => {
                     width="88"
                     height="88"
                     src={`../../assets/user.png`}
-                    style={{ cursor: "pointer", borderRadius: "50%", border: `1px solid ${brand.border}` }}
+                    style={{
+                      cursor: "pointer",
+                      borderRadius: "50%",
+                      border: `1px solid ${brand.border}`,
+                    }}
                   />
                 </Box>
                 <Box textAlign="center" mt={1}>
@@ -189,10 +228,10 @@ const Sidebar = () => {
                     variant="h6"
                     sx={{ color: brand.text, fontWeight: 800, m: "6px 0 0" }}
                   >
-                    Hupes
+                    {fullName}
                   </Typography>
                   <Typography variant="body2" sx={{ color: brand.subtext }}>
-                    Admin
+                    {subtitle}
                   </Typography>
                 </Box>
               </Box>
@@ -202,7 +241,7 @@ const Sidebar = () => {
             <Box paddingLeft={isCollapsed ? undefined : "8px"}>
               <Item
                 title="Dashboard"
-                to="/"
+                to="/dashboard"
                 icon={<HomeOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
