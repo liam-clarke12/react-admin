@@ -20,8 +20,8 @@ import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
 import LandingPage from "./scenes/LandingPage";
-import ContactPage from "./scenes/ContactPage"; // ✅ matches src/scenes/ContactPage/index.jsx
-import FeaturesPage from "./scenes/FeaturePage";
+import ContactPage from "./scenes/ContactPage";        // ⬅️ add
+import FeaturesPage from "./scenes/FeaturesPage";      // ⬅️ add
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
@@ -172,9 +172,7 @@ const amplifyComponents = {
       const { validationErrors } = useAuthenticator();
       return (
         <>
-          {/* Renders all fields defined in `formFields.signUp` */}
           <Authenticator.SignUp.FormFields />
-          {/* Required T&Cs checkbox (value enforced by validateCustomSignUp) */}
           <CheckboxField
             name="acknowledgement"
             label="I agree to the Terms and Conditions"
@@ -194,16 +192,7 @@ function LoginLayout({ children }) {
     <div className="auth-split">
       <div className="auth-left">
         <Link to="/" className="back-arrow-left">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="28"
-            height="28"
-            fill="none"
-            stroke={brand.primary}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </Link>
@@ -321,35 +310,13 @@ function LoginScreen() {
       <Authenticator
         components={amplifyComponents}
         loginMechanisms={["email"]}
-        // Standard attributes to collect & store
         signUpAttributes={["given_name", "family_name"]}
-        // Custom attributes — use the exact API names in your pool.
         formFields={{
           signUp: {
-            given_name: {
-              label: "First name",
-              placeholder: "Jane",
-              isRequired: true,
-              order: 1,
-            },
-            family_name: {
-              label: "Last name",
-              placeholder: "Doe",
-              isRequired: true,
-              order: 2,
-            },
-            "custom:Company": {
-              label: "Company",
-              placeholder: "Acme Foods",
-              isRequired: true,
-              order: 3,
-            },
-            "custom:jobTitle": {
-              label: "Job title",
-              placeholder: "Operations Manager",
-              isRequired: true,
-              order: 4,
-            },
+            given_name: { label: "First name", placeholder: "Jane", isRequired: true, order: 1 },
+            family_name: { label: "Last name", placeholder: "Doe", isRequired: true, order: 2 },
+            "custom:Company": { label: "Company", placeholder: "Acme Foods", isRequired: true, order: 3 },
+            "custom:jobTitle": { label: "Job title", placeholder: "Operations Manager", isRequired: true, order: 4 },
             email: { order: 5, isRequired: true },
             password: { order: 6, isRequired: true },
             confirm_password: { order: 7, isRequired: true },
@@ -370,7 +337,6 @@ function LoginScreen() {
             if (!formData?.acknowledgement) {
               errors.acknowledgement = "You must accept the Terms and Conditions.";
             }
-
             if (isBlank(get("given_name"))) errors["given_name"] = "First name is required.";
             if (isBlank(get("family_name"))) errors["family_name"] = "Last name is required.";
             if (isBlank(get("custom:Company"))) errors["custom:Company"] = "Company is required.";
@@ -445,10 +411,13 @@ function App() {
     <AmplifyThemeProvider theme={noryTheme}>
       <Authenticator.Provider>
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<PublicLanding />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/features" element={<FeaturesPage />} />   {/* ⬅️ add */}
+          <Route path="/contact" element={<ContactPage />} />     {/* ⬅️ add */}
           <Route path="/login" element={<LoginScreen />} />
+
+          {/* Protected app */}
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>
       </Authenticator.Provider>
