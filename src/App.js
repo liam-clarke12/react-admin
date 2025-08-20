@@ -20,6 +20,7 @@ import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
 import LandingPage from "./scenes/LandingPage";
+import ContactPage from "./scenes/ContactPage"; // ✅ matches src/scenes/ContactPage/index.jsx
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
@@ -38,9 +39,6 @@ import IngredientsInventory from "./scenes/IngredientInventory";
 
 import { DataProvider } from "./contexts/DataContext";
 import { AuthProvider } from "./contexts/AuthContext";
-
-// ✅ New: public contact page
-import ContactPage from "./components/ContactPage";
 
 Amplify.configure(awsExports);
 
@@ -325,7 +323,6 @@ function LoginScreen() {
         // Standard attributes to collect & store
         signUpAttributes={["given_name", "family_name"]}
         // Custom attributes — use the exact API names in your pool.
-        // If your pool uses lowercase keys, change to "custom:company" / "custom:job_title".
         formFields={{
           signUp: {
             given_name: {
@@ -358,31 +355,26 @@ function LoginScreen() {
           },
         }}
         services={{
-          // Robust validation that reads values from multiple places + supports alt keys.
           validateCustomSignUp: async (formData) => {
             const errors = {};
             const attrs = formData?.attributes || {};
             const get = (k) =>
               attrs[k] ??
               formData?.[k] ??
-              // also try alternative casings for custom attrs
               (k === "custom:Company" ? attrs["custom:company"] : undefined) ??
               (k === "custom:jobTitle" ? attrs["custom:job_title"] : undefined);
 
             const isBlank = (v) => !v || String(v).trim() === "";
 
-            // Require T&Cs
             if (!formData?.acknowledgement) {
               errors.acknowledgement = "You must accept the Terms and Conditions.";
             }
 
-            // Require attributes
             if (isBlank(get("given_name"))) errors["given_name"] = "First name is required.";
             if (isBlank(get("family_name"))) errors["family_name"] = "Last name is required.";
             if (isBlank(get("custom:Company"))) errors["custom:Company"] = "Company is required.";
             if (isBlank(get("custom:jobTitle"))) errors["custom:jobTitle"] = "Job title is required.";
 
-            // Email can be in username (with loginMechanisms=['email']) or attributes.email
             const emailVal = formData?.username || get("email");
             if (isBlank(emailVal)) errors["email"] = "Email is required.";
             if (isBlank(formData?.password)) errors["password"] = "Password is required.";
@@ -453,10 +445,8 @@ function App() {
       <Authenticator.Provider>
         <Routes>
           <Route path="/" element={<PublicLanding />} />
+          <Route path="/contact" element={<ContactPage />} /> {/* ✅ Public Contact route */}
           <Route path="/login" element={<LoginScreen />} />
-          {/* ✅ Public contact route */}
-          <Route path="/contact" element={<ContactPage />} />
-          {/* Protected app under wildcard */}
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>
       </Authenticator.Provider>
