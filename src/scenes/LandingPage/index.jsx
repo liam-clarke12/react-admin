@@ -23,9 +23,7 @@ const LandingPage = () => {
       return;
     }
     if (item === "Features") {
-      document
-        .getElementById("features")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      navigate("/features")
       return;
     }
     if (item === "About") {

@@ -21,6 +21,7 @@ import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box }
 
 import LandingPage from "./scenes/LandingPage";
 import ContactPage from "./scenes/ContactPage"; // ✅ matches src/scenes/ContactPage/index.jsx
+import FeaturesPage from "./scenes/FeaturesPage";
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
@@ -445,7 +446,8 @@ function App() {
       <Authenticator.Provider>
         <Routes>
           <Route path="/" element={<PublicLanding />} />
-          <Route path="/contact" element={<ContactPage />} /> {/* ✅ Public Contact route */}
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>

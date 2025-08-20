@@ -60,7 +60,7 @@ const ContactPage = () => {
     }
     if (item === "Features") {
       // simple jump to features on landing
-      window.location.href = "/#features";
+      navigate("/features");
       return;
     }
     if (item === "About") {
