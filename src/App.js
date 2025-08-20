@@ -19,9 +19,12 @@ import awsExports from "./aws-exports";
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
+// Public pages
 import LandingPage from "./scenes/LandingPage";
-import ContactPage from "./scenes/ContactPage";        // ⬅️ add
-import FeaturesPage from "./scenes/FeaturePage";      // ⬅️ add
+import ContactPage from "./scenes/ContactPage";   // <-- index.jsx inside /scenes/ContactPage
+import FeaturesPage from "./scenes/FeaturePage";  // <-- index.jsx inside /scenes/FeaturePage
+
+// Protected app pages
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
@@ -413,8 +416,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<PublicLanding />} />
-          <Route path="/features" element={<FeaturesPage />} />   {/* ⬅️ add */}
-          <Route path="/contact" element={<ContactPage />} />     {/* ⬅️ add */}
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginScreen />} />
 
           {/* Protected app */}
