@@ -10,12 +10,30 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   const handleGetStarted = () => {
-    navigate("/login"); // redirect to login / Authenticator
+    navigate("/login");
   };
 
   const handleSignIn = () => {
     navigate("/login");
   };
+
+  const handleNavClick = (item) => {
+    if (item === "Contact") {
+      navigate("/contact");
+      return;
+    }
+    if (item === "Features") {
+      document
+        .getElementById("features")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (item === "About") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const goHome = () => navigate("/");
 
   return (
     <Box sx={{ fontFamily: "Roboto, sans-serif" }}>
@@ -28,15 +46,30 @@ const LandingPage = () => {
           py: 2,
           px: 4,
           backgroundColor: "#fff",
+          borderBottom: "1px solid #e5e7eb",
         }}
       >
-        {/* Logo & Brand Name */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {/* Logo & Brand Name (clickable → landing page) */}
+        <Box
+          onClick={goHome}
+          role="button"
+          aria-label="Go to home"
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            cursor: "pointer",
+            userSelect: "none",
+            "&:hover .brand-text": { color: "#be123c" },
+          }}
+        >
           <Typography
+            className="brand-text"
             sx={{
               fontWeight: "bold",
               fontSize: "1.25rem",
               color: "#0f172a",
+              transition: "color .15s ease",
             }}
           >
             Hupes
@@ -44,7 +77,7 @@ const LandingPage = () => {
           <img
             src="/user.png"
             alt="Logo"
-            style={{ height: 40, marginRight: 8 }}
+            style={{ height: 40, marginRight: 8, pointerEvents: "none" }}
           />
         </Box>
 
@@ -53,10 +86,13 @@ const LandingPage = () => {
           {["Features", "About", "Contact"].map((item) => (
             <Typography
               key={item}
+              onClick={() => handleNavClick(item)}
               sx={{
                 cursor: "pointer",
                 fontWeight: "bold",
-                color: "#e11d48", // brand color
+                color: "#e11d48",
+                "&:hover": { color: "#be123c" },
+                transition: "color .15s ease",
               }}
             >
               {item}
@@ -98,7 +134,6 @@ const LandingPage = () => {
             px: { xs: 3, md: 8 },
           }}
         >
-
           <Typography
             variant="h2"
             sx={{
@@ -112,8 +147,7 @@ const LandingPage = () => {
             Efficient <br /> Inventory <br /> Management
           </Typography>
           <Typography sx={{ mb: 4, color: "#334155", fontSize: 16 }}>
-            Track ingredients, plan production, and keep waste in check all in
-            one place.
+            Track ingredients, plan production, and keep waste in check all in one place.
           </Typography>
           <ul
             style={{
@@ -142,8 +176,7 @@ const LandingPage = () => {
                 fontWeight: 700,
               }}
             >
-              <ShowChartIcon sx={{ color: "#e11d48" }} /> Recipe-driven
-              production
+              <ShowChartIcon sx={{ color: "#e11d48" }} /> Recipe-driven production
             </li>
             <li
               style={{
@@ -153,8 +186,7 @@ const LandingPage = () => {
                 fontWeight: 700,
               }}
             >
-              <Inventory2Icon sx={{ color: "#e11d48" }} /> Focused on product
-              traceability
+              <Inventory2Icon sx={{ color: "#e11d48" }} /> Focused on product traceability
             </li>
           </ul>
           <Button
@@ -197,11 +229,8 @@ const LandingPage = () => {
       </Box>
 
       {/* Features Section */}
-      <Container sx={{ py: 10 }}>
-        <Typography
-          variant="h4"
-          sx={{ fontWeight: 700, textAlign: "center", mb: 6 }}
-        >
+      <Container id="features" sx={{ py: 10 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, textAlign: "center", mb: 6 }}>
           Streamline Your Inventory
         </Typography>
         <Grid container spacing={5} justifyContent="center">
@@ -219,18 +248,14 @@ const LandingPage = () => {
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
               Sales Insights
             </Typography>
-            <Typography>
-              Gain valuable insights into sales trends and product performance.
-            </Typography>
+            <Typography>Gain valuable insights into sales trends and product performance.</Typography>
           </Grid>
           <Grid item xs={12} md={4} textAlign="center">
             <Inventory2Icon sx={{ fontSize: 50, color: "#e11d48", mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
               Inventory Optimization
             </Typography>
-            <Typography>
-              Optimize stock levels and reduce excess inventory
-            </Typography>
+            <Typography>Optimize stock levels and reduce excess inventory</Typography>
           </Grid>
         </Grid>
       </Container>

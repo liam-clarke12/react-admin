@@ -39,6 +39,9 @@ import IngredientsInventory from "./scenes/IngredientInventory";
 import { DataProvider } from "./contexts/DataContext";
 import { AuthProvider } from "./contexts/AuthContext";
 
+// ✅ New: public contact page
+import ContactPage from "./components/ContactPage";
+
 Amplify.configure(awsExports);
 
 /** Brand tokens */
@@ -451,6 +454,9 @@ function App() {
         <Routes>
           <Route path="/" element={<PublicLanding />} />
           <Route path="/login" element={<LoginScreen />} />
+          {/* ✅ Public contact route */}
+          <Route path="/contact" element={<ContactPage />} />
+          {/* Protected app under wildcard */}
           <Route path="/*" element={<ProtectedApp />} />
         </Routes>
       </Authenticator.Provider>

@@ -21,12 +21,15 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import UploadIcon from "@mui/icons-material/Upload";
 import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
-// Amplify v6 modular auth APIs
+
+// Amplify v6 modular APIs
 import {
   fetchUserAttributes,
   updateUserAttributes,
   updatePassword,
+  getCurrentUser,
 } from "aws-amplify/auth";
+import { uploadData, getUrl } from "aws-amplify/storage";
 
 /** Nory-like brand tokens */
 const brand = {
@@ -52,6 +55,9 @@ function splitName(full = "") {
 function joinName(first = "", last = "") {
   return [first, last].filter(Boolean).join(" ").trim();
 }
+function isHttpUrl(v = "") {
+  return /^https?:\/\//i.test(v);
+}
 
 export default function AccountPage() {
   // Loading gate for initial fetch
@@ -65,7 +71,12 @@ export default function AccountPage() {
     jobTitle: "",
   });
   const [email, setEmail] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+
+  // Avatar states
+  const [avatarUrl, setAvatarUrl] = useState("");   // resolved (signed) URL for <Avatar src>
+  const [avatarKey, setAvatarKey] = useState("");   // S3 key saved into Cognito 'picture'
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarProgress, setAvatarProgress] = useState(0);
 
   // Edit state
   const [editMode, setEditMode] = useState(false);
@@ -77,6 +88,22 @@ export default function AccountPage() {
 
   // Feedback
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
+
+  // Helper: resolve a Cognito 'picture' value to a displayable URL
+  const resolveAvatarUrl = async (pictureAttr) => {
+    if (!pictureAttr) return "";
+    if (isHttpUrl(pictureAttr)) return pictureAttr; // already an http(s) URL
+    try {
+      const { url } = await getUrl({
+        key: pictureAttr,                // S3 key stored in 'picture'
+        options: { level: "private", expiresIn: 60 * 60 }, // 1 hour signed URL
+      });
+      return url.toString();
+    } catch (e) {
+      console.warn("[AccountPage] Failed to sign avatar URL:", e);
+      return "";
+    }
+  };
 
   // Fetch from Cognito on mount
   useEffect(() => {
@@ -93,7 +120,10 @@ export default function AccountPage() {
           jobTitle: attrs?.["custom:jobTitle"] || "",
         });
         setEmail(attrs?.email || "");
-        setAvatarUrl(attrs?.picture || "");
+
+        const picture = attrs?.picture || "";
+        setAvatarKey(picture || "");
+        setAvatarUrl(await resolveAvatarUrl(picture));
       } catch (err) {
         console.error("[AccountPage] Failed to fetch user attributes:", err);
         setSnack({ open: true, severity: "error", message: "Failed to load profile." });
@@ -101,17 +131,57 @@ export default function AccountPage() {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const onAvatarUpload = (e) => {
+  // Upload avatar to S3 (private level), set preview, and mark key for saving
+  const onAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (file) setAvatarUrl(URL.createObjectURL(file));
+    if (!file) return;
+
+    // Optional: enforce max size or types
+    // if (file.size > 3 * 1024 * 1024) { ... }
+
+    try {
+      setAvatarUploading(true);
+      setAvatarProgress(0);
+
+      const { userId } = await getCurrentUser(); // for a stable, unique filename component
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const key = `avatars/${userId}/${Date.now()}-${safeName}`;
+
+      const result = await uploadData({
+        key,
+        data: file,
+        options: {
+          level: "private",
+          contentType: file.type,
+          onProgress: ({ transferredBytes, totalBytes }) => {
+            if (totalBytes) {
+              setAvatarProgress(Math.round((transferredBytes / totalBytes) * 100));
+            }
+          },
+        },
+      }).result; // await .result to ensure completion
+
+      // Generate a signed URL for immediate preview
+      const url = await resolveAvatarUrl(key);
+      setAvatarKey(key);
+      setAvatarUrl(url);
+
+      setSnack({ open: true, severity: "success", message: "Image uploaded. Click Save to update your profile." });
+    } catch (err) {
+      console.error("[AccountPage] Avatar upload failed:", err);
+      setSnack({ open: true, severity: "error", message: "Failed to upload image." });
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const onCancel = async () => {
-    // Re-fetch to reset fields back to server state
+    // Re-fetch to reset fields back to server state (and revert avatar if changed)
     try {
       const attrs = await fetchUserAttributes();
       const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
@@ -122,7 +192,10 @@ export default function AccountPage() {
         company: attrs?.["custom:Company"] || "",
         jobTitle: attrs?.["custom:jobTitle"] || "",
       });
-      setAvatarUrl(attrs?.picture || "");
+
+      const picture = attrs?.picture || "";
+      setAvatarKey(picture || "");
+      setAvatarUrl(await resolveAvatarUrl(picture));
     } catch (err) {
       console.error("[AccountPage] Failed to refresh attributes:", err);
     } finally {
@@ -137,18 +210,20 @@ export default function AccountPage() {
     if (!form.lastName.trim()) {
       return setSnack({ open: true, severity: "warning", message: "Last name is required." });
     }
+    if (avatarUploading) {
+      return setSnack({ open: true, severity: "info", message: "Please wait for the image to finish uploading." });
+    }
 
     try {
-      // ✅ v6 signature requires { userAttributes: { ... } }
       await updateUserAttributes({
         userAttributes: {
           given_name: form.firstName,
           family_name: form.lastName,
           name: joinName(form.firstName, form.lastName),
-          // Custom attributes must use the exact keys configured in your pool:
           "custom:Company": form.company || "",
           "custom:jobTitle": form.jobTitle || "",
-          // picture: avatarUrl || "" // enable if you store avatars in Cognito
+          // Save the S3 key to Cognito. (If user never uploaded, leave as-is)
+          ...(avatarKey ? { picture: avatarKey } : {}),
         },
       });
 
@@ -247,9 +322,7 @@ export default function AccountPage() {
           box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
           text-transform: none;
         }
-        .pill:hover {
-          background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
-        }
+        .pill:hover { background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
         .ghost {
           border: 1px solid ${brand.border};
           color: ${brand.text};
@@ -258,20 +331,16 @@ export default function AccountPage() {
           border-radius: 12px;
           text-transform: none;
         }
-        .ghost:hover {
-          background: ${brand.surfaceMuted};
-        }
-        .input .MuiOutlinedInput-root {
-          border-radius: 12px;
-        }
-        .input .MuiOutlinedInput-notchedOutline {
-          border-color: ${brand.border};
-        }
-        .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-          border-color: ${brand.primary};
-        }
-        .input .MuiOutlinedInput-root.Mui-focused {
-          box-shadow: 0 0 0 4px ${brand.focusRing};
+        .ghost:hover { background: ${brand.surfaceMuted}; }
+        .input .MuiOutlinedInput-root { border-radius: 12px; }
+        .input .MuiOutlinedInput-notchedOutline { border-color: ${brand.border}; }
+        .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline { border-color: ${brand.primary}; }
+        .input .MuiOutlinedInput-root.Mui-focused { box-shadow: 0 0 0 4px ${brand.focusRing}; }
+        .avatar-overlay {
+          position: absolute; inset: 0;
+          display: grid; place-items: center;
+          background: rgba(248, 250, 252, 0.7);
+          border-radius: 999px;
         }
       `}</style>
 
@@ -298,9 +367,9 @@ export default function AccountPage() {
           <Grid container spacing={2} alignItems="flex-start">
             {/* Avatar */}
             <Grid item xs={12} sm={4} md={3}>
-              <Box position="relative" textAlign="center">
+              <Box position="relative" textAlign="center" sx={{ width: 110, mx: "auto" }}>
                 <Avatar
-                  src={avatarUrl}
+                  src={avatarUrl || undefined}
                   sx={{
                     width: 110,
                     height: 110,
@@ -309,14 +378,23 @@ export default function AccountPage() {
                     boxShadow: brand.shadow,
                   }}
                 />
+                {avatarUploading && (
+                  <Box className="avatar-overlay">
+                    <Box display="grid" gap={1} justifyItems="center">
+                      <CircularProgress size={26} />
+                      <Typography variant="caption" sx={{ color: brand.subtext }}>
+                        Uploading… {avatarProgress}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
                 {editMode && (
                   <IconButton
                     component="label"
                     sx={{
                       position: "absolute",
-                      bottom: 0,
-                      right: "calc(50% - 55px)",
-                      transform: "translateX(55px)",
+                      bottom: -6,
+                      right: -6,
                       background: "#f1f5f9",
                       border: `1px solid ${brand.border}`,
                       "&:hover": { background: "#e2e8f0" },
