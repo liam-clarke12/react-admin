@@ -14,7 +14,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
-import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 
 const brand = {
@@ -28,6 +27,14 @@ const brand = {
   focusRing: "rgba(225, 29, 72, 0.35)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
+
+// ✅ Where messages should go
+const CONTACT_EMAIL = "euhupes@gmail.com";
+// Optional backend endpoint if you add one later (SES/Lambda, API Gateway, etc.)
+const CONTACT_ENDPOINT =
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_CONTACT_ENDPOINT) ||
+  process.env.REACT_APP_CONTACT_ENDPOINT ||
+  "";
 
 const ContactPage = () => {
   const navigate = useNavigate();
@@ -52,11 +59,12 @@ const ContactPage = () => {
       return;
     }
     if (item === "Features") {
-      navigate("/#features"); // jump to features section on landing
+      // simple jump to features on landing
+      window.location.href = "/#features";
       return;
     }
     if (item === "About") {
-      navigate("/"); // you can add a real about section later
+      navigate("/");
       return;
     }
   };
@@ -76,18 +84,46 @@ const ContactPage = () => {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  const handleSubmit = (evt) => {
+  const handleSubmit = async (evt) => {
     evt.preventDefault();
     if (!validate()) return;
 
-    const to = "hello@hupes.app"; // <-- change to your support email
+    // Prepare common payload
+    const payload = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      company: form.company.trim(),
+      message: form.message.trim(),
+      page: window.location.href,
+      timestamp: new Date().toISOString(),
+    };
+
+    // If you configure a backend endpoint that sends email (SES, etc.), this will use it.
+    if (CONTACT_ENDPOINT) {
+      try {
+        const res = await fetch(CONTACT_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setSnack({ open: true, severity: "success", message: "Thanks! We’ll be in touch shortly." });
+        setForm({ name: "", email: "", company: "", message: "" });
+        return;
+      } catch (err) {
+        console.warn("[Contact] Direct send failed, falling back to mailto:", err);
+        // falls through to mailto
+      }
+    }
+
+    // Fallback: open user's mail client with a filled draft to CONTACT_EMAIL
     const subject = `Contact from ${form.name}${form.company ? " (" + form.company + ")" : ""}`;
     const body = `Name: ${form.name}
 Email: ${form.email}
 Company: ${form.company || "-"}
 
 ${form.message}`;
-    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+    const mailto = `mailto:${encodeURIComponent(CONTACT_EMAIL)}?subject=${encodeURIComponent(
       subject
     )}&body=${encodeURIComponent(body)}`;
 
@@ -229,7 +265,14 @@ ${form.message}`;
                   <EmailOutlinedIcon sx={{ color: brand.primary }} />
                   <Typography sx={{ fontWeight: 800, color: brand.text }}>Email</Typography>
                 </Box>
-                <Typography sx={{ color: brand.subtext, mt: 1 }}>hello@hupes.app</Typography>
+                <Typography sx={{ color: brand.subtext, mt: 1 }}>
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}`}
+                    style={{ color: brand.primary, textDecoration: "none", fontWeight: 700 }}
+                  >
+                    {CONTACT_EMAIL}
+                  </a>
+                </Typography>
               </Paper>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -253,26 +296,7 @@ ${form.message}`;
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  border: `1px solid ${brand.border}`,
-                  background: brand.surface,
-                  boxShadow: brand.shadow,
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <PlaceOutlinedIcon sx={{ color: brand.primary }} />
-                  <Typography sx={{ fontWeight: 800, color: brand.text }}>Address</Typography>
-                </Box>
-                <Typography sx={{ color: brand.subtext, mt: 1 }}>
-                  Add your business address here
-                </Typography>
-              </Paper>
-            </Grid>
+            {/* 🗑️ Address card removed as requested */}
           </Grid>
         </Box>
 
