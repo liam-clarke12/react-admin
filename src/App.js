@@ -21,7 +21,7 @@ import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box }
 
 import LandingPage from "./scenes/LandingPage";
 import ContactPage from "./scenes/ContactPage"; // ✅ matches src/scenes/ContactPage/index.jsx
-import FeaturesPage from "./scenes/FeaturesPage";
+import FeaturesPage from "./scenes/FeaturePage";
 import AccountPage from "./scenes/Account/Account";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
