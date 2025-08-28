@@ -40,7 +40,7 @@ const RecipeInventory = () => {
     const fetchAndProcess = async () => {
       try {
         const response = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log?cognito_id=${cognitoId}`
+          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/production-log/active?cognito_id=${cognitoId}`
         );
         if (!response.ok) throw new Error("Failed to fetch production-log");
         const data = await response.json();
