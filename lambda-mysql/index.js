@@ -1012,6 +1012,45 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
   });
 });
 
+// Hard-delete stock_usage rows by their primary key id(s)
+app.post("/api/stock-usage/delete", async (req, res) => {
+  let { ids, id, cognito_id } = req.body;
+
+  // Normalize to an array
+  if (!Array.isArray(ids)) {
+    ids = typeof id !== "undefined" ? [id] : [];
+  }
+
+  // Basic validation
+  if (!cognito_id || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "cognito_id and at least one id are required" });
+  }
+
+  // Build placeholders (?, ?, ...) for the IN() clause
+  const placeholders = ids.map(() => "?").join(", ");
+
+  try {
+    const sql = `
+      DELETE FROM stock_usage
+      WHERE id IN (${placeholders})
+        AND user_id = ?
+    `;
+    const params = [...ids, cognito_id];
+
+    const [result] = await db.promise().query(sql, params);
+
+    return res.json({
+      message: "Stock usage rows hard-deleted",
+      requested: ids.length,
+      deleted: result.affectedRows,
+    });
+  } catch (err) {
+    console.error("[/api/stock-usage/delete] Failed:", err);
+    return res.status(500).json({ error: "Failed to hard-delete stock usage rows" });
+  }
+});
+
+
 app.post("/api/add-goods-out", async (req, res) => {
   const { date, recipe, stockAmount, recipients, cognito_id } = req.body;
 
