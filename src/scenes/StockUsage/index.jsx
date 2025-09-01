@@ -218,8 +218,15 @@ const StockUsage = () => {
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || flatSelectedIds.length === 0) {
       setOpenConfirmDialog(false);
+      setToastMsg(flatSelectedIds.length === 0 ? "Selected rows have no deletable IDs." : "No user id.");
+      setToastOpen(true);
       return;
     }
+
+    // Debug visibility
+    console.log("[StockUsage] selected rows:", selectedRowObjs);
+    console.log("[StockUsage] sending delete ids:", flatSelectedIds, "cognito_id:", cognitoId);
+
     try {
       const payload = { ids: flatSelectedIds, cognito_id: cognitoId };
       const res = await axios.post(`${API_BASE}/stock-usage/delete`, payload);
@@ -376,6 +383,116 @@ const StockUsage = () => {
       <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
         {toastMsg}
       </Toast>
+
+      {/* Drawer — minimal style */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        PaperProps={{
+          sx: {
+            width: 360,
+            borderRadius: "20px 0 0 20px",
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Gradient header */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1.25,
+            color: "#fff",
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+          }}
+        >
+          <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
+            <MenuOutlinedIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+            {drawerHeader}
+          </Typography>
+        </Box>
+
+        {/* Body */}
+        <Box sx={{ background: brand.surface, p: 2 }}>
+          <List disablePadding>
+            {drawerItems.length === 0 ? (
+              <Typography sx={{ color: brand.subtext, px: 1 }}>
+                No data available
+              </Typography>
+            ) : (
+              drawerItems.map((raw, idx) => {
+                let primaryText = raw;
+                let secondary = null;
+                let pill = null;
+
+                if (drawerMode === "ingredients" && typeof raw === "string" && raw.includes(":")) {
+                  const [name, qty] = raw.split(":");
+                  primaryText = name.trim();
+                  pill = (qty || "").trim();
+                } else if (drawerMode === "barcodes" && typeof raw === "string" && raw.includes(":")) {
+                  const [name, codes] = raw.split(":");
+                  primaryText = name.trim();
+                  secondary = (codes || "").trim();
+                }
+
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${brand.border}`,
+                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
+                      mb: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <ListItem
+                      secondaryAction={
+                        pill ? (
+                          <Box
+                            component="span"
+                            sx={{
+                              borderRadius: 999,
+                              border: `1px solid ${brand.border}`,
+                              background: "#f1f5f9",
+                              px: 1.25,
+                              py: 0.25,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: brand.text,
+                              maxWidth: 160,
+                              textAlign: "right",
+                            }}
+                          >
+                            {pill}
+                          </Box>
+                        ) : null
+                      }
+                    >
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <CheckRoundedIcon sx={{ color: brand.primary }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={primaryText}
+                        secondary={secondary}
+                        primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }}
+                        secondaryTypographyProps={{ sx: { color: brand.subtext, mt: 0.5, wordBreak: "break-word" } }}
+                      />
+                    </ListItem>
+                  </Box>
+                );
+              })
+            )}
+          </List>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

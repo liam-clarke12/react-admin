@@ -908,53 +908,53 @@ app.post("/api/delete-production-log", async (req, res) => {
 });
 
 app.get('/api/stock-usage/:cognitoId', (req, res) => {
-  console.log(`Received request for stock usage with cognitoId: ${req.params.cognitoId}`);
+  const cognitoId = req.params.cognitoId;
+  console.log(`[GET] /api/stock-usage/${cognitoId}`);
 
   const sqlQuery = `
-  SELECT 
-    su.production_log_id,
-    pl.date AS production_log_date,
-    r.recipe_name,
-    pl.batchCode,
-    pl.batchRemaining,
-    pl.user_id AS production_log_user_id,
-    r.id AS recipe_id,
-    i.id AS ingredient_id,
-    i.ingredient_name,
-    ri.quantity,  -- Fetch quantity from recipe_ingredients
-    pl.batchesProduced,  -- Fetch batchesProduced from production_log
-    GROUP_CONCAT(DISTINCT gi.barCode ORDER BY gi.id SEPARATOR ', ') AS ingredient_barcodes  
-  FROM 
-    stock_usage su
-  JOIN 
-    production_log pl ON su.production_log_id = pl.id
-  JOIN 
-    recipes r ON pl.recipe = r.recipe_name
-  JOIN 
-    recipe_ingredients ri ON r.id = ri.recipe_id
-  JOIN 
-    ingredients i ON ri.ingredient_id = i.id
-  JOIN 
-    goods_in gi ON gi.id = su.goods_in_id AND gi.ingredient = i.ingredient_name  -- Ensure correct ingredient match
-  WHERE
-    su.user_id = ?  
-  GROUP BY
-    su.production_log_id, pl.date, pl.batchCode, pl.batchRemaining, 
-    pl.user_id, r.id, i.id, i.ingredient_name, ri.quantity, pl.batchesProduced;  -- Group by necessary fields
+    SELECT 
+      su.production_log_id,
+      GROUP_CONCAT(DISTINCT su.id ORDER BY su.id) AS stock_usage_ids,   -- ✅ add IDs to delete
+      pl.date AS production_log_date,
+      r.recipe_name,
+      pl.batchCode,
+      pl.batchRemaining,
+      pl.user_id AS production_log_user_id,
+      r.id AS recipe_id,
+      i.id AS ingredient_id,
+      i.ingredient_name,
+      ri.quantity,
+      pl.batchesProduced,
+      GROUP_CONCAT(DISTINCT gi.barCode ORDER BY gi.id SEPARATOR ', ') AS ingredient_barcodes
+    FROM stock_usage su
+    JOIN production_log pl ON su.production_log_id = pl.id
+    JOIN recipes r ON pl.recipe = r.recipe_name
+    JOIN recipe_ingredients ri ON r.id = ri.recipe_id
+    JOIN ingredients i ON ri.ingredient_id = i.id
+    JOIN goods_in gi ON gi.id = su.goods_in_id AND gi.ingredient = i.ingredient_name
+    WHERE su.user_id = ?
+    GROUP BY
+      su.production_log_id, pl.date, pl.batchCode, pl.batchRemaining,
+      pl.user_id, r.id, i.id, i.ingredient_name, ri.quantity, pl.batchesProduced
   `;
 
-  console.log('Executing SQL query:', sqlQuery);
+  console.log('[GET /api/stock-usage] Executing SQL:\n', sqlQuery);
 
-  db.query(sqlQuery, [req.params.cognitoId], (err, results) => {
+  db.query(sqlQuery, [cognitoId], (err, results) => {
     if (err) {
       console.error('Error executing query:', err);
       return res.status(500).json({ error: 'Database query failed' });
     }
 
-    console.log('Fetched Stock Usage Data:', JSON.stringify(results, null, 2));
+    // Each row = one ingredient line for a production_log, with a comma string of su.id's for that line
+    const formatted = (results || []).map((row) => {
+      // Parse "1,2,3" -> [1,2,3]
+      const ids =
+        String(row.stock_usage_ids || '')
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n));
 
-    const formattedResults = results.map(row => {
-      console.log(`Transforming row: ${JSON.stringify(row)}`);
       return {
         production_log_id: row.production_log_id,
         production_log_date: row.production_log_date,
@@ -963,85 +963,130 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
         batchRemaining: row.batchRemaining,
         production_log_user_id: row.production_log_user_id,
         recipe_id: row.recipe_id,
-        batchesProduced: row.batchesProduced,  // Include batchesProduced
-        ingredients: [{
-          ingredient_id: row.ingredient_id,
-          ingredient_name: row.ingredient_name,
-          ingredient_barcodes: row.ingredient_barcodes,
-          quantity: row.quantity,  // Include quantity
-          total_quantity: row.quantity * row.batchesProduced,  // Calculate total quantity
-        }]
+        batchesProduced: row.batchesProduced,
+        ids, // ✅ carry the array of stock_usage ids
+        ingredients: [
+          {
+            ingredient_id: row.ingredient_id,
+            ingredient_name: row.ingredient_name,
+            ingredient_barcodes: row.ingredient_barcodes,
+            quantity: row.quantity,
+            total_quantity: (Number(row.quantity) || 0) * (Number(row.batchesProduced) || 0),
+          },
+        ],
       };
     });
 
-    console.log('Formatted Results:', JSON.stringify(formattedResults, null, 2));
+    // Group by production_log (collapsing ingredients & merging id arrays)
+    const grouped = formatted.reduce((acc, row) => {
+      const key = row.production_log_id;
+      let group = acc.find((g) => g.production_log_id === key);
 
-    const groupedResults = formattedResults.reduce((acc, row) => {
-      const logId = row.production_log_id;
-      const existingLog = acc.find(log => log.production_log_id === logId);
-
-      if (!existingLog) {
-        console.log(`Creating new log entry for production_log_id: ${logId}`);
-        acc.push({
-          production_log_id: logId,
+      if (!group) {
+        group = {
+          production_log_id: row.production_log_id,
           production_log_date: row.production_log_date,
           recipe_name: row.recipe_name,
           batchCode: row.batchCode,
           batchRemaining: row.batchRemaining,
           production_log_user_id: row.production_log_user_id,
           recipe_id: row.recipe_id,
-          batchesProduced: row.batchesProduced,  // Include batchesProduced
-          ingredients: row.ingredients
-        });
+          batchesProduced: row.batchesProduced,
+          ids: [...row.ids],                 // ✅ start with this row’s ids
+          ingredients: [...row.ingredients], // first ingredient
+        };
+        acc.push(group);
       } else {
-        const existingIngredient = existingLog.ingredients.find(ing => ing.ingredient_id === row.ingredients[0].ingredient_id);
-        if (!existingIngredient) {
-          console.log(`Adding ingredient to existing log entry for production_log_id: ${logId}`);
-          existingLog.ingredients.push(row.ingredients[0]);
-        } else {
-          console.log(`Ingredient already exists for production_log_id: ${logId}, ingredient_id: ${existingIngredient.ingredient_id}`);
-          console.log(`Existing ingredient barcodes: ${existingIngredient.ingredient_barcodes}`);
-          console.log(`Attempting to add barcodes: ${row.ingredients[0].ingredient_barcodes}`);
+        // merge unique IDs
+        const merged = new Set([...(group.ids || []), ...row.ids]);
+        group.ids = Array.from(merged);
+
+        // add ingredient if new
+        const incoming = row.ingredients[0];
+        if (!group.ingredients.some((ing) => ing.ingredient_id === incoming.ingredient_id)) {
+          group.ingredients.push(incoming);
         }
       }
       return acc;
     }, []);
 
-    console.log('Grouped Results:', JSON.stringify(groupedResults, null, 2));
-    res.json(groupedResults);
+    console.log('[GET /api/stock-usage] Response groups:', grouped.length);
+    res.json(grouped);
   });
 });
 
-// Hard-delete stock_usage rows by their primary key id(s)
+// Hard-delete stock_usage rows by ids, owned by the given user
 app.post("/api/stock-usage/delete", async (req, res) => {
   let { ids, id, cognito_id } = req.body;
 
+  console.log("[/api/stock-usage/delete] body:", req.body);
+
   // Normalize to an array
-  if (!Array.isArray(ids)) {
-    ids = typeof id !== "undefined" ? [id] : [];
-  }
+  if (!Array.isArray(ids)) ids = typeof id !== "undefined" ? [id] : [];
+  // Coerce to numbers (if your stock_usage.id is numeric)
+  ids = ids.map((x) => Number(x)).filter((x) => Number.isFinite(x));
 
   // Basic validation
-  if (!cognito_id || !Array.isArray(ids) || ids.length === 0) {
+  if (!cognito_id || ids.length === 0) {
     return res.status(400).json({ error: "cognito_id and at least one id are required" });
   }
 
+  // If stock_usage.user_id stores an *internal numeric* user id instead of the Cognito sub,
+  // UNCOMMENT this lookup and use `internalUserId` in the queries below:
+  //
+  // const [[userRow]] = await db
+  //   .promise()
+  //   .query("SELECT id FROM users WHERE cognito_id = ? LIMIT 1", [cognito_id]);
+  // if (!userRow) return res.status(404).json({ error: "Unknown user" });
+  // const userKey = userRow.id; // internal numeric
+  //
+  // Otherwise, if stock_usage.user_id stores the Cognito sub directly, use:
+  const userKey = cognito_id;
+
   // Build placeholders (?, ?, ...) for the IN() clause
-  const placeholders = ids.map(() => "?").join(", ");
+  const inPlaceholders = ids.map(() => "?").join(", ");
 
   try {
-    const sql = `
-      DELETE FROM stock_usage
-      WHERE id IN (${placeholders})
-        AND user_id = ?
-    `;
-    const params = [...ids, cognito_id];
+    // 1) Which rows exist for those ids?
+    const [rowsAnyUser] = await db
+      .promise()
+      .query(`SELECT id, user_id FROM stock_usage WHERE id IN (${inPlaceholders})`, ids);
 
-    const [result] = await db.promise().query(sql, params);
+    if (rowsAnyUser.length === 0) {
+      return res.status(404).json({ error: "No matching rows for provided ids", ids });
+    }
+
+    // 2) Which rows belong to this user?
+    const [rowsThisUser] = await db
+      .promise()
+      .query(
+        `SELECT id FROM stock_usage WHERE id IN (${inPlaceholders}) AND user_id = ?`,
+        [...ids, userKey]
+      );
+
+    if (rowsThisUser.length === 0) {
+      // Helpful diagnostics when user_id mismatches (e.g., internal numeric vs cognito sub)
+      return res.status(403).json({
+        error: "Rows do not belong to this user_id. Check user_id type/mapping.",
+        sampleRowUserIds: rowsAnyUser.slice(0, 5).map((r) => r.user_id),
+        cognito_id_received: cognito_id,
+      });
+    }
+
+    // 3) Delete
+    const [result] = await db
+      .promise()
+      .query(
+        `DELETE FROM stock_usage
+         WHERE id IN (${inPlaceholders})
+           AND user_id = ?`,
+        [...ids, userKey]
+      );
 
     return res.json({
       message: "Stock usage rows hard-deleted",
       requested: ids.length,
+      matchedForUser: rowsThisUser.length,
       deleted: result.affectedRows,
     });
   } catch (err) {
@@ -1049,7 +1094,6 @@ app.post("/api/stock-usage/delete", async (req, res) => {
     return res.status(500).json({ error: "Failed to hard-delete stock usage rows" });
   }
 });
-
 
 app.post("/api/add-goods-out", async (req, res) => {
   const { date, recipe, stockAmount, recipients, cognito_id } = req.body;
