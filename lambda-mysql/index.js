@@ -1101,9 +1101,7 @@ app.post("/api/add-goods-out", async (req, res) => {
 
   if (!date || !recipe || !stockAmount || !recipients || !cognito_id) {
     console.error("Missing fields in request:", req.body);
-    return res
-      .status(400)
-      .json({ error: "All fields are required, including cognito_id" });
+    return res.status(400).json({ error: "All fields are required, including cognito_id" });
   }
 
   const connection = await db.promise().getConnection();
@@ -1127,13 +1125,10 @@ app.post("/api/add-goods-out", async (req, res) => {
     const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
     console.log(`Units per batch for '${recipe}':`, unitsPerBatch);
 
-    // NOTE: Your original code treats stockAmount as **batches**.
-    // If stockAmount is actually **units**, use:
+    // If stockAmount is actually UNITS, use the next line instead of the one after it:
     // const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
     const batchesToDeduct = Math.ceil(Number(stockAmount));
-    console.log(
-      `Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`
-    );
+    console.log(`Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`);
 
     // 1) Insert goods_out record
     const goodsOutQuery = `
@@ -1141,11 +1136,7 @@ app.post("/api/add-goods-out", async (req, res) => {
       VALUES (?, ?, ?, ?, ?)
     `;
     const [goodsOutResult] = await connection.execute(goodsOutQuery, [
-      date,
-      recipe,
-      stockAmount,
-      recipients,
-      cognito_id,
+      date, recipe, stockAmount, recipients, cognito_id,
     ]);
     const goodsOutId = goodsOutResult.insertId;
     console.log("Inserted into goods_out. ID:", goodsOutId);
@@ -1159,8 +1150,8 @@ app.post("/api/add-goods-out", async (req, res) => {
         WHERE recipe = ?
           AND user_id = ?
           AND batchRemaining > 0
-          AND deleted_at IS NULL          -- ✅ only active rows
-        ORDER BY id ASC`,                  -- FIFO
+          AND deleted_at IS NULL
+        ORDER BY id ASC`, // FIFO
       [recipe, cognito_id]
     );
 
@@ -1196,7 +1187,7 @@ app.post("/api/add-goods-out", async (req, res) => {
       console.warn(
         `Not enough active batches to cover stockAmount; ${remainingToDeduct} batch(es) short.`
       );
-      // You may choose to rollback here instead of committing a partial deduction.
+      // Decide if you want to rollback here instead of committing a partial deduction.
     }
 
     await connection.commit();
