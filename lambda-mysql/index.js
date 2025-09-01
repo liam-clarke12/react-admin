@@ -1277,6 +1277,58 @@ app.get("/api/goods-out", async (req, res) => {
   }
 });
 
+// HARD DELETE goods_out rows (and their links) for the signed-in user
+app.post("/api/goods-out/delete", async (req, res) => {
+  let { ids, id, cognito_id } = req.body;
+
+  // Normalize ids to an array of integers
+  if (!Array.isArray(ids)) ids = typeof id !== "undefined" ? [id] : [];
+  ids = (ids || []).map((x) => Number(x)).filter((x) => Number.isInteger(x) && x > 0);
+
+  if (!cognito_id || ids.length === 0) {
+    return res.status(400).json({ error: "cognito_id and at least one numeric id are required" });
+  }
+
+  const placeholders = ids.map(() => "?").join(", ");
+
+  // If you have ON DELETE CASCADE from goods_out -> goods_out_batches you can skip the first DELETE.
+  // This version works even without CASCADE by manually removing child rows first.
+  const conn = await db.promise().getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1) Delete join rows for only the caller's rows
+    const delJoinSql = `
+      DELETE gob
+        FROM goods_out_batches AS gob
+        JOIN goods_out AS go ON gob.goods_out_id = go.id
+       WHERE go.id IN (${placeholders})
+         AND go.user_id = ?`;
+    const [delJoinRes] = await conn.query(delJoinSql, [...ids, cognito_id]);
+
+    // 2) Delete goods_out rows themselves (scoped to user)
+    const delSql = `
+      DELETE FROM goods_out
+       WHERE id IN (${placeholders})
+         AND user_id = ?`;
+    const [delRes] = await conn.query(delSql, [...ids, cognito_id]);
+
+    await conn.commit();
+    return res.json({
+      message: "Goods out rows hard-deleted",
+      requested: ids.length,
+      deleted: delRes.affectedRows,
+      deletedJoinRows: delJoinRes.affectedRows || 0,
+    });
+  } catch (err) {
+    await conn.rollback();
+    console.error("[/api/goods-out/delete] Failed:", err);
+    return res.status(500).json({ error: "Failed to hard-delete goods out rows" });
+  } finally {
+    conn.release();
+  }
+});
+
 app.get('/dev/health', (req, res) => {
   db.getConnection((err, conn) => {
     if (err) {
