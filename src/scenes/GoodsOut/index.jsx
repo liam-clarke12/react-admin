@@ -9,10 +9,16 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Button,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Nory-like brand tokens */
@@ -28,6 +34,8 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
 /** Toggle verbose logging */
 const DEBUG = true;
 const dlog = (...a) => DEBUG && console.log("[GoodsOut]", ...a);
@@ -38,10 +46,13 @@ const GoodsOut = () => {
   const { cognitoId } = useAuth();
 
   const [goodsOut, setGoodsOut] = useState([]);
-  const [recipesMap, setRecipesMap] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerItems, setDrawerItems] = useState([]); // [{ code, unitsLabel }]
+
+  // Selection + delete prompt
+  const [selectedRows, setSelectedRows] = useState([]); // DataGrid row IDs
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
 
   // ---- helpers --------------------------------------------------------------
 
@@ -56,7 +67,7 @@ const GoodsOut = () => {
     }
   };
 
-  // Normalize into [{ code, units }] —> IMPORTANT: interpret quantities as UNITS
+  // Normalize into [{ code, units }] — interpret quantities as UNITS
   const normalizeRowPairs = (row) => {
     dgroup("normalizeRowPairs()");
     dlog("Raw row snippet:", {
@@ -159,41 +170,11 @@ const GoodsOut = () => {
 
   useEffect(() => {
     if (!cognitoId) return;
-    const fetchRecipes = async () => {
-      dgroup("fetchRecipes()");
-      try {
-        const res = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
-        );
-        dlog("HTTP status:", res.status);
-        if (!res.ok) throw new Error("Failed to fetch recipes");
-        const data = await res.json();
-        dlog("Raw recipes length:", Array.isArray(data) ? data.length : "n/a");
-
-        const map = {};
-        (Array.isArray(data) ? data : []).forEach((r, idx) => {
-          const key = r.recipe_name ?? r.recipe ?? r.name ?? `unknown_${idx}`;
-          map[String(key)] = Number(r.units_per_batch) || 0;
-        });
-
-        dlog("units_per_batch map (kept for reference):", map);
-        setRecipesMap(map);
-      } catch (err) {
-        console.error("[GoodsOut] Error fetching recipes:", err);
-      } finally {
-        dgroupEnd();
-      }
-    };
-    fetchRecipes();
-  }, [cognitoId]);
-
-  useEffect(() => {
-    if (!cognitoId) return;
     const fetchGoodsOutData = async () => {
       dgroup("fetchGoodsOutData()");
       try {
         const response = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/goods-out?cognito_id=${cognitoId}`
+          `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
         );
         dlog("HTTP status:", response.status);
         if (!response.ok) throw new Error("Failed to fetch goods out");
@@ -216,7 +197,7 @@ const GoodsOut = () => {
   const handleDrawerOpenForRow = (row) => {
     dgroup("handleDrawerOpenForRow()");
     dlog("Clicked row:", row);
-    const items = buildDrawerItems(row); // <- now uses UNITS directly
+    const items = buildDrawerItems(row);
     setDrawerHeader("Batchcodes");
     setDrawerItems(items);
     setDrawerOpen(true);
@@ -226,6 +207,56 @@ const GoodsOut = () => {
   const handleDrawerClose = () => {
     dlog("Drawer closed");
     setDrawerOpen(false);
+  };
+
+  // ---- deletion -------------------------------------------------------------
+
+  const openDeletePrompt = () => {
+    if (selectedRows.length === 0) return;
+    setOpenConfirmDialog(true);
+  };
+
+  const handleDeleteSelectedRows = async () => {
+    try {
+      // Map selected grid IDs back to DB IDs
+      const map = new Map(
+        (Array.isArray(goodsOut) ? goodsOut : []).map((r) => [String(r.id ?? ""), r])
+      );
+      const dbIds = selectedRows
+        .map((rid) => map.get(String(rid)))
+        .filter(Boolean)
+        .map((r) => r.id)
+        .filter((id) => typeof id === "number" || /^\d+$/.test(String(id))) // ensure numeric
+        .map((id) => Number(id));
+
+      if (!cognitoId || dbIds.length === 0) {
+        setOpenConfirmDialog(false);
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/goods-out/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: dbIds, cognito_id: cognitoId }),
+      });
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`Delete failed: ${res.status} ${t}`);
+      }
+
+      // refetch table
+      const refreshed = await fetch(
+        `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
+      );
+      const rows = refreshed.ok ? await refreshed.json() : [];
+      setGoodsOut(Array.isArray(rows) ? rows : []);
+      setSelectedRows([]);
+      setOpenConfirmDialog(false);
+    } catch (err) {
+      console.error("[GoodsOut] Delete failed:", err);
+      setOpenConfirmDialog(false);
+    }
   };
 
   // ---- table columns --------------------------------------------------------
@@ -297,6 +328,28 @@ const GoodsOut = () => {
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
             Goods Out
           </Typography>
+
+          {/* Gradient circular delete icon — same style as your other pages */}
+          <IconButton
+            aria-label="Delete selected"
+            onClick={openDeletePrompt}
+            disabled={selectedRows.length === 0}
+            sx={{
+              color: "#fff",
+              borderRadius: 999,
+              width: 40,
+              height: 40,
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              boxShadow:
+                "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+              "&:hover": {
+                background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
+              },
+              opacity: selectedRows.length === 0 ? 0.5 : 1,
+            }}
+          >
+            <DeleteIcon />
+          </IconButton>
         </Box>
 
         <Box
@@ -326,13 +379,16 @@ const GoodsOut = () => {
               Array.isArray(goodsOut)
                 ? goodsOut.map((row, idx) => ({
                     ...row,
-                    id: row.id || `${row.recipe}-${idx}`,
+                    id: row.id ?? `${row.recipe}-${idx}`, // prefer DB id; fallback keeps grid happy (but won't be deletable)
                   }))
                 : []
             }
             columns={columns}
             getRowId={(row) => row.id}
-            disableSelectionOnClick
+            checkboxSelection
+            disableRowSelectionOnClick
+            onRowSelectionModelChange={(model) => setSelectedRows(model)}
+            rowSelectionModel={selectedRows}
           />
         </Box>
       </Box>
@@ -426,6 +482,48 @@ const GoodsOut = () => {
           )}
         </Box>
       </Drawer>
+
+      {/* Delete confirmation dialog — same styling as others */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={() => setOpenConfirmDialog(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 14,
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Confirm Deletion
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: brand.subtext }}>
+            Are you sure you want to delete the selected row(s)?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteSelectedRows}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={<DeleteIcon />}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

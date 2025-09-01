@@ -817,7 +817,6 @@ app.get("/api/ingredient-inventory/active", async (req, res) => {
   }
 });
 
-
 // Only return non–soft-deleted rows
 app.get("/api/production-log/active", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
@@ -1102,7 +1101,9 @@ app.post("/api/add-goods-out", async (req, res) => {
 
   if (!date || !recipe || !stockAmount || !recipients || !cognito_id) {
     console.error("Missing fields in request:", req.body);
-    return res.status(400).json({ error: "All fields are required, including cognito_id" });
+    return res
+      .status(400)
+      .json({ error: "All fields are required, including cognito_id" });
   }
 
   const connection = await db.promise().getConnection();
@@ -1110,24 +1111,31 @@ app.post("/api/add-goods-out", async (req, res) => {
     console.log("Starting database transaction...");
     await connection.beginTransaction();
 
-    // 0) Look up units_per_batch for this recipe
+    // 0) Look up units_per_batch for this recipe (scoped to this user)
     const [recipeRows] = await connection.execute(
-      `SELECT units_per_batch FROM recipes WHERE recipe_name = ? AND user_id = ?`,
+      `SELECT units_per_batch 
+         FROM recipes 
+        WHERE recipe_name = ? 
+          AND user_id = ?`,
       [recipe, cognito_id]
     );
+
     if (recipeRows.length === 0) {
       throw new Error(`Recipe '${recipe}' not found for user ${cognito_id}`);
     }
+
     const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
     console.log(`Units per batch for '${recipe}':`, unitsPerBatch);
 
-    // Compute how many batches to deduct
+    // NOTE: Your original code treats stockAmount as **batches**.
+    // If stockAmount is actually **units**, use:
+    // const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
     const batchesToDeduct = Math.ceil(Number(stockAmount));
     console.log(
-      `Stock amount ${stockAmount} yields ${batchesToDeduct} batch(es) to deduct`
+      `Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`
     );
 
-    // 1. Insert into goods_out
+    // 1) Insert goods_out record
     const goodsOutQuery = `
       INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
       VALUES (?, ?, ?, ?, ?)
@@ -1142,16 +1150,18 @@ app.post("/api/add-goods-out", async (req, res) => {
     const goodsOutId = goodsOutResult.insertId;
     console.log("Inserted into goods_out. ID:", goodsOutId);
 
-    // 2. Deduct from production_log in batch order
+    // 2) Deduct from ACTIVE production_log rows (deleted_at IS NULL) for this user, FIFO by id
     let remainingToDeduct = batchesToDeduct;
 
     const [productionRows] = await connection.execute(
       `SELECT id, batchRemaining, batchCode
          FROM production_log
-        WHERE recipe = ? 
+        WHERE recipe = ?
+          AND user_id = ?
           AND batchRemaining > 0
-        ORDER BY id ASC`,
-      [recipe]
+          AND deleted_at IS NULL          -- ✅ only active rows
+        ORDER BY id ASC`,                  -- FIFO
+      [recipe, cognito_id]
     );
 
     for (const row of productionRows) {
@@ -1167,38 +1177,37 @@ app.post("/api/add-goods-out", async (req, res) => {
         [deductAmount, row.id]
       );
 
-      // b) Track usage per batch
+      // b) Track deduction against this batch
       await connection.execute(
-        `INSERT INTO goods_out_batches 
+        `INSERT INTO goods_out_batches
            (goods_out_id, production_log_id, quantity_used)
          VALUES (?, ?, ?)`,
         [goodsOutId, row.id, deductAmount]
       );
 
       console.log(
-        `Deducted ${deductAmount} batch(es) from production_log ID ${row.id}`
+        `Deducted ${deductAmount} batch(es) from production_log ID ${row.id} (batchCode: ${row.batchCode})`
       );
+
       remainingToDeduct -= deductAmount;
     }
 
     if (remainingToDeduct > 0) {
       console.warn(
-        `Not enough batches to cover stockAmount; ${remainingToDeduct} batch(es) short.`
+        `Not enough active batches to cover stockAmount; ${remainingToDeduct} batch(es) short.`
       );
-      // You could choose to rollback here or proceed as a partial fill
+      // You may choose to rollback here instead of committing a partial deduction.
     }
 
     await connection.commit();
-    res
-      .status(200)
-      .json({
-        message:
-          "Goods out added; deducted from production_log based on recipe units_per_batch.",
-      });
+    return res.status(200).json({
+      message:
+        "Goods out added; deducted from ACTIVE production_log rows (deleted_at IS NULL).",
+    });
   } catch (err) {
     await connection.rollback();
     console.error("Error processing transaction:", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   } finally {
     connection.release();
   }
