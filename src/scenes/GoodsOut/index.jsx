@@ -14,11 +14,18 @@ import {
   DialogContent,
   DialogTitle,
   Button,
+  TextField,
+  Divider,
+  Stack,
+  Card,
+  CardContent,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 
 /** Nory-like brand tokens */
@@ -49,10 +56,14 @@ const GoodsOut = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerItems, setDrawerItems] = useState([]); // [{ code, unitsLabel }]
+  const [selectedRow, setSelectedRow] = useState(null);
 
   // Selection + delete prompt
   const [selectedRows, setSelectedRows] = useState([]); // DataGrid row IDs
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+
+  // Drawer local UI state
+  const [searchTerm, setSearchTerm] = useState("");
 
   // ---- helpers --------------------------------------------------------------
 
@@ -157,6 +168,7 @@ const GoodsOut = () => {
     const items = pairs.map(({ code, units }) => ({
       code,
       unitsLabel: `${Number(units || 0).toLocaleString()} units`,
+      units: Number(units || 0),
     }));
     const sumUnits = pairs.reduce((t, p) => t + (Number(p.units) || 0), 0);
     const stockAmountNum = Number(row?.stockAmount ?? 0);
@@ -200,6 +212,8 @@ const GoodsOut = () => {
     const items = buildDrawerItems(row);
     setDrawerHeader("Batchcodes");
     setDrawerItems(items);
+    setSelectedRow(row ?? null);
+    setSearchTerm("");
     setDrawerOpen(true);
     dgroupEnd();
   };
@@ -207,6 +221,8 @@ const GoodsOut = () => {
   const handleDrawerClose = () => {
     dlog("Drawer closed");
     setDrawerOpen(false);
+    setSelectedRow(null);
+    setDrawerItems([]);
   };
 
   // ---- deletion -------------------------------------------------------------
@@ -304,6 +320,13 @@ const GoodsOut = () => {
     []
   );
 
+  // ---- derived for drawer UI ------------------------------------------------
+
+  const totalUnitsInDrawer = drawerItems.reduce((s, it) => s + (it.units || 0), 0);
+  const filteredDrawerItems = drawerItems.filter((it) =>
+    it.code.toLowerCase().includes(searchTerm.trim().toLowerCase())
+  );
+
   // ---- render ---------------------------------------------------------------
 
   return (
@@ -393,25 +416,27 @@ const GoodsOut = () => {
         </Box>
       </Box>
 
-      {/* Drawer */}
+      {/* Redesigned Drawer (professional) — Clear button removed */}
       <Drawer
         anchor="right"
         open={drawerOpen}
         onClose={handleDrawerClose}
         PaperProps={{
           sx: {
-            width: 360,
+            width: 420,
             borderRadius: "20px 0 0 20px",
             border: `1px solid ${brand.border}`,
-            boxShadow: brand.shadow,
+            boxShadow: "0 24px 48px rgba(15,23,42,0.12)",
             overflow: "hidden",
           },
         }}
       >
+        {/* Header with gradient */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: 1,
             px: 2,
             py: 1.25,
@@ -419,22 +444,140 @@ const GoodsOut = () => {
             background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
           }}
         >
-          <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
-            <MenuOutlinedIcon />
-          </IconButton>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-            {drawerHeader}
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <MenuOutlinedIcon sx={{ color: "#fff" }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+                {drawerHeader}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
+                {selectedRow?.recipe ? `${selectedRow.recipe} · ${selectedRow?.date ?? ""}` : ""}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                // rudimentary export: build csv and download
+                try {
+                  const csv = [
+                    ["Batch code", "Units"],
+                    ...drawerItems.map((i) => [i.code, i.units || 0]),
+                  ]
+                    .map((r) => r.map((c) => `"${String(c).replace(/\"/g, '""')}"`).join(","))
+                    .join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${selectedRow?.recipe ?? "batchcodes"}-batchcodes.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (e) {
+                  console.error("Export failed", e);
+                }
+              }}
+              sx={{
+                color: "#fff",
+                borderRadius: 1,
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              <FileDownloadOutlinedIcon fontSize="small" />
+            </IconButton>
+
+            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </Box>
 
-        <Box sx={{ background: brand.surface, p: 2 }}>
-          {drawerItems.length === 0 ? (
-            <Typography sx={{ color: brand.subtext, px: 1 }}>
-              No data available
-            </Typography>
+        {/* Content */}
+        <Box sx={{ background: brand.surface, p: 2, height: "calc(100% - 88px)" }}>
+          {/* Meta card */}
+          <Card
+            variant="outlined"
+            sx={{
+              borderColor: brand.border,
+              background: brand.surface,
+              borderRadius: 2,
+              mb: 2,
+            }}
+          >
+            <CardContent sx={{ p: 1.5 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Box>
+                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>
+                    Recipients
+                  </Typography>
+                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>
+                    {selectedRow?.recipients ?? "—"}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right" }}>
+                  <Typography sx={{ color: "text.secondary", fontSize: 12 }}>Total units</Typography>
+                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>
+                    {totalUnitsInDrawer.toLocaleString()}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Search + Reset */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+            <TextField
+              size="small"
+              placeholder="Search batch code or filter"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 1.5,
+                  background: "#fff",
+                  borderColor: brand.border,
+                },
+              }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setSearchTerm("");
+                // reset items to original selectedRow content
+                if (selectedRow) {
+                  setDrawerItems(buildDrawerItems(selectedRow));
+                }
+              }}
+              sx={{ textTransform: "none", borderRadius: 1.5 }}
+            >
+              Reset
+            </Button>
+          </Stack>
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Items list */}
+          {filteredDrawerItems.length === 0 ? (
+            <Typography sx={{ color: brand.subtext }}>No batchcodes available.</Typography>
           ) : (
             <List disablePadding>
-              {drawerItems.map(({ code, unitsLabel }, idx) => (
+              {filteredDrawerItems.map(({ code, unitsLabel }, idx) => (
                 <Box
                   key={`${code}-${idx}`}
                   sx={{
@@ -465,6 +608,7 @@ const GoodsOut = () => {
                         {unitsLabel}
                       </Box>
                     }
+                    sx={{ py: 1 }}
                   >
                     <ListItemIcon sx={{ minWidth: 36 }}>
                       <CheckRoundedIcon sx={{ color: brand.primary }} />
@@ -480,6 +624,55 @@ const GoodsOut = () => {
               ))}
             </List>
           )}
+        </Box>
+
+        {/* Footer actions (note: Clear button removed as requested) */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop: `1px solid ${brand.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: brand.surface,
+          }}
+        >
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              onClick={handleDrawerClose}
+              sx={{
+                textTransform: "none",
+                borderRadius: 999,
+                px: 2,
+                border: `1px solid ${brand.border}`,
+              }}
+            >
+              Close
+            </Button>
+
+            <Button
+              onClick={() => {
+                // example confirm action — simply close for now
+                handleDrawerClose();
+              }}
+              sx={{
+                textTransform: "none",
+                fontWeight: 800,
+                borderRadius: 999,
+                px: 2,
+                color: "#fff",
+                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                "&:hover": { background: brand.primaryDark },
+              }}
+              startIcon={<DeleteIcon />}
+            >
+              Confirm & Close
+            </Button>
+          </Box>
+
+          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+            {filteredDrawerItems.length} items
+          </Typography>
         </Box>
       </Drawer>
 
