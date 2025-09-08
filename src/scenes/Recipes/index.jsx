@@ -173,6 +173,7 @@ const Recipes = () => {
                   ingredientsArray: params.row.ingredients,
                   quantitiesArray: params.row.quantities,
                   unitsArray: params.row.units,
+                  upb: params.row.upb,
                 }
               )
             }
@@ -211,6 +212,7 @@ const Recipes = () => {
                     ingredientsArray: params.row.ingredients,
                     quantitiesArray: params.row.quantities,
                     unitsArray: params.row.units,
+                    upb: params.row.upb,
                   }
                 )
               }
@@ -225,10 +227,46 @@ const Recipes = () => {
   );
 
   // Drawer derived / helpers
-  const filteredDrawerContent = drawerContent.filter((it) =>
-    String(it).toLowerCase().includes(searchTerm.trim().toLowerCase())
+  // Build displayItems so quantities use unitsArray if available (shows value + unit)
+  const buildDisplayItems = () => {
+    const isQuantities = drawerHeader.toLowerCase().includes("quantit");
+    // If quantities and we have metadata arrays, build from those for reliable unit placement
+    if (isQuantities && selectedRowMeta?.ingredientsArray) {
+      const ingArr = selectedRowMeta.ingredientsArray || [];
+      const qtyArr = selectedRowMeta.quantitiesArray || [];
+      const unitArr = selectedRowMeta.unitsArray || [];
+      return ingArr.map((ing, i) => {
+        const qty = qtyArr?.[i] ?? "N/A";
+        const unit = unitArr?.[i] ? String(unitArr[i]).trim() : "";
+        return {
+          raw: `${ing}: ${qty}${unit ? " " + unit : ""}`,
+          name: ing,
+          qty,
+          unit,
+        };
+      });
+    }
+
+    // Otherwise fall back to drawerContent strings (already possibly including units)
+    return (drawerContent || []).map((raw) => {
+      const str = String(raw);
+      const [left, right] = str.split(":");
+      return {
+        raw: str,
+        name: left ? left.trim() : str,
+        qty: right ? right.trim() : "",
+        unit: "", // unknown
+      };
+    });
+  };
+
+  const displayItems = buildDisplayItems();
+
+  const filteredDisplayItems = displayItems.filter((it) =>
+    (it.raw || it.name).toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
-  const totalItemsCount = filteredDrawerContent.length;
+
+  const totalItemsCount = filteredDisplayItems.length;
 
   const resetDrawerContent = () => {
     if (!selectedRowMeta) {
@@ -258,14 +296,10 @@ const Recipes = () => {
 
   const exportDrawerCsv = () => {
     try {
-      const rowsOut = [["Item", drawerHeader.includes("Quantit") ? "Quantity" : ""]];
-      drawerContent.forEach((raw) => {
-        if (typeof raw === "string" && raw.includes(":")) {
-          const [left, right] = raw.split(":");
-          rowsOut.push([left.trim(), (right || "").trim()]);
-        } else {
-          rowsOut.push([String(raw), ""]);
-        }
+      const rowsOut = [["Item", drawerHeader.includes("Quantit") ? "Quantity" : "Value"]];
+      // use displayItems to ensure units are included
+      displayItems.forEach((it) => {
+        rowsOut.push([it.name, it.qty + (it.unit ? ` ${it.unit}` : "")]);
       });
       const csv = rowsOut.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
@@ -500,18 +534,16 @@ const Recipes = () => {
 
           {/* Items list */}
           <List disablePadding>
-            {filteredDrawerContent.length === 0 ? (
+            {filteredDisplayItems.length === 0 ? (
               <Typography sx={{ color: brand.subtext }}>No items available.</Typography>
             ) : (
-              filteredDrawerContent.map((raw, idx) => {
-                let primaryText = raw;
-                let qty = null;
+              filteredDisplayItems.map((it, idx) => {
+                const primaryText = it.name;
+                // For quantities we already have qty and unit separated when metadata available.
+                const qtyText = it.qty ? String(it.qty) : "";
+                const unitText = it.unit ? String(it.unit) : "";
 
-                if (drawerHeader.toLowerCase().includes("quantit") && typeof raw === "string" && raw.includes(":")) {
-                  const [name, rest] = raw.split(":");
-                  primaryText = name.trim();
-                  qty = (rest || "").trim();
-                }
+                const pill = qtyText ? `${qtyText}${unitText ? " " + unitText : ""}` : null;
 
                 return (
                   <Box
@@ -526,7 +558,7 @@ const Recipes = () => {
                   >
                     <ListItem
                       secondaryAction={
-                        qty ? (
+                        pill ? (
                           <Box
                             component="span"
                             sx={{
@@ -540,7 +572,7 @@ const Recipes = () => {
                               color: brand.text,
                             }}
                           >
-                            {qty}
+                            {pill}
                           </Box>
                         ) : null
                       }
