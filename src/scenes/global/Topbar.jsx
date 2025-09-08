@@ -16,6 +16,16 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  Avatar,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  ListItemButton,
+  Divider,
+  Stack,
+  Badge,
+  Tooltip,
 } from "@mui/material";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -25,6 +35,7 @@ import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOu
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 
 import { useState, useEffect } from "react";
 import { useData } from "../../contexts/DataContext";
@@ -93,7 +104,7 @@ export default function Topbar() {
     const seen = new Set(notifications.map((n) => n.barcode));
     const check = () => {
       const now = new Date();
-      const expired = goodsInRows.filter((r) => new Date(r.expiryDate) < now);
+      const expired = goodsInRows.filter((r) => r.expiryDate && new Date(r.expiryDate) < now);
       const still = notifications.filter((n) =>
         expired.some((r) => r.barCode === n.barcode)
       );
@@ -110,8 +121,10 @@ export default function Topbar() {
       }
     };
     const id = setInterval(check, 5000);
+    // run once immediately
+    check();
     return () => clearInterval(id);
-  }, [goodsInRows, notifications]);
+  }, [goodsInRows]); // don't include notifications so we don't create a tight loop
 
   // notification handlers
   const handleNotifClick = (e) => setNotifAnchor(e.currentTarget);
@@ -123,50 +136,46 @@ export default function Topbar() {
     handleCloseNotif();
   };
 
+  const handleMarkAllRead = () => {
+    setNotifications([]);
+    localStorage.setItem("notifications", JSON.stringify([]));
+    handleCloseNotif();
+    setSnack({ open: true, severity: "success", message: "All notifications marked read" });
+  };
+
+  const handleViewAllNotifications = () => {
+    navigate("/GoodsIn");
+    handleCloseNotif();
+  };
+
   // profile handlers
   const handleProfileClick = (e) => setProfileAnchor(e.currentTarget);
   const handleCloseProfile = () => setProfileAnchor(null);
   const handleLogoutClick = () => setLogoutDialogOpen(true);
 
   // Robust logout flow:
-  //  - call signOut() if present
-  //  - if it throws, log error
-  //  - clear common local storage keys we know about (notifications etc)
-  //  - navigate to /login and force a full reload to clear any in-memory state
   const handleConfirmLogout = async () => {
     setLogoutDialogOpen(false);
-    // close profile popover immediately
     setProfileAnchor(null);
     setLoggingOut(true);
 
     try {
-      console.log("[Topbar] Starting signOut()");
       if (signOut && typeof signOut === "function") {
-        // call your app's signOut
         await signOut();
-        console.log("[Topbar] signOut() completed (useAuth)");
       } else if (window && window.Auth && typeof window.Auth.signOut === "function") {
-        // fallback for aws-amplify if exposed globally (rare)
         await window.Auth.signOut();
-        console.log("[Topbar] signOut() completed (window.Auth)");
       } else {
-        console.warn("[Topbar] No signOut function available on useAuth or window.Auth — continuing with local cleanup");
+        console.warn("[Topbar] No signOut function available — continuing with cleanup");
       }
 
-      // Success message to user
       setSnack({ open: true, severity: "success", message: "Logged out successfully" });
     } catch (err) {
-      // If signOut throws, log it and still perform cleanup
       console.error("[Topbar] signOut failed:", err);
       setSnack({ open: true, severity: "warning", message: "Logout encountered an error, clearing local state" });
     } finally {
-      // Defensive cleanup
       try {
-        // clear notifications we store
         localStorage.removeItem("notifications");
-        // remove other likely local keys used for auth/session
-        localStorage.removeItem("amplify-authenticator"); // example; add your keys if present
-        // remove Cognito prefixed keys (best-effort)
+        localStorage.removeItem("amplify-authenticator");
         Object.keys(localStorage).forEach((k) => {
           if (k.startsWith("CognitoIdentityServiceProvider") || k.startsWith("aws-amplify"))
             localStorage.removeItem(k);
@@ -175,22 +184,19 @@ export default function Topbar() {
         console.warn("[Topbar] error clearing localStorage during logout cleanup", e);
       }
 
-      // Try client-side navigation first
       try {
         navigate("/login");
       } catch (navErr) {
         console.warn("[Topbar] navigate('/login') failed:", navErr);
       }
 
-      // Force a hard redirect so in-memory state is cleared
       try {
         window.location.replace("/login");
       } catch (replaceErr) {
-        // very unlikely, but log and fallback to location.href
         console.warn("[Topbar] window.location.replace failed:", replaceErr);
         window.location.href = "/login";
       } finally {
-        setLoggingOut(false); // in case redirect didn't happen immediately (dev)
+        setLoggingOut(false);
       }
     }
   };
@@ -201,6 +207,16 @@ export default function Topbar() {
       (o) => o.label.toLowerCase() === currentValue.toLowerCase()
     );
     if (match) navigate(match.path);
+  };
+
+  // helper to create initials for avatar
+  const userInitials = (id) => {
+    if (!id) return "U";
+    // take first 2 chars of id or split on non-alphanum
+    const parts = String(id).split(/[^A-Za-z0-9]+/).filter(Boolean);
+    if (parts.length === 0) return String(id).slice(0, 2).toUpperCase();
+    if (parts.length === 1) return String(parts[0]).slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
   return (
@@ -309,201 +325,312 @@ export default function Topbar() {
 
         {/* Icons */}
         <Box display="flex" alignItems="center" gap={1}>
-          <IconButton
-            onClick={handleNotifClick}
-            sx={{
-              position: "relative",
-              background: "#f1f5f9",
-              border: `1px solid ${brand.border}`,
-              borderRadius: 999,
-              width: 40,
-              height: 40,
-              "&:hover": { background: "#e2e8f0" },
-            }}
-          >
-            <NotificationsOutlinedIcon sx={{ color: brand.text }} />
-            {notifications.length > 0 && (
-              <Box
-                component="span"
-                sx={{
-                  backgroundColor: brand.red,
-                  color: "white",
-                  borderRadius: "50%",
-                  width: 18,
-                  height: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "absolute",
-                  top: -2,
-                  right: -2,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  boxShadow: brand.shadow,
-                }}
+          <Tooltip title={notifications.length ? `${notifications.length} notifications` : "No notifications"}>
+            <IconButton
+              onClick={handleNotifClick}
+              sx={{
+                position: "relative",
+                background: "#f1f5f9",
+                border: `1px solid ${brand.border}`,
+                borderRadius: 999,
+                width: 44,
+                height: 44,
+                "&:hover": { background: "#e2e8f0" },
+              }}
+            >
+              <Badge
+                badgeContent={notifications.length}
+                color="error"
+                overlap="circular"
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
               >
-                {notifications.length}
-              </Box>
-            )}
-          </IconButton>
+                <NotificationsOutlinedIcon sx={{ color: brand.text }} />
+              </Badge>
+            </IconButton>
+          </Tooltip>
 
-          <IconButton
-            onClick={handleProfileClick}
-            sx={{
-              background: "#f1f5f9",
-              border: `1px solid ${brand.border}`,
-              borderRadius: 999,
-              width: 40,
-              height: 40,
-              "&:hover": { background: "#e2e8f0" },
-            }}
-          >
-            <PersonOutlinedIcon sx={{ color: brand.text }} />
-          </IconButton>
+          <Tooltip title="Account">
+            <IconButton
+              onClick={handleProfileClick}
+              sx={{
+                background: "#f1f5f9",
+                border: `1px solid ${brand.border}`,
+                borderRadius: 999,
+                width: 44,
+                height: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                "&:hover": { background: "#e2e8f0" },
+              }}
+            >
+              <Avatar sx={{ width: 28, height: 28, bgcolor: "transparent", color: brand.text }}>
+                <PersonOutlinedIcon />
+              </Avatar>
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
-      {/* Notification Popover */}
+      {/* Notification Popover - redesigned */}
       <Popover
         open={Boolean(notifAnchor)}
         anchorEl={notifAnchor}
         onClose={handleCloseNotif}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
           paper: {
             sx: {
+              width: 360,
               borderRadius: 14,
               border: `1px solid ${brand.border}`,
-              boxShadow: brand.shadow,
+              boxShadow: "0 18px 36px rgba(15,23,42,0.12)",
               overflow: "hidden",
             },
           },
         }}
       >
-        <Box minWidth={320}>
+        <Box>
+          {/* header */}
           <Box
             sx={{
               background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
               color: "#fff",
-              px: 2,
-              py: 1,
+              px: 3,
+              py: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
             }}
           >
-            <Typography variant="body2" fontWeight="bold">
-              Notifications
-            </Typography>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                Notifications
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                {notifications.length} unread
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button
+                size="small"
+                onClick={handleMarkAllRead}
+                sx={{
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  textTransform: "none",
+                  borderRadius: 2,
+                }}
+              >
+                Mark all read
+              </Button>
+              <Button
+                size="small"
+                onClick={handleViewAllNotifications}
+                sx={{
+                  color: "#fff",
+                  background: "rgba(255,255,255,0.08)",
+                  textTransform: "none",
+                  borderRadius: 2,
+                }}
+              >
+                View all
+              </Button>
+            </Box>
           </Box>
-          <Box p={2}>
-            {notifications.length > 0 ? (
-              notifications.map((n, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    borderBottom:
-                      i < notifications.length - 1
-                        ? `1px solid ${brand.border}`
-                        : "none",
-                    py: "8px",
-                  }}
-                >
-                  <Grid
-                    container
-                    alignItems="center"
-                    justifyContent="space-between"
-                    wrap="nowrap"
-                  >
-                    <Grid item xs>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: brand.text, pr: 1 }}
-                      >
-                        {n.message}
-                      </Typography>
-                    </Grid>
-                    <Grid item>
-                      <IconButton
-                        onClick={handleNotificationClick}
-                        sx={{
-                          color: brand.primary,
-                          p: 0.5,
-                          "&:hover": { color: brand.primaryDark },
-                        }}
-                      >
-                        <ArrowCircleRightOutlinedIcon />
-                      </IconButton>
-                    </Grid>
-                  </Grid>
-                </Box>
-              ))
-            ) : (
+
+          {/* body */}
+          <Box p={2} sx={{ maxHeight: 320, overflowY: "auto", background: brand.surface }}>
+            {notifications.length === 0 ? (
               <Typography variant="body2" sx={{ color: brand.subtext }}>
                 You have no notifications
               </Typography>
+            ) : (
+              <List disablePadding>
+                {notifications.map((n, i) => (
+                  <Box key={n.barcode || i} sx={{ mb: i < notifications.length - 1 ? 1 : 0 }}>
+                    <ListItemButton
+                      onClick={handleNotificationClick}
+                      sx={{
+                        borderRadius: 2,
+                        px: 1,
+                        py: 1,
+                        "&:hover": { background: brand.surfaceMuted },
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: "#fff", color: brand.primary, width: 36, height: 36 }}>
+                          <NotificationsOutlinedIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography sx={{ color: brand.text, fontWeight: 700 }}>
+                            {n.message}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant="caption" sx={{ color: brand.subtext }}>
+                            {n.barcode ? `Barcode: ${n.barcode}` : ""}
+                          </Typography>
+                        }
+                      />
+                      <IconButton edge="end" onClick={handleNotificationClick} sx={{ color: brand.primary }}>
+                        <ArrowCircleRightOutlinedIcon />
+                      </IconButton>
+                    </ListItemButton>
+                    {i < notifications.length - 1 && <Divider sx={{ borderColor: brand.border }} />}
+                  </Box>
+                ))}
+              </List>
             )}
+          </Box>
+
+          {/* footer */}
+          <Box sx={{ px: 2, py: 1, borderTop: `1px solid ${brand.border}`, background: brand.surface }}>
+            <Grid container alignItems="center" justifyContent="space-between">
+              <Grid item>
+                <Typography variant="caption" sx={{ color: brand.subtext }}>
+                  Notifications are checked every 5s.
+                </Typography>
+              </Grid>
+              <Grid item>
+                <Button
+                  size="small"
+                  onClick={handleCloseNotif}
+                  sx={{
+                    textTransform: "none",
+                    color: brand.primary,
+                    fontWeight: 700,
+                  }}
+                >
+                  Close
+                </Button>
+              </Grid>
+            </Grid>
           </Box>
         </Box>
       </Popover>
 
-      {/* Profile Popover */}
+      {/* Profile Popover - redesigned */}
       <Popover
         open={Boolean(profileAnchor)}
         anchorEl={profileAnchor}
         onClose={handleCloseProfile}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
           paper: {
             sx: {
+              width: 300,
               borderRadius: 14,
               border: `1px solid ${brand.border}`,
-              boxShadow: brand.shadow,
+              boxShadow: "0 18px 36px rgba(15,23,42,0.12)",
+              overflow: "hidden",
             },
           },
         }}
       >
-        <Box minWidth={240} p={1.5}>
-          <Typography
-            variant="body2"
-            fontWeight="bold"
-            px={1.5}
-            sx={{ color: brand.text }}
-          >
-            Account ID: {cognitoId || "Not available"}
-          </Typography>
-          <Box height="1px" bgcolor={brand.border} my={1} />
-          <MenuItem
-            onClick={() => {
-              handleCloseProfile();
-              navigate("/account");
-            }}
-          >
-            <AccountCircleOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
-              Account
-            </Box>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              handleCloseProfile();
-              navigate("/settings");
-            }}
-          >
-            <SettingsOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
-              Settings
-            </Box>
-          </MenuItem>
-          <MenuItem
-            onClick={handleLogoutClick}
-            sx={{ color: brand.red }}
-            disabled={loggingOut}
-          >
-            <LogoutOutlinedIcon fontSize="small" />{" "}
-            <Box component="span" ml={1}>
+        <Box>
+          {/* header */}
+          <Box sx={{ px: 3, py: 2, background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, color: "#fff" }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff", width: 56, height: 56 }}>
+                {userInitials(cognitoId)}
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontWeight: 800 }}>{cognitoId ? "Account" : "Guest"}</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
+                  {cognitoId ? `${String(cognitoId).slice(0, 24)}${String(cognitoId).length > 24 ? "…" : ""}` : "Not signed in"}
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+
+          {/* body */}
+          <Box p={2} sx={{ background: brand.surface }}>
+            <List disablePadding>
+              <ListItem disablePadding>
+                <MenuItem
+                  onClick={() => {
+                    handleCloseProfile();
+                    navigate("/account");
+                  }}
+                  sx={{ width: "100%" }}
+                >
+                  <AccountCircleOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
+                  <Box component="span">Account</Box>
+                </MenuItem>
+              </ListItem>
+
+              <ListItem disablePadding>
+                <MenuItem
+                  onClick={() => {
+                    handleCloseProfile();
+                    navigate("/settings");
+                  }}
+                  sx={{ width: "100%" }}
+                >
+                  <SettingsOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
+                  <Box component="span">Settings</Box>
+                </MenuItem>
+              </ListItem>
+
+              <ListItem disablePadding>
+                <MenuItem
+                  onClick={() => {
+                    handleCloseProfile();
+                    navigate("/support");
+                  }}
+                  sx={{ width: "100%" }}
+                >
+                  <SupportAgentOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
+                  <Box component="span">Support</Box>
+                </MenuItem>
+              </ListItem>
+            </List>
+          </Box>
+
+          <Divider sx={{ borderColor: brand.border }} />
+
+          {/* footer with logout action */}
+          <Box sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", background: brand.surface }}>
+            <Button
+              onClick={() => {
+                handleCloseProfile();
+                navigate("/account");
+              }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 999,
+                px: 2,
+                border: `1px solid ${brand.border}`,
+              }}
+            >
+              View account
+            </Button>
+
+            <Button
+              onClick={() => {
+                handleCloseProfile();
+                setLogoutDialogOpen(true);
+              }}
+              sx={{
+                textTransform: "none",
+                fontWeight: 800,
+                borderRadius: 999,
+                px: 2,
+                color: "#fff",
+                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                "&:hover": { background: brand.primaryDark },
+              }}
+              startIcon={<LogoutOutlinedIcon />}
+            >
               Logout
-            </Box>
-          </MenuItem>
+            </Button>
+          </Box>
         </Box>
       </Popover>
 
