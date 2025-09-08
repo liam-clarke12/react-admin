@@ -1,7 +1,7 @@
 // src/components/Sidebar/index.jsx
 import { useEffect, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import { Box, IconButton, Typography, useTheme } from "@mui/material";
+import { Box, IconButton, Typography, useTheme, Tooltip, Divider } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
@@ -121,6 +121,41 @@ const Sidebar = () => {
 
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
+
+  // Section separator component — adapts to collapsed/expanded states
+  const SectionSeparator = ({ label }) => {
+    if (isCollapsed) {
+      // collapsed: small visual tick with tooltip
+      return (
+        <Box display="flex" justifyContent="center" alignItems="center" my={1}>
+          <Tooltip title={label} placement="right">
+            <Box
+              sx={{
+                width: 28,
+                height: 4,
+                borderRadius: 2,
+                background: brand.hover,
+                border: `1px solid ${brand.border}`,
+              }}
+            />
+          </Tooltip>
+        </Box>
+      );
+    }
+
+    // expanded: caption + divider
+    return (
+      <Box sx={{ px: "18px", my: 1 }}>
+        <Typography
+          variant="caption"
+          sx={{ color: brand.subtext, display: "block", fontWeight: 700, mb: 1 }}
+        >
+          {label}
+        </Typography>
+        <Divider sx={{ borderColor: brand.border }} />
+      </Box>
+    );
+  };
 
   return (
     <Box display="flex">
@@ -248,14 +283,8 @@ const Sidebar = () => {
               />
 
               {/* Section: Forms */}
-              {!isCollapsed && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: brand.subtext, m: "10px 0 6px", px: "18px", display: "block" }}
-                >
-                  Forms
-                </Typography>
-              )}
+              <SectionSeparator label="Forms" />
+
               <Item
                 title="Goods In Form"
                 to="/GoodsInForm"
@@ -286,14 +315,8 @@ const Sidebar = () => {
               />
 
               {/* Section: Data */}
-              {!isCollapsed && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: brand.subtext, m: "10px 0 6px", px: "18px", display: "block" }}
-                >
-                  Data
-                </Typography>
-              )}
+              <SectionSeparator label="Data" />
+
               <Item
                 title="Goods In"
                 to="/GoodsIn"

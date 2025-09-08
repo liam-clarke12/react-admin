@@ -4,7 +4,6 @@ import {
   IconButton,
   Popover,
   Typography,
-  Grid,
   MenuItem,
   Dialog,
   DialogActions,
@@ -136,18 +135,6 @@ export default function Topbar() {
     handleCloseNotif();
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications([]);
-    localStorage.setItem("notifications", JSON.stringify([]));
-    handleCloseNotif();
-    setSnack({ open: true, severity: "success", message: "All notifications marked read" });
-  };
-
-  const handleViewAllNotifications = () => {
-    navigate("/GoodsIn");
-    handleCloseNotif();
-  };
-
   // profile handlers
   const handleProfileClick = (e) => setProfileAnchor(e.currentTarget);
   const handleCloseProfile = () => setProfileAnchor(null);
@@ -212,7 +199,6 @@ export default function Topbar() {
   // helper to create initials for avatar
   const userInitials = (id) => {
     if (!id) return "U";
-    // take first 2 chars of id or split on non-alphanum
     const parts = String(id).split(/[^A-Za-z0-9]+/).filter(Boolean);
     if (parts.length === 0) return String(id).slice(0, 2).toUpperCase();
     if (parts.length === 1) return String(parts[0]).slice(0, 2).toUpperCase();
@@ -372,7 +358,7 @@ export default function Topbar() {
         </Box>
       </Box>
 
-      {/* Notification Popover - redesigned */}
+      {/* Notification Popover - simplified per request */}
       <Popover
         open={Boolean(notifAnchor)}
         anchorEl={notifAnchor}
@@ -392,7 +378,7 @@ export default function Topbar() {
         }}
       >
         <Box>
-          {/* header */}
+          {/* header (no unread count) */}
           <Box
             sx={{
               background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
@@ -402,43 +388,19 @@ export default function Topbar() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: 2,
             }}
           >
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                Notifications
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                {notifications.length} unread
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <Button
-                size="small"
-                onClick={handleMarkAllRead}
-                sx={{
-                  color: "#fff",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  textTransform: "none",
-                  borderRadius: 2,
-                }}
-              >
-                Mark all read
-              </Button>
-              <Button
-                size="small"
-                onClick={handleViewAllNotifications}
-                sx={{
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.08)",
-                  textTransform: "none",
-                  borderRadius: 2,
-                }}
-              >
-                View all
-              </Button>
-            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              Notifications
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={handleCloseNotif}
+              sx={{ color: "#fff", borderRadius: 1 }}
+            >
+              {/* simple close affordance */}
+              <ArrowCircleRightOutlinedIcon />
+            </IconButton>
           </Box>
 
           {/* body */}
@@ -487,34 +449,10 @@ export default function Topbar() {
               </List>
             )}
           </Box>
-
-          {/* footer */}
-          <Box sx={{ px: 2, py: 1, borderTop: `1px solid ${brand.border}`, background: brand.surface }}>
-            <Grid container alignItems="center" justifyContent="space-between">
-              <Grid item>
-                <Typography variant="caption" sx={{ color: brand.subtext }}>
-                  Notifications are checked every 5s.
-                </Typography>
-              </Grid>
-              <Grid item>
-                <Button
-                  size="small"
-                  onClick={handleCloseNotif}
-                  sx={{
-                    textTransform: "none",
-                    color: brand.primary,
-                    fontWeight: 700,
-                  }}
-                >
-                  Close
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
         </Box>
       </Popover>
 
-      {/* Profile Popover - redesigned */}
+      {/* Profile Popover - unchanged (keeps professional design) */}
       <Popover
         open={Boolean(profileAnchor)}
         anchorEl={profileAnchor}
