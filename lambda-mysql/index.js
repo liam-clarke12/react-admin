@@ -153,6 +153,97 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
+// POST /api/submit/batch
+app.post("/api/submit/batch", async (req, res) => {
+  const { entries, cognito_id } = req.body;
+
+  // Allow your frontend origin (same as single route)
+  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return res.status(400).json({ success: false, error: "entries must be a non-empty array" });
+  }
+  if (!cognito_id) {
+    return res.status(400).json({ success: false, error: "cognito_id is required" });
+  }
+
+  // Validate entries quickly before DB work (collect errors)
+  const invalid = entries
+    .map((e, i) => {
+      const missing = [];
+      if (!e.date) missing.push("date");
+      if (!e.ingredient) missing.push("ingredient");
+      if (e.stockReceived === undefined || e.stockReceived === null) missing.push("stockReceived");
+      if (!e.unit) missing.push("unit");
+      if (!e.barCode) missing.push("barCode");
+      if (!e.expiryDate) missing.push("expiryDate");
+      if (e.temperature === undefined || e.temperature === null) missing.push("temperature");
+      return missing.length ? { index: i, missing } : null;
+    })
+    .filter(Boolean);
+
+  if (invalid.length) {
+    return res.status(400).json({ success: false, error: "Validation failed for some entries", details: invalid });
+  }
+
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const insertedIds = [];
+    for (const entry of entries) {
+      // Normalize numeric stock
+      const stock = Number(entry.stockReceived) || 0;
+
+      const goodsInQuery = `
+        INSERT INTO goods_in
+          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [goodsRes] = await connection.execute(goodsInQuery, [
+        entry.date,
+        entry.ingredient,
+        stock,
+        stock, // initial remaining
+        entry.barCode,
+        entry.expiryDate,
+        entry.temperature,
+        entry.unit,
+        cognito_id,
+      ]);
+      insertedIds.push(goodsRes.insertId);
+
+      // upsert inventory
+      const ingredientInventoryQuery = `
+        INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE amount = amount + VALUES(amount)
+      `;
+      await connection.execute(ingredientInventoryQuery, [
+        entry.ingredient,
+        stock,
+        entry.barCode,
+        entry.unit,
+      ]);
+    }
+
+    await connection.commit();
+    return res.status(200).json({
+      success: true,
+      message: `Inserted ${insertedIds.length} entries`,
+      insertedIds,
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Batch submit DB error:", { message: err.message, stack: err.stack });
+    return res.status(500).json({ success: false, error: "Database error", details: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
+
 app.get("/api/ingredients", async (req, res) => {
   try {
     // 🔍 Canary test: make sure the pool is responsive
