@@ -27,6 +27,7 @@ import {
   TableRow,
   TableCell,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { Formik, FieldArray } from "formik";
@@ -598,24 +599,6 @@ const GoodsInForm = () => {
 
                     return (
                       <Box>
-                        {/* Add good button (top) */}
-                        <Box display="flex" justifyContent="flex-end" mb={2}>
-                          <Button
-                            startIcon={<AddIcon />}
-                            onClick={() => push({ ...initialBatchItem })}
-                            sx={{
-                              textTransform: "none",
-                              fontWeight: 800,
-                              borderRadius: 2,
-                              background: brand.surfaceMuted,
-                              color: brand.text,
-                              border: `1px solid ${brand.border}`,
-                            }}
-                          >
-                            Add good
-                          </Button>
-                        </Box>
-
                         {/* Goods */}
                         <Box display="grid" gap={2}>
                           {(values.items || []).map((it, idx) => {
@@ -806,19 +789,31 @@ const GoodsInForm = () => {
             gap: 1,
           }}
         >
-          <Fab
-            onClick={() => addGoodRef.current && addGoodRef.current()}
-            sx={{
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              color: "#fff",
-              "&:hover": { background: brand.primaryDark },
-              boxShadow: "0 12px 30px rgba(16,24,40,0.18)",
-            }}
-            aria-label="Add good"
-            size="medium"
-          >
-            <AddIcon />
-          </Fab>
+          <Tooltip title="Add a new good row" arrow>
+            <Fab
+              onClick={() => addGoodRef.current && addGoodRef.current()}
+              sx={{
+                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                color: "#fff",
+                "&:hover": { background: brand.primaryDark },
+                boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
+                width: 170,
+                height: 56,
+                borderRadius: 3,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                fontWeight: 800,
+                textTransform: "none",
+              }}
+              aria-label="Add good"
+              size="medium"
+              variant="extended"
+            >
+              <AddIcon sx={{ mr: 1 }} />
+              Add Good
+            </Fab>
+          </Tooltip>
         </Box>
       )}
 
