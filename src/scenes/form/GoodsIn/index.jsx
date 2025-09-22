@@ -775,14 +775,13 @@ const GoodsInForm = () => {
         )}
       </Paper>
 
-      {/* Floating Add Good FAB (visible only on Multiple tab) */}
+      {/* Floating Add Good FAB (bottom-left) - visible only on Multiple tab */}
       {tabIndex === 1 && (
         <Box
           sx={{
             position: "fixed",
-            right: 18,
-            top: "50%",                 // vertically centered to avoid bottom overlap
-            transform: "translateY(-50%)",
+            left: 18,
+            bottom: 18,
             zIndex: 1400,
             display: "flex",
             flexDirection: "column",
