@@ -1,5 +1,5 @@
 // src/scenes/form/GoodsIn/index.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   TextField,
@@ -141,14 +141,17 @@ const GoodsInForm = () => {
   const [newIngredient, setNewIngredient] = useState("");
   const [adding, setAdding] = useState(false);
 
-  // confirm dialog (batch)
+  // confirm dialog (multiple)
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
   const [batchPreviewItems, setBatchPreviewItems] = useState([]);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResetFormFn, setBatchResetFormFn] = useState(null);
 
-  // tab state: 0 = single, 1 = batch
+  // tab state: 0 = single, 1 = multiple
   const [tabIndex, setTabIndex] = useState(0);
+
+  // ref to allow adding goods from a floating FAB
+  const addGoodRef = useRef(null);
 
   // fetch global ingredients
   useEffect(() => {
@@ -321,7 +324,7 @@ const GoodsInForm = () => {
     }
   };
 
-  // Helper to open confirmation dialog for batch after validating form
+  // Helper to open confirmation dialog for multiple after validating form
   const openBatchConfirmDialog = async ({ validateForm, values, setTouched, resetForm }) => {
     const errors = await validateForm();
     if (errors && Object.keys(errors).length) {
@@ -383,18 +386,18 @@ const GoodsInForm = () => {
               Record Goods In
             </Typography>
             <Typography variant="body2" sx={{ color: brand.subtext }}>
-              Fill out the details below and hit Record (single) or add multiple items in Batch.
+              Fill out the details below and hit Record (single) or add multiple goods in Multiple.
             </Typography>
           </Box>
 
-          {/* Tabs for Single / Batch */}
+          {/* Tabs for Single / Multiple */}
           <Tabs
             value={tabIndex}
             onChange={(_, v) => setTabIndex(v)}
             sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 700 } }}
           >
             <Tab label="Single" />
-            <Tab label="Batch" />
+            <Tab label="Multiple" />
           </Tabs>
         </Box>
 
@@ -583,201 +586,206 @@ const GoodsInForm = () => {
           </Formik>
         )}
 
-        {/* Batch form */}
+        {/* Multiple form */}
         {tabIndex === 1 && (
           <Formik initialValues={initialValuesBatch} validationSchema={batchSchema} onSubmit={submitBatch}>
             {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
               <form>
                 <FieldArray name="items">
-                  {({ push, remove }) => (
-                    <Box>
-                      {/* Add row button */}
-                      <Box display="flex" justifyContent="flex-end" mb={2}>
-                        <Button
-                          startIcon={<AddIcon />}
-                          onClick={() => push({ ...initialBatchItem })}
-                          sx={{
-                            textTransform: "none",
-                            fontWeight: 800,
-                            borderRadius: 2,
-                            background: brand.surfaceMuted,
-                            color: brand.text,
-                            border: `1px solid ${brand.border}`,
-                          }}
-                        >
-                          Add item
-                        </Button>
-                      </Box>
+                  {({ push, remove }) => {
+                    // expose add-good function so floating FAB can call it regardless of scroll
+                    addGoodRef.current = () => push({ ...initialBatchItem });
 
-                      {/* Items */}
-                      <Box display="grid" gap={2}>
-                        {(values.items || []).map((it, idx) => {
-                          // derive selected option for this row (by id)
-                          const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
+                    return (
+                      <Box>
+                        {/* Add good button (top) */}
+                        <Box display="flex" justifyContent="flex-end" mb={2}>
+                          <Button
+                            startIcon={<AddIcon />}
+                            onClick={() => push({ ...initialBatchItem })}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 800,
+                              borderRadius: 2,
+                              background: brand.surfaceMuted,
+                              color: brand.text,
+                              border: `1px solid ${brand.border}`,
+                            }}
+                          >
+                            Add good
+                          </Button>
+                        </Box>
 
-                          return (
-                            <Paper
-                              key={idx}
-                              elevation={0}
-                              sx={{
-                                p: 2,
-                                borderRadius: 2,
-                                border: `1px solid ${brand.border}`,
-                                background: idx % 2 ? brand.surfaceMuted : brand.surface,
-                              }}
-                            >
-                              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                <Typography sx={{ fontWeight: 800 }}>Item {idx + 1}</Typography>
-                                <Box>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => remove(idx)}
-                                    sx={{ color: brand.primary }}
-                                    aria-label={`Remove item ${idx + 1}`}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Box>
-                              </Box>
+                        {/* Goods */}
+                        <Box display="grid" gap={2}>
+                          {(values.items || []).map((it, idx) => {
+                            // derive selected option for this row (by id)
+                            const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
 
-                              <Box
-                                display="grid"
-                                gap="12px"
-                                gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                                sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                            return (
+                              <Paper
+                                key={idx}
+                                elevation={0}
+                                sx={{
+                                  p: 2,
+                                  borderRadius: 2,
+                                  border: `1px solid ${brand.border}`,
+                                  background: idx % 2 ? brand.surfaceMuted : brand.surface,
+                                }}
                               >
-                                <TextField
-                                  fullWidth
-                                  variant="outlined"
-                                  type="date"
-                                  label="Date"
-                                  name={`items.${idx}.date`}
-                                  value={it.date}
-                                  onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
-                                  sx={{ gridColumn: "span 2", ...inputSx }}
-                                />
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                  <Typography sx={{ fontWeight: 800 }}>Good {idx + 1}</Typography>
+                                  <Box>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => remove(idx)}
+                                      sx={{ color: brand.primary }}
+                                      aria-label={`Remove good ${idx + 1}`}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Box>
+                                </Box>
 
-                                <Box sx={{ gridColumn: "span 2" }}>
-                                  <Autocomplete
-                                    options={ingredients}
-                                    getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
-                                    loading={loadingMaster || loadingCustom}
-                                    value={selectedOption}
-                                    onChange={(_, newVal) => setFieldValue(`items.${idx}.ingredient`, newVal ? newVal.id : "")}
-                                    isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
-                                    filterSelectedOptions
-                                    renderInput={(params) => (
-                                      <TextField
-                                        {...params}
-                                        label="Ingredient"
-                                        name={`items.${idx}.ingredient`}
-                                        InputProps={{
-                                          ...params.InputProps,
-                                          endAdornment: (
-                                            <>
-                                              {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
-                                              {params.InputProps.endAdornment}
-                                            </>
-                                          ),
-                                        }}
-                                        sx={inputSx}
-                                      />
-                                    )}
+                                <Box
+                                  display="grid"
+                                  gap="12px"
+                                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                                  sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                                >
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    type="date"
+                                    label="Date"
+                                    name={`items.${idx}.date`}
+                                    value={it.date}
+                                    onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
+                                    sx={{ gridColumn: "span 2", ...inputSx }}
+                                  />
+
+                                  <Box sx={{ gridColumn: "span 2" }}>
+                                    <Autocomplete
+                                      options={ingredients}
+                                      getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                                      loading={loadingMaster || loadingCustom}
+                                      value={selectedOption}
+                                      onChange={(_, newVal) => setFieldValue(`items.${idx}.ingredient`, newVal ? newVal.id : "")}
+                                      isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                                      filterSelectedOptions
+                                      renderInput={(params) => (
+                                        <TextField
+                                          {...params}
+                                          label="Ingredient"
+                                          name={`items.${idx}.ingredient`}
+                                          InputProps={{
+                                            ...params.InputProps,
+                                            endAdornment: (
+                                              <>
+                                                {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
+                                                {params.InputProps.endAdornment}
+                                              </>
+                                            ),
+                                          }}
+                                          sx={inputSx}
+                                        />
+                                      )}
+                                    />
+                                  </Box>
+
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    type="number"
+                                    label="Stock Received"
+                                    name={`items.${idx}.stockReceived`}
+                                    value={it.stockReceived}
+                                    onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
+                                    sx={{ gridColumn: "span 1", ...inputSx }}
+                                  />
+
+                                  <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                                    <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
+                                    <Select
+                                      labelId={`unit-label-${idx}`}
+                                      name={`items.${idx}.unit`}
+                                      value={it.unit}
+                                      label="Metric"
+                                      onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
+                                    >
+                                      {unitOptions.map((opt) => (
+                                        <MenuItem key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    type="text"
+                                    label="Bar Code"
+                                    name={`items.${idx}.barCode`}
+                                    value={it.barCode}
+                                    onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
+                                    sx={{ gridColumn: "span 2", ...inputSx }}
+                                  />
+
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    type="date"
+                                    label="Expiry Date"
+                                    name={`items.${idx}.expiryDate`}
+                                    value={it.expiryDate}
+                                    onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
+                                    sx={{ gridColumn: "span 2", ...inputSx }}
+                                  />
+
+                                  <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    type="text"
+                                    label="Temperature (℃)"
+                                    name={`items.${idx}.temperature`}
+                                    value={it.temperature}
+                                    onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
+                                    sx={{ gridColumn: "span 2", ...inputSx }}
                                   />
                                 </Box>
+                              </Paper>
+                            );
+                          })}
+                        </Box>
 
-                                <TextField
-                                  fullWidth
-                                  variant="outlined"
-                                  type="number"
-                                  label="Stock Received"
-                                  name={`items.${idx}.stockReceived`}
-                                  value={it.stockReceived}
-                                  onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
-                                  sx={{ gridColumn: "span 1", ...inputSx }}
-                                />
-
-                                <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
-                                  <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
-                                  <Select
-                                    labelId={`unit-label-${idx}`}
-                                    name={`items.${idx}.unit`}
-                                    value={it.unit}
-                                    label="Metric"
-                                    onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
-                                  >
-                                    {unitOptions.map((opt) => (
-                                      <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-
-                                <TextField
-                                  fullWidth
-                                  variant="outlined"
-                                  type="text"
-                                  label="Bar Code"
-                                  name={`items.${idx}.barCode`}
-                                  value={it.barCode}
-                                  onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
-                                  sx={{ gridColumn: "span 2", ...inputSx }}
-                                />
-
-                                <TextField
-                                  fullWidth
-                                  variant="outlined"
-                                  type="date"
-                                  label="Expiry Date"
-                                  name={`items.${idx}.expiryDate`}
-                                  value={it.expiryDate}
-                                  onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
-                                  sx={{ gridColumn: "span 2", ...inputSx }}
-                                />
-
-                                <TextField
-                                  fullWidth
-                                  variant="outlined"
-                                  type="text"
-                                  label="Temperature (℃)"
-                                  name={`items.${idx}.temperature`}
-                                  value={it.temperature}
-                                  onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
-                                  sx={{ gridColumn: "span 2", ...inputSx }}
-                                />
-                              </Box>
-                            </Paper>
-                          );
-                        })}
+                        {/* Multiple submit (opens confirmation dialog after validate) */}
+                        <Box display="flex" justifyContent="flex-end" mt={3}>
+                          <Fab
+                            variant="extended"
+                            onClick={() =>
+                              openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })
+                            }
+                            sx={{
+                              px: 4,
+                              py: 1.25,
+                              gap: 1,
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              textTransform: "none",
+                              boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                              color: "#fff",
+                              "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                            }}
+                          >
+                            <AddIcon />
+                            Submit Multiple ({(values.items || []).length})
+                          </Fab>
+                        </Box>
                       </Box>
-
-                      {/* Batch submit (opens confirmation dialog after validate) */}
-                      <Box display="flex" justifyContent="flex-end" mt={3}>
-                        <Fab
-                          variant="extended"
-                          onClick={() =>
-                            openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })
-                          }
-                          sx={{
-                            px: 4,
-                            py: 1.25,
-                            gap: 1,
-                            borderRadius: 999,
-                            fontWeight: 800,
-                            textTransform: "none",
-                            boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                            color: "#fff",
-                            "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-                          }}
-                        >
-                          <AddIcon />
-                          Submit Batch ({(values.items || []).length})
-                        </Fab>
-                      </Box>
-                    </Box>
-                  )}
+                    );
+                  }}
                 </FieldArray>
               </form>
             )}
@@ -785,7 +793,36 @@ const GoodsInForm = () => {
         )}
       </Paper>
 
-      {/* Batch confirmation dialog */}
+      {/* Floating Add Good FAB (visible only on Multiple tab) */}
+      {tabIndex === 1 && (
+        <Box
+          sx={{
+            position: "fixed",
+            right: 24,
+            bottom: 24,
+            zIndex: 1400,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+          }}
+        >
+          <Fab
+            onClick={() => addGoodRef.current && addGoodRef.current()}
+            sx={{
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              color: "#fff",
+              "&:hover": { background: brand.primaryDark },
+              boxShadow: "0 12px 30px rgba(16,24,40,0.18)",
+            }}
+            aria-label="Add good"
+            size="medium"
+          >
+            <AddIcon />
+          </Fab>
+        </Box>
+      )}
+
+      {/* Multiple confirmation dialog */}
       <Dialog
         open={batchConfirmOpen}
         onClose={() => setBatchConfirmOpen(false)}
@@ -798,10 +835,10 @@ const GoodsInForm = () => {
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Batch Submission</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Multiple Submission</DialogTitle>
         <DialogContent dividers>
           <Typography sx={{ color: brand.subtext, mb: 2 }}>
-            You're about to submit <strong>{batchPreviewItems.length}</strong> item(s). Review them below and confirm to proceed.
+            You're about to submit <strong>{batchPreviewItems.length}</strong> good(s). Review them below and confirm to proceed.
           </Typography>
 
           <Table size="small" aria-label="batch-summary">
