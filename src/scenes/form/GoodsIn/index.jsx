@@ -780,8 +780,9 @@ const GoodsInForm = () => {
         <Box
           sx={{
             position: "fixed",
-            right: 24,
-            bottom: 32, // slightly raised so visual separation from submit area
+            right: 18,
+            top: "50%",                 // vertically centered to avoid bottom overlap
+            transform: "translateY(-50%)",
             zIndex: 1400,
             display: "flex",
             flexDirection: "column",
