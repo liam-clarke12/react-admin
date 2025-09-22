@@ -26,8 +26,6 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  Divider,
-  Tooltip,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { Formik, FieldArray } from "formik";
@@ -375,6 +373,7 @@ const GoodsInForm = () => {
         sx={{
           mt: 2,
           p: { xs: 2, sm: 3 },
+          pb: tabIndex === 1 ? "140px" : undefined, // reserve bottom space when Multiple is active so FAB won't cover submit
           borderRadius: 16,
           border: `1px solid ${brand.border}`,
           background: brand.surface,
@@ -743,7 +742,7 @@ const GoodsInForm = () => {
                         </Box>
 
                         {/* Multiple submit (opens confirmation dialog after validate) */}
-                        <Box display="flex" justifyContent="flex-end" mt={3}>
+                        <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
                           <Fab
                             variant="extended"
                             onClick={() =>
@@ -782,38 +781,36 @@ const GoodsInForm = () => {
           sx={{
             position: "fixed",
             right: 24,
-            bottom: 24,
+            bottom: 32, // slightly raised so visual separation from submit area
             zIndex: 1400,
             display: "flex",
             flexDirection: "column",
             gap: 1,
           }}
         >
-          <Tooltip title="Add a new good row" arrow>
-            <Fab
-              onClick={() => addGoodRef.current && addGoodRef.current()}
-              sx={{
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                color: "#fff",
-                "&:hover": { background: brand.primaryDark },
-                boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
-                width: 170,
-                height: 56,
-                borderRadius: 3,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                fontWeight: 800,
-                textTransform: "none",
-              }}
-              aria-label="Add good"
-              size="medium"
-              variant="extended"
-            >
-              <AddIcon sx={{ mr: 1 }} />
-              Add Good
-            </Fab>
-          </Tooltip>
+          <Fab
+            onClick={() => addGoodRef.current && addGoodRef.current()}
+            sx={{
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              color: "#fff",
+              "&:hover": { background: brand.primaryDark },
+              boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
+              width: 170,
+              height: 56,
+              borderRadius: 3,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              fontWeight: 800,
+              textTransform: "none",
+            }}
+            aria-label="Add good"
+            size="medium"
+            variant="extended"
+          >
+            <AddIcon sx={{ mr: 1 }} />
+            Add Good
+          </Fab>
         </Box>
       )}
 
