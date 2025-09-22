@@ -149,7 +149,7 @@ const GoodsInForm = () => {
   // tab state: 0 = single, 1 = multiple
   const [tabIndex, setTabIndex] = useState(0);
 
-  // ref to allow adding goods from a floating FAB
+  // ref to allow adding goods from the FAB (now inside the form wrapper)
   const addGoodRef = useRef(null);
 
   // fetch global ingredients
@@ -220,7 +220,7 @@ const GoodsInForm = () => {
   const goodsInSchema = itemSchema;
 
   const batchSchema = yup.object().shape({
-    items: yup.array().of(itemSchema).min(1, "At least one item is required"),
+    items: yup.array().of(itemSchema).min(1, "At least one good is required"),
   });
 
   const initialValuesSingle = {
@@ -311,7 +311,7 @@ const GoodsInForm = () => {
           body: JSON.stringify(payload),
         });
         if (!r.ok) {
-          console.error("Failed to submit item in fallback:", await r.text().catch(() => r.status));
+          console.error("Failed to submit good in fallback:", await r.text().catch(() => r.status));
           // continue attempting others, but report in console
         }
       }
@@ -319,7 +319,7 @@ const GoodsInForm = () => {
       setOpenSnackbar(true);
     } catch (err) {
       console.error("[submitBatch] fallback submission error:", err);
-      alert("Batch submission failed. Check console.");
+      alert("Multiple submission failed. Check console.");
     }
   };
 
@@ -359,8 +359,8 @@ const GoodsInForm = () => {
       setBatchConfirmOpen(false);
       setBatchPreviewItems([]);
     } catch (err) {
-      console.error("Batch confirm submit error:", err);
-      alert("Batch submit failed. See console.");
+      console.error("Multiple confirm submit error:", err);
+      alert("Multiple submit failed. See console.");
     } finally {
       setBatchSubmitting(false);
     }
@@ -368,451 +368,453 @@ const GoodsInForm = () => {
 
   return (
     <Box m="20px">
-      <Paper
-        elevation={0}
-        sx={{
-          mt: 2,
-          p: { xs: 2, sm: 3 },
-          pb: tabIndex === 1 ? "140px" : undefined, // reserve bottom space when Multiple is active so FAB won't cover submit
-          borderRadius: 16,
-          border: `1px solid ${brand.border}`,
-          background: brand.surface,
-          boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-        }}
-      >
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: brand.text }}>
-              Record Goods In
-            </Typography>
-            <Typography variant="body2" sx={{ color: brand.subtext }}>
-              Fill out the details below and hit Record (single) or add multiple goods in Multiple.
-            </Typography>
-          </Box>
-
-          {/* Tabs for Single / Multiple */}
-          <Tabs
-            value={tabIndex}
-            onChange={(_, v) => setTabIndex(v)}
-            sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 700 } }}
-          >
-            <Tab label="Single" />
-            <Tab label="Multiple" />
-          </Tabs>
-        </Box>
-
-        {/* Single item form (original) */}
-        {tabIndex === 0 && (
-          <Formik onSubmit={submitSingle} initialValues={initialValuesSingle} validationSchema={goodsInSchema}>
-            {({
-              values,
-              errors,
-              touched,
-              handleBlur,
-              handleChange,
-              handleSubmit,
-              setFieldValue,
-            }) => {
-              const selected = ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
-
-              return (
-                <form onSubmit={handleSubmit}>
-                  <Box
-                    display="grid"
-                    gap="20px"
-                    gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                    sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
-                  >
-                    {/* Date */}
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      type="date"
-                      label="Date"
-                      name="date"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.date}
-                      error={!!touched.date && !!errors.date}
-                      helperText={touched.date && errors.date}
-                      sx={{ gridColumn: "span 2", ...inputSx }}
-                    />
-
-                    {/* Ingredient */}
-                    <Box sx={{ gridColumn: "span 2" }}>
-                      <Autocomplete
-                        options={ingredients}
-                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
-                        loading={loadingMaster || loadingCustom}
-                        value={selected}
-                        onChange={(_, newVal) => setFieldValue("ingredient", newVal ? newVal.id : "")}
-                        isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
-                        filterSelectedOptions
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Ingredient"
-                            name="ingredient"
-                            onBlur={handleBlur}
-                            error={!!touched.ingredient && !!errors.ingredient}
-                            helperText={touched.ingredient && errors.ingredient}
-                            InputProps={{
-                              ...params.InputProps,
-                              endAdornment: (
-                                <>
-                                  {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
-                                  {params.InputProps.endAdornment}
-                                </>
-                              ),
-                            }}
-                            sx={inputSx}
-                          />
-                        )}
-                      />
-                      <Box textAlign="right" mt={1}>
-                        <Button
-                          size="small"
-                          onClick={openAddDialog}
-                          sx={{
-                            textTransform: "none",
-                            fontWeight: 700,
-                            color: brand.primary,
-                            "&:hover": { color: brand.primaryDark, bgColor: "transparent" },
-                          }}
-                        >
-                          Add Ingredient +
-                        </Button>
-                      </Box>
-                    </Box>
-
-                    {/* Stock Received */}
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      type="number"
-                      label="Stock Received"
-                      name="stockReceived"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.stockReceived}
-                      error={!!touched.stockReceived && !!errors.stockReceived}
-                      helperText={touched.stockReceived && errors.stockReceived}
-                      sx={{ gridColumn: "span 1", ...inputSx }}
-                    />
-
-                    {/* Unit */}
-                    <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
-                      <InputLabel id="unit-label">Metric</InputLabel>
-                      <Select labelId="unit-label" name="unit" value={values.unit} label="Metric" onChange={handleChange}>
-                        {unitOptions.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    {/* Bar Code */}
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      type="text"
-                      label="Bar Code"
-                      name="barCode"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.barCode}
-                      error={!!touched.barCode && !!errors.barCode}
-                      helperText={touched.barCode && errors.barCode}
-                      sx={{ gridColumn: "span 2", ...inputSx }}
-                    />
-
-                    {/* Expiry Date */}
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      type="date"
-                      label="Expiry Date"
-                      name="expiryDate"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.expiryDate}
-                      error={!!touched.expiryDate && !!errors.expiryDate}
-                      helperText={touched.expiryDate && errors.expiryDate}
-                      sx={{ gridColumn: "span 2", ...inputSx }}
-                    />
-
-                    {/* Temperature */}
-                    <TextField
-                      fullWidth
-                      variant="outlined"
-                      type="text"
-                      label="Temperature (℃)"
-                      name="temperature"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.temperature}
-                      error={!!touched.temperature && !!errors.temperature}
-                      helperText={touched.temperature && errors.temperature}
-                      sx={{ gridColumn: "span 2", ...inputSx }}
-                    />
-                  </Box>
-
-                  {/* Primary action: FAB aligned to the right */}
-                  <Box display="flex" justifyContent="flex-end" mt={3}>
-                    <Fab
-                      variant="extended"
-                      onClick={handleSubmit}
-                      sx={{
-                        px: 4,
-                        py: 1.25,
-                        gap: 1,
-                        borderRadius: 999,
-                        fontWeight: 800,
-                        textTransform: "none",
-                        boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                        background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                        color: "#fff",
-                        "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-                      }}
-                    >
-                      <AddIcon />
-                      Record Stock
-                    </Fab>
-                  </Box>
-                </form>
-              );
-            }}
-          </Formik>
-        )}
-
-        {/* Multiple form */}
-        {tabIndex === 1 && (
-          <Formik initialValues={initialValuesBatch} validationSchema={batchSchema} onSubmit={submitBatch}>
-            {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
-              <form>
-                <FieldArray name="items">
-                  {({ push, remove }) => {
-                    // expose add-good function so floating FAB can call it regardless of scroll
-                    addGoodRef.current = () => push({ ...initialBatchItem });
-
-                    return (
-                      <Box>
-                        {/* Goods */}
-                        <Box display="grid" gap={2}>
-                          {(values.items || []).map((it, idx) => {
-                            // derive selected option for this row (by id)
-                            const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
-
-                            return (
-                              <Paper
-                                key={idx}
-                                elevation={0}
-                                sx={{
-                                  p: 2,
-                                  borderRadius: 2,
-                                  border: `1px solid ${brand.border}`,
-                                  background: idx % 2 ? brand.surfaceMuted : brand.surface,
-                                }}
-                              >
-                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                  <Typography sx={{ fontWeight: 800 }}>Good {idx + 1}</Typography>
-                                  <Box>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => remove(idx)}
-                                      sx={{ color: brand.primary }}
-                                      aria-label={`Remove good ${idx + 1}`}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </Box>
-                                </Box>
-
-                                <Box
-                                  display="grid"
-                                  gap="12px"
-                                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                                  sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
-                                >
-                                  <TextField
-                                    fullWidth
-                                    variant="outlined"
-                                    type="date"
-                                    label="Date"
-                                    name={`items.${idx}.date`}
-                                    value={it.date}
-                                    onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
-                                    sx={{ gridColumn: "span 2", ...inputSx }}
-                                  />
-
-                                  <Box sx={{ gridColumn: "span 2" }}>
-                                    <Autocomplete
-                                      options={ingredients}
-                                      getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
-                                      loading={loadingMaster || loadingCustom}
-                                      value={selectedOption}
-                                      onChange={(_, newVal) => setFieldValue(`items.${idx}.ingredient`, newVal ? newVal.id : "")}
-                                      isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
-                                      filterSelectedOptions
-                                      renderInput={(params) => (
-                                        <TextField
-                                          {...params}
-                                          label="Ingredient"
-                                          name={`items.${idx}.ingredient`}
-                                          InputProps={{
-                                            ...params.InputProps,
-                                            endAdornment: (
-                                              <>
-                                                {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
-                                                {params.InputProps.endAdornment}
-                                              </>
-                                            ),
-                                          }}
-                                          sx={inputSx}
-                                        />
-                                      )}
-                                    />
-                                  </Box>
-
-                                  <TextField
-                                    fullWidth
-                                    variant="outlined"
-                                    type="number"
-                                    label="Stock Received"
-                                    name={`items.${idx}.stockReceived`}
-                                    value={it.stockReceived}
-                                    onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
-                                    sx={{ gridColumn: "span 1", ...inputSx }}
-                                  />
-
-                                  <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
-                                    <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
-                                    <Select
-                                      labelId={`unit-label-${idx}`}
-                                      name={`items.${idx}.unit`}
-                                      value={it.unit}
-                                      label="Metric"
-                                      onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
-                                    >
-                                      {unitOptions.map((opt) => (
-                                        <MenuItem key={opt.value} value={opt.value}>
-                                          {opt.label}
-                                        </MenuItem>
-                                      ))}
-                                    </Select>
-                                  </FormControl>
-
-                                  <TextField
-                                    fullWidth
-                                    variant="outlined"
-                                    type="text"
-                                    label="Bar Code"
-                                    name={`items.${idx}.barCode`}
-                                    value={it.barCode}
-                                    onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
-                                    sx={{ gridColumn: "span 2", ...inputSx }}
-                                  />
-
-                                  <TextField
-                                    fullWidth
-                                    variant="outlined"
-                                    type="date"
-                                    label="Expiry Date"
-                                    name={`items.${idx}.expiryDate`}
-                                    value={it.expiryDate}
-                                    onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
-                                    sx={{ gridColumn: "span 2", ...inputSx }}
-                                  />
-
-                                  <TextField
-                                    fullWidth
-                                    variant="outlined"
-                                    type="text"
-                                    label="Temperature (℃)"
-                                    name={`items.${idx}.temperature`}
-                                    value={it.temperature}
-                                    onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
-                                    sx={{ gridColumn: "span 2", ...inputSx }}
-                                  />
-                                </Box>
-                              </Paper>
-                            );
-                          })}
-                        </Box>
-
-                        {/* Multiple submit (opens confirmation dialog after validate) */}
-                        <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
-                          <Fab
-                            variant="extended"
-                            onClick={() =>
-                              openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })
-                            }
-                            sx={{
-                              px: 4,
-                              py: 1.25,
-                              gap: 1,
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              textTransform: "none",
-                              boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                              color: "#fff",
-                              "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-                            }}
-                          >
-                            <AddIcon />
-                            Submit Multiple ({(values.items || []).length})
-                          </Fab>
-                        </Box>
-                      </Box>
-                    );
-                  }}
-                </FieldArray>
-              </form>
-            )}
-          </Formik>
-        )}
-      </Paper>
-
-      {/* Floating Add Good FAB (bottom-left) - visible only on Multiple tab */}
-      {tabIndex === 1 && (
-        <Box
+      {/* wrapper that establishes positioning context for the FAB (so it stays within the form margins) */}
+      <Box sx={{ position: "relative" }}>
+        <Paper
+          elevation={0}
           sx={{
-            position: "fixed",
-            left: 18,
-            bottom: 18,
-            zIndex: 1400,
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
+            mt: 2,
+            p: { xs: 2, sm: 3 },
+            pb: tabIndex === 1 ? "120px" : undefined, // reserve space when Multiple is active so FAB won't cover submit
+            borderRadius: 16,
+            border: `1px solid ${brand.border}`,
+            background: brand.surface,
+            boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
           }}
         >
-          <Fab
-            onClick={() => addGoodRef.current && addGoodRef.current()}
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: brand.text }}>
+                Record Goods In
+              </Typography>
+              <Typography variant="body2" sx={{ color: brand.subtext }}>
+                Fill out the details below and hit Record (single) or add multiple goods in Multiple.
+              </Typography>
+            </Box>
+
+            {/* Tabs for Single / Multiple */}
+            <Tabs
+              value={tabIndex}
+              onChange={(_, v) => setTabIndex(v)}
+              sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 700 } }}
+            >
+              <Tab label="Single" />
+              <Tab label="Multiple" />
+            </Tabs>
+          </Box>
+
+          {/* Single item form (original) */}
+          {tabIndex === 0 && (
+            <Formik onSubmit={submitSingle} initialValues={initialValuesSingle} validationSchema={goodsInSchema}>
+              {({
+                values,
+                errors,
+                touched,
+                handleBlur,
+                handleChange,
+                handleSubmit,
+                setFieldValue,
+              }) => {
+                const selected = ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
+
+                return (
+                  <form onSubmit={handleSubmit}>
+                    <Box
+                      display="grid"
+                      gap="20px"
+                      gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                      sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                    >
+                      {/* Date */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="date"
+                        label="Date"
+                        name="date"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.date}
+                        error={!!touched.date && !!errors.date}
+                        helperText={touched.date && errors.date}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                      />
+
+                      {/* Ingredient */}
+                      <Box sx={{ gridColumn: "span 2" }}>
+                        <Autocomplete
+                          options={ingredients}
+                          getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                          loading={loadingMaster || loadingCustom}
+                          value={selected}
+                          onChange={(_, newVal) => setFieldValue("ingredient", newVal ? newVal.id : "")}
+                          isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                          filterSelectedOptions
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Ingredient"
+                              name="ingredient"
+                              onBlur={handleBlur}
+                              error={!!touched.ingredient && !!errors.ingredient}
+                              helperText={touched.ingredient && errors.ingredient}
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
+                                    {params.InputProps.endAdornment}
+                                  </>
+                                ),
+                              }}
+                              sx={inputSx}
+                            />
+                          )}
+                        />
+                        <Box textAlign="right" mt={1}>
+                          <Button
+                            size="small"
+                            onClick={openAddDialog}
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 700,
+                              color: brand.primary,
+                              "&:hover": { color: brand.primaryDark, bgColor: "transparent" },
+                            }}
+                          >
+                            Add Ingredient +
+                          </Button>
+                        </Box>
+                      </Box>
+
+                      {/* Stock Received */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="number"
+                        label="Stock Received"
+                        name="stockReceived"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.stockReceived}
+                        error={!!touched.stockReceived && !!errors.stockReceived}
+                        helperText={touched.stockReceived && errors.stockReceived}
+                        sx={{ gridColumn: "span 1", ...inputSx }}
+                      />
+
+                      {/* Unit */}
+                      <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                        <InputLabel id="unit-label">Metric</InputLabel>
+                        <Select labelId="unit-label" name="unit" value={values.unit} label="Metric" onChange={handleChange}>
+                          {unitOptions.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      {/* Bar Code */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="text"
+                        label="Bar Code"
+                        name="barCode"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.barCode}
+                        error={!!touched.barCode && !!errors.barCode}
+                        helperText={touched.barCode && errors.barCode}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                      />
+
+                      {/* Expiry Date */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="date"
+                        label="Expiry Date"
+                        name="expiryDate"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.expiryDate}
+                        error={!!touched.expiryDate && !!errors.expiryDate}
+                        helperText={touched.expiryDate && errors.expiryDate}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                      />
+
+                      {/* Temperature */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="text"
+                        label="Temperature (℃)"
+                        name="temperature"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.temperature}
+                        error={!!touched.temperature && !!errors.temperature}
+                        helperText={touched.temperature && errors.temperature}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                      />
+                    </Box>
+
+                    {/* Primary action: FAB aligned to the right */}
+                    <Box display="flex" justifyContent="flex-end" mt={3}>
+                      <Fab
+                        variant="extended"
+                        onClick={handleSubmit}
+                        sx={{
+                          px: 4,
+                          py: 1.25,
+                          gap: 1,
+                          borderRadius: 999,
+                          fontWeight: 800,
+                          textTransform: "none",
+                          boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                          background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                          color: "#fff",
+                          "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                        }}
+                      >
+                        <AddIcon />
+                        Record Stock
+                      </Fab>
+                    </Box>
+                  </form>
+                );
+              }}
+            </Formik>
+          )}
+
+          {/* Multiple form */}
+          {tabIndex === 1 && (
+            <Formik initialValues={initialValuesBatch} validationSchema={batchSchema} onSubmit={submitBatch}>
+              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
+                <form>
+                  <FieldArray name="items">
+                    {({ push, remove }) => {
+                      // expose add-good function so FAB inside wrapper can call it regardless of scroll
+                      addGoodRef.current = () => push({ ...initialBatchItem });
+
+                      return (
+                        <Box>
+                          {/* Goods */}
+                          <Box display="grid" gap={2}>
+                            {(values.items || []).map((it, idx) => {
+                              // derive selected option for this row (by id)
+                              const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
+
+                              return (
+                                <Paper
+                                  key={idx}
+                                  elevation={0}
+                                  sx={{
+                                    p: 2,
+                                    borderRadius: 2,
+                                    border: `1px solid ${brand.border}`,
+                                    background: idx % 2 ? brand.surfaceMuted : brand.surface,
+                                  }}
+                                >
+                                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                    <Typography sx={{ fontWeight: 800 }}>Good {idx + 1}</Typography>
+                                    <Box>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => remove(idx)}
+                                        sx={{ color: brand.primary }}
+                                        aria-label={`Remove good ${idx + 1}`}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </Box>
+                                  </Box>
+
+                                  <Box
+                                    display="grid"
+                                    gap="12px"
+                                    gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                                    sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                                  >
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="date"
+                                      label="Date"
+                                      name={`items.${idx}.date`}
+                                      value={it.date}
+                                      onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                    />
+
+                                    <Box sx={{ gridColumn: "span 2" }}>
+                                      <Autocomplete
+                                        options={ingredients}
+                                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                                        loading={loadingMaster || loadingCustom}
+                                        value={selectedOption}
+                                        onChange={(_, newVal) => setFieldValue(`items.${idx}.ingredient`, newVal ? newVal.id : "")}
+                                        isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                                        filterSelectedOptions
+                                        renderInput={(params) => (
+                                          <TextField
+                                            {...params}
+                                            label="Ingredient"
+                                            name={`items.${idx}.ingredient`}
+                                            InputProps={{
+                                              ...params.InputProps,
+                                              endAdornment: (
+                                                <>
+                                                  {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
+                                                  {params.InputProps.endAdornment}
+                                                </>
+                                              ),
+                                            }}
+                                            sx={inputSx}
+                                          />
+                                        )}
+                                      />
+                                    </Box>
+
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="number"
+                                      label="Stock Received"
+                                      name={`items.${idx}.stockReceived`}
+                                      value={it.stockReceived}
+                                      onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
+                                      sx={{ gridColumn: "span 1", ...inputSx }}
+                                    />
+
+                                    <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                                      <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
+                                      <Select
+                                        labelId={`unit-label-${idx}`}
+                                        name={`items.${idx}.unit`}
+                                        value={it.unit}
+                                        label="Metric"
+                                        onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
+                                      >
+                                        {unitOptions.map((opt) => (
+                                          <MenuItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </MenuItem>
+                                        ))}
+                                      </Select>
+                                    </FormControl>
+
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="text"
+                                      label="Bar Code"
+                                      name={`items.${idx}.barCode`}
+                                      value={it.barCode}
+                                      onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                    />
+
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="date"
+                                      label="Expiry Date"
+                                      name={`items.${idx}.expiryDate`}
+                                      value={it.expiryDate}
+                                      onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                    />
+
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="text"
+                                      label="Temperature (℃)"
+                                      name={`items.${idx}.temperature`}
+                                      value={it.temperature}
+                                      onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                    />
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Box>
+
+                          {/* Multiple submit (opens confirmation dialog after validate) */}
+                          <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
+                            <Fab
+                              variant="extended"
+                              onClick={() =>
+                                openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })
+                              }
+                              sx={{
+                                px: 4,
+                                py: 1.25,
+                                gap: 1,
+                                borderRadius: 999,
+                                fontWeight: 800,
+                                textTransform: "none",
+                                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                                color: "#fff",
+                                "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                              }}
+                            >
+                              <AddIcon />
+                              Submit Multiple ({(values.items || []).length})
+                            </Fab>
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                  </FieldArray>
+                </form>
+              )}
+            </Formik>
+          )}
+        </Paper>
+
+        {/* FAB now absolutely positioned inside the wrapper (left margin of form) so it won't overlap the sidebar */}
+        {tabIndex === 1 && (
+          <Box
             sx={{
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              color: "#fff",
-              "&:hover": { background: brand.primaryDark },
-              boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
-              width: 170,
-              height: 56,
-              borderRadius: 3,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              fontWeight: 800,
-              textTransform: "none",
+              position: "absolute",
+              left: 20,
+              bottom: 20,
+              zIndex: 1200,
+              // ensure it stays within Paper's rounded corner area
+              pointerEvents: "auto",
             }}
-            aria-label="Add good"
-            size="medium"
-            variant="extended"
           >
-            <AddIcon sx={{ mr: 1 }} />
-            Add Good
-          </Fab>
-        </Box>
-      )}
+            <Fab
+              onClick={() => addGoodRef.current && addGoodRef.current()}
+              sx={{
+                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                color: "#fff",
+                "&:hover": { background: brand.primaryDark },
+                boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
+                width: 170,
+                height: 56,
+                borderRadius: 3,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                fontWeight: 800,
+                textTransform: "none",
+              }}
+              aria-label="Add good"
+              size="medium"
+              variant="extended"
+            >
+              <AddIcon sx={{ mr: 1 }} />
+              Add Good
+            </Fab>
+          </Box>
+        )}
+      </Box>
 
       {/* Multiple confirmation dialog */}
       <Dialog
