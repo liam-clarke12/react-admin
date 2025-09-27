@@ -58,6 +58,27 @@ const GoodsIn = () => {
   const [editingRow, setEditingRow] = useState(null); // when editing full row
   const [updating, setUpdating] = useState(false);
 
+  // Helper: format dates to YYYY-MM-DD (resilient)
+  const formatDateValue = (v) => {
+    if (v === undefined || v === null || v === "") return "";
+    // If already looks like YYYY-MM-DD (quick test)
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    try {
+      // Try creating a Date and take local date portion in ISO format (YYYY-MM-DD)
+      const d = new Date(v);
+      if (isNaN(d.getTime())) {
+        // fallback: try splitting by 'T'
+        if (typeof v === "string" && v.includes("T")) return v.split("T")[0];
+        return String(v);
+      }
+      // Use toISOString (UTC) then split. This matches HTML date input expectation.
+      return d.toISOString().split("T")[0];
+    } catch {
+      if (typeof v === "string" && v.includes("T")) return v.split("T")[0];
+      return String(v);
+    }
+  };
+
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
@@ -69,9 +90,12 @@ const GoodsIn = () => {
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
 
-        // Normalize + compute processed flag from stockRemaining
+        // Normalize + compute processed flag from stockRemaining and format dates
         const normalized = (Array.isArray(data) ? data : []).map((row) => ({
           ...row,
+          // format both date fields as YYYY-MM-DD
+          date: formatDateValue(row.date),
+          expiryDate: formatDateValue(row.expiryDate),
           processed: Number(row.stockRemaining) === 0 ? "Yes" : "No",
         }));
 
@@ -82,6 +106,7 @@ const GoodsIn = () => {
       }
     };
     if (cognitoId) fetchGoodsInData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId, setGoodsInRows]);
 
   // Columns (no per-row delete; we use checkboxSelection + toolbar)
@@ -163,9 +188,15 @@ const GoodsIn = () => {
               aria-label="Edit row"
               onClick={() => {
                 // open full-row editor
-                setEditingRow(params.row);
-                setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
-                setEditValue(null);
+                // ensure editingRow has formatted dates
+                const formattedRow = {
+                  ...params.row,
+                  date: formatDateValue(params.row.date),
+                  expiryDate: formatDateValue(params.row.expiryDate),
+                };
+                setEditingRow(formattedRow);
+                setActiveCell({ id: params.row.barCode, field: null, value: null, row: formattedRow });
+                setEditValue("");
                 setEditDialogOpen(true);
               }}
             >
@@ -180,9 +211,14 @@ const GoodsIn = () => {
 
   // Save edits (still allowed for active rows) — key by barCode
   const processRowUpdate = async (newRow) => {
+    // Ensure dates are formatted
     const updatedRow = {
       ...newRow,
-      processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
+      date: formatDateValue(newRow.date),
+      expiryDate: formatDateValue(newRow.expiryDate),
+      stockReceived: Number(newRow.stockReceived ?? 0),
+      stockRemaining: Number(newRow.stockRemaining ?? 0),
+      processed: Number(newRow.stockRemaining ?? 0) === 0 ? "Yes" : "No",
     };
 
     try {
@@ -295,11 +331,22 @@ const GoodsIn = () => {
   const handleCellClick = (params, event) => {
     // ignore checkbox clicks
     if (params.field === "__check__") return;
+
+    // If the clicked field is a date, normalize its value for the edit dialog
+    const valueToStore =
+      params.field === "date" || params.field === "expiryDate"
+        ? formatDateValue(params.value)
+        : params.value;
+
     setActiveCell({
       id: params.row.barCode,
       field: params.field,
-      value: params.value,
-      row: params.row,
+      value: valueToStore,
+      row: {
+        ...params.row,
+        date: formatDateValue(params.row.date),
+        expiryDate: formatDateValue(params.row.expiryDate),
+      },
     });
   };
 
@@ -331,6 +378,12 @@ const GoodsIn = () => {
         if (activeCell.field === "stockRemaining" || activeCell.field === "stockReceived") {
           patched[activeCell.field] = Number(editValue || 0);
         }
+
+        // Format date fields (if applicable) before updating
+        if (activeCell.field === "date" || activeCell.field === "expiryDate") {
+          patched[activeCell.field] = formatDateValue(editValue);
+        }
+
         if (patched.stockRemaining !== undefined) {
           patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
         }
@@ -338,7 +391,7 @@ const GoodsIn = () => {
         updatedRow = await processRowUpdate(patched);
       } else {
         // editingRow (full row) - prepare payload
-        const patched = { ...editingRow };
+        const patched = { ...(editingRow || activeCell.row) };
 
         // if editValue is set and activeCell.field present, apply that single change
         if (activeCell && activeCell.field) {
@@ -348,6 +401,11 @@ const GoodsIn = () => {
         // coerce numeric fields
         patched.stockReceived = Number(patched.stockReceived || 0);
         patched.stockRemaining = Number(patched.stockRemaining || 0);
+
+        // Ensure dates normalized
+        patched.date = formatDateValue(patched.date);
+        patched.expiryDate = formatDateValue(patched.expiryDate);
+
         patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
         updatedRow = await processRowUpdate(patched);

@@ -430,6 +430,102 @@ app.post("/api/delete-row", async (req, res) => {
   }
 });
 
+app.put("/api/goods-in/:barcode", async (req, res) => {
+  const { barcode } = req.params;
+  const {
+    date,
+    ingredient,
+    temperature,
+    stockReceived,
+    stockRemaining,
+    unit,
+    expiryDate,
+    cognito_id,
+  } = req.body;
+
+  if (!barcode) return res.status(400).json({ error: "barcode is required in path" });
+  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+
+  const conn = await db.promise().getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Check row exists for given barcode and user (and not soft-deleted)
+    const [rows] = await conn.execute(
+      `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [barcode, cognito_id]
+    );
+
+    if (!rows || !rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: "No matching goods_in row found for that barCode/user" });
+    }
+
+    // Build update set (only allow updating certain fields)
+    const updateCols = [];
+    const params = [];
+
+    if (date !== undefined) {
+      updateCols.push("date = ?");
+      params.push(date);
+    }
+    if (ingredient !== undefined) {
+      updateCols.push("ingredient = ?");
+      params.push(ingredient);
+    }
+    if (temperature !== undefined) {
+      updateCols.push("temperature = ?");
+      params.push(temperature);
+    }
+    if (stockReceived !== undefined) {
+      updateCols.push("stockReceived = ?");
+      params.push(Number(stockReceived));
+    }
+    if (stockRemaining !== undefined) {
+      updateCols.push("stockRemaining = ?");
+      params.push(Number(stockRemaining));
+    }
+    if (unit !== undefined) {
+      updateCols.push("unit = ?");
+      params.push(unit);
+    }
+    if (expiryDate !== undefined) {
+      updateCols.push("expiryDate = ?");
+      params.push(expiryDate);
+    }
+
+    if (updateCols.length === 0) {
+      // nothing to update
+      await conn.rollback();
+      return res.status(400).json({ error: "No updatable fields supplied" });
+    }
+
+    params.push(barcode, cognito_id);
+
+    const updateSql = `UPDATE goods_in SET ${updateCols.join(", ")} WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL`;
+    await conn.execute(updateSql, params);
+
+    // Recompute inventory for user (absolute amounts)
+    await syncIngredientInventoryForUser(cognito_id);
+
+    await conn.commit();
+
+    // Return updated row for convenience
+    const [updatedRows] = await conn.execute(
+      `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`,
+      [barcode, cognito_id]
+    );
+
+    return res.json({ success: true, updated: updatedRows[0] || null });
+  } catch (err) {
+    await conn.rollback();
+    console.error("Database error (update):", err);
+    return res.status(500).json({ error: "Database error", details: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 // **New API Endpoint to Add a Recipe**
 app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
