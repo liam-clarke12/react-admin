@@ -860,6 +860,94 @@ app.get('/dev/get-recipes', (req, res) => {
   });
 });
 
+app.put("/api/recipes/:id", async (req, res) => {
+  const recipeId = req.params.id;
+  const FRONTEND_ORIGIN = "https://master.d2fdrxobxyr2je.amplifyapp.com";
+  const { recipe, upb, ingredients, quantities, units, cognito_id } = req.body;
+
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (!recipeId) return res.status(400).json({ error: "recipe id required in path" });
+  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+  if (!recipe) return res.status(400).json({ error: "recipe name is required" });
+  if (!Array.isArray(ingredients) || !Array.isArray(quantities) || !Array.isArray(units) || ingredients.length !== quantities.length || ingredients.length !== units.length) {
+    return res.status(400).json({ error: "ingredients, quantities, units arrays must be same length" });
+  }
+
+  const conn = await db.promise().getConnection();
+  try {
+    console.info(`[PUT.recipes] Starting transaction for recipe=${recipeId} user=${cognito_id}`);
+    await conn.beginTransaction();
+
+    // Verify ownership
+    const [found] = await conn.execute(`SELECT id, user_id FROM recipes WHERE id = ? LIMIT 1`, [recipeId]);
+    if (!found || found.length === 0 || String(found[0].user_id) !== String(cognito_id)) {
+      await conn.rollback();
+      console.warn(`[PUT.recipes] recipe not found or not owned: recipe=${recipeId}, user=${cognito_id}`);
+      return res.status(404).json({ error: "Recipe not found or not owned by user" });
+    }
+
+    // Update recipe meta
+    await conn.execute(`UPDATE recipes SET recipe_name = ?, units_per_batch = ? WHERE id = ?`, [recipe, upb, recipeId]);
+
+    // Delete existing recipe_ingredients for this recipe and user
+    await conn.execute(`DELETE FROM recipe_ingredients WHERE recipe_id = ? AND user_id = ?`, [recipeId, cognito_id]);
+
+    // For each provided ingredient name, ensure an ingredient row exists for the user (find or create), then insert into recipe_ingredients
+    for (let i = 0; i < ingredients.length; i++) {
+      const ingName = String(ingredients[i]).trim();
+      const qty = quantities[i];
+      const unitVal = units[i];
+
+      if (!ingName) {
+        // skip blank names but log this unusual case
+        console.warn(`[PUT.recipes] Skipping empty ingredient at index ${i} for recipe ${recipeId}`);
+        continue;
+      }
+
+      // find ingredient for user
+      const [ingRows] = await conn.execute(`SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ? LIMIT 1`, [ingName, cognito_id]);
+      let ingredientId;
+      if (ingRows && ingRows.length) {
+        ingredientId = ingRows[0].id;
+      } else {
+        const [ins] = await conn.execute(`INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)`, [ingName, cognito_id]);
+        ingredientId = ins.insertId;
+      }
+
+      // insert recipe_ingredient
+      await conn.execute(
+        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, user_id) VALUES (?, ?, ?, ?, ?)`,
+        [recipeId, ingredientId, qty, unitVal, cognito_id]
+      );
+    }
+
+    await conn.commit();
+    console.info(`[PUT.recipes] Commit successful recipe=${recipeId} user=${cognito_id}`);
+
+    // Return updated recipe (reselect)
+    const [updatedRows] = await db.promise().execute(
+      `SELECT r.id as recipe_id, r.recipe_name, r.units_per_batch,
+              i.ingredient_name, ri.quantity, ri.unit
+       FROM recipes r
+       JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+       JOIN ingredients i ON i.id = ri.ingredient_id
+       WHERE r.id = ? AND r.user_id = ?
+    `,
+      [recipeId, cognito_id]
+    );
+
+    return res.json({ success: true, updated: updatedRows });
+  } catch (err) {
+    await conn.rollback();
+    console.error("[PUT.recipes] DB error, rollback:", err);
+    return res.status(500).json({ error: "Database error", details: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 // **Add user to the database**
 app.post('/dev/api/add-user', async (req, res) => {
   try {

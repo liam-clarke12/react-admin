@@ -20,6 +20,11 @@ import {
   Stack,
   Card,
   CardContent,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Paper,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
@@ -27,10 +32,12 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
-/** Nory-like brand tokens (Ruby / Rose) */
+/** Nory-like brand tokens (kept consistent) */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -43,6 +50,14 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+const unitOptions = [
+  { value: "grams", label: "Grams (g)" },
+  { value: "ml", label: "Milliliters (ml)" },
+  { value: "units", label: "Units" },
+];
+
 const Recipes = () => {
   const { cognitoId } = useAuth();
   const theme = useTheme();
@@ -51,23 +66,27 @@ const Recipes = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
   const [drawerContent, setDrawerContent] = useState([]); // array of strings for list
-  const [selectedRowMeta, setSelectedRowMeta] = useState(null); // stores arrays for reset/export/search
+  const [selectedRowMeta, setSelectedRowMeta] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
 
+  // === Editor state ===
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState(null); // { id, recipe, upb, ingredients: [{ name, quantity, unit, recipeIngredientId? }] }
+  const [editingLoading, setEditingLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
       try {
-        const res = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/recipes?cognito_id=${cognitoId}`
-        );
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch Recipe data");
         const data = await res.json();
 
-        // Group rows by recipe_id to combine ingredients/quantities/units
+        // Group by recipe_id
         const formatted = data.reduce((acc, row) => {
           let entry = acc.find((r) => r.id === row.recipe_id);
           if (entry) {
@@ -94,46 +113,15 @@ const Recipes = () => {
     fetchRecipeData();
   }, [cognitoId, setRows]);
 
-  const handleDeleteRecipe = async () => {
-    if (!selectedRows.length || !cognitoId) return;
-    try {
-      await Promise.all(
-        selectedRows.map(async (recipeId) => {
-          const rec = (rows || []).find((r) => r.id === recipeId);
-          if (!rec) return;
-          const resp = await fetch(
-            "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/delete-recipe",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ recipeName: rec.recipe, cognito_id: cognitoId }),
-            }
-          );
-          if (resp.ok) {
-            setRows((prev) => prev.filter((r) => r.id !== recipeId));
-          }
-        })
-      );
-      setSelectedRows([]);
-      setOpenDialog(false);
-    } catch (err) {
-      console.error("Error deleting recipes:", err);
-      alert("Could not delete recipes");
-    }
-  };
-
-  // Drawer open helper: content can be an array or string list
+  // Drawer helpers (unchanged)
   const handleDrawerOpen = (header, list, meta = {}) => {
     setDrawerHeader(header);
-
-    // canonicalise list -> array of strings
     let items = [];
     if (Array.isArray(list)) {
       items = list.map((l) => (typeof l === "string" ? l : String(l)));
     } else if (typeof list === "string" && list.length) {
       items = list.split("; ").filter(Boolean);
     }
-
     setDrawerContent(items);
     setSelectedRowMeta(meta || null);
     setSearchTerm("");
@@ -146,6 +134,7 @@ const Recipes = () => {
     setSearchTerm("");
   };
 
+  // Columns with Actions: include Edit button
   const columns = useMemo(
     () => [
       { field: "recipe", headerName: "Recipe", flex: 1 },
@@ -165,17 +154,13 @@ const Recipes = () => {
               "&:hover": { color: brand.primaryDark },
             }}
             onClick={() =>
-              handleDrawerOpen(
-                "Ingredients",
-                params.row.ingredients,
-                {
-                  recipe: params.row.recipe,
-                  ingredientsArray: params.row.ingredients,
-                  quantitiesArray: params.row.quantities,
-                  unitsArray: params.row.units,
-                  upb: params.row.upb,
-                }
-              )
+              handleDrawerOpen("Ingredients", params.row.ingredients, {
+                recipe: params.row.recipe,
+                ingredientsArray: params.row.ingredients,
+                quantitiesArray: params.row.quantities,
+                unitsArray: params.row.units,
+                upb: params.row.upb,
+              })
             }
           >
             Show Ingredients
@@ -204,17 +189,13 @@ const Recipes = () => {
                 "&:hover": { color: brand.primaryDark },
               }}
               onClick={() =>
-                handleDrawerOpen(
-                  "Quantities",
-                  list,
-                  {
-                    recipe: params.row.recipe,
-                    ingredientsArray: params.row.ingredients,
-                    quantitiesArray: params.row.quantities,
-                    unitsArray: params.row.units,
-                    upb: params.row.upb,
-                  }
-                )
+                handleDrawerOpen("Quantities", list, {
+                  recipe: params.row.recipe,
+                  ingredientsArray: params.row.ingredients,
+                  quantitiesArray: params.row.quantities,
+                  unitsArray: params.row.units,
+                  upb: params.row.upb,
+                })
               }
             >
               Show Quantities
@@ -222,15 +203,63 @@ const Recipes = () => {
           );
         },
       },
+      {
+        field: "actions",
+        headerName: "Actions",
+        width: 96,
+        sortable: false,
+        filterable: false,
+        align: "center",
+        renderCell: (params) => {
+          return (
+            <IconButton
+              size="small"
+              aria-label="Edit recipe"
+              onClick={async () => {
+                // fetch full recipe details and open editor
+                try {
+                  setEditingLoading(true);
+                  const id = params.row.id;
+                  const url = `${API_BASE}/recipes/${encodeURIComponent(id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
+                  const r = await fetch(url);
+                  if (!r.ok) throw new Error(`Failed to fetch recipe ${id}`);
+                  const payload = await r.json();
+                  // payload shape: { recipe_id, recipe_name, units_per_batch, ingredients: [{ ingredient_name, quantity, unit, recipe_ingredient_id}] }
+                  setEditingRecipe({
+                    id: payload.recipe_id,
+                    recipe: payload.recipe_name,
+                    upb: payload.units_per_batch,
+                    items:
+                      Array.isArray(payload.ingredients) && payload.ingredients.length
+                        ? payload.ingredients.map((ing) => ({
+                            name: ing.ingredient_name,
+                            quantity: ing.quantity,
+                            unit: ing.unit,
+                            recipeIngredientId: ing.id,
+                          }))
+                        : [],
+                  });
+                  setEditDialogOpen(true);
+                } catch (err) {
+                  console.error("Failed to open editor:", err);
+                  alert("Could not open recipe editor. See console.");
+                } finally {
+                  setEditingLoading(false);
+                }
+              }}
+            >
+              <EditOutlinedIcon sx={{ color: brand.primary }} />
+            </IconButton>
+          );
+        },
+      },
     ],
-    []
+    [cognitoId]
   );
 
-  // Drawer derived / helpers
-  // Build displayItems so quantities use unitsArray if available (shows value + unit)
+  // Build displayItems for drawer (unchanged)
   const buildDisplayItems = () => {
     const isQuantities = drawerHeader.toLowerCase().includes("quantit");
-    // If quantities and we have metadata arrays, build from those for reliable unit placement
     if (isQuantities && selectedRowMeta?.ingredientsArray) {
       const ingArr = selectedRowMeta.ingredientsArray || [];
       const qtyArr = selectedRowMeta.quantitiesArray || [];
@@ -246,8 +275,6 @@ const Recipes = () => {
         };
       });
     }
-
-    // Otherwise fall back to drawerContent strings (already possibly including units)
     return (drawerContent || []).map((raw) => {
       const str = String(raw);
       const [left, right] = str.split(":");
@@ -255,17 +282,15 @@ const Recipes = () => {
         raw: str,
         name: left ? left.trim() : str,
         qty: right ? right.trim() : "",
-        unit: "", // unknown
+        unit: "",
       };
     });
   };
 
   const displayItems = buildDisplayItems();
-
   const filteredDisplayItems = displayItems.filter((it) =>
     (it.raw || it.name).toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
-
   const totalItemsCount = filteredDisplayItems.length;
 
   const resetDrawerContent = () => {
@@ -274,7 +299,6 @@ const Recipes = () => {
       return;
     }
     if (drawerHeader.toLowerCase().includes("quantit")) {
-      // rebuild quantities list from meta arrays
       const { ingredientsArray = [], quantitiesArray = [], unitsArray = [] } = selectedRowMeta;
       const rebuilt = ingredientsArray.map((ing, i) => {
         const q = quantitiesArray?.[i] ?? "N/A";
@@ -285,7 +309,6 @@ const Recipes = () => {
       setSearchTerm("");
       return;
     }
-    // default: rebuild ingredients list
     if (selectedRowMeta?.ingredientsArray) {
       setDrawerContent(selectedRowMeta.ingredientsArray.slice());
       setSearchTerm("");
@@ -297,7 +320,6 @@ const Recipes = () => {
   const exportDrawerCsv = () => {
     try {
       const rowsOut = [["Item", drawerHeader.includes("Quantit") ? "Quantity" : "Value"]];
-      // use displayItems to ensure units are included
       displayItems.forEach((it) => {
         rowsOut.push([it.name, it.qty + (it.unit ? ` ${it.unit}` : "")]);
       });
@@ -316,9 +338,71 @@ const Recipes = () => {
     }
   };
 
+  // Save edited recipe -> PUT /api/recipes/:id
+  const handleSaveRecipe = async () => {
+    if (!editingRecipe || !cognitoId) return;
+    setSaving(true);
+    try {
+      // Prepare arrays
+      const ingredients = (editingRecipe.items || []).map((it) => it.name);
+      const quantities = (editingRecipe.items || []).map((it) => it.quantity);
+      const units = (editingRecipe.items || []).map((it) => it.unit);
+
+      const payload = {
+        recipe: editingRecipe.recipe,
+        upb: editingRecipe.upb,
+        ingredients,
+        quantities,
+        units,
+        cognito_id: cognitoId,
+      };
+
+      const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(editingRecipe.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        throw new Error(txt || `Update failed (${resp.status})`);
+      }
+
+      // refresh the recipe list
+      const refetch = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+      if (!refetch.ok) throw new Error("Failed to refresh recipes");
+      const newData = await refetch.json();
+      const formatted = newData.reduce((acc, row) => {
+        let entry = acc.find((r) => r.id === row.recipe_id);
+        if (entry) {
+          entry.ingredients.push(row.ingredient);
+          entry.quantities.push(row.quantity);
+          entry.units.push(row.unit);
+        } else {
+          acc.push({
+            id: row.recipe_id,
+            recipe: row.recipe,
+            upb: row.units_per_batch,
+            ingredients: [row.ingredient],
+            quantities: [row.quantity],
+            units: [row.unit],
+          });
+        }
+        return acc;
+      }, []);
+      setRows(formatted);
+
+      setEditDialogOpen(false);
+      setEditingRecipe(null);
+    } catch (err) {
+      console.error("Save recipe failed:", err);
+      alert("Save failed. See console for details.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Box m="20px">
-      {/* Local styles to keep theme overrides from interfering */}
       <style>{`
         .recipes-card {
           border: 1px solid ${brand.border};
@@ -335,11 +419,8 @@ const Recipes = () => {
       `}</style>
 
       <Box className="recipes-card" mt={2}>
-        {/* Toolbar with delete button */}
         <Box className="recipes-toolbar">
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Recipes
-          </Typography>
+          <Typography sx={{ fontWeight: 800, color: brand.text }}>Recipes</Typography>
 
           <IconButton
             aria-label="Delete selected"
@@ -351,11 +432,8 @@ const Recipes = () => {
               width: 40,
               height: 40,
               background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              boxShadow:
-                "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              "&:hover": {
-                background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
-              },
+              boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+              "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
               opacity: selectedRows.length === 0 ? 0.5 : 1,
             }}
           >
@@ -363,227 +441,83 @@ const Recipes = () => {
           </IconButton>
         </Box>
 
-        {/* DataGrid */}
-        <Box
-          sx={{
-            height: "70vh",
-            "& .MuiDataGrid-root": { border: "none", minWidth: "650px" },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#fbfcfd",
-              color: brand.subtext,
-              borderBottom: `1px solid ${brand.border}`,
-              fontWeight: 800,
-            },
-            "& .MuiDataGrid-columnSeparator": { display: "none" },
-            "& .MuiDataGrid-cell": {
-              borderBottom: `1px solid ${brand.border}`,
-              color: brand.text,
-            },
-            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-            "& .MuiDataGrid-footerContainer": {
-              borderTop: `1px solid ${brand.border}`,
-              background: brand.surface,
-            },
-          }}
-        >
+        <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", minWidth: "650px" } }}>
           <DataGrid
             rows={rows || []}
             columns={columns}
             checkboxSelection
             onRowSelectionModelChange={(model) => setSelectedRows(model)}
             getRowId={(r) => r.id}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50]}
           />
         </Box>
       </Box>
 
-      {/* Redesigned Drawer — Ingredients & Quantities */}
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        PaperProps={{
-          sx: {
-            width: 420,
-            borderRadius: "20px 0 0 20px",
-            border: `1px solid ${brand.border}`,
-            boxShadow: "0 24px 48px rgba(15,23,42,0.12)",
-            overflow: "hidden",
-          },
-        }}
-      >
-        {/* Header with gradient */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            px: 2,
-            py: 1.25,
-            color: "#fff",
-            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-          }}
-        >
+      {/* Drawer (ingredients/quantities) - unchanged */}
+      <Drawer anchor="right" open={drawerOpen} onClose={handleDrawerClose}
+        PaperProps={{ sx: { width: 420, borderRadius: "20px 0 0 20px", border: `1px solid ${brand.border}`, boxShadow: "0 24px 48px rgba(15,23,42,0.12)", overflow: "hidden" } }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 2, py: 1.25, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 2,
-                background: "rgba(255,255,255,0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <Box sx={{ width: 44, height: 44, borderRadius: 2, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <MenuOutlinedIcon sx={{ color: "#fff" }} />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-                {drawerHeader}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
-                {selectedRowMeta?.recipe ? `${selectedRowMeta.recipe}` : ""}
-              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>{drawerHeader}</Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>{selectedRowMeta?.recipe ? `${selectedRowMeta.recipe}` : ""}</Typography>
             </Box>
           </Box>
 
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <IconButton
-              size="small"
-              onClick={exportDrawerCsv}
-              sx={{
-                color: "#fff",
-                borderRadius: 1,
-                border: "1px solid rgba(255,255,255,0.12)",
-              }}
-            >
+            <IconButton size="small" onClick={exportDrawerCsv} sx={{ color: "#fff", borderRadius: 1, border: "1px solid rgba(255,255,255,0.12)" }}>
               <FileDownloadOutlinedIcon fontSize="small" />
             </IconButton>
-
-            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
-              <CloseIcon />
-            </IconButton>
+            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}><CloseIcon /></IconButton>
           </Box>
         </Box>
 
-        {/* Content */}
         <Box sx={{ background: brand.surface, p: 2, height: "calc(100% - 88px)" }}>
-          {/* Meta card */}
-          <Card
-            variant="outlined"
-            sx={{
-              borderColor: brand.border,
-              background: brand.surface,
-              borderRadius: 2,
-              mb: 2,
-            }}
-          >
+          <Card variant="outlined" sx={{ borderColor: brand.border, background: brand.surface, borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ p: 1.5 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
-                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>
-                    Recipe
-                  </Typography>
-                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>
-                    {selectedRowMeta?.recipe || "—"}
-                  </Typography>
-                  {selectedRowMeta?.upb && (
-                    <Typography variant="caption" sx={{ color: brand.subtext }}>
-                      Units per batch: {selectedRowMeta.upb}
-                    </Typography>
-                  )}
+                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>Recipe</Typography>
+                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>{selectedRowMeta?.recipe || "—"}</Typography>
+                  {selectedRowMeta?.upb && <Typography variant="caption" sx={{ color: brand.subtext }}>Units per batch: {selectedRowMeta.upb}</Typography>}
                 </Box>
                 <Box sx={{ textAlign: "right" }}>
                   <Typography sx={{ color: "text.secondary", fontSize: 12 }}>Items</Typography>
-                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>
-                    {totalItemsCount}
-                  </Typography>
+                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>{totalItemsCount}</Typography>
                 </Box>
               </Box>
             </CardContent>
           </Card>
 
-          {/* Search + Reset */}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <TextField
-              size="small"
-              placeholder="Search item or filter"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              fullWidth
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 1.5,
-                  background: "#fff",
-                  borderColor: brand.border,
-                },
-              }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={resetDrawerContent}
-              sx={{ textTransform: "none", borderRadius: 1.5 }}
-            >
-              Reset
-            </Button>
+            <TextField size="small" placeholder="Search item or filter" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} fullWidth
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5, background: "#fff", borderColor: brand.border } }} />
+            <Button variant="outlined" size="small" onClick={resetDrawerContent} sx={{ textTransform: "none", borderRadius: 1.5 }}>Reset</Button>
           </Stack>
 
           <Divider sx={{ mb: 2 }} />
 
-          {/* Items list */}
           <List disablePadding>
             {filteredDisplayItems.length === 0 ? (
               <Typography sx={{ color: brand.subtext }}>No items available.</Typography>
             ) : (
               filteredDisplayItems.map((it, idx) => {
                 const primaryText = it.name;
-                // For quantities we already have qty and unit separated when metadata available.
                 const qtyText = it.qty ? String(it.qty) : "";
                 const unitText = it.unit ? String(it.unit) : "";
-
                 const pill = qtyText ? `${qtyText}${unitText ? " " + unitText : ""}` : null;
 
                 return (
-                  <Box
-                    key={idx}
-                    sx={{
-                      borderRadius: 2,
-                      border: `1px solid ${brand.border}`,
-                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
-                      mb: 1,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <ListItem
-                      secondaryAction={
-                        pill ? (
-                          <Box
-                            component="span"
-                            sx={{
-                              borderRadius: 999,
-                              border: `1px solid ${brand.border}`,
-                              background: "#f1f5f9",
-                              px: 1.25,
-                              py: 0.25,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: brand.text,
-                            }}
-                          >
-                            {pill}
-                          </Box>
-                        ) : null
-                      }
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <CheckRoundedIcon sx={{ color: brand.primary }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={primaryText}
-                        primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }}
-                      />
+                  <Box key={idx} sx={{ borderRadius: 2, border: `1px solid ${brand.border}`, backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface, mb: 1, overflow: "hidden" }}>
+                    <ListItem secondaryAction={pill ? (
+                      <Box component="span" sx={{ borderRadius: 999, border: `1px solid ${brand.border}`, background: "#f1f5f9", px: 1.25, py: 0.25, fontSize: 12, fontWeight: 700, color: brand.text }}>{pill}</Box>
+                    ) : null}>
+                      <ListItemIcon sx={{ minWidth: 36 }}><CheckRoundedIcon sx={{ color: brand.primary }} /></ListItemIcon>
+                      <ListItemText primary={primaryText} primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }} />
                     </ListItem>
                   </Box>
                 );
@@ -592,95 +526,110 @@ const Recipes = () => {
           </List>
         </Box>
 
-        {/* Footer actions */}
-        <Box
-          sx={{
-            p: 2,
-            borderTop: `1px solid ${brand.border}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: brand.surface,
-          }}
-        >
+        <Box sx={{ p: 2, borderTop: `1px solid ${brand.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: brand.surface }}>
           <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              onClick={handleDrawerClose}
-              sx={{
-                textTransform: "none",
-                borderRadius: 999,
-                px: 2,
-                border: `1px solid ${brand.border}`,
-              }}
-            >
-              Close
-            </Button>
-
-            <Button
-              onClick={() => {
-                // simple context action — close for now
-                handleDrawerClose();
-              }}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-                borderRadius: 999,
-                px: 2,
-                color: "#fff",
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                "&:hover": { background: brand.primaryDark },
-              }}
-              startIcon={<DeleteIcon />}
-            >
-              Done
-            </Button>
+            <Button onClick={handleDrawerClose} sx={{ textTransform: "none", borderRadius: 999, px: 2, border: `1px solid ${brand.border}` }}>Close</Button>
+            <Button onClick={() => { handleDrawerClose(); }} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>Done</Button>
           </Box>
-
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-            {totalItemsCount} items
-          </Typography>
+          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>{totalItemsCount} items</Typography>
         </Box>
       </Drawer>
 
       {/* Delete confirmation dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={() => setOpenDialog(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 14,
-            border: `1px solid ${brand.border}`,
-            boxShadow: brand.shadow,
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          Confirm deletion
-        </DialogTitle>
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
         <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>
-            Delete {selectedRows.length} selected recipe
-            {selectedRows.length === 1 ? "" : "s"}?
-          </Typography>
+          <Typography sx={{ color: brand.subtext }}>Delete {selectedRows.length} selected recipe{selectedRows.length === 1 ? "" : "s"}?</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteRecipe}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={<DeleteIcon />}
-          >
-            Delete
+          <Button onClick={() => setOpenDialog(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+          <Button onClick={async () => {
+              // handleDeleteRecipe logic kept similar to your earlier implementation
+              if (!selectedRows.length || !cognitoId) return;
+              try {
+                await Promise.all(selectedRows.map(async (recipeId) => {
+                  const rec = (rows || []).find((r) => r.id === recipeId);
+                  if (!rec) return;
+                  const resp = await fetch(`${API_BASE}/delete-recipe`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ recipeName: rec.recipe, cognito_id: cognitoId }),
+                  });
+                  if (resp.ok) {
+                    setRows((prev) => prev.filter((r) => r.id !== recipeId));
+                  }
+                }));
+                setSelectedRows([]);
+                setOpenDialog(false);
+              } catch (err) {
+                console.error("Error deleting recipes:", err);
+                alert("Could not delete recipes");
+              }
+            }} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit recipe dialog */}
+      <Dialog open={editDialogOpen} onClose={() => { setEditDialogOpen(false); setEditingRecipe(null); }} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>{editingRecipe ? `Edit Recipe: ${editingRecipe.recipe}` : "Edit Recipe"}</DialogTitle>
+        <DialogContent dividers>
+          {!editingRecipe ? (
+            <Typography sx={{ color: brand.subtext }}>Loading…</Typography>
+          ) : (
+            <Box sx={{ display: "grid", gap: 2 }}>
+              <TextField label="Recipe name" fullWidth value={editingRecipe.recipe} onChange={(e) => setEditingRecipe((p) => ({ ...p, recipe: e.target.value }))} />
+              <TextField label="Units per batch" fullWidth value={editingRecipe.upb} onChange={(e) => setEditingRecipe((p) => ({ ...p, upb: e.target.value }))} />
+
+              <Box>
+                <Typography sx={{ fontWeight: 800, mb: 1 }}>Ingredients</Typography>
+                <Stack spacing={1}>
+                  {(editingRecipe.items || []).map((it, idx) => (
+                    <Paper key={idx} sx={{ p: 1, display: "grid", gridTemplateColumns: "2fr 1fr 1fr 40px", gap: 8, alignItems: "center" }}>
+                      <TextField label="Ingredient" value={it.name} onChange={(e) => {
+                        const copy = (editingRecipe.items || []).slice();
+                        copy[idx] = { ...copy[idx], name: e.target.value };
+                        setEditingRecipe((p) => ({ ...p, items: copy }));
+                      }} />
+                      <TextField label="Quantity" type="number" value={it.quantity} onChange={(e) => {
+                        const copy = (editingRecipe.items || []).slice();
+                        copy[idx] = { ...copy[idx], quantity: e.target.value };
+                        setEditingRecipe((p) => ({ ...p, items: copy }));
+                      }} />
+                      <FormControl fullWidth>
+                        <InputLabel id={`unit-label-${idx}`}>Unit</InputLabel>
+                        <Select labelId={`unit-label-${idx}`} value={it.unit || ""} label="Unit" onChange={(e) => {
+                          const copy = (editingRecipe.items || []).slice();
+                          copy[idx] = { ...copy[idx], unit: e.target.value };
+                          setEditingRecipe((p) => ({ ...p, items: copy }));
+                        }}>
+                          {unitOptions.map((u) => (<MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>))}
+                        </Select>
+                      </FormControl>
+                      <IconButton size="small" onClick={() => {
+                        const copy = (editingRecipe.items || []).slice();
+                        copy.splice(idx, 1);
+                        setEditingRecipe((p) => ({ ...p, items: copy }));
+                      }}><CloseIcon /></IconButton>
+                    </Paper>
+                  ))}
+                </Stack>
+
+                <Box mt={1} textAlign="right">
+                  <Button startIcon={<AddOutlinedIcon />} onClick={() => {
+                    const copy = (editingRecipe.items || []).slice();
+                    copy.push({ name: "", quantity: "", unit: unitOptions[0].value });
+                    setEditingRecipe((p) => ({ ...p, items: copy }));
+                  }} sx={{ textTransform: "none" }}>Add ingredient</Button>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setEditDialogOpen(false); setEditingRecipe(null); }} sx={{ textTransform: "none" }} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSaveRecipe} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
           </Button>
         </DialogActions>
       </Dialog>
