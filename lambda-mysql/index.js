@@ -68,6 +68,97 @@ app.use((req, res, next) => {
   next();
 });
 
+async function syncIngredientInventoryForUser(userId) {
+  const tag = "[syncIngredientInventoryForUser]";
+  const conn = await db.promise().getConnection();
+  try {
+    console.info(`${tag} start for user=${userId}`);
+    await conn.beginTransaction();
+
+    // 1) Aggregate active goods_in per ingredient for this user
+    const aggSql = `
+      SELECT
+        ingredient,
+        COALESCE(SUM(stockRemaining), 0) AS amount
+      FROM goods_in
+      WHERE user_id = ? AND deleted_at IS NULL
+      GROUP BY ingredient
+    `;
+    console.info(`${tag} executing aggregation`, { sql: aggSql, params: [userId] });
+    const [aggRows] = await conn.execute(aggSql, [userId]);
+
+    // Convert to map for easy lookup
+    const ingredientMap = new Map(); // ingredient -> amount
+    for (const r of aggRows) {
+      const name = r.ingredient;
+      const amount = Number(r.amount || 0);
+      ingredientMap.set(name, amount);
+    }
+
+    // 2) For each ingredient in map, find a representative barcode (earliest expiryDate)
+    // We'll also collect unit if goods_in has unit.
+    const upsertSql = `
+      INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit, user_id)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        amount = VALUES(amount),
+        barcode = VALUES(barcode),
+        unit = VALUES(unit)
+    `;
+
+    // For ingredients that have zero amount (i.e. no active goods), we'll set amount = 0.
+    // You may prefer to delete rows with zero amount — adjust below if desired.
+
+    for (const [ingredient, amount] of ingredientMap.entries()) {
+      // Attempt to pick the barcode with earliest expiryDate (fallback to any barcode)
+      const barcodeSql = `
+        SELECT barCode, unit
+        FROM goods_in
+        WHERE user_id = ? AND ingredient = ? AND deleted_at IS NULL
+        ORDER BY expiryDate IS NULL, expiryDate ASC, date ASC
+        LIMIT 1
+      `;
+      const [pickRows] = await conn.execute(barcodeSql, [userId, ingredient]);
+      let barcode = null;
+      let unit = null;
+      if (Array.isArray(pickRows) && pickRows.length > 0) {
+        barcode = pickRows[0].barCode || null;
+        unit = pickRows[0].unit || null;
+      }
+
+      // Upsert to inventory
+      console.info(`${tag} upserting ingredient`, { ingredient, amount, barcode, unit });
+      await conn.execute(upsertSql, [ingredient, amount, barcode, unit, userId]);
+    }
+
+    // 3) OPTIONAL: If you want ingredient_inventory rows for ingredients that no longer exist
+    // in goods_in to be removed or zeroed out, handle here. We'll set any not present to amount = 0.
+    // Fetch all inventory ingredients for user to find stale rows.
+    const [invRows] = await conn.execute(`SELECT ingredient FROM ingredient_inventory WHERE user_id = ?`, [userId]);
+    for (const inv of invRows) {
+      if (!ingredientMap.has(inv.ingredient)) {
+        // Set to 0 and null barcode/unit (or delete if you prefer)
+        console.info(`${tag} zeroing stale inventory for`, inv.ingredient);
+        await conn.execute(
+          `UPDATE ingredient_inventory SET amount = 0, barcode = NULL, unit = NULL WHERE ingredient = ? AND user_id = ?`,
+          [inv.ingredient, userId]
+        );
+        // alternatively: await conn.execute(`DELETE FROM ingredient_inventory WHERE ingredient = ? AND user_id = ?`, [inv.ingredient, userId]);
+      }
+    }
+
+    await conn.commit();
+    console.info(`${tag} committed for user=${userId}`);
+    return { success: true };
+  } catch (err) {
+    try { await conn.rollback(); } catch (e) { console.error("[sync] rollback failed", e); }
+    console.error("[sync] error:", err && err.stack ? err.stack : err);
+    throw err;
+  } finally {
+    try { conn.release(); } catch (e) { console.warn("[sync] release failed", e); }
+  }
+}
+
 // ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {
   const { 
@@ -430,13 +521,11 @@ app.post("/api/delete-row", async (req, res) => {
   }
 });
 
-// PUT /api/goods-in/:barcode  — with extensive CloudWatch-friendly logging
 app.put("/api/goods-in/:barcode", async (req, res) => {
-  const routeTag = "[PUT.goods-in]";
-  const now = new Date().toISOString();
+  const startTs = new Date().toISOString();
+  const log = (tag, obj) => console.info(`[PUT.goods-in] ${tag}`, typeof obj === "string" ? obj : JSON.stringify(obj));
 
-  // raw incoming values
-  let { barcode } = req.params;
+  const originalPathBarcode = req.params.barcode;
   const {
     date,
     ingredient,
@@ -445,97 +534,72 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
     stockRemaining,
     unit,
     expiryDate,
+    barCode: newBarCode, // new barcode (optional) supplied in body
     cognito_id,
   } = req.body || {};
 
-  // Basic request log (headers/body summary)
-  try {
-    console.log(`${routeTag} ${now} - Request start`);
-    console.log(`${routeTag} Incoming params:`, { barcode: String(barcode) });
-    console.log(`${routeTag} Incoming body keys:`, Object.keys(req.body || {}));
-    // (don't dump entire headers in prod; helpful during debug)
-    console.log(`${routeTag} Request headers (selected):`, {
-      origin: req.headers.origin,
-      "user-agent": req.headers["user-agent"],
-      referer: req.headers.referer,
-    });
-  } catch (logErr) {
-    console.warn(`${routeTag} Failed to log request meta:`, logErr);
-  }
+  log("Request start", { startTs, originalPathBarcode, body: req.body });
 
-  // Validate
-  if (!barcode) {
-    console.error(`${routeTag} Missing path barcode`);
+  if (!originalPathBarcode) {
+    log("Missing path barcode", {});
     return res.status(400).json({ error: "barcode is required in path" });
   }
   if (!cognito_id) {
-    console.error(`${routeTag} Missing cognito_id in request body`);
+    log("Missing cognito_id", {});
     return res.status(400).json({ error: "cognito_id is required" });
   }
-
-  // Normalize the barcode (trim only here for diagnostics)
-  const normalizedBarcode = String(barcode).trim();
-  console.log(`${routeTag} Normalized barcode => "${normalizedBarcode}"`);
 
   const conn = await db.promise().getConnection();
   try {
     await conn.beginTransaction();
-    console.log(`${routeTag} Started DB transaction for user=${cognito_id}`);
+    log("Started DB transaction for user", cognito_id);
 
-    // Query for an exact match (case-sensitive as stored) for this user
+    // 1) Find the row by the path barcode AND user_id (and not soft-deleted)
     const selectSql = `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`;
-    console.log(`${routeTag} Executing: ${selectSql} -- params: [${normalizedBarcode}, ${cognito_id}]`);
-    const [rows] = await conn.execute(selectSql, [normalizedBarcode, cognito_id]);
+    log("Executing", { sql: selectSql, params: [originalPathBarcode, cognito_id] });
+    const [rows] = await conn.execute(selectSql, [originalPathBarcode, cognito_id]);
 
-    console.log(`${routeTag} Exact match rows.length = ${rows?.length ?? 0}`);
     if (!rows || rows.length === 0) {
-      // Diagnostics: try trimmed/lower match across any user
-      try {
-        const diagSql1 = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE TRIM(LOWER(barCode)) = TRIM(LOWER(?)) LIMIT 10`;
-        console.log(`${routeTag} No exact match for user. Running diagnostic query 1: ${diagSql1} params: [${normalizedBarcode}]`);
-        const [diagRows] = await conn.execute(diagSql1, [normalizedBarcode]);
-        console.log(`${routeTag} diagRows.length = ${diagRows?.length ?? 0}`, diagRows?.slice(0, 10));
+      // Diagnostic queries to help CloudWatch debugging
+      log("Exact match rows.length", rows ? rows.length : 0);
+      const diag1Sql = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE TRIM(LOWER(barCode)) = TRIM(LOWER(?)) LIMIT 10`;
+      log("Running diagnostic query 1", { sql: diag1Sql, params: [originalPathBarcode] });
+      const [diagRows] = await conn.execute(diag1Sql, [originalPathBarcode]);
+      log("diagRows.length", diagRows ? diagRows.length : 0);
+      const diag2Sql = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE barCode LIKE ? LIMIT 10`;
+      log("Running diagnostic query 2 (LIKE)", { sql: diag2Sql, params: [`%${originalPathBarcode}%`] });
+      const [likeRows] = await conn.execute(diag2Sql, [`%${originalPathBarcode}%`]);
+      log("likeRows.length", likeRows ? likeRows.length : 0);
 
-        if (diagRows && diagRows.length > 0) {
-          await conn.rollback();
-          console.warn(`${routeTag} Barcode exists but not for this user OR soft-deleted. Returning 404 with debug.`);
-          return res.status(404).json({
-            error: "No matching goods_in row found for that barCode/user",
-            debug: {
-              message: "Barcode exists in DB but belongs to different user(s) or soft-deleted.",
-              sampleMatches: diagRows.slice(0, 5),
-            },
-          });
-        }
+      await conn.rollback();
+      return res.status(404).json({
+        error: "No matching goods_in row found for that barCode/user",
+        debug: {
+          message: "No exact match for this user. Nearby barcodes (if any):",
+          exactMatches: diagRows || [],
+          likeMatches: likeRows || [],
+        },
+      });
+    }
 
-        // Try LIKE search to find near matches
-        const likeVal = `%${normalizedBarcode.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
-        const diagSql2 = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE barCode LIKE ? LIMIT 10`;
-        console.log(`${routeTag} Diagnostic query 2 (LIKE): ${diagSql2} params: [${likeVal}]`);
-        const [likeRows] = await conn.execute(diagSql2, [likeVal]);
-        console.log(`${routeTag} likeRows.length = ${likeRows?.length ?? 0}`, likeRows?.slice(0, 10));
+    const existing = rows[0];
+    log("Found existing row", { id: existing.id, barCode: existing.barCode, user_id: existing.user_id });
 
+    // If client wants to change barcode, check unique constraint for the same user.
+    if (typeof newBarCode === "string" && newBarCode.trim() && newBarCode !== existing.barCode) {
+      const checkSql = `SELECT COUNT(*) AS cnt FROM goods_in WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL`;
+      log("Checking new barcode uniqueness", { sql: checkSql, params: [newBarCode, cognito_id] });
+      const [chk] = await conn.execute(checkSql, [newBarCode, cognito_id]);
+      const conflict = (Array.isArray(chk) && chk[0] && chk[0].cnt) ? Number(chk[0].cnt) > 0 : false;
+      log("Barcode conflict check", { conflict, chk });
+
+      if (conflict) {
         await conn.rollback();
-        return res.status(404).json({
-          error: "No matching goods_in row found for that barCode/user",
-          debug: {
-            message: "No exact match for this user. Nearby barcodes (if any):",
-            likeMatches: likeRows.slice(0, 10),
-          },
-        });
-      } catch (diagErr) {
-        // If diagnostics fail, rollback and return a less detailed error but log
-        console.error(`${routeTag} Diagnostic queries error:`, diagErr);
-        await conn.rollback();
-        return res.status(404).json({ error: "No matching goods_in row found for that barCode/user" });
+        return res.status(409).json({ error: "Conflict: new barCode already exists for this user" });
       }
     }
 
-    // At this point rows[0] is the found row for this user
-    const existingRow = rows[0];
-    console.log(`${routeTag} Found row id=${existingRow.id} for barcode=${normalizedBarcode}`);
-
-    // Build update set (only allow updating certain fields)
+    // Build update set (allow updating barCode too)
     const updateCols = [];
     const params = [];
 
@@ -567,71 +631,52 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
       updateCols.push("expiryDate = ?");
       params.push(expiryDate);
     }
+    // IMPORTANT: support changing the barcode on update
+    if (newBarCode !== undefined) {
+      updateCols.push("barCode = ?");
+      params.push(newBarCode);
+    }
 
     if (updateCols.length === 0) {
-      console.warn(`${routeTag} No updatable fields supplied. Rolling back.`);
       await conn.rollback();
+      log("No updatable fields supplied", {});
       return res.status(400).json({ error: "No updatable fields supplied" });
     }
 
     // append WHERE params
-    params.push(normalizedBarcode, cognito_id);
+    params.push(originalPathBarcode, cognito_id);
+
     const updateSql = `UPDATE goods_in SET ${updateCols.join(", ")} WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL`;
-    console.log(`${routeTag} Executing update: ${updateSql} -- params:`, params);
-
+    log("Executing update", { sql: updateSql, params });
     const [updateRes] = await conn.execute(updateSql, params);
-    console.log(`${routeTag} Update result:`, {
-      affectedRows: updateRes?.affectedRows ?? null,
-      changedRows: updateRes?.changedRows ?? null,
-      insertId: updateRes?.insertId ?? null,
-    });
+    log("Update result", updateRes);
 
-    if (!updateRes || updateRes.affectedRows === 0) {
-      console.error(`${routeTag} Update succeeded but affectedRows === 0; rolling back.`);
-      await conn.rollback();
-      return res.status(500).json({ error: "Update did not affect rows (unexpected)" });
-    }
-
-    // Attempt to resync inventory safely
+    // Recompute inventory for user (function assumed present)
     try {
-      if (typeof syncIngredientInventoryForUser === "function") {
-        console.log(`${routeTag} Calling syncIngredientInventoryForUser(${cognito_id})`);
-        await syncIngredientInventoryForUser(cognito_id);
-        console.log(`${routeTag} syncIngredientInventoryForUser completed`);
-      } else {
-        console.log(`${routeTag} syncIngredientInventoryForUser not defined, skipping`);
-      }
+      log("Calling syncIngredientInventoryForUser", { user: cognito_id });
+      await syncIngredientInventoryForUser(cognito_id);
     } catch (syncErr) {
-      console.warn(`${routeTag} syncIngredientInventoryForUser threw:`, syncErr);
-      // do not fail the whole update for inventory sync errors — keep going
+      // non-fatal: log, but proceed to commit (you might want to handle differently)
+      log("syncIngredientInventoryForUser failed", { error: syncErr && syncErr.message ? syncErr.message : String(syncErr) });
     }
 
     await conn.commit();
-    console.log(`${routeTag} Transaction committed successfully`);
+    log("Transaction committed", {});
 
-    // Return updated row for convenience
-    const [updatedRows] = await conn.execute(
-      `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`,
-      [normalizedBarcode, cognito_id]
-    );
-    console.log(`${routeTag} Returning updated row:`, updatedRows?.[0] ?? null);
+    // Return updated row (fresh from DB)
+    const [updatedRows] = await conn.execute(`SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`, [ newBarCode || originalPathBarcode, cognito_id ]);
+    log("Selected updated row", { updatedRows: (updatedRows && updatedRows[0]) ? { id: updatedRows[0].id, barCode: updatedRows[0].barCode } : null });
 
-    return res.json({ success: true, updated: updatedRows[0] || null });
+    return res.json({ success: true, updated: (updatedRows && updatedRows[0]) ? updatedRows[0] : null });
   } catch (err) {
-    // Extensive error logging
-    console.error(`${routeTag} Database error (update):`, {
-      message: err?.message,
-      stack: err?.stack,
-      name: err?.name,
-    });
-    try { await conn.rollback(); } catch (rbErr) { console.warn(`${routeTag} rollback failed:`, rbErr); }
-    return res.status(500).json({ error: "Database error", details: err?.message || String(err) });
+    try { await conn.rollback(); } catch (e) { log("Rollback failed", { err: e && e.message ? e.message : e }); }
+    log("Database error (update)", { error: err && err.message ? err.message : String(err), stack: err && err.stack ? err.stack : null });
+    return res.status(500).json({ error: "Database error", details: err.message || String(err) });
   } finally {
-    try { conn.release(); } catch (relErr) { console.warn(`${routeTag} connection.release failed:`, relErr); }
-    console.log(`${routeTag} Finished handler`);
+    try { conn.release(); } catch (e) { log("Conn release failed", { err: e && e.message ? e.message : e }); }
+    log("Finished handler", {});
   }
 });
-
 
 // **New API Endpoint to Add a Recipe**
 app.post("/api/add-recipe", async (req, res) => {
