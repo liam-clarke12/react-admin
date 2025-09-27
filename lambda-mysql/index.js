@@ -430,8 +430,13 @@ app.post("/api/delete-row", async (req, res) => {
   }
 });
 
+// PUT /api/goods-in/:barcode  — with extensive CloudWatch-friendly logging
 app.put("/api/goods-in/:barcode", async (req, res) => {
-  const { barcode } = req.params;
+  const routeTag = "[PUT.goods-in]";
+  const now = new Date().toISOString();
+
+  // raw incoming values
+  let { barcode } = req.params;
   const {
     date,
     ingredient,
@@ -441,25 +446,94 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
     unit,
     expiryDate,
     cognito_id,
-  } = req.body;
+  } = req.body || {};
 
-  if (!barcode) return res.status(400).json({ error: "barcode is required in path" });
-  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+  // Basic request log (headers/body summary)
+  try {
+    console.log(`${routeTag} ${now} - Request start`);
+    console.log(`${routeTag} Incoming params:`, { barcode: String(barcode) });
+    console.log(`${routeTag} Incoming body keys:`, Object.keys(req.body || {}));
+    // (don't dump entire headers in prod; helpful during debug)
+    console.log(`${routeTag} Request headers (selected):`, {
+      origin: req.headers.origin,
+      "user-agent": req.headers["user-agent"],
+      referer: req.headers.referer,
+    });
+  } catch (logErr) {
+    console.warn(`${routeTag} Failed to log request meta:`, logErr);
+  }
+
+  // Validate
+  if (!barcode) {
+    console.error(`${routeTag} Missing path barcode`);
+    return res.status(400).json({ error: "barcode is required in path" });
+  }
+  if (!cognito_id) {
+    console.error(`${routeTag} Missing cognito_id in request body`);
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  // Normalize the barcode (trim only here for diagnostics)
+  const normalizedBarcode = String(barcode).trim();
+  console.log(`${routeTag} Normalized barcode => "${normalizedBarcode}"`);
 
   const conn = await db.promise().getConnection();
   try {
     await conn.beginTransaction();
+    console.log(`${routeTag} Started DB transaction for user=${cognito_id}`);
 
-    // Check row exists for given barcode and user (and not soft-deleted)
-    const [rows] = await conn.execute(
-      `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
-      [barcode, cognito_id]
-    );
+    // Query for an exact match (case-sensitive as stored) for this user
+    const selectSql = `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`;
+    console.log(`${routeTag} Executing: ${selectSql} -- params: [${normalizedBarcode}, ${cognito_id}]`);
+    const [rows] = await conn.execute(selectSql, [normalizedBarcode, cognito_id]);
 
-    if (!rows || !rows.length) {
-      await conn.rollback();
-      return res.status(404).json({ error: "No matching goods_in row found for that barCode/user" });
+    console.log(`${routeTag} Exact match rows.length = ${rows?.length ?? 0}`);
+    if (!rows || rows.length === 0) {
+      // Diagnostics: try trimmed/lower match across any user
+      try {
+        const diagSql1 = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE TRIM(LOWER(barCode)) = TRIM(LOWER(?)) LIMIT 10`;
+        console.log(`${routeTag} No exact match for user. Running diagnostic query 1: ${diagSql1} params: [${normalizedBarcode}]`);
+        const [diagRows] = await conn.execute(diagSql1, [normalizedBarcode]);
+        console.log(`${routeTag} diagRows.length = ${diagRows?.length ?? 0}`, diagRows?.slice(0, 10));
+
+        if (diagRows && diagRows.length > 0) {
+          await conn.rollback();
+          console.warn(`${routeTag} Barcode exists but not for this user OR soft-deleted. Returning 404 with debug.`);
+          return res.status(404).json({
+            error: "No matching goods_in row found for that barCode/user",
+            debug: {
+              message: "Barcode exists in DB but belongs to different user(s) or soft-deleted.",
+              sampleMatches: diagRows.slice(0, 5),
+            },
+          });
+        }
+
+        // Try LIKE search to find near matches
+        const likeVal = `%${normalizedBarcode.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+        const diagSql2 = `SELECT id, barCode, user_id, deleted_at FROM goods_in WHERE barCode LIKE ? LIMIT 10`;
+        console.log(`${routeTag} Diagnostic query 2 (LIKE): ${diagSql2} params: [${likeVal}]`);
+        const [likeRows] = await conn.execute(diagSql2, [likeVal]);
+        console.log(`${routeTag} likeRows.length = ${likeRows?.length ?? 0}`, likeRows?.slice(0, 10));
+
+        await conn.rollback();
+        return res.status(404).json({
+          error: "No matching goods_in row found for that barCode/user",
+          debug: {
+            message: "No exact match for this user. Nearby barcodes (if any):",
+            likeMatches: likeRows.slice(0, 10),
+          },
+        });
+      } catch (diagErr) {
+        // If diagnostics fail, rollback and return a less detailed error but log
+        console.error(`${routeTag} Diagnostic queries error:`, diagErr);
+        await conn.rollback();
+        return res.status(404).json({ error: "No matching goods_in row found for that barCode/user" });
+      }
     }
+
+    // At this point rows[0] is the found row for this user
+    const existingRow = rows[0];
+    console.log(`${routeTag} Found row id=${existingRow.id} for barcode=${normalizedBarcode}`);
 
     // Build update set (only allow updating certain fields)
     const updateCols = [];
@@ -495,36 +569,69 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
     }
 
     if (updateCols.length === 0) {
-      // nothing to update
+      console.warn(`${routeTag} No updatable fields supplied. Rolling back.`);
       await conn.rollback();
       return res.status(400).json({ error: "No updatable fields supplied" });
     }
 
-    params.push(barcode, cognito_id);
-
+    // append WHERE params
+    params.push(normalizedBarcode, cognito_id);
     const updateSql = `UPDATE goods_in SET ${updateCols.join(", ")} WHERE barCode = ? AND user_id = ? AND deleted_at IS NULL`;
-    await conn.execute(updateSql, params);
+    console.log(`${routeTag} Executing update: ${updateSql} -- params:`, params);
 
-    // Recompute inventory for user (absolute amounts)
-    await syncIngredientInventoryForUser(cognito_id);
+    const [updateRes] = await conn.execute(updateSql, params);
+    console.log(`${routeTag} Update result:`, {
+      affectedRows: updateRes?.affectedRows ?? null,
+      changedRows: updateRes?.changedRows ?? null,
+      insertId: updateRes?.insertId ?? null,
+    });
+
+    if (!updateRes || updateRes.affectedRows === 0) {
+      console.error(`${routeTag} Update succeeded but affectedRows === 0; rolling back.`);
+      await conn.rollback();
+      return res.status(500).json({ error: "Update did not affect rows (unexpected)" });
+    }
+
+    // Attempt to resync inventory safely
+    try {
+      if (typeof syncIngredientInventoryForUser === "function") {
+        console.log(`${routeTag} Calling syncIngredientInventoryForUser(${cognito_id})`);
+        await syncIngredientInventoryForUser(cognito_id);
+        console.log(`${routeTag} syncIngredientInventoryForUser completed`);
+      } else {
+        console.log(`${routeTag} syncIngredientInventoryForUser not defined, skipping`);
+      }
+    } catch (syncErr) {
+      console.warn(`${routeTag} syncIngredientInventoryForUser threw:`, syncErr);
+      // do not fail the whole update for inventory sync errors — keep going
+    }
 
     await conn.commit();
+    console.log(`${routeTag} Transaction committed successfully`);
 
     // Return updated row for convenience
     const [updatedRows] = await conn.execute(
       `SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`,
-      [barcode, cognito_id]
+      [normalizedBarcode, cognito_id]
     );
+    console.log(`${routeTag} Returning updated row:`, updatedRows?.[0] ?? null);
 
     return res.json({ success: true, updated: updatedRows[0] || null });
   } catch (err) {
-    await conn.rollback();
-    console.error("Database error (update):", err);
-    return res.status(500).json({ error: "Database error", details: err.message });
+    // Extensive error logging
+    console.error(`${routeTag} Database error (update):`, {
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    });
+    try { await conn.rollback(); } catch (rbErr) { console.warn(`${routeTag} rollback failed:`, rbErr); }
+    return res.status(500).json({ error: "Database error", details: err?.message || String(err) });
   } finally {
-    conn.release();
+    try { conn.release(); } catch (relErr) { console.warn(`${routeTag} connection.release failed:`, relErr); }
+    console.log(`${routeTag} Finished handler`);
   }
 });
+
 
 // **New API Endpoint to Add a Recipe**
 app.post("/api/add-recipe", async (req, res) => {
