@@ -985,6 +985,81 @@ app.post('/dev/api/add-user', async (req, res) => {
   }
 });
 
+// GET /api/recipes/:id - detailed logging
+app.get("/api/recipes/:id", async (req, res) => {
+  const recipeId = req.params.id;
+  const cognito_id = req.query.cognito_id;
+  const start = Date.now();
+
+  // set CORS to match other routes you have
+  res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  console.info(`[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(req.query)} headers=${JSON.stringify(req.headers)}`);
+
+  if (!recipeId) {
+    console.warn("[GET.recipes.id] missing recipeId in params");
+    return res.status(400).json({ error: "recipe id required in path" });
+  }
+  if (!cognito_id) {
+    console.warn("[GET.recipes.id] missing cognito_id in query");
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  try {
+    // Query recipe + its ingredients
+    const sql = `
+      SELECT r.id as recipe_id,
+             r.recipe_name,
+             r.units_per_batch,
+             ri.id as recipe_ingredient_id,
+             ri.quantity,
+             ri.unit,
+             i.id as ingredient_id,
+             i.ingredient_name
+      FROM recipes r
+      LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.user_id = r.user_id
+      LEFT JOIN ingredients i ON i.id = ri.ingredient_id AND i.user_id = r.user_id
+      WHERE r.id = ? AND r.user_id = ?
+    `;
+    console.info(`[GET.recipes.id] Executing query: ${sql.trim()} -- params: [${recipeId}, ${cognito_id}]`);
+
+    const [rows] = await db.promise().execute(sql, [recipeId, cognito_id]);
+
+    console.info(`[GET.recipes.id] Query returned rows.length=${rows && rows.length}`);
+
+    if (!rows || rows.length === 0) {
+      console.warn(`[GET.recipes.id] Not found or not owned by user: recipe=${recipeId} user=${cognito_id}`);
+      return res.status(404).json({ error: "Recipe not found or not owned by user" });
+    }
+
+    // build response shape
+    const recipeMeta = rows[0];
+    const ingredients = rows
+      .filter((r) => r.ingredient_name !== null)
+      .map((r) => ({
+        recipe_ingredient_id: r.recipe_ingredient_id,
+        ingredient_id: r.ingredient_id,
+        ingredient_name: r.ingredient_name,
+        quantity: r.quantity,
+        unit: r.unit,
+      }));
+
+    const payload = {
+      recipe_id: recipeMeta.recipe_id,
+      recipe_name: recipeMeta.recipe_name,
+      units_per_batch: recipeMeta.units_per_batch,
+      ingredients,
+    };
+
+    console.info(`[GET.recipes.id] Responding (${Date.now() - start}ms) payload.items=${ingredients.length}`);
+    return res.json(payload);
+  } catch (err) {
+    console.error("[GET.recipes.id] DB error:", { message: err.message, stack: err.stack });
+    return res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
 app.post("/api/add-production-log", async (req, res) => {
   const {
     date,
