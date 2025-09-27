@@ -56,6 +56,7 @@ const GoodsIn = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [editingRow, setEditingRow] = useState(null); // when editing full row
+  const [originalBarcode, setOriginalBarcode] = useState(null); // IMPORTANT: keep original identifier
   const [updating, setUpdating] = useState(false);
 
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
@@ -69,10 +70,9 @@ const GoodsIn = () => {
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
 
-        // Normalize + compute processed flag from stockRemaining
+        // Normalize + compute processed flag from stockRemaining and format dates yyyy-mm-dd
         const normalized = (Array.isArray(data) ? data : []).map((row) => ({
           ...row,
-          // Ensure dates are normalized to yyyy-mm-dd for any UI date inputs
           date: row.date ? String(row.date).slice(0, 10) : row.date,
           expiryDate: row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate,
           processed: Number(row.stockRemaining) === 0 ? "Yes" : "No",
@@ -165,8 +165,9 @@ const GoodsIn = () => {
               size="small"
               aria-label="Edit row"
               onClick={() => {
-                // open full-row editor
+                // open full-row editor — capture original barcode immediately
                 setEditingRow(params.row);
+                setOriginalBarcode(params.row.barCode); // store original identifier
                 setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
                 setEditValue(null);
                 setEditDialogOpen(true);
@@ -183,9 +184,9 @@ const GoodsIn = () => {
 
   // Save edits (still allowed for active rows) — key by barCode
   // Accepts optional originalBarcode to be used as the path identifier when updating.
-  const processRowUpdate = async (newRow, originalBarcode) => {
-    // originalBarcode: the barcode that identifies the row in DB before any change.
-    const identifier = originalBarcode || newRow.barCode;
+  const processRowUpdate = async (newRow, originalBar) => {
+    // originalBar: the barcode that identifies the row in DB before any change.
+    const identifier = originalBar || newRow.barCode;
     const updatedRow = {
       ...newRow,
       processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
@@ -224,7 +225,13 @@ const GoodsIn = () => {
       if (!response.ok) {
         const text = await response.text().catch(() => "");
         console.error("[processRowUpdate] server returned non-OK:", response.status, text);
-        throw new Error(text || `Failed to update row (status ${response.status})`);
+        // Try to parse JSON error if possible for better message
+        try {
+          const json = JSON.parse(text || "{}");
+          throw new Error(JSON.stringify(json));
+        } catch {
+          throw new Error(text || `Failed to update row (status ${response.status})`);
+        }
       }
 
       const json = await response.json().catch(() => null);
@@ -235,8 +242,6 @@ const GoodsIn = () => {
         r.barCode === identifier ? resultRow : r
       );
 
-      // If barcode changed, ensure we don't end up with duplicates — replace by identifier match
-      // and if new barcode not previously present, the map above will reflect the new barCode value.
       setGoodsInRows(nextRows);
       updateIngredientInventory(nextRows);
 
@@ -333,6 +338,7 @@ const GoodsIn = () => {
     if (!activeCell) return;
     setEditValue(activeCell.value ?? "");
     setEditingRow(activeCell.row ?? null); // keep reference
+    setOriginalBarcode(activeCell.id); // store original identifier for single-cell edit too
     setEditDialogOpen(true);
   };
 
@@ -360,8 +366,8 @@ const GoodsIn = () => {
           patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
         }
 
-        // Pass original barcode (activeCell.id) as identifier so backend finds the correct row
-        updatedRow = await processRowUpdate(patched, activeCell.id);
+        // Pass original barcode (originalBarcode) as identifier so backend finds the correct row
+        updatedRow = await processRowUpdate(patched, originalBarcode || activeCell.id);
       } else {
         // editingRow (full row) - prepare payload
         const patched = { ...editingRow };
@@ -376,9 +382,9 @@ const GoodsIn = () => {
         patched.stockRemaining = Number(patched.stockRemaining || 0);
         patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
-        // when editing the full row, original barcode is the editingRow.barCode BEFORE changes
-        const originalBarcode = editingRow?.barCode ?? (activeCell ? activeCell.id : patched.barCode);
-        updatedRow = await processRowUpdate(patched, originalBarcode);
+        // originalBarcode state was set when dialog opened
+        const original = originalBarcode || (activeCell ? activeCell.id : patched.barCode);
+        updatedRow = await processRowUpdate(patched, original);
       }
 
       // clear editing states
@@ -386,6 +392,7 @@ const GoodsIn = () => {
       setEditingRow(null);
       setActiveCell(null);
       setEditValue("");
+      setOriginalBarcode(null);
     } catch (err) {
       console.error("Confirm edit failed:", err);
       alert("Update failed. See console for details.");
@@ -557,8 +564,8 @@ const GoodsIn = () => {
             disableRowSelectionOnClick
             editMode="row"
             experimentalFeatures={{ newEditingApi: true }}
-            // wrap processRowUpdate so it always uses current row.barCode as original id
-            processRowUpdate={(r) => processRowUpdate(r, r.barCode)}
+            // IMPORTANT: use oldRow.barCode as the original identifier
+            processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow?.barCode)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
             onRowSelectionModelChange={(model) => setSelectedRows(model)} // model is array of barCodes
             onCellClick={handleCellClick}
@@ -574,6 +581,7 @@ const GoodsIn = () => {
           setEditingRow(null);
           setActiveCell(null);
           setEditValue("");
+          setOriginalBarcode(null);
         }}
         maxWidth="sm"
         fullWidth
@@ -594,7 +602,7 @@ const GoodsIn = () => {
           {activeCell && activeCell.field && !editingRow && (
             <Box sx={{ mt: 1 }}>
               <Typography variant="caption" sx={{ color: brand.subtext }}>
-                Bar Code: {activeCell.id}
+                Original Bar Code: {originalBarcode || activeCell.id}
               </Typography>
               <Box sx={{ mt: 1 }}>
                 {renderEditInputForField(activeCell.field, editValue, setEditValue)}
@@ -605,7 +613,6 @@ const GoodsIn = () => {
           {/* If editing full row (editingRow exists) render inputs for common fields */}
           {(editingRow || (activeCell && activeCell.field === null)) && (
             <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
-              {/* editingRow may be null if we only had activeCell with field=null, so prefer found row */}
               {(() => {
                 const row = editingRow || (activeCell ? activeCell.row : null);
                 if (!row) return null;
@@ -700,6 +707,7 @@ const GoodsIn = () => {
               setEditingRow(null);
               setActiveCell(null);
               setEditValue("");
+              setOriginalBarcode(null);
             }}
             sx={{ textTransform: "none" }}
             disabled={updating}
