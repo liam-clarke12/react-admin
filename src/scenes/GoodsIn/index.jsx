@@ -58,27 +58,6 @@ const GoodsIn = () => {
   const [editingRow, setEditingRow] = useState(null); // when editing full row
   const [updating, setUpdating] = useState(false);
 
-  // Helper: format dates to YYYY-MM-DD (resilient)
-  const formatDateValue = (v) => {
-    if (v === undefined || v === null || v === "") return "";
-    // If already looks like YYYY-MM-DD (quick test)
-    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    try {
-      // Try creating a Date and take local date portion in ISO format (YYYY-MM-DD)
-      const d = new Date(v);
-      if (isNaN(d.getTime())) {
-        // fallback: try splitting by 'T'
-        if (typeof v === "string" && v.includes("T")) return v.split("T")[0];
-        return String(v);
-      }
-      // Use toISOString (UTC) then split. This matches HTML date input expectation.
-      return d.toISOString().split("T")[0];
-    } catch {
-      if (typeof v === "string" && v.includes("T")) return v.split("T")[0];
-      return String(v);
-    }
-  };
-
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
@@ -90,12 +69,12 @@ const GoodsIn = () => {
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
 
-        // Normalize + compute processed flag from stockRemaining and format dates
+        // Normalize + compute processed flag from stockRemaining
         const normalized = (Array.isArray(data) ? data : []).map((row) => ({
           ...row,
-          // format both date fields as YYYY-MM-DD
-          date: formatDateValue(row.date),
-          expiryDate: formatDateValue(row.expiryDate),
+          // Ensure dates are normalized to yyyy-mm-dd for any UI date inputs
+          date: row.date ? String(row.date).slice(0, 10) : row.date,
+          expiryDate: row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate,
           processed: Number(row.stockRemaining) === 0 ? "Yes" : "No",
         }));
 
@@ -106,7 +85,6 @@ const GoodsIn = () => {
       }
     };
     if (cognitoId) fetchGoodsInData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId, setGoodsInRows]);
 
   // Columns (no per-row delete; we use checkboxSelection + toolbar)
@@ -188,15 +166,9 @@ const GoodsIn = () => {
               aria-label="Edit row"
               onClick={() => {
                 // open full-row editor
-                // ensure editingRow has formatted dates
-                const formattedRow = {
-                  ...params.row,
-                  date: formatDateValue(params.row.date),
-                  expiryDate: formatDateValue(params.row.expiryDate),
-                };
-                setEditingRow(formattedRow);
-                setActiveCell({ id: params.row.barCode, field: null, value: null, row: formattedRow });
-                setEditValue("");
+                setEditingRow(params.row);
+                setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
+                setEditValue(null);
                 setEditDialogOpen(true);
               }}
             >
@@ -210,52 +182,69 @@ const GoodsIn = () => {
   );
 
   // Save edits (still allowed for active rows) — key by barCode
-  const processRowUpdate = async (newRow) => {
-    // Ensure dates are formatted
+  // Accepts optional originalBarcode to be used as the path identifier when updating.
+  const processRowUpdate = async (newRow, originalBarcode) => {
+    // originalBarcode: the barcode that identifies the row in DB before any change.
+    const identifier = originalBarcode || newRow.barCode;
     const updatedRow = {
       ...newRow,
-      date: formatDateValue(newRow.date),
-      expiryDate: formatDateValue(newRow.expiryDate),
-      stockReceived: Number(newRow.stockReceived ?? 0),
-      stockRemaining: Number(newRow.stockRemaining ?? 0),
-      processed: Number(newRow.stockRemaining ?? 0) === 0 ? "Yes" : "No",
+      processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
     };
 
     try {
-      const response = await fetch(
-        `${API_BASE}/goods-in/${encodeURIComponent(updatedRow.barCode)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: updatedRow.date,
-            ingredient: updatedRow.ingredient,
-            temperature: updatedRow.temperature,
-            stockReceived: updatedRow.stockReceived,
-            stockRemaining: updatedRow.stockRemaining,
-            unit: updatedRow.unit,
-            expiryDate: updatedRow.expiryDate,
-            cognito_id: cognitoId,
-          }),
-        }
-      );
+      const url = `${API_BASE}/goods-in/${encodeURIComponent(identifier)}`;
+      console.log("[processRowUpdate] PUT", url, "payload:", {
+        date: updatedRow.date,
+        ingredient: updatedRow.ingredient,
+        temperature: updatedRow.temperature,
+        stockReceived: updatedRow.stockReceived,
+        stockRemaining: updatedRow.stockRemaining,
+        unit: updatedRow.unit,
+        expiryDate: updatedRow.expiryDate,
+        barCode: updatedRow.barCode, // include new barcode in body if changed
+        cognito_id: cognitoId,
+      });
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: updatedRow.date,
+          ingredient: updatedRow.ingredient,
+          temperature: updatedRow.temperature,
+          stockReceived: updatedRow.stockReceived,
+          stockRemaining: updatedRow.stockRemaining,
+          unit: updatedRow.unit,
+          expiryDate: updatedRow.expiryDate,
+          barCode: updatedRow.barCode, // new barcode value to be written (if changed)
+          cognito_id: cognitoId,
+        }),
+      });
+
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        throw new Error(text || "Failed to update on server");
+        console.error("[processRowUpdate] server returned non-OK:", response.status, text);
+        throw new Error(text || `Failed to update row (status ${response.status})`);
       }
+
+      const json = await response.json().catch(() => null);
+      const resultRow = (json && json.updated) ? json.updated : updatedRow;
+
+      // Update local rows + inventory. Use identifier (original barcode) to find row to replace.
+      const nextRows = (goodsInRows || []).map((r) =>
+        r.barCode === identifier ? resultRow : r
+      );
+
+      // If barcode changed, ensure we don't end up with duplicates — replace by identifier match
+      // and if new barcode not previously present, the map above will reflect the new barCode value.
+      setGoodsInRows(nextRows);
+      updateIngredientInventory(nextRows);
+
+      return resultRow;
     } catch (error) {
       console.error("Backend update error:", error);
       throw error;
     }
-
-    // Update local rows + inventory by barCode
-    const nextRows = (goodsInRows || []).map((r) =>
-      r.barCode === updatedRow.barCode ? updatedRow : r
-    );
-    setGoodsInRows(nextRows);
-    updateIngredientInventory(nextRows);
-
-    return updatedRow;
   };
 
   // Inventory: sum ACTIVE stockRemaining; earliest active barcode per ingredient
@@ -331,22 +320,11 @@ const GoodsIn = () => {
   const handleCellClick = (params, event) => {
     // ignore checkbox clicks
     if (params.field === "__check__") return;
-
-    // If the clicked field is a date, normalize its value for the edit dialog
-    const valueToStore =
-      params.field === "date" || params.field === "expiryDate"
-        ? formatDateValue(params.value)
-        : params.value;
-
     setActiveCell({
       id: params.row.barCode,
       field: params.field,
-      value: valueToStore,
-      row: {
-        ...params.row,
-        date: formatDateValue(params.row.date),
-        expiryDate: formatDateValue(params.row.expiryDate),
-      },
+      value: params.value,
+      row: params.row,
     });
   };
 
@@ -378,20 +356,15 @@ const GoodsIn = () => {
         if (activeCell.field === "stockRemaining" || activeCell.field === "stockReceived") {
           patched[activeCell.field] = Number(editValue || 0);
         }
-
-        // Format date fields (if applicable) before updating
-        if (activeCell.field === "date" || activeCell.field === "expiryDate") {
-          patched[activeCell.field] = formatDateValue(editValue);
-        }
-
         if (patched.stockRemaining !== undefined) {
           patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
         }
 
-        updatedRow = await processRowUpdate(patched);
+        // Pass original barcode (activeCell.id) as identifier so backend finds the correct row
+        updatedRow = await processRowUpdate(patched, activeCell.id);
       } else {
         // editingRow (full row) - prepare payload
-        const patched = { ...(editingRow || activeCell.row) };
+        const patched = { ...editingRow };
 
         // if editValue is set and activeCell.field present, apply that single change
         if (activeCell && activeCell.field) {
@@ -401,14 +374,11 @@ const GoodsIn = () => {
         // coerce numeric fields
         patched.stockReceived = Number(patched.stockReceived || 0);
         patched.stockRemaining = Number(patched.stockRemaining || 0);
-
-        // Ensure dates normalized
-        patched.date = formatDateValue(patched.date);
-        patched.expiryDate = formatDateValue(patched.expiryDate);
-
         patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
-        updatedRow = await processRowUpdate(patched);
+        // when editing the full row, original barcode is the editingRow.barCode BEFORE changes
+        const originalBarcode = editingRow?.barCode ?? (activeCell ? activeCell.id : patched.barCode);
+        updatedRow = await processRowUpdate(patched, originalBarcode);
       }
 
       // clear editing states
@@ -587,7 +557,8 @@ const GoodsIn = () => {
             disableRowSelectionOnClick
             editMode="row"
             experimentalFeatures={{ newEditingApi: true }}
-            processRowUpdate={processRowUpdate}
+            // wrap processRowUpdate so it always uses current row.barCode as original id
+            processRowUpdate={(r) => processRowUpdate(r, r.barCode)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
             onRowSelectionModelChange={(model) => setSelectedRows(model)} // model is array of barCodes
             onCellClick={handleCellClick}
