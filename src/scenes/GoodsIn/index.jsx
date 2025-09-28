@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -44,87 +45,12 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
-/**
- * Public loader helper: fetch active goods-in rows, normalize them,
- * and compute ingredient inventory snapshot (sum stockRemaining per ingredient).
- *
- * This is exported so other modules (e.g. ProductionLog form) can
- * call it after a successful production submission to refresh UI state.
- */
-export async function loadGoodsInActive(cognitoId) {
-  if (!cognitoId) return { goodsRows: [], inventory: [] };
-
-  try {
-    const response = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`);
-    if (!response.ok) {
-      console.error("Failed to fetch goods-in active:", response.status);
-      return { goodsRows: [], inventory: [] };
-    }
-
-    const data = await response.json();
-    const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
-      const date = row.date ? String(row.date).slice(0, 10) : row.date;
-      const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
-
-      const stockReceived = Number(row.stockReceived || 0);
-      const stockRemaining = Number(row.stockRemaining || 0);
-
-      // stable internal id uses barCode (if present) + index to always be unique
-      const serverBar = row.barCode ? String(row.barCode) : null;
-      const _id = serverBar
-        ? `${serverBar}-${idx}`
-        : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-      return {
-        ...row,
-        date,
-        expiryDate,
-        stockReceived,
-        stockRemaining,
-        processed: Number(stockRemaining) === 0 ? "Yes" : "No",
-        barCode: serverBar || row.barCode || null,
-        _id,
-      };
-    });
-
-    // compute inventory snapshot
-    const active = normalized.filter((r) => Number(r.stockRemaining) > 0);
-    const map = new Map();
-    for (const r of active) {
-      const key = r.ingredient;
-      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-      const amount = prev.amount + Number(r.stockRemaining || 0);
-
-      // choose earliest date as the "next" barcode (FIFO)
-      let nextBarcode = prev.barcode;
-      let nextDate = prev._date;
-      try {
-        const prevTime = new Date(prev._date).getTime() || Infinity;
-        const curTime = new Date(r.date).getTime() || Infinity;
-        if (curTime < prevTime) {
-          nextBarcode = r.barCode;
-          nextDate = r.date;
-        }
-      } catch {
-        // ignore parse errors
-      }
-
-      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-    }
-
-    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-    return { goodsRows: normalized, inventory };
-  } catch (error) {
-    console.error("Error in loadGoodsInActive:", error);
-    return { goodsRows: [], inventory: [] };
-  }
-}
-
 const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
   const [selectedRows, setSelectedRows] = useState([]); // array of selected _id's
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const { cognitoId } = useAuth();
+  const location = useLocation();
 
   // Editing state
   const [activeCell, setActiveCell] = useState(null);
@@ -138,15 +64,48 @@ const GoodsIn = () => {
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
-      if (!cognitoId) return;
-      const { goodsRows, inventory } = await loadGoodsInActive(cognitoId);
-      setGoodsInRows(goodsRows);
-      setIngredientInventory(inventory);
+      try {
+        if (!cognitoId) return;
+        const response = await fetch(
+          `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch Goods In data");
+        const data = await response.json();
+
+        const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
+          const date = row.date ? String(row.date).slice(0, 10) : row.date;
+          const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
+
+          const stockReceived = Number(row.stockReceived || 0);
+          const stockRemaining = Number(row.stockRemaining || 0);
+
+          // stable internal id: combine barcode (if exists) + index
+          const serverBar = row.barCode ? String(row.barCode) : null;
+          const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+
+          return {
+            ...row,
+            date,
+            expiryDate,
+            stockReceived,
+            stockRemaining,
+            processed: Number(stockRemaining) === 0 ? "Yes" : "No",
+            barCode: serverBar || row.barCode || null,
+            _id,
+          };
+        });
+
+        setGoodsInRows(normalized);
+        computeAndSetIngredientInventory(normalized);
+      } catch (error) {
+        console.error("Error fetching Goods In data:", error);
+      }
     };
     if (cognitoId) fetchGoodsInData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
+  // highlight CSS - injected via style tag below
   // columns
   const columns = useMemo(
     () => [
@@ -225,10 +184,9 @@ const GoodsIn = () => {
               size="small"
               aria-label="Edit row"
               onClick={() => {
-                // open full-row editor — capture original barcode and internal id immediately
                 setEditingRow(params.row);
-                setOriginalBarcode(params.row.barCode); // store original server identifier
-                setOriginalId(params.row._id); // store internal id for matching
+                setOriginalBarcode(params.row.barCode);
+                setOriginalId(params.row._id);
                 setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
                 setEditValue(null);
                 setEditDialogOpen(true);
@@ -243,13 +201,38 @@ const GoodsIn = () => {
     []
   );
 
+  // helper: compute ingredient inventory from rows and set it
+  const computeAndSetIngredientInventory = (rows) => {
+    const active = (Array.isArray(rows) ? rows : []).filter((r) => Number(r.stockRemaining) > 0);
+    const map = new Map();
+    for (const r of active) {
+      const key = r.ingredient;
+      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+      const amount = prev.amount + Number(r.stockRemaining || 0);
+
+      let nextBarcode = prev.barcode;
+      let nextDate = prev._date;
+      try {
+        const prevTime = new Date(prev._date).getTime() || Infinity;
+        const curTime = new Date(r.date).getTime() || Infinity;
+        if (curTime < prevTime) {
+          nextBarcode = r.barCode;
+          nextDate = r.date;
+        }
+      } catch {}
+
+      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+    }
+
+    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+    setIngredientInventory(inventory);
+  };
+
   // processRowUpdate - robust immutable updater, accepts both newRow & oldRow
   const processRowUpdate = async (newRow, oldRow) => {
-    // determine identifiers
     const oldBar = oldRow && oldRow.barCode ? String(oldRow.barCode) : undefined;
     const oldId = oldRow && oldRow._id ? String(oldRow._id) : undefined;
 
-    // prepare payload for server
     const payload = {
       date: newRow.date,
       ingredient: newRow.ingredient,
@@ -258,7 +241,7 @@ const GoodsIn = () => {
       stockRemaining: Number(newRow.stockRemaining || 0),
       unit: newRow.unit,
       expiryDate: newRow.expiryDate,
-      barCode: newRow.barCode, // new value if user changed it
+      barCode: newRow.barCode,
       cognito_id: cognitoId,
     };
 
@@ -286,7 +269,6 @@ const GoodsIn = () => {
       const json = await response.json().catch(() => null);
       const serverRow = (json && json.updated) ? json.updated : (json || null);
 
-      // build normalized result: prefer server values, but keep internal _id if possible
       const normalizedResult = {
         ...newRow,
         ...(serverRow ? serverRow : {}),
@@ -295,7 +277,6 @@ const GoodsIn = () => {
         processed: Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
       };
 
-      // ensure stable _id: keep oldId if present, else keep newRow._id else generate
       normalizedResult._id =
         oldId ||
         newRow._id ||
@@ -303,7 +284,6 @@ const GoodsIn = () => {
 
       normalizedResult.barCode = (serverRow && serverRow.barCode) ? serverRow.barCode : (newRow.barCode || null);
 
-      // Update local goodsInRows immutably and recompute inventory from the new array
       setGoodsInRows((prev = []) => {
         const list = Array.isArray(prev) ? prev.slice() : [];
         let found = false;
@@ -312,7 +292,6 @@ const GoodsIn = () => {
             found = true;
             return { ...r, ...normalizedResult };
           }
-          // fallback match by barCode/path if no oldId
           if (!oldId && identifierForPath && r.barCode === identifierForPath) {
             found = true;
             return { ...r, ...normalizedResult };
@@ -324,30 +303,7 @@ const GoodsIn = () => {
           next.push(normalizedResult);
         }
 
-        // recompute ingredient inventory using next snapshot
-        const active = next.filter((r) => Number(r.stockRemaining) > 0);
-        const map = new Map();
-        for (const r of active) {
-          const key = r.ingredient;
-          const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-          const amount = prev.amount + Number(r.stockRemaining || 0);
-          let nextBarcode = prev.barcode;
-          let nextDate = prev._date;
-          try {
-            const prevTime = new Date(prev._date).getTime() || Infinity;
-            const curTime = new Date(r.date).getTime() || Infinity;
-            if (curTime < prevTime) {
-              nextBarcode = r.barCode;
-              nextDate = r.date;
-            }
-          } catch {
-            // ignore
-          }
-          map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-        }
-        const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-        setIngredientInventory(inventory);
-
+        computeAndSetIngredientInventory(next);
         return next;
       });
 
@@ -381,27 +337,7 @@ const GoodsIn = () => {
 
       setGoodsInRows((prev = []) => {
         const remaining = prev.filter((r) => !selectedRows.includes(r._id));
-        // recompute inventory
-        const active = remaining.filter((r) => Number(r.stockRemaining) > 0);
-        const map = new Map();
-        for (const r of active) {
-          const key = r.ingredient;
-          const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-          const amount = prev.amount + Number(r.stockRemaining || 0);
-          let nextBarcode = prev.barcode;
-          let nextDate = prev._date;
-          try {
-            const prevTime = new Date(prev._date).getTime() || Infinity;
-            const curTime = new Date(r.date).getTime() || Infinity;
-            if (curTime < prevTime) {
-              nextBarcode = r.barCode;
-              nextDate = r.date;
-            }
-          } catch {}
-          map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-        }
-        const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-        setIngredientInventory(inventory);
+        computeAndSetIngredientInventory(remaining);
         return remaining;
       });
 
@@ -446,16 +382,13 @@ const GoodsIn = () => {
     try {
       let result;
       if (activeCell && activeCell.field && !editingRow) {
-        // single-field edit
         const row = (goodsInRows || []).find((r) => r._id === (activeCell.row?._id) || r.barCode === activeCell.id);
         if (!row) throw new Error("Row not found");
         const patched = { ...row, [activeCell.field]: activeCell.field === "stockRemaining" || activeCell.field === "stockReceived" ? Number(editValue || 0) : editValue };
-        // ensure processed
         if (patched.stockRemaining !== undefined) patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
         result = await processRowUpdate(patched, { barCode: originalBarcode || activeCell.id, _id: originalId || row._id });
       } else {
-        // full-row edit
         const patched = { ...editingRow };
         if (activeCell && activeCell.field) patched[activeCell.field] = editValue;
         patched.stockReceived = Number(patched.stockReceived || 0);
@@ -465,7 +398,6 @@ const GoodsIn = () => {
         result = await processRowUpdate(patched, { barCode: originalBarcode, _id: originalId });
       }
 
-      // close
       setEditDialogOpen(false);
       setEditingRow(null);
       setActiveCell(null);
@@ -480,7 +412,6 @@ const GoodsIn = () => {
     }
   };
 
-  // render input helper
   const renderEditInputForField = (fieldName, value, onChange) => {
     if (fieldName === "unit") {
       return (
@@ -508,11 +439,63 @@ const GoodsIn = () => {
     return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
   };
 
+  // NEW: focus & highlight flow — reacts to location.state.focusBar or ?focusBar=...
+  useEffect(() => {
+    const focusBar =
+      (location && location.state && location.state.focusBar) ||
+      new URLSearchParams(window.location.search).get("focusBar");
+    if (!focusBar) return;
+    if (!goodsInRows || goodsInRows.length === 0) return;
+
+    const target = goodsInRows.find((r) => r.barCode === focusBar);
+    if (!target) return;
+    const targetId = target._id;
+
+    // set selection (controlled)
+    try {
+      setSelectedRows([targetId]);
+    } catch (e) {}
+
+    // scroll + highlight after grid rendered rows
+    setTimeout(() => {
+      // MUI DataGrid renders a row element with data-id attribute equal to row id
+      const el = document.querySelector(`[data-id="${targetId}"]`);
+      if (el) {
+        try {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch {}
+        el.classList.add("plf-row-highlight");
+        setTimeout(() => el.classList.remove("plf-row-highlight"), 2500);
+      }
+    }, 250);
+
+    // clear location state so this doesn't run repeatedly on back/forward
+    try {
+      if (window && window.history && window.history.replaceState) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("focusBar");
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [goodsInRows, location]);
+
   return (
     <Box m="20px">
-      {/* Card container */}
+      <style>{`
+        .plf-row-highlight {
+          animation: plfHighlight 2.4s ease forwards;
+        }
+        @keyframes plfHighlight {
+          0% { background-color: rgba(255, 239, 213, 0.95); }
+          10% { background-color: rgba(255, 239, 213, 0.95); }
+          90% { background-color: transparent; }
+          100% { background-color: transparent; }
+        }
+      `}</style>
+
       <Box sx={{ mt: 2, border: `1px solid ${brand.border}`, borderRadius: 16, background: brand.surface, boxShadow: brand.shadow, overflow: "hidden" }}>
-        {/* Toolbar */}
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: `1px solid ${brand.border}` }}>
           <Typography sx={{ fontWeight: 800, color: brand.text }}>Goods In</Typography>
 
@@ -554,7 +537,6 @@ const GoodsIn = () => {
           </Box>
         </Box>
 
-        {/* DataGrid */}
         <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", borderRadius: 0 }, "& .MuiDataGrid-columnHeaders": { backgroundColor: "#fbfcfd", color: brand.subtext, borderBottom: `1px solid ${brand.border}`, fontWeight: 800 }, "& .MuiDataGrid-columnSeparator": { display: "none" }, "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text }, "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted }, "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface }, "& .barCode-column--cell": { color: brand.primary }, "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": { outline: `2px solid ${brand.primary}`, outlineOffset: "-2px", boxShadow: `0 0 0 4px ${brand.focusRing}` } }}>
           <DataGrid
             rows={goodsInRows || []}
@@ -563,18 +545,18 @@ const GoodsIn = () => {
             pageSize={10}
             rowsPerPageOptions={[10, 25, 50]}
             checkboxSelection
+            rowSelectionModel={selectedRows}
+            onRowSelectionModelChange={(model) => setSelectedRows(Array.isArray(model) ? model : [])}
             disableRowSelectionOnClick
             editMode="row"
             experimentalFeatures={{ newEditingApi: true }}
             processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
-            onRowSelectionModelChange={(model) => setSelectedRows(model)}
             onCellClick={handleCellClick}
           />
         </Box>
       </Box>
 
-      {/* Edit dialog */}
       <Dialog open={editDialogOpen} onClose={() => { setEditDialogOpen(false); setEditingRow(null); setActiveCell(null); setEditValue(""); setOriginalBarcode(null); setOriginalId(null); }} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>{activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}</DialogTitle>
 
@@ -627,7 +609,6 @@ const GoodsIn = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
       <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog} PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
         <DialogContent>
