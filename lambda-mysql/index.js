@@ -68,6 +68,59 @@ app.use((req, res, next) => {
   next();
 });
 
+function addCorsHeaders(res, req) {
+  try {
+    const FRONTEND_ORIGIN = 'https://master.d2fdrxobxyr2je.amplifyapp.com';
+    // If req is provided and has an Origin header, echo it when allowed (optional)
+    const origin = (req && req.headers && req.headers.origin) || FRONTEND_ORIGIN;
+    // Always set these headers so client receives them even on error responses
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  } catch (err) {
+    // defensive: if res is already finished, don't let this blow up the request
+    console.warn('addCorsHeaders failed:', err && err.message);
+  }
+}
+
+const wrapAsync = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+function registerGlobalErrorHandler(app) {
+  app.use((err, req, res, next) => {
+    // ensure CORS on the error response too
+    try { addCorsHeaders(res, req); } catch (e) { /* ignore */ }
+
+    // log stack/traces to CloudWatch for debugging
+    console.error('Unhandled error in route:', {
+      message: err && err.message,
+      stack: err && err.stack,
+      route: req && `${req.method} ${req.originalUrl}`,
+      body: req && req.body,
+      headers: req && req.headers && { origin: req.headers.origin },
+    });
+
+    // common error response (do not leak internals in prod)
+    const status = (err && err.status) || 500;
+    const payload = {
+      message: status === 500 ? 'Internal server error' : err.message,
+      // include details only if you want them visible in client (optional)
+      ...(process.env.NODE_ENV !== 'production' ? { details: err && err.message } : {}),
+    };
+
+    try {
+      res.status(status).json(payload);
+    } catch (sendErr) {
+      console.error('Failed to send JSON error response:', sendErr);
+      try { res.sendStatus(500); } catch (e) { /* nothing */ }
+    }
+  });
+}
+
+registerGlobalErrorHandler(app);
+
 async function syncIngredientInventoryForUser(userId) {
   const tag = "[syncIngredientInventoryForUser]";
   const conn = await db.promise().getConnection();
@@ -1408,7 +1461,7 @@ app.post("/api/delete-production-log", async (req, res) => {
   }
 });
 
-app.put("/api/production-log/:batchCode", async (req, res) => {
+app.put('/api/production-log/:batchCode', wrapAsync(async (req, res) => {
   addCorsHeaders(res);
   const { batchCode } = req.params;
   const {
@@ -1484,7 +1537,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
   } finally {
     conn.release();
   }
-});
+}));
 
 /* Helper: syncProductionInventoryForUser (simple template) */
 async function syncProductionInventoryForUser(cognito_id, connArg = null) {
