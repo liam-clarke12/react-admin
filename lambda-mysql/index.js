@@ -1462,122 +1462,177 @@ app.post("/api/delete-production-log", async (req, res) => {
 });
 
 // PUT /api/production-log/:batchCode
-app.put('/api/production-log/:batchCode', wrapAsync(async (req, res) => {
-  // Optional CORS helper if you have one
-  try { if (typeof addCorsHeaders === 'function') addCorsHeaders(res, req); } catch (e) { console.warn('addCorsHeaders not callable', e && e.message); }
-
+app.put("/api/production-log/:batchCode", async (req, res) => {
   const { batchCode } = req.params;
   const body = req.body || {};
-
-  // Accept both snake_case and camelCase from clients
   const {
     date,
     recipe,
     batchesProduced,
-    batchRemaining,
-    units_of_waste,   // client may send this
-    unitsOfWaste,     // or this
+    // client may send units_of_waste (snake) or unitsOfWaste (camel)
+    units_of_waste,
+    unitsOfWaste,
+    // client-editable value (not a DB column)
+    unitsRemaining,
     cognito_id,
   } = body;
 
-  console.info('[PUT.production-log] request params:', req.params, 'body:', body);
+  console.info("[PUT.production-log] called", { batchCode, body });
 
-  if (!batchCode) {
-    console.warn('[PUT.production-log] missing batchCode');
-    return res.status(400).json({ error: 'batchCode is required in path' });
-  }
-  if (!cognito_id) {
-    console.warn('[PUT.production-log] missing cognito_id');
-    return res.status(400).json({ error: 'cognito_id is required' });
-  }
+  if (!batchCode) return res.status(400).json({ error: "batchCode is required in path" });
+  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
 
   const conn = await db.promise().getConnection();
   try {
     await conn.beginTransaction();
-    console.info('[PUT.production-log] transaction started', { batchCode, cognito_id });
+    console.info("[PUT.production-log] transaction started for user:", cognito_id);
 
-    // ensure the row exists & belongs to this user
-    const [rows] = await conn.execute(
+    // fetch existing row
+    const [existingRows] = await conn.execute(
       `SELECT * FROM production_log WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
       [batchCode, cognito_id]
     );
 
-    if (!rows || rows.length === 0) {
+    if (!existingRows || !existingRows.length) {
       await conn.rollback();
-      console.warn('[PUT.production-log] no matching production_log row', { batchCode, cognito_id });
-      return res.status(404).json({ error: 'No matching production_log row found for that batchCode/user' });
+      console.warn("[PUT.production-log] no matching row found for", { batchCode, cognito_id });
+      return res.status(404).json({ error: "No matching production_log row found for that batchCode/user" });
+    }
+    const existing = existingRows[0];
+
+    // resolve units_of_waste value (prefer explicit in body)
+    const newUnitsOfWaste =
+      units_of_waste !== undefined ? Number(units_of_waste)
+      : unitsOfWaste !== undefined ? Number(unitsOfWaste)
+      : Number(existing.units_of_waste || 0);
+
+    // We'll need units_per_batch for computations when necessary.
+    // Determine recipe to use for the lookup (body.recipe overrides existing.recipe)
+    const recipeToUse = (recipe !== undefined && recipe !== null && String(recipe).trim() !== "")
+      ? recipe
+      : existing.recipe;
+
+    // Fetch units_per_batch (UPB) for recipe (scoped to user)
+    let upb = 0;
+    try {
+      const [recipeRows] = await conn.execute(
+        `SELECT id, units_per_batch FROM recipes WHERE recipe_name = ? AND user_id = ? LIMIT 1`,
+        [recipeToUse, cognito_id]
+      );
+      if (Array.isArray(recipeRows) && recipeRows.length) {
+        upb = Number(recipeRows[0].units_per_batch || 0) || 0;
+      } else {
+        upb = 0;
+      }
+    } catch (err) {
+      console.warn("[PUT.production-log] warning: failed to lookup recipe UPB:", err && err.message ? err.message : err);
+      upb = 0;
     }
 
-    // Build updatable fields only for real DB columns
+    // Compute the canonical batchRemaining (stored in DB) as *units*.
+    // Priority:
+    //  1) If client provided unitsRemaining -> treat that as desired unitsRemaining (units left after waste)
+    //       then batchRemaining_units = unitsRemaining + units_of_waste
+    //  2) Else if client provided batchesProduced -> batchRemaining_units = batchesProduced * units_per_batch
+    //  3) Else keep existing.batchRemaining
+    let computedBatchRemainingUnits = Number(existing.batchRemaining || 0);
+
+    if (unitsRemaining !== undefined && unitsRemaining !== null && unitsRemaining !== "") {
+      const uRem = Number(unitsRemaining || 0);
+      computedBatchRemainingUnits = uRem + (Number(newUnitsOfWaste) || 0);
+      console.info("[PUT.production-log] computed batchRemaining (units) from unitsRemaining:", {
+        unitsRemaining: uRem, units_of_waste: newUnitsOfWaste, batchRemaining_units: computedBatchRemainingUnits
+      });
+    } else if (batchesProduced !== undefined && batchesProduced !== null && batchesProduced !== "") {
+      const bp = Number(batchesProduced || 0);
+      computedBatchRemainingUnits = bp * (Number(upb) || 0);
+      console.info("[PUT.production-log] computed batchRemaining (units) from batchesProduced:", {
+        batchesProduced: bp, units_per_batch: upb, batchRemaining_units: computedBatchRemainingUnits
+      });
+    } else {
+      computedBatchRemainingUnits = Number(existing.batchRemaining || 0);
+      console.info("[PUT.production-log] keeping existing batchRemaining (units):", computedBatchRemainingUnits);
+    }
+
+    // Now compute derived unitsRemaining and batchesRemaining for the response:
+    const computedUnitsRemaining = Number(computedBatchRemainingUnits) - Number(newUnitsOfWaste || 0);
+    const computedBatchesRemaining = (Number(upb) && Number(upb) > 0)
+      ? Number(computedUnitsRemaining) / Number(upb)
+      : null; // null if upb unknown/zero
+
+    // Build update columns for DB (only real DB columns)
     const updateCols = [];
     const params = [];
 
-    if (date !== undefined) {
-      updateCols.push('date = ?');
-      params.push(date);
-    }
-    if (recipe !== undefined) {
-      updateCols.push('recipe = ?');
-      params.push(recipe);
-    }
-    if (batchesProduced !== undefined) {
-      const n = Number(batchesProduced);
-      updateCols.push('batchesProduced = ?');
-      params.push(Number.isFinite(n) ? n : 0);
-    }
-    if (batchRemaining !== undefined) {
-      const n = Number(batchRemaining);
-      updateCols.push('batchRemaining = ?');
-      params.push(Number.isFinite(n) ? n : 0);
+    if (date !== undefined) { updateCols.push("date = ?"); params.push(date); }
+    if (recipe !== undefined) { updateCols.push("recipe = ?"); params.push(recipe); }
+    if (batchesProduced !== undefined) { updateCols.push("batchesProduced = ?"); params.push(Number(batchesProduced)); }
+
+    // Always update batchRemaining (DB column stores units total)
+    updateCols.push("batchRemaining = ?");
+    params.push(Number(computedBatchRemainingUnits));
+
+    // Update units_of_waste only if supplied explicitly (or if you want to always reflect newUnitsOfWaste uncomment)
+    if (units_of_waste !== undefined || unitsOfWaste !== undefined) {
+      updateCols.push("units_of_waste = ?");
+      params.push(Number(newUnitsOfWaste));
     }
 
-    // Map either units_of_waste or unitsOfWaste -> units_of_waste (DB column)
-    const uw = (units_of_waste !== undefined) ? units_of_waste : unitsOfWaste;
-    if (uw !== undefined) {
-      const n = Number(uw);
-      updateCols.push('units_of_waste = ?');
-      params.push(Number.isFinite(n) ? n : 0);
-    }
-
-    // DO NOT attempt to update derived/client-only fields such as unitsRemaining
-    // If updateCols is empty, nothing to do
     if (updateCols.length === 0) {
       await conn.rollback();
-      console.warn('[PUT.production-log] no updatable fields supplied');
-      return res.status(400).json({ error: 'No updatable fields supplied' });
+      console.warn("[PUT.production-log] nothing to update");
+      return res.status(400).json({ error: "No updatable fields supplied" });
     }
 
-    // finalize query
+    // add WHERE params
     params.push(batchCode, cognito_id);
-    const updateSql = `UPDATE production_log SET ${updateCols.join(', ')} WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL`;
-    console.info('[PUT.production-log] executing update:', updateSql, 'params:', params);
+
+    const updateSql = `UPDATE production_log SET ${updateCols.join(", ")} WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL`;
+    console.info("[PUT.production-log] Executing update:", updateSql, "params:", params);
     await conn.execute(updateSql, params);
 
-    // Recompute any dependent inventory aggregates (if function exists)
-    if (typeof syncProductionInventoryForUser === 'function') {
-      try {
-        await syncProductionInventoryForUser(cognito_id, conn);
-      } catch (syncErr) {
-        console.warn('[PUT.production-log] syncProductionInventoryForUser failed (continuing):', syncErr && syncErr.message);
-      }
-    } else {
-      console.info('[PUT.production-log] syncProductionInventoryForUser not defined — skipping');
+    // Re-select the updated row and join recipe UPB for the response, compute derived fields server-side
+    const [updatedRows] = await conn.execute(
+      `SELECT pl.*, COALESCE(r.units_per_batch,0) AS units_per_batch
+       FROM production_log pl
+       LEFT JOIN recipes r ON r.recipe_name = pl.recipe AND r.user_id = pl.user_id
+       WHERE pl.batchCode = ? AND pl.user_id = ? LIMIT 1`,
+      [batchCode, cognito_id]
+    );
+
+    if (!updatedRows || !updatedRows.length) {
+      await conn.rollback();
+      console.error("[PUT.production-log] failed to fetch updated row after update");
+      return res.status(500).json({ error: "Failed to fetch updated row" });
     }
 
-    await conn.commit();
-    console.info('[PUT.production-log] commit successful');
+    const updated = updatedRows[0];
+    // compute returned derived values (server truth)
+    const returnedBatchRemainingUnits = Number(updated.batchRemaining || 0);
+    const returnedUnitsOfWaste = Number(updated.units_of_waste || 0);
+    const returnedUnitsRemaining = returnedBatchRemainingUnits - returnedUnitsOfWaste;
+    const returnedUPB = Number(updated.units_per_batch || 0);
+    const returnedBatchesRemaining = returnedUPB > 0 ? returnedUnitsRemaining / returnedUPB : null;
 
-    // Return updated row for frontend sync
-    const [updatedRows] = await conn.execute(`SELECT * FROM production_log WHERE batchCode = ? AND user_id = ? LIMIT 1`, [batchCode, cognito_id]);
-    return res.json({ success: true, updated: updatedRows[0] || null });
+    await conn.commit();
+    console.info("[PUT.production-log] commit successful, returning updated row with derived fields");
+
+    return res.json({
+      success: true,
+      updated: {
+        ...updated,
+        unitsRemaining: returnedUnitsRemaining,
+        batchesRemaining: returnedBatchesRemaining,
+      },
+    });
   } catch (err) {
-    try { await conn.rollback(); } catch (rbErr) { console.error('[PUT.production-log] rollback failed', rbErr); }
-    console.error('[PUT.production-log] DB error:', err && err.message, err && err.stack);
-    return res.status(500).json({ error: 'Database error', details: err && err.message });
+    await conn.rollback().catch(() => {});
+    console.error("[PUT.production-log] DB error:", err && err.message ? err.message : err);
+    return res.status(500).json({ error: "Database error", details: err && err.message ? err.message : String(err) });
   } finally {
     conn.release();
   }
-}));
+});
 
 /* Helper: syncProductionInventoryForUser (simple template) */
 async function syncProductionInventoryForUser(cognito_id, connArg = null) {
