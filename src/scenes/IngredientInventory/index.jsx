@@ -35,6 +35,56 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+/**
+ * Unit normalization helpers
+ *
+ * - mass base: grams (g)  — kg -> *1000
+ * - volume base: milliliters (ml) — l -> *1000
+ * - count base: units (no conversion)
+ *
+ * If unit text is unknown we treat as 'units' fallback.
+ */
+const detectUnitTypeAndFactor = (rawUnit) => {
+  const u = String(rawUnit || "").trim().toLowerCase();
+  if (!u) return { type: "units", base: "units", factor: 1 };
+
+  // Mass
+  if (u.includes("kg") || u.includes("kilogram")) return { type: "mass", base: "g", factor: 1000 };
+  if (u.includes("g") || u.includes("gram")) return { type: "mass", base: "g", factor: 1 };
+
+  // Volume
+  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter")) return { type: "volume", base: "ml", factor: 1000 };
+  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre")) return { type: "volume", base: "ml", factor: 1 };
+
+  // Count-ish
+  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("pieces")) return { type: "units", base: "units", factor: 1 };
+
+  // Fallback — treat as units
+  return { type: "units", base: "units", factor: 1 };
+};
+
+const formatDisplayForGroup = ({ type, totalBase }) => {
+  if (type === "mass") {
+    // base is grams; show kg if >= 1000g
+    if (Math.abs(totalBase) >= 1000) {
+      const val = +(totalBase / 1000).toFixed(3);
+      // trim unnecessary zeros
+      return { displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()), displayUnit: "kg", numericForChart: val };
+    }
+    return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "g", numericForChart: totalBase };
+  }
+  if (type === "volume") {
+    // base is ml; show L if >= 1000ml
+    if (Math.abs(totalBase) >= 1000) {
+      const val = +(totalBase / 1000).toFixed(3);
+      return { displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()), displayUnit: "L", numericForChart: val };
+    }
+    return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "ml", numericForChart: totalBase };
+  }
+  // units / fallback
+  return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "units", numericForChart: totalBase };
+};
+
 const IngredientsInventory = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -57,23 +107,93 @@ const IngredientsInventory = () => {
         if (!res.ok) throw new Error(`Failed to fetch active inventory (${res.status})`);
         const data = await res.json();
 
-        // 🔎 Debug: confirm what API returns
-        console.log("[IngredientsInventory] /ingredient-inventory/active response:", data);
+        // Defensive: ensure array
+        const rows = Array.isArray(data) ? data : [];
 
-        // Map API -> grid rows (defensive)
-        const mapped = (Array.isArray(data) ? data : []).map((r, idx) => {
-          const stockNum = Number(r?.totalRemaining);
+        // Normalize & aggregate
+        const groups = {}; // key: normalized ingredient name
+        rows.forEach((r, idx) => {
+          const ingredient = (r?.ingredient ?? "").trim();
+          if (!ingredient) return; // skip empty names
+
+          const rawUnit = r?.unit ?? "";
+          const { type, base, factor } = detectUnitTypeAndFactor(rawUnit);
+
+          // Parse numeric totalRemaining (fallback 0)
+          const rawAmount = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
+          const baseAmount = rawAmount * (Number(factor) || 1);
+
+          const key = ingredient.toLowerCase(); // case-insensitive grouping
+          if (!groups[key]) {
+            groups[key] = {
+              ingredient,
+              totalBase: baseAmount,
+              type,
+              baseUnit: base,
+              sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
+              // keep a sample batchCode/id for row id (prefer existing batchCode if present)
+              sampleId: r?.batchCode ?? `${ingredient}-${idx}`,
+              latestDate: r?.date ?? null,
+            };
+          } else {
+            // If type mismatch (e.g., some rows recorded in mass and some in volume) — treat conservatively:
+            if (groups[key].type !== type) {
+              // fallback: don't try to coerce; append unit label to ingredient name to avoid silent weird sums
+              // convert current group's data into a compound key so both remain visible
+              const altKey = `${key}::${type}`;
+              if (!groups[altKey]) {
+                groups[altKey] = {
+                  ingredient: `${ingredient} (${type === "mass" ? "mass" : type === "volume" ? "volume" : "units"})`,
+                  totalBase: baseAmount,
+                  type,
+                  baseUnit: base,
+                  sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
+                  sampleId: r?.batchCode ?? `${ingredient}-${idx}-alt`,
+                  latestDate: r?.date ?? null,
+                };
+              } else {
+                groups[altKey].totalBase += baseAmount;
+                if (r?.date && (!groups[altKey].latestDate || new Date(r.date) > new Date(groups[altKey].latestDate))) {
+                  groups[altKey].latestDate = r.date;
+                }
+              }
+            } else {
+              groups[key].totalBase += baseAmount;
+              // prefer the newest date for the group (useful for display if needed)
+              if (r?.date && (!groups[key].latestDate || new Date(r.date) > new Date(groups[key].latestDate))) {
+                groups[key].latestDate = r.date;
+              }
+              // pick first non-empty barcode (keep whatever we had)
+              if (!groups[key].sampleBarcode && (r?.activeBarcode || r?.barcode)) {
+                groups[key].sampleBarcode = r?.activeBarcode ?? r?.barcode;
+              }
+            }
+          }
+        });
+
+        // Convert groups object into array for grid, formatting human-friendly units
+        const processed = Object.values(groups).map((g) => {
+          const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup({
+            type: g.type,
+            totalBase: g.totalBase,
+          });
+
           return {
-            ingredient: r?.ingredient ?? "",
-            unit: r?.unit ?? "",
-            stockOnHand: Number.isFinite(stockNum) ? stockNum : 0,
-            barcode: r?.activeBarcode ?? "",
-            _id: `${r?.ingredient ?? "row"}-${r?.unit ?? "unit"}-${idx}`,
+            id: g.sampleId,
+            ingredient: g.ingredient,
+            unitsInStock: displayValue,
+            unit: displayUnit,
+            // keep raw numeric value for charts
+            _numeric: numericForChart,
+            barcode: g.sampleBarcode ?? "",
+            date: g.latestDate,
           };
         });
 
-        console.log("[IngredientsInventory] mapped rows:", mapped);
-        setIngredientInventory(mapped);
+        // sort alphabetically for UX
+        processed.sort((a, b) => a.ingredient.localeCompare(b.ingredient));
+
+        setIngredientInventory(processed);
       } catch (err) {
         console.error("Error fetching active ingredient inventory:", err);
         setSnackbarMessage("Failed to load ingredient inventory");
@@ -95,20 +215,23 @@ const IngredientsInventory = () => {
         editable: false,
       },
       {
-        field: "stockOnHand",
-        headerName: "Stock on Hand",
+        field: "unitsInStock",
+        headerName: "Units in Stock",
         type: "number",
         flex: 1,
         editable: false,
+        valueGetter: (params) => params.row?.unitsInStock ?? 0,
         renderCell: (params) => {
-          const v = Number(params.row?.stockOnHand ?? params.value ?? 0);
-          return Number.isFinite(v) ? v.toLocaleString() : "";
+          const v = params.row?.unitsInStock;
+          // If it's a number-like show nicely with locale; otherwise return as-is
+          if (typeof v === "number") return Number.isFinite(v) ? v.toLocaleString() : String(v);
+          return String(v);
         },
       },
       {
         field: "unit",
         headerName: "Unit",
-        flex: 1,
+        flex: 0.7,
         editable: false,
       },
       {
@@ -127,7 +250,7 @@ const IngredientsInventory = () => {
     () =>
       (ingredientInventory || []).map((item) => ({
         ingredient: item.ingredient,
-        amount: Number(item.stockOnHand) || 0,
+        amount: Number(item._numeric) || 0,
       })),
     [ingredientInventory]
   );
@@ -211,7 +334,7 @@ const IngredientsInventory = () => {
         >
           <DataGrid
             autoHeight={false}
-            getRowId={(row) => row._id || `${row.ingredient}-${row.unit}`}
+            getRowId={(row) => row.id || `${row.ingredient}`}
             rows={ingredientInventory || []}
             columns={columns}
             pageSize={10}

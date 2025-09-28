@@ -14,6 +14,7 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useData } from "../../contexts/DataContext";
@@ -38,11 +39,128 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+// keep select options for editing; UI shows friendly units for display
 const unitOptions = [
-  { value: "grams", label: "Grams (g)" },
+  { value: "g", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
   { value: "units", label: "Units" },
 ];
+
+/** Unit helpers: detect type + base factor */
+const detectUnitTypeAndFactor = (rawUnit) => {
+  const u = String(rawUnit || "").trim().toLowerCase();
+  if (!u) return { type: "units", base: "units", factor: 1 };
+
+  // mass
+  if (u === "kg" || u.includes("kg") || u.includes("kilogram")) return { type: "mass", base: "g", factor: 1000 };
+  if (u === "g" || u.includes("g") || u.includes("gram")) return { type: "mass", base: "g", factor: 1 };
+
+  // volume
+  if (u === "l" || u.includes("l ") || u.includes("litre") || u.includes("liter")) return { type: "volume", base: "ml", factor: 1000 };
+  if (u === "ml" || u.includes("ml") || u.includes("milliliter") || u.includes("millilitre")) return { type: "volume", base: "ml", factor: 1 };
+
+  // counts
+  if (u === "unit" || u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("piece")) return { type: "units", base: "units", factor: 1 };
+
+  // fallback
+  return { type: "units", base: "units", factor: 1 };
+};
+
+const normalizeToBase = (value, rawUnit) => {
+  const n = Number(value || 0) || 0;
+  const { factor } = detectUnitTypeAndFactor(rawUnit);
+  return n * factor;
+};
+
+/** Format value for display:
+ * - mass base unit 'g' -> display 'kg' when abs(value) >= 1000 (value/1000, 2 decimals)
+ * - volume base unit 'ml' -> display 'L' when abs(value) >= 1000
+ * - otherwise show base with thousand separators
+ */
+const formatForDisplay = (value, baseUnit) => {
+  const n = Number(value || 0) || 0;
+  if (baseUnit === "g") {
+    if (Math.abs(n) >= 1000) {
+      const kg = n / 1000;
+      const str = Math.abs(kg) >= 100 ? kg.toFixed(1) : kg.toFixed(2);
+      return { text: `${Number(str)} kg`, unit: "kg", raw: `${n.toLocaleString()} g` };
+    }
+    return { text: `${n.toLocaleString()} g`, unit: "g", raw: `${n.toLocaleString()} g` };
+  }
+  if (baseUnit === "ml") {
+    if (Math.abs(n) >= 1000) {
+      const l = n / 1000;
+      const str = Math.abs(l) >= 100 ? l.toFixed(1) : l.toFixed(2);
+      return { text: `${Number(str)} L`, unit: "L", raw: `${n.toLocaleString()} ml` };
+    }
+    return { text: `${n.toLocaleString()} ml`, unit: "ml", raw: `${n.toLocaleString()} ml` };
+  }
+  // units or unknown
+  return { text: `${n.toLocaleString()} ${baseUnit}`, unit: baseUnit, raw: `${n.toLocaleString()} ${baseUnit}` };
+};
+
+/** Parse user input string into base units.
+ * Accepts forms:
+ *  - "1500"           => treated as base units (number)
+ *  - "1.5 kg"         => converted to base (1500) if base is g
+ *  - "1,500 g"        => converted (1500)
+ *  - "1.2 L"          => converted to ml if base is ml
+ * Returns a Number (base units). If parsing fails returns NaN.
+ */
+const parseInputToBase = (input, baseUnit) => {
+  if (input === null || input === undefined) return NaN;
+  if (typeof input === "number") return Number(input || 0);
+
+  const s = String(input).trim().toLowerCase().replace(/\u00A0/g, ""); // remove NBSP
+  if (s.length === 0) return NaN;
+
+  // match number (allow commas) and optional unit token
+  const m = s.match(/^([\d,]*\.?\d+)\s*(kg|g|l|ml|litre|liter|millilitre|milliliter|units?|pcs?|pieces?)?$/i);
+  if (!m) {
+    // fallback: remove commas and parse number
+    const cleaned = s.replace(/,/g, "");
+    const v = Number(cleaned);
+    return Number.isFinite(v) ? v : NaN;
+  }
+
+  const numStr = m[1].replace(/,/g, "");
+  const num = Number(numStr);
+  const unitToken = (m[2] || "").toLowerCase();
+
+  if (!unitToken) {
+    // no unit specified — assume the user entered base units (backwards compatible)
+    return num;
+  }
+
+  // map token to factor relative to baseUnit
+  // mass
+  if (unitToken === "kg" || unitToken === "kilogram") {
+    if (baseUnit === "g") return num * 1000;
+    if (baseUnit === "ml") return num * 1000; // improbable, but let user convert if they typed L for a ml base; treat similarly
+  }
+  if (unitToken === "g" || unitToken === "gram") {
+    if (baseUnit === "g") return num;
+    if (baseUnit === "ml") return num; // weird, but keep numeric
+  }
+
+  // volume
+  if (unitToken === "l" || unitToken === "litre" || unitToken === "liter") {
+    if (baseUnit === "ml") return num * 1000;
+    if (baseUnit === "g") return num * 1000;
+  }
+  if (unitToken === "ml" || unitToken === "millilitre" || unitToken === "milliliter") {
+    if (baseUnit === "ml") return num;
+    if (baseUnit === "g") return num;
+  }
+
+  // units / pieces
+  if (unitToken.startsWith("unit") || unitToken.startsWith("pcs") || unitToken.startsWith("piece")) {
+    return num;
+  }
+
+  // fallback: return numeric as-is
+  return num;
+};
 
 const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
@@ -52,14 +170,13 @@ const GoodsIn = () => {
 
   // Editing state
   const [activeCell, setActiveCell] = useState(null);
-  // activeCell shape: { id: barCode, field: string|null, value: any, row: {...} }
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState("");
-  const [editingRow, setEditingRow] = useState(null); // when editing full row
-  const [originalBarcode, setOriginalBarcode] = useState(null); // IMPORTANT: keep original identifier
+  const [editingRow, setEditingRow] = useState(null);
+  const [originalBarcode, setOriginalBarcode] = useState(null);
   const [updating, setUpdating] = useState(false);
 
-  // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
+  // Fetch ACTIVE goods-in rows
   useEffect(() => {
     const fetchGoodsInData = async () => {
       try {
@@ -70,13 +187,24 @@ const GoodsIn = () => {
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
 
-        // Normalize + compute processed flag from stockRemaining and format dates yyyy-mm-dd
-        const normalized = (Array.isArray(data) ? data : []).map((row) => ({
-          ...row,
-          date: row.date ? String(row.date).slice(0, 10) : row.date,
-          expiryDate: row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate,
-          processed: Number(row.stockRemaining) === 0 ? "Yes" : "No",
-        }));
+        // Normalize: convert stockReceived/stockRemaining to base units (g/ml/units)
+        const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
+          const rawUnit = row.unit || "";
+          const { base } = detectUnitTypeAndFactor(rawUnit);
+          const stockReceivedBase = normalizeToBase(row.stockReceived, rawUnit);
+          const stockRemainingBase = normalizeToBase(row.stockRemaining, rawUnit);
+
+          return {
+            ...row,
+            date: row.date ? String(row.date).slice(0, 10) : row.date,
+            expiryDate: row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate,
+            stockReceived: stockReceivedBase,
+            stockRemaining: stockRemainingBase,
+            unit: base,
+            processed: Number(stockRemainingBase) === 0 ? "Yes" : "No",
+            barCode: row.barCode ?? `gen-${idx}-${String(row.ingredient || "x").replace(/\s+/g, "-")}`,
+          };
+        });
 
         setGoodsInRows(normalized);
         updateIngredientInventory(normalized);
@@ -87,7 +215,37 @@ const GoodsIn = () => {
     if (cognitoId) fetchGoodsInData();
   }, [cognitoId, setGoodsInRows]);
 
-  // Columns (no per-row delete; we use checkboxSelection + toolbar)
+  // Update ingredient inventory by summing stockRemaining (base units)
+  const updateIngredientInventory = (rows) => {
+    const active = (rows || []).filter((r) => Number(r.stockRemaining) > 0);
+
+    const map = new Map();
+    for (const r of active) {
+      const key = r.ingredient;
+      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date, unit: r.unit };
+      const amount = prev.amount + Number(r.stockRemaining || 0);
+
+      let nextBarcode = prev.barcode;
+      let nextDate = prev._date;
+      try {
+        const prevTime = new Date(prev._date).getTime() || Infinity;
+        const curTime = new Date(r.date).getTime() || Infinity;
+        if (curTime < prevTime) {
+          nextBarcode = r.barCode;
+          nextDate = r.date;
+        }
+      } catch {
+        // ignore parsing errors
+      }
+
+      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate, unit: r.unit || prev.unit });
+    }
+
+    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+    setIngredientInventory(inventory);
+  };
+
+  // Columns: show friendly display for stock values, unit column shows display unit (kg/L/g/ml/units)
   const columns = useMemo(
     () => [
       { field: "date", headerName: "Date", flex: 1, editable: false },
@@ -95,23 +253,69 @@ const GoodsIn = () => {
       { field: "temperature", headerName: "Temperature", flex: 1, editable: false },
       {
         field: "stockReceived",
-        headerName: "Stock Received (kg)",
-        type: "number",
+        headerName: "Stock Received",
         flex: 1,
         headerAlign: "left",
         align: "left",
         editable: false,
+        renderCell: (params) => {
+          const { text, raw } = formatForDisplay(params.value, params.row.unit);
+          return (
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Raw: {raw}</Typography>
+                  <br />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Display: {text}</Typography>
+                </Box>
+              }
+            >
+              <Typography sx={{ fontWeight: 700 }}>{text}</Typography>
+            </Tooltip>
+          );
+        },
       },
       {
         field: "stockRemaining",
-        headerName: "Stock Remaining (kg)",
-        type: "number",
+        headerName: "Stock Remaining",
         flex: 1,
         headerAlign: "left",
         align: "left",
         editable: false,
+        renderCell: (params) => {
+          const { text, raw } = formatForDisplay(params.value, params.row.unit);
+          return (
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Raw: {raw}</Typography>
+                  <br />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Display: {text}</Typography>
+                </Box>
+              }
+            >
+              <Box>
+                <Typography sx={{ fontWeight: 700 }}>{text}</Typography>
+              </Box>
+            </Tooltip>
+          );
+        },
       },
-      { field: "unit", headerName: "Unit", flex: 1, editable: false },
+      {
+        field: "unit",
+        headerName: "Unit",
+        flex: 0.8,
+        editable: false,
+        renderCell: (params) => {
+          const chooseVal = params.row.stockRemaining !== undefined ? params.row.stockRemaining : params.row.stockReceived;
+          const { unit: displayUnit } = formatForDisplay(chooseVal, params.row.unit);
+          return <Typography sx={{ color: brand.subtext, fontWeight: 700 }}>{displayUnit}</Typography>;
+        },
+      },
       { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
       {
         field: "barCode",
@@ -159,132 +363,27 @@ const GoodsIn = () => {
         filterable: false,
         width: 96,
         align: "center",
-        renderCell: (params) => {
-          return (
-            <IconButton
-              size="small"
-              aria-label="Edit row"
-              onClick={() => {
-                // open full-row editor — capture original barcode immediately
-                setEditingRow(params.row);
-                setOriginalBarcode(params.row.barCode); // store original identifier
-                setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
-                setEditValue(null);
-                setEditDialogOpen(true);
-              }}
-            >
-              <EditOutlinedIcon sx={{ color: brand.primary }} />
-            </IconButton>
-          );
-        },
+        renderCell: (params) => (
+          <IconButton
+            size="small"
+            aria-label="Edit row"
+            onClick={() => {
+              setEditingRow(params.row);
+              setOriginalBarcode(params.row.barCode);
+              setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
+              setEditValue(null);
+              setEditDialogOpen(true);
+            }}
+          >
+            <EditOutlinedIcon sx={{ color: brand.primary }} />
+          </IconButton>
+        ),
       },
     ],
     []
   );
 
-  // Save edits (still allowed for active rows) — key by barCode
-  // Accepts optional originalBarcode to be used as the path identifier when updating.
-  const processRowUpdate = async (newRow, originalBar) => {
-    // originalBar: the barcode that identifies the row in DB before any change.
-    const identifier = originalBar || newRow.barCode;
-    const updatedRow = {
-      ...newRow,
-      processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
-    };
-
-    try {
-      const url = `${API_BASE}/goods-in/${encodeURIComponent(identifier)}`;
-      console.log("[processRowUpdate] PUT", url, "payload:", {
-        date: updatedRow.date,
-        ingredient: updatedRow.ingredient,
-        temperature: updatedRow.temperature,
-        stockReceived: updatedRow.stockReceived,
-        stockRemaining: updatedRow.stockRemaining,
-        unit: updatedRow.unit,
-        expiryDate: updatedRow.expiryDate,
-        barCode: updatedRow.barCode, // include new barcode in body if changed
-        cognito_id: cognitoId,
-      });
-
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: updatedRow.date,
-          ingredient: updatedRow.ingredient,
-          temperature: updatedRow.temperature,
-          stockReceived: updatedRow.stockReceived,
-          stockRemaining: updatedRow.stockRemaining,
-          unit: updatedRow.unit,
-          expiryDate: updatedRow.expiryDate,
-          barCode: updatedRow.barCode, // new barcode value to be written (if changed)
-          cognito_id: cognitoId,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        console.error("[processRowUpdate] server returned non-OK:", response.status, text);
-        // Try to parse JSON error if possible for better message
-        try {
-          const json = JSON.parse(text || "{}");
-          throw new Error(JSON.stringify(json));
-        } catch {
-          throw new Error(text || `Failed to update row (status ${response.status})`);
-        }
-      }
-
-      const json = await response.json().catch(() => null);
-      const resultRow = (json && json.updated) ? json.updated : updatedRow;
-
-      // Update local rows + inventory. Use identifier (original barcode) to find row to replace.
-      const nextRows = (goodsInRows || []).map((r) =>
-        r.barCode === identifier ? resultRow : r
-      );
-
-      setGoodsInRows(nextRows);
-      updateIngredientInventory(nextRows);
-
-      return resultRow;
-    } catch (error) {
-      console.error("Backend update error:", error);
-      throw error;
-    }
-  };
-
-  // Inventory: sum ACTIVE stockRemaining; earliest active barcode per ingredient
-  const updateIngredientInventory = (rows) => {
-    const active = rows.filter((r) => Number(r.stockRemaining) > 0);
-
-    const map = new Map();
-    for (const r of active) {
-      const key = r.ingredient;
-      const prev =
-        map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-      const amount = prev.amount + Number(r.stockRemaining || 0);
-
-      // choose earliest date as the "next" barcode
-      let nextBarcode = prev.barcode;
-      let nextDate = prev._date;
-      try {
-        const prevTime = new Date(prev._date).getTime() || Infinity;
-        const curTime = new Date(r.date).getTime() || Infinity;
-        if (curTime < prevTime) {
-          nextBarcode = r.barCode;
-          nextDate = r.date;
-        }
-      } catch {
-        // ignore date parsing errors
-      }
-
-      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-    }
-
-    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-    setIngredientInventory(inventory);
-  };
-
-  // Bulk soft delete — loop over selected barCodes to match /api/delete-row
+  // Bulk soft delete
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
 
@@ -304,7 +403,6 @@ const GoodsIn = () => {
         )
       );
 
-      // Remove from local state (by barCode) and refresh inventory
       const remaining = goodsInRows.filter((r) => !selectedRows.includes(r.barCode));
       setGoodsInRows(remaining);
       updateIngredientInventory(remaining);
@@ -321,9 +419,8 @@ const GoodsIn = () => {
   const handleCloseConfirmDialog = () => setOpenConfirmDialog(false);
   const handleFileOpen = (fileUrl) => window.open(fileUrl, "_blank");
 
-  // Called when user clicks a cell - we record the active cell
-  const handleCellClick = (params, event) => {
-    // ignore checkbox clicks
+  // Cell click
+  const handleCellClick = (params) => {
     if (params.field === "__check__") return;
     setActiveCell({
       id: params.row.barCode,
@@ -333,16 +430,79 @@ const GoodsIn = () => {
     });
   };
 
-  // Called when user wants to edit the currently selected cell (toolbar button)
+  // When editing we send values in base units (normalized)
+  const processRowUpdate = async (newRow, originalBar) => {
+    const identifier = originalBar || newRow.barCode;
+    const updatedRow = {
+      ...newRow,
+      processed: Number(newRow.stockRemaining) === 0 ? "Yes" : "No",
+    };
+
+    try {
+      const url = `${API_BASE}/goods-in/${encodeURIComponent(identifier)}`;
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: updatedRow.date,
+          ingredient: updatedRow.ingredient,
+          temperature: updatedRow.temperature,
+          stockReceived: Number(updatedRow.stockReceived || 0),
+          stockRemaining: Number(updatedRow.stockRemaining || 0),
+          unit: updatedRow.unit,
+          expiryDate: updatedRow.expiryDate,
+          barCode: updatedRow.barCode,
+          cognito_id: cognitoId,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error("[processRowUpdate] server returned non-OK:", response.status, text);
+        try {
+          const json = JSON.parse(text || "{}");
+          throw new Error(JSON.stringify(json));
+        } catch {
+          throw new Error(text || `Failed to update row (status ${response.status})`);
+        }
+      }
+
+      const json = await response.json().catch(() => null);
+      const resultRow = (json && json.updated) ? json.updated : updatedRow;
+
+      // Normalize server result into base units for UI
+      const serverUnit = resultRow.unit ?? updatedRow.unit;
+      const serverReceivedBase = normalizeToBase(resultRow.stockReceived, serverUnit);
+      const serverRemainingBase = normalizeToBase(resultRow.stockRemaining, serverUnit);
+
+      const normalizedResult = {
+        ...resultRow,
+        stockReceived: serverReceivedBase,
+        stockRemaining: serverRemainingBase,
+        unit: detectUnitTypeAndFactor(serverUnit).base,
+        processed: Number(serverRemainingBase) === 0 ? "Yes" : "No",
+      };
+
+      const nextRows = (goodsInRows || []).map((r) => (r.barCode === identifier ? normalizedResult : r));
+      setGoodsInRows(nextRows);
+      updateIngredientInventory(nextRows);
+
+      return normalizedResult;
+    } catch (error) {
+      console.error("Backend update error:", error);
+      throw error;
+    }
+  };
+
   const openEditForActiveCell = () => {
     if (!activeCell) return;
     setEditValue(activeCell.value ?? "");
-    setEditingRow(activeCell.row ?? null); // keep reference
-    setOriginalBarcode(activeCell.id); // store original identifier for single-cell edit too
+    setEditingRow(activeCell.row ?? null);
+    setOriginalBarcode(activeCell.id);
     setEditDialogOpen(true);
   };
 
-  // Confirm edit - if activeCell.field === null we edit full row (editingRow)
   const handleConfirmEdit = async () => {
     if (!editingRow && !activeCell) {
       setEditDialogOpen(false);
@@ -353,41 +513,42 @@ const GoodsIn = () => {
     try {
       let updatedRow;
       if (activeCell && activeCell.field && !editingRow) {
-        // single field update: clone row and set the field
         const row = (goodsInRows || []).find((r) => r.barCode === activeCell.id);
         if (!row) throw new Error("Row not found");
         const patched = { ...row, [activeCell.field]: editValue };
 
-        // If editing stockRemaining/stockReceived ensure numbers, processed flag
-        if (activeCell.field === "stockRemaining" || activeCell.field === "stockReceived") {
-          patched[activeCell.field] = Number(editValue || 0);
+        // If editing stock fields allow friendly input like "1.5 kg"
+        if (activeCell.field === "stockReceived" || activeCell.field === "stockRemaining") {
+          const parsed = parseInputToBase(editValue, row.unit);
+          if (!Number.isFinite(parsed)) throw new Error("Invalid numeric input");
+          patched[activeCell.field] = parsed;
         }
+
         if (patched.stockRemaining !== undefined) {
           patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
         }
 
-        // Pass original barcode (originalBarcode) as identifier so backend finds the correct row
         updatedRow = await processRowUpdate(patched, originalBarcode || activeCell.id);
       } else {
-        // editingRow (full row) - prepare payload
-        const patched = { ...editingRow };
+        const patched = { ...(editingRow || (activeCell ? activeCell.row : null)) };
 
-        // if editValue is set and activeCell.field present, apply that single change
-        if (activeCell && activeCell.field) {
-          patched[activeCell.field] = editValue;
-        }
+        // For full-row editing, allow friendly strings as input for the numeric fields
+        patched.stockReceived = Number.isFinite(Number(patched.stockReceived))
+          ? Number(patched.stockReceived)
+          : parseInputToBase(patched.stockReceived, patched.unit);
+        patched.stockRemaining = Number.isFinite(Number(patched.stockRemaining))
+          ? Number(patched.stockRemaining)
+          : parseInputToBase(patched.stockRemaining, patched.unit);
 
-        // coerce numeric fields
-        patched.stockReceived = Number(patched.stockReceived || 0);
-        patched.stockRemaining = Number(patched.stockRemaining || 0);
+        if (!Number.isFinite(patched.stockReceived)) patched.stockReceived = 0;
+        if (!Number.isFinite(patched.stockRemaining)) patched.stockRemaining = 0;
+
         patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
-        // originalBarcode state was set when dialog opened
         const original = originalBarcode || (activeCell ? activeCell.id : patched.barCode);
         updatedRow = await processRowUpdate(patched, original);
       }
 
-      // clear editing states
       setEditDialogOpen(false);
       setEditingRow(null);
       setActiveCell(null);
@@ -401,7 +562,7 @@ const GoodsIn = () => {
     }
   };
 
-  // Render an appropriate input type depending on field name
+  // Render appropriate input
   const renderEditInputForField = (fieldName, value, onChange) => {
     if (fieldName === "unit") {
       return (
@@ -409,7 +570,7 @@ const GoodsIn = () => {
           <InputLabel id="unit-edit-label">Unit</InputLabel>
           <Select
             labelId="unit-edit-label"
-            value={value ?? ""}
+            value={value ?? "g"}
             label="Unit"
             onChange={(e) => onChange(e.target.value)}
           >
@@ -424,35 +585,22 @@ const GoodsIn = () => {
     }
 
     if (fieldName === "expiryDate" || fieldName === "date") {
-      return (
-        <TextField
-          fullWidth
-          type="date"
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      );
+      return <TextField fullWidth type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
     }
 
     if (fieldName === "stockReceived" || fieldName === "stockRemaining") {
       return (
         <TextField
           fullWidth
-          type="number"
+          type="text"
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
+          helperText="You can enter '1500' (base g/ml/units) or friendly '1.5 kg', '1.2 L', '1200 g'."
         />
       );
     }
 
-    // default text
-    return (
-      <TextField
-        fullWidth
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
+    return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
   };
 
   return (
@@ -468,7 +616,7 @@ const GoodsIn = () => {
           overflow: "hidden",
         }}
       >
-        {/* Toolbar with bulk Delete + Edit active cell */}
+        {/* Toolbar */}
         <Box
           sx={{
             display: "flex",
@@ -492,11 +640,8 @@ const GoodsIn = () => {
                 borderRadius: 999,
                 width: 40,
                 height: 40,
-                background: activeCell
-                  ? `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`
-                  : "#f1f5f9",
-                boxShadow:
-                  activeCell && "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                background: activeCell ? `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` : "#f1f5f9",
+                boxShadow: activeCell && "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
               }}
             >
               <EditOutlinedIcon />
@@ -512,8 +657,7 @@ const GoodsIn = () => {
                 width: 40,
                 height: 40,
                 background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                boxShadow:
-                  "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
                 "&:hover": {
                   background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
                 },
@@ -556,7 +700,7 @@ const GoodsIn = () => {
         >
           <DataGrid
             rows={goodsInRows}
-            getRowId={(row) => row.barCode} // <- use barCode as the ID
+            getRowId={(row) => row.barCode}
             columns={columns}
             pageSize={10}
             rowsPerPageOptions={[10, 25, 50]}
@@ -564,16 +708,15 @@ const GoodsIn = () => {
             disableRowSelectionOnClick
             editMode="row"
             experimentalFeatures={{ newEditingApi: true }}
-            // IMPORTANT: use oldRow.barCode as the original identifier
             processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow?.barCode)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
-            onRowSelectionModelChange={(model) => setSelectedRows(model)} // model is array of barCodes
+            onRowSelectionModelChange={(model) => setSelectedRows(model)}
             onCellClick={handleCellClick}
           />
         </Box>
       </Box>
 
-      {/* Edit dialog (single cell or full-row) */}
+      {/* Edit dialog */}
       <Dialog
         open={editDialogOpen}
         onClose={() => {
@@ -598,19 +741,15 @@ const GoodsIn = () => {
         </DialogTitle>
 
         <DialogContent dividers>
-          {/* If editing a single cell, render appropriate input for that field */}
           {activeCell && activeCell.field && !editingRow && (
             <Box sx={{ mt: 1 }}>
               <Typography variant="caption" sx={{ color: brand.subtext }}>
                 Original Bar Code: {originalBarcode || activeCell.id}
               </Typography>
-              <Box sx={{ mt: 1 }}>
-                {renderEditInputForField(activeCell.field, editValue, setEditValue)}
-              </Box>
+              <Box sx={{ mt: 1 }}>{renderEditInputForField(activeCell.field, editValue, setEditValue)}</Box>
             </Box>
           )}
 
-          {/* If editing full row (editingRow exists) render inputs for common fields */}
           {(editingRow || (activeCell && activeCell.field === null)) && (
             <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
               {(() => {
@@ -622,45 +761,40 @@ const GoodsIn = () => {
                       label="Ingredient"
                       fullWidth
                       value={editingRow?.ingredient ?? row.ingredient ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))}
                     />
                     <TextField
                       label="Date"
                       fullWidth
                       type="date"
                       value={editingRow?.date ?? row.date ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))}
                     />
                     <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
                       <TextField
-                        label="Stock Received"
+                        label="Stock Received (base or friendly)"
                         fullWidth
-                        type="number"
+                        type="text"
                         value={editingRow?.stockReceived ?? row.stockReceived ?? ""}
-                        onChange={(e) =>
-                          setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))
-                        }
+                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))}
+                        helperText="Enter base (g/ml/units) or friendly like '1.5 kg', '1.2 L'"
                       />
                       <TextField
-                        label="Stock Remaining"
+                        label="Stock Remaining (base or friendly)"
                         fullWidth
-                        type="number"
+                        type="text"
                         value={editingRow?.stockRemaining ?? row.stockRemaining ?? ""}
-                        onChange={(e) =>
-                          setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))
-                        }
+                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))}
+                        helperText="Enter base (g/ml/units) or friendly like '1.5 kg', '1.2 L'"
                       />
                     </Box>
+
                     <FormControl fullWidth>
-                      <InputLabel id="unit-edit-label">Unit</InputLabel>
+                      <InputLabel id="unit-edit-label">Unit (base)</InputLabel>
                       <Select
                         labelId="unit-edit-label"
-                        value={editingRow?.unit ?? row.unit ?? ""}
-                        label="Unit"
+                        value={editingRow?.unit ?? row.unit ?? "g"}
+                        label="Unit (base)"
                         onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unit: e.target.value }))}
                       >
                         {unitOptions.map((opt) => (
@@ -670,6 +804,7 @@ const GoodsIn = () => {
                         ))}
                       </Select>
                     </FormControl>
+
                     <TextField
                       label="Bar Code"
                       fullWidth
@@ -681,17 +816,13 @@ const GoodsIn = () => {
                       fullWidth
                       type="date"
                       value={editingRow?.expiryDate ?? row.expiryDate ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))}
                     />
                     <TextField
                       label="Temperature (℃)"
                       fullWidth
                       value={editingRow?.temperature ?? row.temperature ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))}
                     />
                   </>
                 );
@@ -733,7 +864,7 @@ const GoodsIn = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
+      {/* Delete confirmation */}
       <Dialog
         open={openConfirmDialog}
         onClose={handleCloseConfirmDialog}
@@ -745,13 +876,10 @@ const GoodsIn = () => {
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          Confirm deletion
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: brand.subtext }}>
-            Delete {selectedRows.length} selected record
-            {selectedRows.length === 1 ? "" : "s"}?
+            Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
