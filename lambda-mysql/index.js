@@ -1372,40 +1372,38 @@ app.get("/api/ingredient-inventory/active", async (req, res) => {
   }
 });
 
-// Only return non–soft-deleted rows
 app.get("/api/production-log/active", async (req, res) => {
-  const { cognito_id } = req.query; // Get cognito_id from query parameters
-
-  // Log the incoming request
-  console.log("Received /api/production-log/active request with query:", req.query);
-
-  // Ensure cognito_id is provided
+  const { cognito_id } = req.query;
   if (!cognito_id) {
     console.error("Missing cognito_id in request:", req.query);
     return res.status(400).json({ error: "cognito_id is required" });
   }
 
-  console.log("Cognito ID provided:", cognito_id);
-
   try {
-    // Log the SQL query before execution
-    console.log("Executing query to fetch non-deleted production_log rows filtered by user_id (cognito_id):");
-    const query = "SELECT * FROM production_log WHERE user_id = ? AND deleted_at IS NULL";
-    console.log("SQL Query:", query);
-    console.log("Query Parameters:", [cognito_id]);
-
-    // Query table filtered by user_id (cognito_id) and not soft-deleted
-    const [results] = await db.promise().query(query, [cognito_id]);
-
-    // Log the results of the query
-    console.log("Query successful. Results fetched:", results);
-
-    res.json(results);
+    // compute derived fields server-side so clients see canonical values
+    const query = `
+      SELECT
+        pl.*,
+        COALESCE(r.units_per_batch, 0) AS units_per_batch,
+        (pl.batchRemaining - COALESCE(pl.units_of_waste, 0)) AS unitsRemaining,
+        CASE
+          WHEN COALESCE(r.units_per_batch, 0) > 0
+          THEN (pl.batchRemaining - COALESCE(pl.units_of_waste, 0)) / r.units_per_batch
+          ELSE NULL
+        END AS batchesRemaining
+      FROM production_log pl
+      LEFT JOIN recipes r ON r.recipe_name = pl.recipe AND r.user_id = pl.user_id
+      WHERE pl.user_id = ? AND pl.deleted_at IS NULL
+      ORDER BY pl.date DESC, pl.id DESC
+    `;
+    const [rows] = await db.promise().query(query, [cognito_id]);
+    return res.json(rows);
   } catch (err) {
-    console.error("Database error:", err);
-    res.status(500).json({ error: "Database error" });
+    console.error("Database error fetching production_log active:", err);
+    return res.status(500).json({ error: "Database error", details: err.message });
   }
 });
+
 
 app.post("/api/delete-production-log", async (req, res) => {
   console.log("[/api/delete-production-log] Received:", req.body);
@@ -1468,7 +1466,6 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     date,
     recipe,
     batchesProduced,
-    // client may send units_of_waste (snake) or unitsOfWaste (camel)
     units_of_waste,
     unitsOfWaste,
     // client-editable value (NOT a DB column): when present, this drives batchRemaining
@@ -1510,7 +1507,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       ? recipe
       : existing.recipe;
 
-    // Fetch units_per_batch (UPB) for recipe (scoped to user) — needed only to return batchesRemaining in response
+    // Fetch units_per_batch (UPB) for recipe (scoped to user) — used to return batchesRemaining in response
     let upb = 0;
     try {
       const [recipeRows] = await conn.execute(
@@ -1527,7 +1524,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       upb = 0;
     }
 
-    // DECISION: Only update batchRemaining when client supplies unitsRemaining explicitly.
+    // Only update batchRemaining when client supplies unitsRemaining explicitly.
     // If unitsRemaining provided => compute batchRemaining_units = unitsRemaining + units_of_waste
     // If not provided => DO NOT touch batchRemaining (leave DB value unchanged).
     let computedBatchRemainingUnits = null; // null => do not update DB batchRemaining
@@ -1558,7 +1555,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       params.push(Number(computedBatchRemainingUnits));
     }
 
-    // Update units_of_waste if explicitly provided (either name)
+    // Update units_of_waste only if explicitly provided
     if (units_of_waste !== undefined || unitsOfWaste !== undefined) {
       updateCols.push("units_of_waste = ?");
       params.push(Number(newUnitsOfWaste));

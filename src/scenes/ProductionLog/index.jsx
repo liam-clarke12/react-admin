@@ -66,9 +66,7 @@ const ProductionLog = () => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
         const map = {};
@@ -90,20 +88,20 @@ const ProductionLog = () => {
     if (!cognitoId) return;
     const fetchProductionLogData = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const response = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
         const data = await response.json();
         if (!Array.isArray(data)) return;
 
         const sanitized = data.map((row, idx) => {
           const batchesProduced = Number(row.batchesProduced) || 0;
-          const batchRemaining = Number(row.batchRemaining) || 0;
+          const batchRemaining = Number(row.batchRemaining) || 0; // stored in DB as units
           const unitsOfWaste = Number(row.units_of_waste || row.unitsOfWaste) || 0;
           const upb = recipesMap[row.recipe] ?? Number(row.units_per_batch || 0);
-          // compute unitsRemaining from stored batchRemaining * upb - unitsOfWaste
-          const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining * upb - unitsOfWaste)) || 0;
+
+          // === CORRECTED: compute unitsRemaining from stored units (batchRemaining) minus waste
+          const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining - unitsOfWaste)) || 0;
+          const batchesRemaining = upb > 0 ? Number(unitsRemaining) / Number(upb) : null;
 
           return {
             date: formatDateYMD(row.date),
@@ -112,6 +110,7 @@ const ProductionLog = () => {
             batchRemaining, // stored value in DB (units)
             unitsOfWaste,
             unitsRemaining,
+            batchesRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
             id: row.batchCode || `gen-${idx}-${Date.now()}`,
           };
@@ -185,21 +184,13 @@ const ProductionLog = () => {
   // Cell click handler: record active cell — but ignore batchRemaining field (not editable)
   const handleCellClick = (params) => {
     if (params.field === "__check__") return;
-    if (params.field === "batchRemaining") return; // defensive: don't allow editing this derived DB column
+    if (params.field === "batchRemaining") return; // don't let user edit DB column
     setActiveCell({
       id: params.row.batchCode,
       field: params.field,
       value: params.value,
       row: params.row,
     });
-  };
-
-  // open editor for active cell
-  const openEditForActiveCell = () => {
-    if (!activeCell) return;
-    setEditValue(activeCell.value ?? "");
-    setEditingRow(activeCell.row ?? null);
-    setEditDialogOpen(true);
   };
 
   // process update call to backend (single object)
@@ -255,7 +246,7 @@ const ProductionLog = () => {
         // full-row editing: editingRow holds string values; ensure types and date format
         const r = editingRow || (activeCell ? activeCell.row : null);
         if (!r) throw new Error("No row to edit");
-        // IMPORTANT: do NOT trust/edit batchRemaining here — server will compute it.
+        // IMPORTANT: do NOT trust/edit batchRemaining here — server will compute it if unitsRemaining present.
         patched = {
           ...r,
           date: formatDateYMD(r.date),
@@ -296,9 +287,7 @@ const ProductionLog = () => {
       }
 
       // update local state by batchCode
-      setProductionLogs((prev) =>
-        (prev || []).map((p) => (p.batchCode === newRow.batchCode ? { ...p, ...newRow } : p))
-      );
+      setProductionLogs((prev) => (prev || []).map((p) => (p.batchCode === newRow.batchCode ? { ...p, ...newRow } : p)));
 
       // clear states
       setEditDialogOpen(false);
@@ -422,11 +411,7 @@ const ProductionLog = () => {
                 Batch Code: {activeCell.id}
               </Typography>
               <Box sx={{ mt: 1 }}>
-                {renderEditInputForField(
-                  activeCell.field,
-                  editValue !== "" ? editValue : activeCell.value,
-                  setEditValue
-                )}
+                {renderEditInputForField(activeCell.field, editValue !== "" ? editValue : activeCell.value, setEditValue)}
               </Box>
             </Box>
           )}
@@ -459,7 +444,7 @@ const ProductionLog = () => {
                         value={editingRow?.batchesProduced ?? row.batchesProduced ?? 0}
                         onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), batchesProduced: e.target.value }))}
                       />
-                      {/* NOTE: Batch Remaining is intentionally removed from the edit UI */}
+                      {/* NOTE: batchRemaining is intentionally removed from the edit UI */}
                       <TextField
                         label="Units of Waste"
                         fullWidth
@@ -533,8 +518,22 @@ const ProductionLog = () => {
           <Typography sx={{ color: brand.subtext }}>Are you sure you want to delete the selected row(s)?</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>Cancel</Button>
-          <Button onClick={handleDeleteSelectedRows} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>
+          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteSelectedRows}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={<DeleteIcon />}
+          >
             Confirm
           </Button>
         </DialogActions>
