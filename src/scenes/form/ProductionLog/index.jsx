@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Formik } from "formik";
 import * as yup from "yup";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useData } from "../../../contexts/DataContext";
+import { loadGoodsInActive } from "../../data/GoodsIn";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -159,6 +161,7 @@ const unitFactorToBase = (canonUnit) => {
 
 const ProductionLogForm = () => {
   const { cognitoId } = useAuth();
+  const { setGoodsInRows, setIngredientInventory } = useData();
 
   /* Recipes */
   const [recipeNames, setRecipeNames] = useState([]); // select options
@@ -304,6 +307,16 @@ const ProductionLogForm = () => {
       });
       if (!res.ok) throw new Error("Failed to submit data");
       await res.json().catch(() => null);
+
+      // refresh client-side goods-in snapshot so UI shows server deductions immediately
+      try {
+        const { goodsRows, inventory } = await loadGoodsInActive(cognitoId);
+        if (Array.isArray(goodsRows)) setGoodsInRows(goodsRows);
+        if (Array.isArray(inventory)) setIngredientInventory(inventory);
+      } catch (refreshErr) {
+        console.warn("Could not refresh goods-in after production submit:", refreshErr);
+      }
+
       resetForm();
       setOpenToast(true);
     } catch (err) {

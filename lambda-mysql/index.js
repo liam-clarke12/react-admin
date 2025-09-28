@@ -1139,11 +1139,41 @@ app.post("/api/add-production-log", async (req, res) => {
 
   const connection = await db.promise().getConnection();
 
+  // --- helpers (server-side) ---
+  const normalizeUnit = (u) => {
+    const raw = (u || "").toString().trim().toLowerCase();
+    if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+    if (["g", "gram", "grams"].includes(raw)) return "g";
+    if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+    if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
+    if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+    if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
+    return raw;
+  };
+
+  // factor to convert canonical unit -> base numeric unit
+  const unitFactorToBase = (canonUnit) => {
+    const u = (canonUnit || "").toString().toLowerCase();
+    if (!u) return 1;
+    if (u === "kg") return 1000; // kg -> g
+    if (u === "g") return 1;
+    if (u === "l") return 1000; // L -> ml
+    if (u === "ml") return 1;
+    if (u === "unit") return 1;
+    return 1;
+  };
+
+  // safe rounding when converting back to lot unit (limits floating point drift)
+  const toFixedSafe = (num, decimals = 6) => {
+    // keep a sensible precision
+    return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+  };
+
   try {
     console.log("🔄 Starting database transaction...");
     await connection.beginTransaction();
 
-    // 🔍 Fetch recipe (scoped to user) and its UPB
+    // fetch recipe + units_per_batch
     const [recipeRows] = await connection.execute(
       `SELECT id, units_per_batch
          FROM recipes
@@ -1172,7 +1202,6 @@ app.post("/api/add-production-log", async (req, res) => {
       units_of_waste: finalUnitsOfWaste
     });
 
-    // ✅ Insert production log
     const [productionLogResult] = await connection.execute(
       `
       INSERT INTO production_log
@@ -1193,7 +1222,7 @@ app.post("/api/add-production-log", async (req, res) => {
     const productionLogId = productionLogResult.insertId;
     console.log("✅ Inserted production_log ID:", productionLogId);
 
-    // 🔄 Pull recipe ingredients WITH UNIT and compute total needed
+    // fetch recipe ingredients WITH UNIT and compute total needed (in recipe unit)
     const [ingredients] = await connection.execute(
       `
       SELECT
@@ -1214,49 +1243,64 @@ app.post("/api/add-production-log", async (req, res) => {
       return res.status(400).json({ error: "No ingredients found for this recipe" });
     }
 
-    // 📉 Deduct from ACTIVE goods_in (FIFO by date,id), matching unit and user, skipping soft-deleted rows
-    console.log("🔁 Deducting stock from goods_in (FIFO, active lots only)...");
+    console.log("🔁 Deducting stock from goods_in (FIFO, active lots; unit-aware conversion)...");
+
     for (const ing of ingredients) {
+      // amountNeeded is in the recipe unit (e.g., 10 if recipe says 10 g)
       let amountNeeded = Number(ing.total_needed) || 0;
       const ingName = ing.ingredient_name;
-      const ingUnit = ing.unit;
+      const ingUnitRaw = ing.unit;
+      const ingUnitCanon = normalizeUnit(ingUnitRaw);
+      const needBasePerUnit = unitFactorToBase(ingUnitCanon);
+      // convert total need to base units (grams, ml, or units)
+      let amountNeededBase = amountNeeded * needBasePerUnit;
 
-      console.log(`▶ ${ingName} (${ingUnit}): need ${amountNeeded}`);
+      console.log(`▶ ${ingName} (${ingUnitCanon || "no-unit"}): need ${amountNeeded} (${amountNeededBase} base)`);
 
-      while (amountNeeded > 0) {
+      // loop until we've satisfied the need (in base units) or run out of lots
+      while (amountNeededBase > 0) {
+        // fetch earliest active lot for this ingredient (any unit) — FIFO
         const [stockRows] = await connection.execute(
           `
-          SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date
+          SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit
             FROM goods_in gi
            WHERE gi.user_id = ?
              AND gi.ingredient = ?
-             AND gi.unit = ?
              AND gi.deleted_at IS NULL
              AND gi.stockRemaining > 0
            ORDER BY gi.date ASC, gi.id ASC
            LIMIT 1
           `,
-          [cognito_id, ingName, ingUnit]
+          [cognito_id, ingName]
         );
 
         if (stockRows.length === 0) {
           console.warn(
-            `⚠ Not enough stock for ${ingName} (${ingUnit}). Remaining shortfall: ${amountNeeded}`
+            `⚠ Not enough stock for ${ingName}. Remaining shortfall (base units): ${amountNeededBase}`
           );
-          break; // continue with other ingredients; partial fulfillment
+          break; // no more lots to pull from
         }
 
-        const { id: goodsInId, stockRemaining } = stockRows[0];
-        const deduction = Math.min(amountNeeded, Number(stockRemaining) || 0);
+        const { id: goodsInId, stockRemaining: lotStockRaw, unit: lotUnitRaw } = stockRows[0];
 
-        // Deduct from the lot
+        const lotUnitCanon = normalizeUnit(lotUnitRaw);
+        const lotFactor = unitFactorToBase(lotUnitCanon);
+        const lotBase = (Number(lotStockRaw) || 0) * lotFactor;
+
+        // how much we'll take (in base units)
+        const deductionBase = Math.min(amountNeededBase, lotBase);
+
+        // compute new lot base and convert back to lot's stored unit
+        const newLotBase = lotBase - deductionBase;
+        const newLotRemaining = toFixedSafe(newLotBase / (lotFactor || 1), 6);
+
+        // Update the lot's stockRemaining in its original unit
         await connection.execute(
-          `UPDATE goods_in SET stockRemaining = stockRemaining - ? WHERE id = ?`,
-          [deduction, goodsInId]
+          `UPDATE goods_in SET stockRemaining = ? WHERE id = ?`,
+          [newLotRemaining, goodsInId]
         );
 
-        // Track which lot (barcode) was used for this production
-        // (If you later add a "quantity_used" column, include it here.)
+        // Record usage (existing schema) — preserve original behavior (you can expand to include quantity if you want)
         await connection.execute(
           `
           INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
@@ -1265,12 +1309,12 @@ app.post("/api/add-production-log", async (req, res) => {
           [productionLogId, goodsInId, cognito_id]
         );
 
-        amountNeeded -= deduction;
+        amountNeededBase -= deductionBase;
         console.log(
-          `   • Used ${deduction} from goods_in.id=${goodsInId}; still need ${amountNeeded}`
+          `   • Used ${deductionBase} base units from goods_in.id=${goodsInId} (lot unit ${lotUnitCanon} => lotBase ${lotBase}). New lot remaining in lot unit: ${newLotRemaining}`
         );
-      }
-    }
+      } // end while per ingredient
+    } // end for each ingredient
 
     await connection.commit();
     console.log("✅ Transaction committed.");
@@ -1286,6 +1330,7 @@ app.post("/api/add-production-log", async (req, res) => {
     connection.release();
   }
 });
+
 
 app.get("/api/production-log", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters

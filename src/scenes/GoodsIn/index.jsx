@@ -44,6 +44,82 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
+/**
+ * Public loader helper: fetch active goods-in rows, normalize them,
+ * and compute ingredient inventory snapshot (sum stockRemaining per ingredient).
+ *
+ * This is exported so other modules (e.g. ProductionLog form) can
+ * call it after a successful production submission to refresh UI state.
+ */
+export async function loadGoodsInActive(cognitoId) {
+  if (!cognitoId) return { goodsRows: [], inventory: [] };
+
+  try {
+    const response = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+    if (!response.ok) {
+      console.error("Failed to fetch goods-in active:", response.status);
+      return { goodsRows: [], inventory: [] };
+    }
+
+    const data = await response.json();
+    const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
+      const date = row.date ? String(row.date).slice(0, 10) : row.date;
+      const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
+
+      const stockReceived = Number(row.stockReceived || 0);
+      const stockRemaining = Number(row.stockRemaining || 0);
+
+      // stable internal id uses barCode (if present) + index to always be unique
+      const serverBar = row.barCode ? String(row.barCode) : null;
+      const _id = serverBar
+        ? `${serverBar}-${idx}`
+        : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      return {
+        ...row,
+        date,
+        expiryDate,
+        stockReceived,
+        stockRemaining,
+        processed: Number(stockRemaining) === 0 ? "Yes" : "No",
+        barCode: serverBar || row.barCode || null,
+        _id,
+      };
+    });
+
+    // compute inventory snapshot
+    const active = normalized.filter((r) => Number(r.stockRemaining) > 0);
+    const map = new Map();
+    for (const r of active) {
+      const key = r.ingredient;
+      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+      const amount = prev.amount + Number(r.stockRemaining || 0);
+
+      // choose earliest date as the "next" barcode (FIFO)
+      let nextBarcode = prev.barcode;
+      let nextDate = prev._date;
+      try {
+        const prevTime = new Date(prev._date).getTime() || Infinity;
+        const curTime = new Date(r.date).getTime() || Infinity;
+        if (curTime < prevTime) {
+          nextBarcode = r.barCode;
+          nextDate = r.date;
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+    }
+
+    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+    return { goodsRows: normalized, inventory };
+  } catch (error) {
+    console.error("Error in loadGoodsInActive:", error);
+    return { goodsRows: [], inventory: [] };
+  }
+}
+
 const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
   const [selectedRows, setSelectedRows] = useState([]); // array of selected _id's
@@ -62,44 +138,10 @@ const GoodsIn = () => {
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
-      try {
-        if (!cognitoId) return;
-        const response = await fetch(
-          `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch Goods In data");
-        const data = await response.json();
-
-        // Normalize rows, ensure numeric types and create a stable internal _id
-        const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
-          const date = row.date ? String(row.date).slice(0, 10) : row.date;
-          const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
-
-          const stockReceived = Number(row.stockReceived || 0);
-          const stockRemaining = Number(row.stockRemaining || 0);
-
-          // stable internal id uses barCode (if present) + index to always be unique
-          const serverBar = row.barCode ? String(row.barCode) : null;
-          const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-
-          return {
-            ...row,
-            date,
-            expiryDate,
-            stockReceived,
-            stockRemaining,
-            processed: Number(stockRemaining) === 0 ? "Yes" : "No",
-            barCode: serverBar || row.barCode || null,
-            _id,
-          };
-        });
-
-        // set into context and compute inventory
-        setGoodsInRows(normalized);
-        computeAndSetIngredientInventory(normalized);
-      } catch (error) {
-        console.error("Error fetching Goods In data:", error);
-      }
+      if (!cognitoId) return;
+      const { goodsRows, inventory } = await loadGoodsInActive(cognitoId);
+      setGoodsInRows(goodsRows);
+      setIngredientInventory(inventory);
     };
     if (cognitoId) fetchGoodsInData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,36 +243,6 @@ const GoodsIn = () => {
     []
   );
 
-  // helper: compute ingredient inventory from rows and set it
-  const computeAndSetIngredientInventory = (rows) => {
-    const active = (Array.isArray(rows) ? rows : []).filter((r) => Number(r.stockRemaining) > 0);
-    const map = new Map();
-    for (const r of active) {
-      const key = r.ingredient;
-      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-      const amount = prev.amount + Number(r.stockRemaining || 0);
-
-      // choose earliest date as the "next" barcode
-      let nextBarcode = prev.barcode;
-      let nextDate = prev._date;
-      try {
-        const prevTime = new Date(prev._date).getTime() || Infinity;
-        const curTime = new Date(r.date).getTime() || Infinity;
-        if (curTime < prevTime) {
-          nextBarcode = r.barCode;
-          nextDate = r.date;
-        }
-      } catch {
-        // ignore parse errors
-      }
-
-      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-    }
-
-    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-    setIngredientInventory(inventory);
-  };
-
   // processRowUpdate - robust immutable updater, accepts both newRow & oldRow
   const processRowUpdate = async (newRow, oldRow) => {
     // determine identifiers
@@ -313,7 +325,29 @@ const GoodsIn = () => {
         }
 
         // recompute ingredient inventory using next snapshot
-        computeAndSetIngredientInventory(next);
+        const active = next.filter((r) => Number(r.stockRemaining) > 0);
+        const map = new Map();
+        for (const r of active) {
+          const key = r.ingredient;
+          const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+          const amount = prev.amount + Number(r.stockRemaining || 0);
+          let nextBarcode = prev.barcode;
+          let nextDate = prev._date;
+          try {
+            const prevTime = new Date(prev._date).getTime() || Infinity;
+            const curTime = new Date(r.date).getTime() || Infinity;
+            if (curTime < prevTime) {
+              nextBarcode = r.barCode;
+              nextDate = r.date;
+            }
+          } catch {
+            // ignore
+          }
+          map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+        }
+        const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+        setIngredientInventory(inventory);
+
         return next;
       });
 
@@ -347,7 +381,27 @@ const GoodsIn = () => {
 
       setGoodsInRows((prev = []) => {
         const remaining = prev.filter((r) => !selectedRows.includes(r._id));
-        computeAndSetIngredientInventory(remaining);
+        // recompute inventory
+        const active = remaining.filter((r) => Number(r.stockRemaining) > 0);
+        const map = new Map();
+        for (const r of active) {
+          const key = r.ingredient;
+          const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+          const amount = prev.amount + Number(r.stockRemaining || 0);
+          let nextBarcode = prev.barcode;
+          let nextDate = prev._date;
+          try {
+            const prevTime = new Date(prev._date).getTime() || Infinity;
+            const curTime = new Date(r.date).getTime() || Infinity;
+            if (curTime < prevTime) {
+              nextBarcode = r.barCode;
+              nextDate = r.date;
+            }
+          } catch {}
+          map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+        }
+        const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+        setIngredientInventory(inventory);
         return remaining;
       });
 
