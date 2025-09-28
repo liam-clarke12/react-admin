@@ -172,14 +172,15 @@ const IngredientsInventory = () => {
         });
 
         // Convert groups object into array for grid, formatting human-friendly units
-        const processed = Object.values(groups).map((g) => {
+        const processed = Object.values(groups).map((g, idx) => {
           const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup({
             type: g.type,
             totalBase: g.totalBase,
           });
 
           return {
-            id: g.sampleId,
+            // ensure stable unique id per row
+            id: g.sampleId ?? `${g.ingredient}-${idx}`,
             ingredient: g.ingredient,
             unitsInStock: displayValue,
             unit: displayUnit,
@@ -220,12 +221,12 @@ const IngredientsInventory = () => {
         type: "number",
         flex: 1,
         editable: false,
-        valueGetter: (params) => params.row?.unitsInStock ?? 0,
+        // defensive: guard params might be undefined
+        valueGetter: (params) => (params && params.row ? params.row.unitsInStock ?? 0 : params?.value ?? 0),
         renderCell: (params) => {
-          const v = params.row?.unitsInStock;
-          // If it's a number-like show nicely with locale; otherwise return as-is
+          const v = params && params.row ? params.row.unitsInStock : params?.value;
           if (typeof v === "number") return Number.isFinite(v) ? v.toLocaleString() : String(v);
-          return String(v);
+          return String(v ?? "");
         },
       },
       {
