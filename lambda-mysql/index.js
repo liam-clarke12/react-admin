@@ -1461,7 +1461,6 @@ app.post("/api/delete-production-log", async (req, res) => {
   }
 });
 
-// PUT /api/production-log/:batchCode
 app.put("/api/production-log/:batchCode", async (req, res) => {
   const { batchCode } = req.params;
   const body = req.body || {};
@@ -1472,7 +1471,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     // client may send units_of_waste (snake) or unitsOfWaste (camel)
     units_of_waste,
     unitsOfWaste,
-    // client-editable value (not a DB column)
+    // client-editable value (NOT a DB column): when present, this drives batchRemaining
     unitsRemaining,
     cognito_id,
   } = body;
@@ -1500,19 +1499,18 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     }
     const existing = existingRows[0];
 
-    // resolve units_of_waste value (prefer explicit in body)
+    // resolve units_of_waste value (prefer explicit in body; otherwise keep existing)
     const newUnitsOfWaste =
       units_of_waste !== undefined ? Number(units_of_waste)
       : unitsOfWaste !== undefined ? Number(unitsOfWaste)
       : Number(existing.units_of_waste || 0);
 
-    // We'll need units_per_batch for computations when necessary.
     // Determine recipe to use for the lookup (body.recipe overrides existing.recipe)
     const recipeToUse = (recipe !== undefined && recipe !== null && String(recipe).trim() !== "")
       ? recipe
       : existing.recipe;
 
-    // Fetch units_per_batch (UPB) for recipe (scoped to user)
+    // Fetch units_per_batch (UPB) for recipe (scoped to user) — needed only to return batchesRemaining in response
     let upb = 0;
     try {
       const [recipeRows] = await conn.execute(
@@ -1529,36 +1527,22 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       upb = 0;
     }
 
-    // Compute the canonical batchRemaining (stored in DB) as *units*.
-    // Priority:
-    //  1) If client provided unitsRemaining -> treat that as desired unitsRemaining (units left after waste)
-    //       then batchRemaining_units = unitsRemaining + units_of_waste
-    //  2) Else if client provided batchesProduced -> batchRemaining_units = batchesProduced * units_per_batch
-    //  3) Else keep existing.batchRemaining
-    let computedBatchRemainingUnits = Number(existing.batchRemaining || 0);
+    // DECISION: Only update batchRemaining when client supplies unitsRemaining explicitly.
+    // If unitsRemaining provided => compute batchRemaining_units = unitsRemaining + units_of_waste
+    // If not provided => DO NOT touch batchRemaining (leave DB value unchanged).
+    let computedBatchRemainingUnits = null; // null => do not update DB batchRemaining
 
     if (unitsRemaining !== undefined && unitsRemaining !== null && unitsRemaining !== "") {
       const uRem = Number(unitsRemaining || 0);
       computedBatchRemainingUnits = uRem + (Number(newUnitsOfWaste) || 0);
-      console.info("[PUT.production-log] computed batchRemaining (units) from unitsRemaining:", {
-        unitsRemaining: uRem, units_of_waste: newUnitsOfWaste, batchRemaining_units: computedBatchRemainingUnits
-      });
-    } else if (batchesProduced !== undefined && batchesProduced !== null && batchesProduced !== "") {
-      const bp = Number(batchesProduced || 0);
-      computedBatchRemainingUnits = bp * (Number(upb) || 0);
-      console.info("[PUT.production-log] computed batchRemaining (units) from batchesProduced:", {
-        batchesProduced: bp, units_per_batch: upb, batchRemaining_units: computedBatchRemainingUnits
+      console.info("[PUT.production-log] will update batchRemaining (units) from unitsRemaining:", {
+        unitsRemaining: uRem,
+        units_of_waste: newUnitsOfWaste,
+        batchRemaining_units: computedBatchRemainingUnits
       });
     } else {
-      computedBatchRemainingUnits = Number(existing.batchRemaining || 0);
-      console.info("[PUT.production-log] keeping existing batchRemaining (units):", computedBatchRemainingUnits);
+      console.info("[PUT.production-log] unitsRemaining not supplied by client — will NOT modify batchRemaining");
     }
-
-    // Now compute derived unitsRemaining and batchesRemaining for the response:
-    const computedUnitsRemaining = Number(computedBatchRemainingUnits) - Number(newUnitsOfWaste || 0);
-    const computedBatchesRemaining = (Number(upb) && Number(upb) > 0)
-      ? Number(computedUnitsRemaining) / Number(upb)
-      : null; // null if upb unknown/zero
 
     // Build update columns for DB (only real DB columns)
     const updateCols = [];
@@ -1568,11 +1552,13 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     if (recipe !== undefined) { updateCols.push("recipe = ?"); params.push(recipe); }
     if (batchesProduced !== undefined) { updateCols.push("batchesProduced = ?"); params.push(Number(batchesProduced)); }
 
-    // Always update batchRemaining (DB column stores units total)
-    updateCols.push("batchRemaining = ?");
-    params.push(Number(computedBatchRemainingUnits));
+    // Only include batchRemaining if we computed it from unitsRemaining above
+    if (computedBatchRemainingUnits !== null) {
+      updateCols.push("batchRemaining = ?");
+      params.push(Number(computedBatchRemainingUnits));
+    }
 
-    // Update units_of_waste only if supplied explicitly (or if you want to always reflect newUnitsOfWaste uncomment)
+    // Update units_of_waste if explicitly provided (either name)
     if (units_of_waste !== undefined || unitsOfWaste !== undefined) {
       updateCols.push("units_of_waste = ?");
       params.push(Number(newUnitsOfWaste));
@@ -1612,7 +1598,7 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     const returnedUnitsOfWaste = Number(updated.units_of_waste || 0);
     const returnedUnitsRemaining = returnedBatchRemainingUnits - returnedUnitsOfWaste;
     const returnedUPB = Number(updated.units_per_batch || 0);
-    const returnedBatchesRemaining = returnedUPB > 0 ? returnedUnitsRemaining / returnedUPB : null;
+    const returnedBatchesRemaining = returnedUPB > 0 ? Number(returnedUnitsRemaining) / returnedUPB : null;
 
     await conn.commit();
     console.info("[PUT.production-log] commit successful, returning updated row with derived fields");
