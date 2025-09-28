@@ -5,7 +5,6 @@ import { Formik } from "formik";
 import * as yup from "yup";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useData } from "../../../contexts/DataContext";
-import { loadGoodsInActive } from "../../data/GoodsIn";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -297,6 +296,67 @@ const ProductionLogForm = () => {
     return problems;
   };
 
+  // --- helper: refresh goods-in active & recompute ingredient inventory client-side ---
+  const refreshGoodsInAndInventory = async () => {
+    if (!cognitoId) return;
+    try {
+      // goods-in active rows
+      const res = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+      const goodsRows = res.ok ? await res.json() : [];
+
+      // normalize goods rows similar to other components
+      const normalized = (Array.isArray(goodsRows) ? goodsRows : []).map((row, idx) => {
+        const date = row.date ? String(row.date).slice(0, 10) : row.date;
+        const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
+        const stockReceived = Number(row.stockReceived || 0);
+        const stockRemaining = Number(row.stockRemaining || 0);
+        const serverBar = row.barCode ? String(row.barCode) : null;
+        const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+
+        return {
+          ...row,
+          date,
+          expiryDate,
+          stockReceived,
+          stockRemaining,
+          processed: Number(stockRemaining) === 0 ? "Yes" : "No",
+          barCode: serverBar || null,
+          _id,
+        };
+      });
+
+      setGoodsInRows(normalized);
+
+      // compute ingredient inventory from normalized goods (sum stockRemaining per ingredient; pick earliest date's barcode)
+      const active = normalized.filter((r) => Number(r.stockRemaining) > 0);
+      const map = new Map();
+      for (const r of active) {
+        const key = r.ingredient;
+        const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+        const amount = prev.amount + Number(r.stockRemaining || 0);
+
+        let nextBarcode = prev.barcode;
+        let nextDate = prev._date;
+        try {
+          const prevTime = new Date(prev._date).getTime() || Infinity;
+          const curTime = new Date(r.date).getTime() || Infinity;
+          if (curTime < prevTime) {
+            nextBarcode = r.barCode;
+            nextDate = r.date;
+          }
+        } catch {
+          // ignore
+        }
+
+        map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+      }
+      const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
+      setIngredientInventory(inventory);
+    } catch (err) {
+      console.warn("refreshGoodsInAndInventory failed:", err);
+    }
+  };
+
   // --- Final submit to API ---
   const submitToServer = async (payload, resetForm) => {
     try {
@@ -310,9 +370,7 @@ const ProductionLogForm = () => {
 
       // refresh client-side goods-in snapshot so UI shows server deductions immediately
       try {
-        const { goodsRows, inventory } = await loadGoodsInActive(cognitoId);
-        if (Array.isArray(goodsRows)) setGoodsInRows(goodsRows);
-        if (Array.isArray(inventory)) setIngredientInventory(inventory);
+        await refreshGoodsInAndInventory();
       } catch (refreshErr) {
         console.warn("Could not refresh goods-in after production submit:", refreshErr);
       }
