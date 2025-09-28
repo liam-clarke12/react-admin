@@ -7,11 +7,17 @@ import {
   IconButton,
   Snackbar,
   useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BarChart from "../../components/BarChart";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
@@ -38,6 +44,7 @@ const IngredientsInventory = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Fetch ACTIVE inventory (soft-deleted/zero-remaining excluded)
   useEffect(() => {
@@ -146,22 +153,36 @@ const IngredientsInventory = () => {
           width: 40px; height: 40px; border-radius: 999px;
         }
         .pill-icon:hover { background: #e2e8f0; }
+        .toolbar-right { display:flex; gap:8px; align-items:center; }
+        .barCode-column--cell { color: ${brand.primary}; }
       `}</style>
 
       <Box className="inv-card" mt={2}>
-        {/* Toolbar with Bar Chart toggle */}
+        {/* Toolbar with Bar Chart toggle and Info button */}
         <Box className="inv-toolbar">
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
             Ingredient Inventory
           </Typography>
-          <IconButton
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open Bar Chart"
-            className="pill-icon"
-            sx={{ color: brand.text }}
-          >
-            <BarChartOutlinedIcon />
-          </IconButton>
+
+          <Box className="toolbar-right">
+            <IconButton
+              aria-label="Info about goods in / editability"
+              onClick={() => setInfoOpen(true)}
+              className="pill-icon"
+              sx={{ color: brand.text }}
+            >
+              <InfoOutlinedIcon />
+            </IconButton>
+
+            <IconButton
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open Bar Chart"
+              className="pill-icon"
+              sx={{ color: brand.text }}
+            >
+              <BarChartOutlinedIcon />
+            </IconButton>
+          </Box>
         </Box>
 
         {/* DataGrid */}
@@ -195,6 +216,7 @@ const IngredientsInventory = () => {
             columns={columns}
             pageSize={10}
             rowsPerPageOptions={[5, 10, 20]}
+            disableSelectionOnClick
           />
         </Box>
       </Box>
@@ -254,6 +276,24 @@ const IngredientsInventory = () => {
           />
         </Box>
       </Drawer>
+
+      {/* Info dialog */}
+      <Dialog open={infoOpen} onClose={() => setInfoOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 800 }}>About this table</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: brand.subtext }}>
+            These rows are read-only aggregates of your active goods-in lots.
+            To change stock-on-hand values you must add, delete or edit the corresponding
+            goods-in entries from the "Goods In" screen. This view only summarizes active
+            inventory and cannot be edited directly.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1 }}>
+          <Button onClick={() => setInfoOpen(false)} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={openSnackbar}
