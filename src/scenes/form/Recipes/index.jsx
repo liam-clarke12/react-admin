@@ -24,6 +24,8 @@ const brand = {
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
+   { value: "kg", label: "Kilograms (Kg)" },
+    { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 

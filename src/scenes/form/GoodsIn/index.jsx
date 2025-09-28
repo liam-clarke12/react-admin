@@ -28,7 +28,7 @@ import {
   TableCell,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
-import { Formik, FieldArray } from "formik";
+import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import AddIcon from "@mui/icons-material/Add";
@@ -99,6 +99,8 @@ const selectSx = {
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
+   { value: "kg", label: "Kilograms (Kg)" },
+    { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 
@@ -151,6 +153,37 @@ const GoodsInForm = () => {
 
   // ref to allow adding goods from the FAB (now inside the form wrapper)
   const addGoodRef = useRef(null);
+
+  // helper: find first error path in nested errors object
+  const findFirstErrorPath = (errObj) => {
+    if (!errObj || typeof errObj !== "object") return null;
+    for (const k of Object.keys(errObj)) {
+      if (!errObj[k]) continue;
+      if (typeof errObj[k] === "string") return k;
+      if (typeof errObj[k] === "object") {
+        const child = findFirstErrorPath(errObj[k]);
+        if (child) return `${k}.${child}`;
+      }
+    }
+    return null;
+  };
+
+  // helper: scroll to first error and focus
+  const scrollToFirstError = (errors) => {
+    const firstPath = findFirstErrorPath(errors);
+    if (!firstPath) return;
+    // query selector uses data-field attribute on the input element
+    const selector = `[data-field="${firstPath}"]`;
+    const el = document.querySelector(selector);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      try {
+        el.focus({ preventScroll: true });
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
 
   // fetch global ingredients
   useEffect(() => {
@@ -338,6 +371,8 @@ const GoodsInForm = () => {
         temperature: true,
       }));
       setTouched({ items: touchedItems }, false);
+      // scroll/focus
+      scrollToFirstError(errors);
       return;
     }
 
@@ -405,7 +440,12 @@ const GoodsInForm = () => {
 
           {/* Single item form (original) */}
           {tabIndex === 0 && (
-            <Formik onSubmit={submitSingle} initialValues={initialValuesSingle} validationSchema={goodsInSchema}>
+            <Formik
+              onSubmit={submitSingle}
+              initialValues={initialValuesSingle}
+              validationSchema={goodsInSchema}
+              validateOnMount={true}
+            >
               {({
                 values,
                 errors,
@@ -414,8 +454,34 @@ const GoodsInForm = () => {
                 handleChange,
                 handleSubmit,
                 setFieldValue,
+                validateForm,
+                setTouched,
+                submitForm,
+                isValid,
+                isSubmitting,
               }) => {
                 const selected = ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
+
+                // when user clicks Record Stock, validate and scroll-to-first-error if invalid
+                const onPrimaryClick = async () => {
+                  const errs = await validateForm();
+                  if (errs && Object.keys(errs).length) {
+                    // mark touched
+                    setTouched({
+                      date: true,
+                      ingredient: true,
+                      stockReceived: true,
+                      unit: true,
+                      barCode: true,
+                      expiryDate: true,
+                      temperature: true,
+                    }, false);
+                    scrollToFirstError(errs);
+                    return;
+                  }
+                  // otherwise submit
+                  await submitForm();
+                };
 
                 return (
                   <form onSubmit={handleSubmit}>
@@ -438,6 +504,9 @@ const GoodsInForm = () => {
                         error={!!touched.date && !!errors.date}
                         helperText={touched.date && errors.date}
                         sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "date" },
+                        }}
                       />
 
                       {/* Ingredient */}
@@ -456,10 +525,11 @@ const GoodsInForm = () => {
                               label="Ingredient"
                               name="ingredient"
                               onBlur={handleBlur}
-                              error={!!touched.ingredient && !!errors.ingredient}
-                              helperText={touched.ingredient && errors.ingredient}
+                              error={!!getIn(touched, "ingredient") && !!getIn(errors, "ingredient")}
+                              helperText={getIn(touched, "ingredient") && getIn(errors, "ingredient")}
                               InputProps={{
                                 ...params.InputProps,
+                                inputProps: { ...(params.InputProps.inputProps || {}), "data-field": "ingredient" },
                                 endAdornment: (
                                   <>
                                     {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
@@ -500,12 +570,22 @@ const GoodsInForm = () => {
                         error={!!touched.stockReceived && !!errors.stockReceived}
                         helperText={touched.stockReceived && errors.stockReceived}
                         sx={{ gridColumn: "span 1", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "stockReceived" },
+                        }}
                       />
 
                       {/* Unit */}
                       <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
                         <InputLabel id="unit-label">Metric</InputLabel>
-                        <Select labelId="unit-label" name="unit" value={values.unit} label="Metric" onChange={handleChange}>
+                        <Select
+                          labelId="unit-label"
+                          name="unit"
+                          value={values.unit}
+                          label="Metric"
+                          onChange={handleChange}
+                          inputProps={{ "data-field": "unit" }}
+                        >
                           {unitOptions.map((opt) => (
                             <MenuItem key={opt.value} value={opt.value}>
                               {opt.label}
@@ -527,6 +607,9 @@ const GoodsInForm = () => {
                         error={!!touched.barCode && !!errors.barCode}
                         helperText={touched.barCode && errors.barCode}
                         sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "barCode" },
+                        }}
                       />
 
                       {/* Expiry Date */}
@@ -542,6 +625,9 @@ const GoodsInForm = () => {
                         error={!!touched.expiryDate && !!errors.expiryDate}
                         helperText={touched.expiryDate && errors.expiryDate}
                         sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "expiryDate" },
+                        }}
                       />
 
                       {/* Temperature */}
@@ -557,6 +643,9 @@ const GoodsInForm = () => {
                         error={!!touched.temperature && !!errors.temperature}
                         helperText={touched.temperature && errors.temperature}
                         sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "temperature" },
+                        }}
                       />
                     </Box>
 
@@ -564,7 +653,7 @@ const GoodsInForm = () => {
                     <Box display="flex" justifyContent="flex-end" mt={3}>
                       <Fab
                         variant="extended"
-                        onClick={handleSubmit}
+                        onClick={onPrimaryClick}
                         sx={{
                           px: 4,
                           py: 1.25,
@@ -577,6 +666,7 @@ const GoodsInForm = () => {
                           color: "#fff",
                           "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
                         }}
+                        disabled={!isValid || isSubmitting}
                       >
                         <AddIcon />
                         Record Stock
@@ -590,8 +680,13 @@ const GoodsInForm = () => {
 
           {/* Multiple form */}
           {tabIndex === 1 && (
-            <Formik initialValues={initialValuesBatch} validationSchema={batchSchema} onSubmit={submitBatch}>
-              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
+            <Formik
+              initialValues={initialValuesBatch}
+              validationSchema={batchSchema}
+              onSubmit={submitBatch}
+              validateOnMount={true}
+            >
+              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue, submitForm, isValid, isSubmitting }) => (
                 <form>
                   <FieldArray name="items">
                     {({ push, remove }) => {
@@ -605,6 +700,23 @@ const GoodsInForm = () => {
                             {(values.items || []).map((it, idx) => {
                               // derive selected option for this row (by id)
                               const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
+
+                              // helper shortcuts for nested error/touched
+                              const base = `items.${idx}`;
+                              const dateError = getIn(errors, `${base}.date`);
+                              const dateTouched = getIn(touched, `${base}.date`);
+                              const ingError = getIn(errors, `${base}.ingredient`);
+                              const ingTouched = getIn(touched, `${base}.ingredient`);
+                              const qtyError = getIn(errors, `${base}.stockReceived`);
+                              const qtyTouched = getIn(touched, `${base}.stockReceived`);
+                              const unitError = getIn(errors, `${base}.unit`);
+                              const unitTouched = getIn(touched, `${base}.unit`);
+                              const codeError = getIn(errors, `${base}.barCode`);
+                              const codeTouched = getIn(touched, `${base}.barCode`);
+                              const expError = getIn(errors, `${base}.expiryDate`);
+                              const expTouched = getIn(touched, `${base}.expiryDate`);
+                              const tempError = getIn(errors, `${base}.temperature`);
+                              const tempTouched = getIn(touched, `${base}.temperature`);
 
                               return (
                                 <Paper
@@ -646,6 +758,11 @@ const GoodsInForm = () => {
                                       value={it.date}
                                       onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
                                       sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!dateTouched && !!dateError}
+                                      helperText={dateTouched && dateError ? dateError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.date` },
+                                      }}
                                     />
 
                                     <Box sx={{ gridColumn: "span 2" }}>
@@ -662,8 +779,12 @@ const GoodsInForm = () => {
                                             {...params}
                                             label="Ingredient"
                                             name={`items.${idx}.ingredient`}
+                                            sx={inputSx}
+                                            error={!!ingTouched && !!ingError}
+                                            helperText={ingTouched && ingError ? ingError : ""}
                                             InputProps={{
                                               ...params.InputProps,
+                                              inputProps: { ...(params.InputProps.inputProps || {}), "data-field": `items.${idx}.ingredient` },
                                               endAdornment: (
                                                 <>
                                                   {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
@@ -671,7 +792,6 @@ const GoodsInForm = () => {
                                                 </>
                                               ),
                                             }}
-                                            sx={inputSx}
                                           />
                                         )}
                                       />
@@ -686,9 +806,18 @@ const GoodsInForm = () => {
                                       value={it.stockReceived}
                                       onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
                                       sx={{ gridColumn: "span 1", ...inputSx }}
+                                      error={!!qtyTouched && !!qtyError}
+                                      helperText={qtyTouched && qtyError ? qtyError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.stockReceived` },
+                                      }}
                                     />
 
-                                    <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                                    <FormControl
+                                      fullWidth
+                                      sx={{ gridColumn: "span 1", ...selectSx }}
+                                      error={!!unitTouched && !!unitError}
+                                    >
                                       <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
                                       <Select
                                         labelId={`unit-label-${idx}`}
@@ -696,6 +825,7 @@ const GoodsInForm = () => {
                                         value={it.unit}
                                         label="Metric"
                                         onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
+                                        inputProps={{ "data-field": `items.${idx}.unit` }}
                                       >
                                         {unitOptions.map((opt) => (
                                           <MenuItem key={opt.value} value={opt.value}>
@@ -703,6 +833,11 @@ const GoodsInForm = () => {
                                           </MenuItem>
                                         ))}
                                       </Select>
+                                      {!!unitTouched && !!unitError && (
+                                        <Typography variant="caption" sx={{ color: "error.main", mt: 0.5 }}>
+                                          {unitError}
+                                        </Typography>
+                                      )}
                                     </FormControl>
 
                                     <TextField
@@ -714,6 +849,11 @@ const GoodsInForm = () => {
                                       value={it.barCode}
                                       onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
                                       sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!codeTouched && !!codeError}
+                                      helperText={codeTouched && codeError ? codeError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.barCode` },
+                                      }}
                                     />
 
                                     <TextField
@@ -725,6 +865,11 @@ const GoodsInForm = () => {
                                       value={it.expiryDate}
                                       onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
                                       sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!expTouched && !!expError}
+                                      helperText={expTouched && expError ? expError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.expiryDate` },
+                                      }}
                                     />
 
                                     <TextField
@@ -736,6 +881,11 @@ const GoodsInForm = () => {
                                       value={it.temperature}
                                       onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
                                       sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!tempTouched && !!tempError}
+                                      helperText={tempTouched && tempError ? tempError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.temperature` },
+                                      }}
                                     />
                                   </Box>
                                 </Paper>
@@ -762,6 +912,7 @@ const GoodsInForm = () => {
                                 color: "#fff",
                                 "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
                               }}
+                              disabled={!isValid || isSubmitting}
                             >
                               <AddIcon />
                               Submit Multiple ({(values.items || []).length})
