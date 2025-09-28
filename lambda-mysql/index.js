@@ -1461,79 +1461,119 @@ app.post("/api/delete-production-log", async (req, res) => {
   }
 });
 
+// PUT /api/production-log/:batchCode
 app.put('/api/production-log/:batchCode', wrapAsync(async (req, res) => {
-  addCorsHeaders(res);
+  // Optional CORS helper if you have one
+  try { if (typeof addCorsHeaders === 'function') addCorsHeaders(res, req); } catch (e) { console.warn('addCorsHeaders not callable', e && e.message); }
+
   const { batchCode } = req.params;
+  const body = req.body || {};
+
+  // Accept both snake_case and camelCase from clients
   const {
     date,
     recipe,
     batchesProduced,
     batchRemaining,
-    units_of_waste,
-    unitsOfWaste,
-    unitsRemaining,
+    units_of_waste,   // client may send this
+    unitsOfWaste,     // or this
     cognito_id,
-  } = req.body;
+  } = body;
 
-  console.info("[PUT.production-log] params:", req.params, "body:", req.body);
+  console.info('[PUT.production-log] request params:', req.params, 'body:', body);
 
-  if (!batchCode) return res.status(400).json({ error: "batchCode is required in path" });
-  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+  if (!batchCode) {
+    console.warn('[PUT.production-log] missing batchCode');
+    return res.status(400).json({ error: 'batchCode is required in path' });
+  }
+  if (!cognito_id) {
+    console.warn('[PUT.production-log] missing cognito_id');
+    return res.status(400).json({ error: 'cognito_id is required' });
+  }
 
   const conn = await db.promise().getConnection();
   try {
     await conn.beginTransaction();
-    console.info("[PUT.production-log] transaction started for user:", cognito_id);
+    console.info('[PUT.production-log] transaction started', { batchCode, cognito_id });
 
+    // ensure the row exists & belongs to this user
     const [rows] = await conn.execute(
       `SELECT * FROM production_log WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
       [batchCode, cognito_id]
     );
-    if (!rows || !rows.length) {
+
+    if (!rows || rows.length === 0) {
       await conn.rollback();
-      console.warn("[PUT.production-log] no matching row found for", { batchCode, cognito_id });
-      return res.status(404).json({ error: "No matching production_log row found for that batchCode/user" });
+      console.warn('[PUT.production-log] no matching production_log row', { batchCode, cognito_id });
+      return res.status(404).json({ error: 'No matching production_log row found for that batchCode/user' });
     }
 
+    // Build updatable fields only for real DB columns
     const updateCols = [];
     const params = [];
 
-    if (date !== undefined) { updateCols.push("date = ?"); params.push(date); }
-    if (recipe !== undefined) { updateCols.push("recipe = ?"); params.push(recipe); }
-    if (batchesProduced !== undefined) { updateCols.push("batchesProduced = ?"); params.push(Number(batchesProduced)); }
-    if (batchRemaining !== undefined) { updateCols.push("batchRemaining = ?"); params.push(Number(batchRemaining)); }
-    // accept either units_of_waste (db) or unitsOfWaste (client)
-    const uw = (units_of_waste !== undefined) ? units_of_waste : unitsOfWaste;
-    if (uw !== undefined) { updateCols.push("units_of_waste = ?"); params.push(Number(uw)); }
-    if (unitsRemaining !== undefined) { updateCols.push("unitsRemaining = ?"); params.push(Number(unitsRemaining)); }
-
-    if (!updateCols.length) {
-      await conn.rollback();
-      console.warn("[PUT.production-log] nothing to update");
-      return res.status(400).json({ error: "No updatable fields supplied" });
+    if (date !== undefined) {
+      updateCols.push('date = ?');
+      params.push(date);
+    }
+    if (recipe !== undefined) {
+      updateCols.push('recipe = ?');
+      params.push(recipe);
+    }
+    if (batchesProduced !== undefined) {
+      const n = Number(batchesProduced);
+      updateCols.push('batchesProduced = ?');
+      params.push(Number.isFinite(n) ? n : 0);
+    }
+    if (batchRemaining !== undefined) {
+      const n = Number(batchRemaining);
+      updateCols.push('batchRemaining = ?');
+      params.push(Number.isFinite(n) ? n : 0);
     }
 
+    // Map either units_of_waste or unitsOfWaste -> units_of_waste (DB column)
+    const uw = (units_of_waste !== undefined) ? units_of_waste : unitsOfWaste;
+    if (uw !== undefined) {
+      const n = Number(uw);
+      updateCols.push('units_of_waste = ?');
+      params.push(Number.isFinite(n) ? n : 0);
+    }
+
+    // DO NOT attempt to update derived/client-only fields such as unitsRemaining
+    // If updateCols is empty, nothing to do
+    if (updateCols.length === 0) {
+      await conn.rollback();
+      console.warn('[PUT.production-log] no updatable fields supplied');
+      return res.status(400).json({ error: 'No updatable fields supplied' });
+    }
+
+    // finalize query
     params.push(batchCode, cognito_id);
-    const updateSql = `UPDATE production_log SET ${updateCols.join(", ")} WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL`;
-    console.info("[PUT.production-log] Executing:", updateSql, "params:", params);
+    const updateSql = `UPDATE production_log SET ${updateCols.join(', ')} WHERE batchCode = ? AND user_id = ? AND deleted_at IS NULL`;
+    console.info('[PUT.production-log] executing update:', updateSql, 'params:', params);
     await conn.execute(updateSql, params);
 
-    // Recompute any inventory / aggregate tables your app uses
-    try {
-      await syncProductionInventoryForUser(cognito_id, conn);
-    } catch (syncErr) {
-      console.warn("[PUT.production-log] syncProductionInventoryForUser failed:", syncErr.message || syncErr);
+    // Recompute any dependent inventory aggregates (if function exists)
+    if (typeof syncProductionInventoryForUser === 'function') {
+      try {
+        await syncProductionInventoryForUser(cognito_id, conn);
+      } catch (syncErr) {
+        console.warn('[PUT.production-log] syncProductionInventoryForUser failed (continuing):', syncErr && syncErr.message);
+      }
+    } else {
+      console.info('[PUT.production-log] syncProductionInventoryForUser not defined — skipping');
     }
 
     await conn.commit();
-    console.info("[PUT.production-log] commit successful");
+    console.info('[PUT.production-log] commit successful');
 
+    // Return updated row for frontend sync
     const [updatedRows] = await conn.execute(`SELECT * FROM production_log WHERE batchCode = ? AND user_id = ? LIMIT 1`, [batchCode, cognito_id]);
     return res.json({ success: true, updated: updatedRows[0] || null });
   } catch (err) {
-    await conn.rollback();
-    console.error("[PUT.production-log] DB error:", err);
-    return res.status(500).json({ error: "Database error", details: err.message });
+    try { await conn.rollback(); } catch (rbErr) { console.error('[PUT.production-log] rollback failed', rbErr); }
+    console.error('[PUT.production-log] DB error:', err && err.message, err && err.stack);
+    return res.status(500).json({ error: 'Database error', details: err && err.message });
   } finally {
     conn.release();
   }
