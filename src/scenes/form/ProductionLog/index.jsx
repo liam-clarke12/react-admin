@@ -141,6 +141,22 @@ const normalizeUnit = (u) => {
 
 const keyNameUnit = (name, unit) => `${normalizeName(name)}|${normalizeUnit(unit)}`;
 
+/* ===== New: unit conversion helper ===== */
+// Convert canonical unit to the factor that converts that unit into the chosen "base unit"
+// - mass base unit: grams (g) => kg -> *1000
+// - volume base unit: milliliters (ml) => l -> *1000
+// - count base unit: units => factor 1
+const unitFactorToBase = (canonUnit) => {
+  const u = (canonUnit || "").toString().toLowerCase();
+  if (!u) return 1;
+  if (u === "kg") return 1000;
+  if (u === "g") return 1;
+  if (u === "l") return 1000;
+  if (u === "ml") return 1;
+  if (u === "unit") return 1;
+  return 1;
+};
+
 const ProductionLogForm = () => {
   const { cognitoId } = useAuth();
 
@@ -205,66 +221,72 @@ const ProductionLogForm = () => {
     const lines = recipesIndex[recipeName] || [];
     if (!lines.length) return [];
 
-    // 1) Compute required per (ingredient, unit)
+    // 1) Compute required per (ingredient, unit) and convert to base units
     const required = []; // keep array to preserve each line
-    const requiredMap = new Map(); // key -> aggregated need (in same canonical unit key)
     for (const line of lines) {
       const ing = (line.ingredient || "").toString();
       const uCanon = normalizeUnit(line.unit);
-      const need = (Number(line.quantity) || 0) * (Number(batchesProduced) || 0);
-      const k = `${normalizeName(ing)}|${uCanon}`;
-      required.push({ ingredient: ing, unit: uCanon, need });
-      requiredMap.set(k, (requiredMap.get(k) || 0) + need);
+      const qty = Number(line.quantity) || 0;
+      const need = qty * (Number(batchesProduced) || 0);
+      const needBase = need * unitFactorToBase(uCanon);
+      required.push({ ingredient: ing, unit: uCanon, need, needBase });
     }
 
     // 2) Fetch ACTIVE inventory snapshot
     const invRes = await fetch(
-      `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-        cognitoId
-      )}`
+      `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`
     );
     const invRows = invRes.ok ? await invRes.json() : [];
 
-    // Build two maps:
-    //  - availableByIU: name+unit (canonical)
-    //  - availableByI:  name only (sum of all units) — used ONLY when recipe unit is empty
+    // Build two maps in BASE UNITS:
+    //  - availableByIU: name+unit (canonical) -> amount (in base units)
+    //  - availableByI:  name only -> sum of all units (in base units) — used ONLY when recipe unit is empty
     const availableByIU = new Map();
     const availableByI = new Map();
 
     for (const r of Array.isArray(invRows) ? invRows : []) {
       const nameCanon = normalizeName(r?.ingredient ?? "");
       const unitCanon = normalizeUnit(r?.unit ?? "");
-      const have = Number(r?.totalRemaining) || 0;
+      const rawHave = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
+      const haveBase = rawHave * unitFactorToBase(unitCanon);
 
-      // per unit
       const kIU = `${nameCanon}|${unitCanon}`;
-      availableByIU.set(kIU, (availableByIU.get(kIU) || 0) + have);
+      availableByIU.set(kIU, (availableByIU.get(kIU) || 0) + haveBase);
 
-      // per ingredient (for wildcard recipe unit ONLY)
-      availableByI.set(nameCanon, (availableByI.get(nameCanon) || 0) + have);
+      availableByI.set(nameCanon, (availableByI.get(nameCanon) || 0) + haveBase);
     }
 
-    // 3) Compare
+    // 3) Compare (all in base units)
     const problems = [];
-    for (const { ingredient, unit, need } of required) {
+    for (const { ingredient, unit, need, needBase } of required) {
       const nameCanon = normalizeName(ingredient);
-      let have = 0;
+      let haveBase = 0;
 
       if (unit) {
-        // unit specified: require exact canonical unit match
         const k = `${nameCanon}|${unit}`;
-        have = availableByIU.get(k) ?? 0;
+        haveBase = availableByIU.get(k) ?? 0;
       } else {
-        // unit not specified (or "N/A"): compare to total across units for that ingredient
-        have = availableByI.get(nameCanon) ?? 0;
+        haveBase = availableByI.get(nameCanon) ?? 0;
       }
 
-      if (need > have) {
+      if (needBase > haveBase) {
+        // report human-friendly need & have:
+        // - reportedNeed: in recipe unit (if present) else in base units
+        // - reportedHave: convert back to recipe unit if unit present, otherwise show base units
+        let reportedNeed = need;
+        let reportedHave = unit ? (haveBase / unitFactorToBase(unit)) : haveBase;
+
+        // Round small floats for readability
+        const round = (n) => {
+          if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
+          return Math.round(n * 1000) / 1000;
+        };
+
         problems.push({
           ingredient,
           unit,
-          need,
-          have,
+          need: round(reportedNeed),
+          have: round(reportedHave),
         });
       }
     }
