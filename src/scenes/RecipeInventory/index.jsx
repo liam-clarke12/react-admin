@@ -5,11 +5,17 @@ import {
   Drawer,
   Typography,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BarChart from "../../components/BarChart";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
@@ -32,8 +38,9 @@ const RecipeInventory = () => {
   const { cognitoId } = useAuth();
   const { recipeInventory, setRecipeInventory } = useData();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
-  // Fetch and process production log (same behavior)
+  // Fetch and process production log
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -46,28 +53,29 @@ const RecipeInventory = () => {
         const data = await response.json();
         if (!Array.isArray(data)) return;
 
+        // Filter active lots with positive batchRemaining (stored as units) and compute units in stock per recipe
         const filtered = data.filter((row) => Number(row.batchRemaining) > 0);
 
         const grouped = filtered.reduce((acc, row) => {
           const rec = row.recipe;
-          const rem = Number(row.batchRemaining) || 0;
+          const rem = Number(row.batchRemaining) || 0; // stored units
           const waste = Number(row.units_of_waste) || 0;
+          const available = Math.max(0, rem - waste);
+
           if (!acc[rec]) {
             acc[rec] = {
-              date: row.date,
               recipe: rec,
-              totalUnits: rem - waste,
+              totalUnits: available,
               batchCode: row.batchCode,
             };
           } else {
-            acc[rec].totalUnits += rem - waste;
+            acc[rec].totalUnits += available;
           }
           return acc;
         }, {});
 
-        const processed = Object.values(grouped).map((g) => ({
-          id: g.batchCode,
-          date: g.date,
+        const processed = Object.values(grouped).map((g, idx) => ({
+          id: `${g.recipe}-${idx}`,
           recipe: g.recipe,
           unitsInStock: g.totalUnits,
           batchCode: g.batchCode,
@@ -84,7 +92,7 @@ const RecipeInventory = () => {
 
   const columns = useMemo(
     () => [
-      { field: "date", headerName: "Date", flex: 1 },
+      // Date column removed per request
       { field: "recipe", headerName: "Recipe Name", flex: 1 },
       {
         field: "unitsInStock",
@@ -126,23 +134,36 @@ const RecipeInventory = () => {
           width: 40px; height: 40px; border-radius: 999px;
         }
         .pill-icon:hover { background: #e2e8f0; }
+        .toolbar-right { display: flex; gap: 8px; align-items: center; }
       `}</style>
 
       {/* Card container */}
       <Box className="ri-card" mt={2}>
-        {/* Toolbar with Bar Chart toggle */}
+        {/* Toolbar with Bar Chart toggle and Info button */}
         <Box className="ri-toolbar">
           <Typography sx={{ fontWeight: 800, color: brand.text }}>
             Recipe Inventory
           </Typography>
-          <IconButton
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open bar chart"
-            className="pill-icon"
-            sx={{ color: brand.text }}
-          >
-            <BarChartOutlinedIcon />
-          </IconButton>
+
+          <Box className="toolbar-right">
+            <IconButton
+              aria-label="Info about editability"
+              onClick={() => setInfoOpen(true)}
+              className="pill-icon"
+              sx={{ color: brand.text }}
+            >
+              <InfoOutlinedIcon />
+            </IconButton>
+
+            <IconButton
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open bar chart"
+              className="pill-icon"
+              sx={{ color: brand.text }}
+            >
+              <BarChartOutlinedIcon />
+            </IconButton>
+          </Box>
         </Box>
 
         {/* DataGrid */}
@@ -176,6 +197,7 @@ const RecipeInventory = () => {
             pageSize={10}
             rowsPerPageOptions={[10, 25, 50]}
             getRowId={(row) => row.id}
+            disableSelectionOnClick
           />
         </Box>
       </Box>
@@ -235,6 +257,24 @@ const RecipeInventory = () => {
           />
         </Box>
       </Drawer>
+
+      {/* Info dialog */}
+      <Dialog open={infoOpen} onClose={() => setInfoOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 800 }}>About this table</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: brand.subtext }}>
+            These rows are not directly editable from this view. If you need to change
+            the units in stock for a recipe, please add, delete or edit the corresponding
+            production log rows in the Production Log screen. This view is an aggregate
+            read-only summary computed from active production log entries.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1 }}>
+          <Button onClick={() => setInfoOpen(false)} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
