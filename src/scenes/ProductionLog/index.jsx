@@ -11,10 +11,6 @@ import {
   DialogTitle,
   Typography,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   CircularProgress,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
@@ -40,10 +36,8 @@ const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api
 /** Utility to safely format dates as yyyy-mm-dd */
 const formatDateYMD = (val) => {
   if (!val) return "";
-  // Accept either Date object or ISO string with timezone or plain yyyy-mm-dd
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) {
-    // if invalid, attempt substring yyyy-MM-dd if present
     const s = String(val);
     const m = s.match(/\d{4}-\d{2}-\d{2}/);
     return m ? m[0] : s;
@@ -67,7 +61,7 @@ const ProductionLog = () => {
   const [editingRow, setEditingRow] = useState(null); // full row edit
   const [updating, setUpdating] = useState(false);
 
-  // Fetch recipe data for upb map (unchanged behavior)
+  // Fetch recipe data for upb map
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
@@ -108,14 +102,14 @@ const ProductionLog = () => {
           const batchRemaining = Number(row.batchRemaining) || 0;
           const unitsOfWaste = Number(row.units_of_waste || row.unitsOfWaste) || 0;
           const upb = recipesMap[row.recipe] ?? Number(row.units_per_batch || 0);
-          // compute unitsRemaining if schema has it, otherwise compute
+          // compute unitsRemaining from stored batchRemaining * upb - unitsOfWaste
           const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining * upb - unitsOfWaste)) || 0;
 
           return {
             date: formatDateYMD(row.date),
             recipe: row.recipe,
             batchesProduced,
-            batchRemaining,
+            batchRemaining, // stored value in DB (units)
             unitsOfWaste,
             unitsRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
@@ -132,7 +126,7 @@ const ProductionLog = () => {
     fetchProductionLogData();
   }, [cognitoId, recipesMap]);
 
-  // Columns
+  // Columns (batchRemaining intentionally not editable and not shown)
   const columns = useMemo(
     () => [
       { field: "date", headerName: "Date", flex: 1 },
@@ -188,9 +182,10 @@ const ProductionLog = () => {
     []
   );
 
-  // Cell click handler: record active cell
+  // Cell click handler: record active cell — but ignore batchRemaining field (not editable)
   const handleCellClick = (params) => {
     if (params.field === "__check__") return;
+    if (params.field === "batchRemaining") return; // defensive: don't allow editing this derived DB column
     setActiveCell({
       id: params.row.batchCode,
       field: params.field,
@@ -210,18 +205,18 @@ const ProductionLog = () => {
   // process update call to backend (single object)
   const processRowUpdate = async (updatedRow) => {
     if (!cognitoId) throw new Error("Missing cognitoId");
+
+    // build payload: DO NOT include `batchRemaining` (server computes/stores it)
     const payload = {
-      // send only allowed fields
       date: updatedRow.date,
       recipe: updatedRow.recipe,
       batchesProduced: Number(updatedRow.batchesProduced || 0),
-      batchRemaining: Number(updatedRow.batchRemaining || 0),
-      unitsOfWaste: Number(updatedRow.unitsOfWaste || updatedRow.unitsOfWaste || 0),
+      // send unitsOfWaste and unitsRemaining if present — server will compute batchRemaining accordingly
+      unitsOfWaste: Number(updatedRow.unitsOfWaste || 0),
       unitsRemaining: Number(updatedRow.unitsRemaining || 0),
       cognito_id: cognitoId,
     };
 
-    // PUT by batchCode (path param)
     const url = `${API_BASE}/production-log/${encodeURIComponent(updatedRow.batchCode)}`;
     console.info("[processRowUpdate] PUT", url, "payload:", payload);
 
@@ -252,29 +247,58 @@ const ProductionLog = () => {
         const row = (productionLogs || []).find((r) => r.batchCode === activeCell.id);
         if (!row) throw new Error("Row not found locally");
         patched = { ...row, [activeCell.field]: activeCell.field === "date" ? formatDateYMD(editValue) : editValue };
-        // coerce numbers for numeric fields
-        if (["batchesProduced", "batchRemaining", "unitsOfWaste", "unitsRemaining"].includes(activeCell.field)) {
+        // coerce numbers for numeric fields (batchRemaining removed from editable list)
+        if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(activeCell.field)) {
           patched[activeCell.field] = Number(editValue || 0);
         }
       } else {
         // full-row editing: editingRow holds string values; ensure types and date format
         const r = editingRow || (activeCell ? activeCell.row : null);
         if (!r) throw new Error("No row to edit");
+        // IMPORTANT: do NOT trust/edit batchRemaining here — server will compute it.
         patched = {
           ...r,
           date: formatDateYMD(r.date),
           batchesProduced: Number(r.batchesProduced || 0),
-          batchRemaining: Number(r.batchRemaining || 0),
           unitsOfWaste: Number(r.unitsOfWaste || 0),
           unitsRemaining: Number(r.unitsRemaining || 0),
+          // DO NOT include batchRemaining
         };
       }
 
       // call backend
-      await processRowUpdate(patched);
+      const result = await processRowUpdate(patched);
 
-      // update local state
-      setProductionLogs((prev) => (prev || []).map((p) => (p.batchCode === patched.batchCode ? { ...p, ...patched } : p)));
+      // prefer the server-returned updated object if available
+      const updatedServer = result && (result.updated || result.updatedRow || result.updatedLog || result);
+      let newRow;
+      if (updatedServer && updatedServer.batchCode) {
+        // server returned a DB row: normalize to our local shape (format date, ensure numeric types)
+        newRow = {
+          date: formatDateYMD(updatedServer.date),
+          recipe: updatedServer.recipe,
+          batchesProduced: Number(updatedServer.batchesProduced || 0),
+          batchRemaining: Number(updatedServer.batchRemaining || 0), // stored units
+          unitsOfWaste: Number(updatedServer.units_of_waste ?? updatedServer.unitsOfWaste ?? 0),
+          unitsRemaining:
+            Number(
+              updatedServer.unitsRemaining ??
+                updatedServer.units_remaining ??
+                (Number(updatedServer.batchRemaining || 0) - Number(updatedServer.units_of_waste || 0))
+            ) || 0,
+          batchCode: updatedServer.batchCode,
+          id: updatedServer.batchCode || patched.id,
+        };
+      } else {
+        // fallback: merge patched into existing
+        newRow = { ...patched };
+        newRow.date = formatDateYMD(newRow.date);
+      }
+
+      // update local state by batchCode
+      setProductionLogs((prev) =>
+        (prev || []).map((p) => (p.batchCode === newRow.batchCode ? { ...p, ...newRow } : p))
+      );
 
       // clear states
       setEditDialogOpen(false);
@@ -319,12 +343,12 @@ const ProductionLog = () => {
     }
   };
 
-  // Render input for field
+  // Render input for field — note batchRemaining removed from editable list
   const renderEditInputForField = (fieldName, value, onChange) => {
     if (fieldName === "date") {
       return <TextField fullWidth type="date" value={formatDateYMD(value)} onChange={(e) => onChange(e.target.value)} />;
     }
-    if (["batchesProduced", "batchRemaining", "unitsOfWaste", "unitsRemaining"].includes(fieldName)) {
+    if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(fieldName)) {
       return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
     }
     // default
@@ -368,6 +392,8 @@ const ProductionLog = () => {
             onRowSelectionModelChange={(model) => setSelectedRows(model)}
             columns={columns}
             onCellClick={handleCellClick}
+            disableSelectionOnClick={true}
+            experimentalFeatures={{ newEditingApi: false }}
           />
         </Box>
       </Box>
@@ -396,7 +422,11 @@ const ProductionLog = () => {
                 Batch Code: {activeCell.id}
               </Typography>
               <Box sx={{ mt: 1 }}>
-                {renderEditInputForField(activeCell.field, editValue !== "" ? editValue : activeCell.value, setEditValue)}
+                {renderEditInputForField(
+                  activeCell.field,
+                  editValue !== "" ? editValue : activeCell.value,
+                  setEditValue
+                )}
               </Box>
             </Box>
           )}
@@ -429,15 +459,7 @@ const ProductionLog = () => {
                         value={editingRow?.batchesProduced ?? row.batchesProduced ?? 0}
                         onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), batchesProduced: e.target.value }))}
                       />
-                      <TextField
-                        label="Batch Remaining"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.batchRemaining ?? row.batchRemaining ?? 0}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), batchRemaining: e.target.value }))}
-                      />
-                    </Box>
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                      {/* NOTE: Batch Remaining is intentionally removed from the edit UI */}
                       <TextField
                         label="Units of Waste"
                         fullWidth
@@ -445,14 +467,16 @@ const ProductionLog = () => {
                         value={editingRow?.unitsOfWaste ?? row.unitsOfWaste ?? 0}
                         onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsOfWaste: e.target.value }))}
                       />
-                      <TextField
-                        label="Units Remaining"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.unitsRemaining ?? row.unitsRemaining ?? 0}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsRemaining: e.target.value }))}
-                      />
                     </Box>
+
+                    <TextField
+                      label="Units Remaining"
+                      fullWidth
+                      type="number"
+                      value={editingRow?.unitsRemaining ?? row.unitsRemaining ?? 0}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsRemaining: e.target.value }))}
+                    />
+
                     <TextField
                       label="Batch Code"
                       fullWidth
@@ -481,7 +505,15 @@ const ProductionLog = () => {
           </Button>
           <Button
             onClick={handleConfirmEdit}
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
             startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
             disabled={updating}
           >
