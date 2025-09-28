@@ -99,8 +99,8 @@ const selectSx = {
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
-   { value: "kg", label: "Kilograms (Kg)" },
-    { value: "l", label: "Litres (L)" },
+  { value: "kg", label: "Kilograms (Kg)" },
+  { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 
@@ -440,12 +440,7 @@ const GoodsInForm = () => {
 
           {/* Single item form (original) */}
           {tabIndex === 0 && (
-            <Formik
-              onSubmit={submitSingle}
-              initialValues={initialValuesSingle}
-              validationSchema={goodsInSchema}
-              validateOnMount={true}
-            >
+            <Formik onSubmit={submitSingle} initialValues={initialValuesSingle} validationSchema={goodsInSchema}>
               {({
                 values,
                 errors,
@@ -653,7 +648,23 @@ const GoodsInForm = () => {
                     <Box display="flex" justifyContent="flex-end" mt={3}>
                       <Fab
                         variant="extended"
-                        onClick={onPrimaryClick}
+                        onClick={async () => {
+                          const errs = await validateForm();
+                          if (errs && Object.keys(errs).length) {
+                            setTouched({
+                              date: true,
+                              ingredient: true,
+                              stockReceived: true,
+                              unit: true,
+                              barCode: true,
+                              expiryDate: true,
+                              temperature: true,
+                            }, false);
+                            scrollToFirstError(errs);
+                            return;
+                          }
+                          await submitForm();
+                        }}
                         sx={{
                           px: 4,
                           py: 1.25,
@@ -666,7 +677,7 @@ const GoodsInForm = () => {
                           color: "#fff",
                           "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
                         }}
-                        disabled={!isValid || isSubmitting}
+                        disabled={false}
                       >
                         <AddIcon />
                         Record Stock
@@ -684,9 +695,8 @@ const GoodsInForm = () => {
               initialValues={initialValuesBatch}
               validationSchema={batchSchema}
               onSubmit={submitBatch}
-              validateOnMount={true}
             >
-              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue, submitForm, isValid, isSubmitting }) => (
+              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
                 <form>
                   <FieldArray name="items">
                     {({ push, remove }) => {
@@ -698,10 +708,8 @@ const GoodsInForm = () => {
                           {/* Goods */}
                           <Box display="grid" gap={2}>
                             {(values.items || []).map((it, idx) => {
-                              // derive selected option for this row (by id)
                               const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
 
-                              // helper shortcuts for nested error/touched
                               const base = `items.${idx}`;
                               const dateError = getIn(errors, `${base}.date`);
                               const dateTouched = getIn(touched, `${base}.date`);
@@ -912,7 +920,6 @@ const GoodsInForm = () => {
                                 color: "#fff",
                                 "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
                               }}
-                              disabled={!isValid || isSubmitting}
                             >
                               <AddIcon />
                               Submit Multiple ({(values.items || []).length})
