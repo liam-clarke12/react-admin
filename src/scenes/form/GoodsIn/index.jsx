@@ -522,9 +522,10 @@ const GoodsInForm = () => {
                               onBlur={handleBlur}
                               error={!!getIn(touched, "ingredient") && !!getIn(errors, "ingredient")}
                               helperText={getIn(touched, "ingredient") && getIn(errors, "ingredient")}
+                              sx={inputSx}
+                              // IMPORTANT: preserve params.InputProps and params.inputProps (ref lives in params.inputProps)
                               InputProps={{
                                 ...params.InputProps,
-                                inputProps: { ...(params.InputProps.inputProps || {}), "data-field": "ingredient" },
                                 endAdornment: (
                                   <>
                                     {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
@@ -532,7 +533,10 @@ const GoodsInForm = () => {
                                   </>
                                 ),
                               }}
-                              sx={inputSx}
+                              inputProps={{
+                                ...(params.inputProps || {}),
+                                "data-field": "ingredient",
+                              }}
                             />
                           )}
                         />
@@ -677,7 +681,6 @@ const GoodsInForm = () => {
                           color: "#fff",
                           "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
                         }}
-                        disabled={false}
                       >
                         <AddIcon />
                         Record Stock
@@ -790,15 +793,19 @@ const GoodsInForm = () => {
                                             sx={inputSx}
                                             error={!!ingTouched && !!ingError}
                                             helperText={ingTouched && ingError ? ingError : ""}
+                                            // Preserve params.InputProps and params.inputProps (ref lives in params.inputProps)
                                             InputProps={{
                                               ...params.InputProps,
-                                              inputProps: { ...(params.InputProps.inputProps || {}), "data-field": `items.${idx}.ingredient` },
                                               endAdornment: (
                                                 <>
                                                   {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
                                                   {params.InputProps.endAdornment}
                                                 </>
                                               ),
+                                            }}
+                                            inputProps={{
+                                              ...(params.inputProps || {}),
+                                              "data-field": `items.${idx}.ingredient`,
                                             }}
                                           />
                                         )}
