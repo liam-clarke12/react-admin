@@ -493,6 +493,19 @@ const GoodsIn = () => {
           90% { background-color: transparent; }
           100% { background-color: transparent; }
         }
+
+        /* alternating row coloring */
+        .even-row {
+          background-color: ${brand.surfaceMuted} !important;
+        }
+        .odd-row {
+          background-color: ${brand.surface} !important;
+        }
+
+        /* keep barCode colored */
+        .barCode-column--cell {
+          color: ${brand.primary};
+        }
       `}</style>
 
       <Box sx={{ mt: 2, border: `1px solid ${brand.border}`, borderRadius: 16, background: brand.surface, boxShadow: brand.shadow, overflow: "hidden" }}>
@@ -537,7 +550,17 @@ const GoodsIn = () => {
           </Box>
         </Box>
 
-        <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", borderRadius: 0 }, "& .MuiDataGrid-columnHeaders": { backgroundColor: "#fbfcfd", color: brand.subtext, borderBottom: `1px solid ${brand.border}`, fontWeight: 800 }, "& .MuiDataGrid-columnSeparator": { display: "none" }, "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text }, "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted }, "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface }, "& .barCode-column--cell": { color: brand.primary }, "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": { outline: `2px solid ${brand.primary}`, outlineOffset: "-2px", boxShadow: `0 0 0 4px ${brand.focusRing}` } }}>
+        <Box sx={{
+          height: "70vh",
+          "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#fbfcfd", color: brand.subtext, borderBottom: `1px solid ${brand.border}`, fontWeight: 800 },
+          "& .MuiDataGrid-columnSeparator": { display: "none" },
+          "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
+          "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+          "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
+          "& .barCode-column--cell": { color: brand.primary },
+          "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": { outline: `2px solid ${brand.primary}`, outlineOffset: "-2px", boxShadow: `0 0 0 4px ${brand.focusRing}` }
+        }}>
           <DataGrid
             rows={goodsInRows || []}
             getRowId={(row) => row._id}
@@ -553,6 +576,11 @@ const GoodsIn = () => {
             processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
             onCellClick={handleCellClick}
+            /* <-- ADD alternating row classes here */
+            getRowClassName={(params) =>
+              // indexRelativeToCurrentPage is 0-based; even => even-row
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "even-row" : "odd-row"
+            }
           />
         </Box>
       </Box>

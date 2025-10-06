@@ -293,13 +293,6 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
               <Item
-                title="Recipe Form"
-                to="/recipeform"
-                icon={<ReceiptLongOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
                 title="Recipe Production"
                 to="/recipe_production"
                 icon={<OutdoorGrillOutlinedIcon />}
@@ -310,6 +303,13 @@ const Sidebar = () => {
                 title="Goods Out Form"
                 to="/goods_out_form"
                 icon={<Inventory2OutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Recipe Form"
+                to="/recipeform"
+                icon={<ReceiptLongOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
               />
