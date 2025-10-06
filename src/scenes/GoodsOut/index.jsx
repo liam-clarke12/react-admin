@@ -344,6 +344,10 @@ const GoodsOut = () => {
           padding: 12px 16px; border-bottom: 1px solid ${brand.border};
           background: ${brand.surface};
         }
+
+        /* alternating DataGrid rows */
+        .even-row { background-color: ${brand.surfaceMuted} !important; }
+        .odd-row { background-color: ${brand.surface} !important; }
       `}</style>
 
       <Box className="go-card" mt={2}>
@@ -412,6 +416,9 @@ const GoodsOut = () => {
             disableRowSelectionOnClick
             onRowSelectionModelChange={(model) => setSelectedRows(model)}
             rowSelectionModel={selectedRows}
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "even-row" : "odd-row"
+            }
           />
         </Box>
       </Box>

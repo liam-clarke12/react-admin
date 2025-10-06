@@ -279,6 +279,10 @@ const IngredientsInventory = () => {
         .pill-icon:hover { background: #e2e8f0; }
         .toolbar-right { display:flex; gap:8px; align-items:center; }
         .barCode-column--cell { color: ${brand.primary}; }
+
+        /* Alternating row colors for Ingredients DataGrid */
+        .inv-even-row { background-color: ${brand.surfaceMuted} !important; }
+        .inv-odd-row  { background-color: ${brand.surface} !important; }
       `}</style>
 
       <Box className="inv-card" mt={2}>
@@ -341,6 +345,9 @@ const IngredientsInventory = () => {
             pageSize={10}
             rowsPerPageOptions={[5, 10, 20]}
             disableSelectionOnClick
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "inv-even-row" : "inv-odd-row"
+            }
           />
         </Box>
       </Box>

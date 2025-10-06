@@ -70,7 +70,7 @@ const ProductionLog = () => {
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
         const map = {};
-        data.forEach((r) => {
+        (Array.isArray(data) ? data : []).forEach((r) => {
           const key = r.recipe_name ?? r.recipe ?? r.name ?? "unknown";
           const upb = Number(r.units_per_batch) || 0;
           map[key] = upb;
@@ -99,7 +99,7 @@ const ProductionLog = () => {
           const unitsOfWaste = Number(row.units_of_waste || row.unitsOfWaste) || 0;
           const upb = recipesMap[row.recipe] ?? Number(row.units_per_batch || 0);
 
-          // === CORRECTED: compute unitsRemaining from stored units (batchRemaining) minus waste
+          // compute unitsRemaining from stored units (batchRemaining) minus waste
           const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining - unitsOfWaste)) || 0;
           const batchesRemaining = upb > 0 ? Number(unitsRemaining) / Number(upb) : null;
 
@@ -349,6 +349,13 @@ const ProductionLog = () => {
       <style>{`
         .pl-card { border: 1px solid ${brand.border}; background: ${brand.surface}; border-radius: 16px; box-shadow: ${brand.shadow}; overflow: hidden; }
         .pl-toolbar { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid ${brand.border}; background:${brand.surface}; }
+
+        /* Alternating row colors */
+        .pl-even-row { background-color: ${brand.surface} !important; }
+        .pl-odd-row  { background-color: ${brand.surfaceMuted} !important; }
+
+        /* Keep hover highlight readable */
+        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
       `}</style>
 
       <Box className="pl-card" mt={2}>
@@ -383,6 +390,9 @@ const ProductionLog = () => {
             onCellClick={handleCellClick}
             disableSelectionOnClick={true}
             experimentalFeatures={{ newEditingApi: false }}
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "pl-even-row" : "pl-odd-row"
+            }
           />
         </Box>
       </Box>

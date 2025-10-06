@@ -416,6 +416,12 @@ const Recipes = () => {
           padding: 12px 16px; border-bottom: 1px solid ${brand.border};
           background: ${brand.surface};
         }
+
+        /* Alternating row colors for recipes DataGrid */
+        .recipes-even-row { background-color: ${brand.surface} !important; }
+        .recipes-odd-row  { background-color: ${brand.surfaceMuted} !important; }
+        /* preserve hover visibility (hover will override briefly) */
+        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
       `}</style>
 
       <Box className="recipes-card" mt={2}>
@@ -450,6 +456,9 @@ const Recipes = () => {
             getRowId={(r) => r.id}
             pageSize={10}
             rowsPerPageOptions={[10, 25, 50]}
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "recipes-even-row" : "recipes-odd-row"
+            }
           />
         </Box>
       </Box>

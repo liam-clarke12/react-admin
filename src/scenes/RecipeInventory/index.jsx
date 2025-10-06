@@ -135,6 +135,13 @@ const RecipeInventory = () => {
         }
         .pill-icon:hover { background: #e2e8f0; }
         .toolbar-right { display: flex; gap: 8px; align-items: center; }
+
+        /* Alternating row colors */
+        .ri-even-row { background-color: ${brand.surface} !important; }
+        .ri-odd-row  { background-color: ${brand.surfaceMuted} !important; }
+
+        /* Keep hover consistent and readable */
+        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
       `}</style>
 
       {/* Card container */}
@@ -198,6 +205,9 @@ const RecipeInventory = () => {
             rowsPerPageOptions={[10, 25, 50]}
             getRowId={(row) => row.id}
             disableSelectionOnClick
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "ri-even-row" : "ri-odd-row"
+            }
           />
         </Box>
       </Box>

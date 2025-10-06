@@ -333,6 +333,12 @@ const StockUsage = () => {
           background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
           padding: 10px 12px; border-radius: 10px; font-weight: 700; box-shadow: ${brand.shadow};
         }
+
+        /* Alternating DataGrid rows */
+        .su-even-row { background-color: ${brand.surface} !important; }
+        .su-odd-row  { background-color: ${brand.surfaceMuted} !important; }
+        /* keep hover visible */
+        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
       `}</style>
 
       {/* Card */}
@@ -396,6 +402,9 @@ const StockUsage = () => {
             disableRowSelectionOnClick
             onRowSelectionModelChange={(model) => setSelectedRows(model)}
             rowSelectionModel={selectedRows}
+            getRowClassName={(params) =>
+              (params.indexRelativeToCurrentPage % 2 === 0) ? "su-even-row" : "su-odd-row"
+            }
           />
         </Box>
       </Box>
@@ -575,8 +584,6 @@ const StockUsage = () => {
               onClick={() => {
                 setSearchTerm("");
                 // reset drawer items to original content (best-effort)
-                // if selectedRowMeta exists, we can attempt to re-open to rebuild items
-                // (but we keep it simple: do nothing else)
               }}
               sx={{ textTransform: "none", borderRadius: 1.5 }}
             >
