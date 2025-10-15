@@ -22,16 +22,21 @@ import BakeryDiningOutlinedIcon from '@mui/icons-material/BakeryDiningOutlined';
 // ✅ Amplify v6 modular auth API
 import { fetchUserAttributes } from "aws-amplify/auth";
 
+/* ===== BRAND UPDATED: Pantone 13-4520 TCX (Ocean Current) =====
+   Primary hex: #A3CDD5 (Ocean Current)
+   primaryDark chosen slightly darker for contrast: #82A4AA
+   focusRing updated to use primary color at 35% opacity
+*/
 const brand = {
   text: "#0f172a",
-  subtext: "#64748b",
+  subtext: "#0f172a50", // slightly muted
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
+  primary: "#A3CDD5",      // Pantone 13-4520 TCX -> #A3CDD5
+  primaryDark: "#82A4AA",  // darker companion for gradients/hover
   hover: "#f1f5f9",
-  focusRing: "rgba(225, 29, 72, 0.35)",
+  focusRing: "rgba(163,205,213,0.35)", // primary at 35% opacity
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
