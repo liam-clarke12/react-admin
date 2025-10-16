@@ -46,32 +46,35 @@ import { AuthProvider } from "./contexts/AuthContext";
 
 Amplify.configure(awsExports);
 
-/** Brand tokens */
+/** Brand tokens (Pantone 13-4520 TCX / soft teal) */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
+  inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
-  focusRing: "rgba(225, 29, 72, 0.35)",
+  // Pantone 13-4520 TCX (soft teal/cyan)
+  primary: "#A3CDD5",
+  primaryDark: "#82A4AA",
+  focusRing: "rgba(163,205,213,0.35)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-/** Amplify UI theme overrides */
+/** Amplify UI theme overrides (updated to teal accents) */
 const noryTheme = {
   name: "nory",
   tokens: {
     colors: {
-      background: { primary: { value: "#ffffff" }, secondary: { value: "#f8fafc" } },
+      background: { primary: { value: "#ffffff" }, secondary: { value: brand.surfaceMuted } },
       font: { primary: { value: brand.text }, secondary: { value: brand.subtext } },
       border: { primary: { value: brand.border } },
       brand: {
+        // lighter / mid / darker teal palette
         primary: {
-          10: { value: "#ffe4ea" },
-          20: { value: "#fecdd3" },
-          60: { value: "#fb7185" },
+          10: { value: "#eaf9fa" },
+          20: { value: "#cfeff0" },
+          60: { value: "#7fbfc2" },
           80: { value: brand.primary },
           90: { value: brand.primaryDark },
         },
@@ -96,7 +99,8 @@ const noryTheme = {
         borderRadius: { value: "{radii.medium}" },
         _focus: {
           borderColor: { value: "{colors.brand.primary.80}" },
-          boxShadow: { value: "0 0 0 4px rgba(225,29,72,0.35)" },
+          // use our new soft teal focus ring
+          boxShadow: { value: "0 0 0 4px rgba(163,205,213,0.35)" },
         },
       },
       button: {
@@ -217,15 +221,15 @@ function LoginLayout({ children }) {
           min-height: 100dvh;
           display: grid;
           grid-template-columns: minmax(320px, 46%) 1fr;
-          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          background: linear-gradient(180deg, #ffffff 0%, ${brand.surfaceMuted} 100%);
         }
         @media (max-width: 1000px) { .auth-split { grid-template-columns: 1fr; } }
         .auth-left {
           position: relative;
           overflow: hidden;
           background:
-            radial-gradient(800px 400px at 80% -20%, #ffe4ea 0%, rgba(255,228,234,0) 60%),
-            linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            radial-gradient(800px 400px at 80% -20%, rgba(163,205,213,0.18) 0%, rgba(163,205,213,0) 60%),
+            linear-gradient(180deg, #fff 0%, ${brand.surfaceMuted} 100%);
           border-right: 1px solid ${brand.border};
           display: grid;
           place-items: center;
