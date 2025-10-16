@@ -23,7 +23,7 @@ const LandingPage = () => {
       return;
     }
     if (item === "Features") {
-      navigate("/features")
+      navigate("/features");
       return;
     }
     if (item === "About") {
@@ -32,6 +32,17 @@ const LandingPage = () => {
   };
 
   const goHome = () => navigate("/");
+
+  // Brand tokens (Pantone-accent update)
+  const brand = {
+    text: "#0f172a",
+    subtext: "#334155",
+    border: "#e5e7eb",
+    surface: "#ffffff",
+    surfaceMuted: "#f8fafc",
+    primary: "#A3CDD5", // Pantone 13-4520 TCX
+    primaryDark: "#82A4AA",
+  };
 
   return (
     <Box sx={{ fontFamily: "Roboto, sans-serif" }}>
@@ -43,8 +54,8 @@ const LandingPage = () => {
           alignItems: "center",
           py: 2,
           px: 4,
-          backgroundColor: "#fff",
-          borderBottom: "1px solid #e5e7eb",
+          backgroundColor: brand.surface,
+          borderBottom: `1px solid ${brand.border}`,
         }}
       >
         {/* Logo & Brand Name (clickable → landing page) */}
@@ -58,7 +69,7 @@ const LandingPage = () => {
             gap: 1,
             cursor: "pointer",
             userSelect: "none",
-            "&:hover .brand-text": { color: "#be123c" },
+            "&:hover .brand-text": { color: brand.primaryDark },
           }}
         >
           <Typography
@@ -66,7 +77,7 @@ const LandingPage = () => {
             sx={{
               fontWeight: "bold",
               fontSize: "1.25rem",
-              color: "#0f172a",
+              color: brand.text,
               transition: "color .15s ease",
             }}
           >
@@ -88,8 +99,8 @@ const LandingPage = () => {
               sx={{
                 cursor: "pointer",
                 fontWeight: "bold",
-                color: "#e11d48",
-                "&:hover": { color: "#be123c" },
+                color: brand.primary,
+                "&:hover": { color: brand.primaryDark },
                 transition: "color .15s ease",
               }}
             >
@@ -102,8 +113,8 @@ const LandingPage = () => {
               borderRadius: "999px",
               padding: "6px 20px",
               fontWeight: 600,
-              backgroundColor: "#e11d48",
-              "&:hover": { backgroundColor: "#be123c" },
+              backgroundColor: brand.primary,
+              "&:hover": { backgroundColor: brand.primaryDark },
               textTransform: "none",
             }}
             onClick={handleSignIn}
@@ -120,7 +131,7 @@ const LandingPage = () => {
           gridTemplateColumns: { xs: "1fr", md: "46% 1fr" },
           minHeight: "90vh",
           background:
-            "radial-gradient(800px 400px at 80% -20%, #ffe4ea 0%, rgba(255,228,234,0) 60%), linear-gradient(180deg, #fff 0%, #f8fafc 100%)",
+            `radial-gradient(800px 400px at 80% -20%, rgba(163,205,213,0.18) 0%, rgba(163,205,213,0) 60%), linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
         }}
       >
         {/* Left Hero Text */}
@@ -138,13 +149,13 @@ const LandingPage = () => {
               fontWeight: 900,
               mb: 3,
               lineHeight: 1.2,
-              color: "#0f172a",
+              color: brand.text,
               fontSize: { xs: "2rem", md: "2.8rem" },
             }}
           >
             Efficient <br /> Inventory <br /> Management
           </Typography>
-          <Typography sx={{ mb: 4, color: "#334155", fontSize: 16 }}>
+          <Typography sx={{ mb: 4, color: brand.subtext, fontSize: 16 }}>
             Track ingredients, plan production, and keep waste in check all in one place.
           </Typography>
           <ul
@@ -164,7 +175,7 @@ const LandingPage = () => {
                 fontWeight: 700,
               }}
             >
-              <CheckIcon sx={{ color: "#e11d48" }} /> Real-time stock & barcodes
+              <CheckIcon sx={{ color: brand.primary }} /> Real-time stock & barcodes
             </li>
             <li
               style={{
@@ -174,7 +185,7 @@ const LandingPage = () => {
                 fontWeight: 700,
               }}
             >
-              <ShowChartIcon sx={{ color: "#e11d48" }} /> Recipe-driven production
+              <ShowChartIcon sx={{ color: brand.primary }} /> Recipe-driven production
             </li>
             <li
               style={{
@@ -184,7 +195,7 @@ const LandingPage = () => {
                 fontWeight: 700,
               }}
             >
-              <Inventory2Icon sx={{ color: "#e11d48" }} /> Focused on product traceability
+              <Inventory2Icon sx={{ color: brand.primary }} /> Focused on product traceability
             </li>
           </ul>
           <Button
@@ -194,8 +205,8 @@ const LandingPage = () => {
               borderRadius: "999px",
               padding: "12px 32px",
               fontWeight: 600,
-              backgroundColor: "#e11d48",
-              "&:hover": { backgroundColor: "#be123c" },
+              backgroundColor: brand.primary,
+              "&:hover": { backgroundColor: brand.primaryDark },
             }}
             onClick={handleGetStarted}
           >
@@ -233,7 +244,7 @@ const LandingPage = () => {
         </Typography>
         <Grid container spacing={5} justifyContent="center">
           <Grid item xs={12} md={4} textAlign="center">
-            <CheckIcon sx={{ fontSize: 50, color: "#e11d48", mb: 2 }} />
+            <CheckIcon sx={{ fontSize: 50, color: brand.primary, mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
               Real-Time Tracking
             </Typography>
@@ -242,14 +253,14 @@ const LandingPage = () => {
             </Typography>
           </Grid>
           <Grid item xs={12} md={4} textAlign="center">
-            <ShowChartIcon sx={{ fontSize: 50, color: "#e11d48", mb: 2 }} />
+            <ShowChartIcon sx={{ fontSize: 50, color: brand.primary, mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
               Sales Insights
             </Typography>
             <Typography>Gain valuable insights into sales trends and product performance.</Typography>
           </Grid>
           <Grid item xs={12} md={4} textAlign="center">
-            <Inventory2Icon sx={{ fontSize: 50, color: "#e11d48", mb: 2 }} />
+            <Inventory2Icon sx={{ fontSize: 50, color: brand.primary, mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
               Inventory Optimization
             </Typography>
@@ -259,7 +270,7 @@ const LandingPage = () => {
       </Container>
 
       {/* Footer */}
-      <Box sx={{ height: 60, backgroundColor: "#e11d48" }} />
+      <Box sx={{ height: 60, backgroundColor: brand.primary }} />
     </Box>
   );
 };

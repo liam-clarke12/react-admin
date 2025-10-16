@@ -38,7 +38,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /**
- * Nory-like tokens (Ruby/Rose)
+ * Nory-like tokens — updated to Pantone 13-4520 TCX
  */
 const brand = {
   text: "#0f172a",
@@ -47,9 +47,10 @@ const brand = {
   inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
-  focusRing: "rgba(225, 29, 72, 0.35)",
+  // Pantone 13-4520 TCX (soft teal/cyan)
+  primary: "#A3CDD5",
+  primaryDark: "#82A4AA",
+  focusRing: "rgba(163,205,213,0.35)",
 };
 
 // shared input styling for TextField & Autocomplete

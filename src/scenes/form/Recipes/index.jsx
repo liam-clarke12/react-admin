@@ -7,16 +7,16 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/** Brand tokens (Nory-like) */
+/** Brand tokens (Nory-like) — updated to Pantone 13-4520 TCX */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
   inputBg: "#ffffff",
   surface: "#ffffff",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
-  focusRing: "rgba(225, 29, 72, 0.35)",
+  primary: "#A3CDD5",      // Pantone 13-4520 TCX
+  primaryDark: "#82A4AA",  // companion darker tone
+  focusRing: "rgba(163,205,213,0.35)",
   danger: "#dc2626",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
@@ -24,8 +24,8 @@ const brand = {
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
-   { value: "kg", label: "Kilograms (Kg)" },
-    { value: "l", label: "Litres (L)" },
+  { value: "kg", label: "Kilograms (Kg)" },
+  { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 

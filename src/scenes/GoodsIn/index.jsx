@@ -30,11 +30,13 @@ const brand = {
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
+  inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
-  focusRing: "rgba(225, 29, 72, 0.35)",
+  // Pantone 13-4520 TCX (soft teal/cyan)
+  primary: "#A3CDD5",
+  primaryDark: "#82A4AA",
+  focusRing: "rgba(163,205,213,0.35)",
   danger: "#dc2626",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
