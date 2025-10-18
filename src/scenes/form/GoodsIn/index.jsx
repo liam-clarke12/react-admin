@@ -116,6 +116,8 @@ const itemSchema = yup.object().shape({
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
   temperature: yup.string().required("Temperature is required"),
+  // invoice number is optional
+  invoiceNumber: yup.string().notRequired(),
 });
 
 const GoodsInForm = () => {
@@ -265,6 +267,7 @@ const GoodsInForm = () => {
     barCode: "",
     expiryDate: new Date().toISOString().split("T")[0],
     temperature: "N/A",
+    invoiceNumber: "", // optional
   };
 
   const initialBatchItem = {
@@ -275,6 +278,7 @@ const GoodsInForm = () => {
     barCode: "",
     expiryDate: new Date().toISOString().split("T")[0],
     temperature: "N/A",
+    invoiceNumber: "", // optional
   };
 
   const initialValuesBatch = { items: [initialBatchItem] };
@@ -287,6 +291,7 @@ const GoodsInForm = () => {
       ingredient: selectedOpt ? selectedOpt.name : values.ingredient,
       ingredientId: selectedOpt ? String(selectedOpt.id) : null,
       cognito_id: cognitoId,
+      invoiceNumber: values.invoiceNumber || null,
     };
 
     try {
@@ -312,6 +317,7 @@ const GoodsInForm = () => {
         ...it,
         ingredient: selectedOpt ? selectedOpt.name : it.ingredient,
         ingredientId: selectedOpt ? String(selectedOpt.id) : null,
+        invoiceNumber: it.invoiceNumber || null,
       };
     });
 
@@ -370,6 +376,7 @@ const GoodsInForm = () => {
         barCode: true,
         expiryDate: true,
         temperature: true,
+        invoiceNumber: true,
       }));
       setTouched({ items: touchedItems }, false);
       // scroll/focus
@@ -471,6 +478,7 @@ const GoodsInForm = () => {
                       barCode: true,
                       expiryDate: true,
                       temperature: true,
+                      invoiceNumber: true,
                     }, false);
                     scrollToFirstError(errs);
                     return;
@@ -612,6 +620,24 @@ const GoodsInForm = () => {
                         }}
                       />
 
+                      {/* Invoice Number (optional) */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="text"
+                        label="Invoice Number (optional)"
+                        name="invoiceNumber"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.invoiceNumber}
+                        error={!!touched.invoiceNumber && !!errors.invoiceNumber}
+                        helperText={touched.invoiceNumber && errors.invoiceNumber ? errors.invoiceNumber : ""}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "invoiceNumber" },
+                        }}
+                      />
+
                       {/* Expiry Date */}
                       <TextField
                         fullWidth
@@ -664,6 +690,7 @@ const GoodsInForm = () => {
                               barCode: true,
                               expiryDate: true,
                               temperature: true,
+                              invoiceNumber: true,
                             }, false);
                             scrollToFirstError(errs);
                             return;
@@ -705,7 +732,12 @@ const GoodsInForm = () => {
                   <FieldArray name="items">
                     {({ push, remove }) => {
                       // expose add-good function so FAB inside wrapper can call it regardless of scroll
-                      addGoodRef.current = () => push({ ...initialBatchItem });
+                      addGoodRef.current = () => {
+                        // If previous item had an invoiceNumber provided, default it to the new one
+                        const last = values.items && values.items.length ? values.items[values.items.length - 1] : null;
+                        const inv = last && last.invoiceNumber ? last.invoiceNumber : "";
+                        push({ ...initialBatchItem, invoiceNumber: inv || "" });
+                      };
 
                       return (
                         <Box>
@@ -729,6 +761,8 @@ const GoodsInForm = () => {
                               const expTouched = getIn(touched, `${base}.expiryDate`);
                               const tempError = getIn(errors, `${base}.temperature`);
                               const tempTouched = getIn(touched, `${base}.temperature`);
+                              const invError = getIn(errors, `${base}.invoiceNumber`);
+                              const invTouched = getIn(touched, `${base}.invoiceNumber`);
 
                               return (
                                 <Paper
@@ -872,6 +906,23 @@ const GoodsInForm = () => {
                                       }}
                                     />
 
+                                    {/* Invoice Number (optional) for each good */}
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="text"
+                                      label="Invoice Number (optional)"
+                                      name={`items.${idx}.invoiceNumber`}
+                                      value={it.invoiceNumber}
+                                      onChange={(e) => setFieldValue(`items.${idx}.invoiceNumber`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!invTouched && !!invError}
+                                      helperText={invTouched && invError ? invError : ""}
+                                      InputProps={{
+                                        inputProps: { "data-field": `items.${idx}.invoiceNumber` },
+                                      }}
+                                    />
+
                                     <TextField
                                       fullWidth
                                       variant="outlined"
@@ -1009,6 +1060,7 @@ const GoodsInForm = () => {
                 <TableCell sx={{ fontWeight: 800 }}>Quantity</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Unit</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Barcode</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Invoice</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Expiry</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Temp</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
@@ -1022,6 +1074,7 @@ const GoodsInForm = () => {
                   <TableCell>{String(it.stockReceived ?? "—")}</TableCell>
                   <TableCell>{String(it.unit ?? "—")}</TableCell>
                   <TableCell>{String(it.barCode ?? "—")}</TableCell>
+                  <TableCell>{String(it.invoiceNumber ?? "—")}</TableCell>
                   <TableCell>{String(it.expiryDate ?? "—")}</TableCell>
                   <TableCell>{String(it.temperature ?? "—")}</TableCell>
                   <TableCell>{String(it.date ?? "—")}</TableCell>
