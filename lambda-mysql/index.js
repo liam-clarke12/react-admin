@@ -608,8 +608,13 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
     unit,
     expiryDate,
     barCode: newBarCode, // new barcode (optional) supplied in body
+    invoiceNumber,       // accept camelCase
+    invoice_number,      // accept snake_case
     cognito_id,
   } = req.body || {};
+
+  // normalize invoice field (prefer invoiceNumber, fallback to invoice_number)
+  const invoiceVal = invoiceNumber !== undefined ? invoiceNumber : invoice_number;
 
   log("Request start", { startTs, originalPathBarcode, body: req.body });
 
@@ -672,7 +677,7 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
       }
     }
 
-    // Build update set (allow updating barCode too)
+    // Build update set (allow updating barCode & invoiceNumber too)
     const updateCols = [];
     const params = [];
 
@@ -710,6 +715,12 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
       params.push(newBarCode);
     }
 
+    // Support invoice number update (accepts invoiceNumber or invoice_number from body)
+    if (invoiceVal !== undefined) {
+      updateCols.push("invoice_number = ?");
+      params.push(invoiceVal);
+    }
+
     if (updateCols.length === 0) {
       await conn.rollback();
       log("No updatable fields supplied", {});
@@ -729,16 +740,17 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
       log("Calling syncIngredientInventoryForUser", { user: cognito_id });
       await syncIngredientInventoryForUser(cognito_id);
     } catch (syncErr) {
-      // non-fatal: log, but proceed to commit (you might want to handle differently)
+      // non-fatal: log, but proceed to commit
       log("syncIngredientInventoryForUser failed", { error: syncErr && syncErr.message ? syncErr.message : String(syncErr) });
     }
 
     await conn.commit();
     log("Transaction committed", {});
 
-    // Return updated row (fresh from DB)
-    const [updatedRows] = await conn.execute(`SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`, [ newBarCode || originalPathBarcode, cognito_id ]);
-    log("Selected updated row", { updatedRows: (updatedRows && updatedRows[0]) ? { id: updatedRows[0].id, barCode: updatedRows[0].barCode } : null });
+    // Return updated row (fresh from DB) — ensure we select by whichever barcode is now authoritative
+    const lookupBarcode = (newBarCode && String(newBarCode).trim()) ? newBarCode : originalPathBarcode;
+    const [updatedRows] = await conn.execute(`SELECT * FROM goods_in WHERE barCode = ? AND user_id = ? LIMIT 1`, [ lookupBarcode, cognito_id ]);
+    log("Selected updated row", { updatedRows: (updatedRows && updatedRows[0]) ? { id: updatedRows[0].id, barCode: updatedRows[0].barCode, invoice_number: updatedRows[0].invoice_number } : null });
 
     return res.json({ success: true, updated: (updatedRows && updatedRows[0]) ? updatedRows[0] : null });
   } catch (err) {
