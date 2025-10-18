@@ -85,6 +85,9 @@ const GoodsIn = () => {
           const serverBar = row.barCode ? String(row.barCode) : null;
           const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
 
+          // invoice may be returned as invoice_number (snake) or invoiceNumber (camel)
+          const invoiceNumber = row.invoice_number ?? row.invoiceNumber ?? null;
+
           return {
             ...row,
             date,
@@ -93,6 +96,7 @@ const GoodsIn = () => {
             stockRemaining,
             processed: Number(stockRemaining) === 0 ? "Yes" : "No",
             barCode: serverBar || row.barCode || null,
+            invoiceNumber,
             _id,
           };
         });
@@ -107,7 +111,6 @@ const GoodsIn = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
-  // highlight CSS - injected via style tag below
   // columns
   const columns = useMemo(
     () => [
@@ -133,6 +136,8 @@ const GoodsIn = () => {
         editable: false,
       },
       { field: "unit", headerName: "Unit", flex: 1, editable: false },
+      // new Invoice column
+      { field: "invoiceNumber", headerName: "Invoice #", flex: 1, editable: false },
       { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
       {
         field: "barCode",
@@ -244,6 +249,8 @@ const GoodsIn = () => {
       unit: newRow.unit,
       expiryDate: newRow.expiryDate,
       barCode: newRow.barCode,
+      // send invoice using snake_case to match backend column
+      invoice_number: newRow.invoiceNumber ?? null,
       cognito_id: cognitoId,
     };
 
@@ -277,6 +284,8 @@ const GoodsIn = () => {
         stockReceived: Number((serverRow && serverRow.stockReceived) ?? newRow.stockReceived ?? 0),
         stockRemaining: Number((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining ?? 0),
         processed: Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
+        // prefer server-provided invoice (snake or camel), otherwise use newRow value
+        invoiceNumber: (serverRow && (serverRow.invoice_number ?? serverRow.invoiceNumber)) ?? newRow.invoiceNumber ?? null,
       };
 
       normalizedResult._id =
@@ -386,7 +395,12 @@ const GoodsIn = () => {
       if (activeCell && activeCell.field && !editingRow) {
         const row = (goodsInRows || []).find((r) => r._id === (activeCell.row?._id) || r.barCode === activeCell.id);
         if (!row) throw new Error("Row not found");
-        const patched = { ...row, [activeCell.field]: activeCell.field === "stockRemaining" || activeCell.field === "stockReceived" ? Number(editValue || 0) : editValue };
+        const patched = {
+          ...row,
+          [activeCell.field]: activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
+            ? Number(editValue || 0)
+            : editValue,
+        };
         if (patched.stockRemaining !== undefined) patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
         result = await processRowUpdate(patched, { barCode: originalBarcode || activeCell.id, _id: originalId || row._id });
@@ -438,6 +452,7 @@ const GoodsIn = () => {
       return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
     }
 
+    // invoiceNumber is a plain text input (falls through to default)
     return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
   };
 
@@ -622,6 +637,8 @@ const GoodsIn = () => {
                       </Select>
                     </FormControl>
                     <TextField label="Bar Code" fullWidth value={editingRow?.barCode ?? row.barCode ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))} />
+                    {/* Invoice Number field added to edit dialog */}
+                    <TextField label="Invoice Number" fullWidth value={editingRow?.invoiceNumber ?? row.invoiceNumber ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), invoiceNumber: e.target.value }))} />
                     <TextField label="Expiry Date" fullWidth type="date" value={editingRow?.expiryDate ?? row.expiryDate ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))} />
                     <TextField label="Temperature (℃)" fullWidth value={editingRow?.temperature ?? row.temperature ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))} />
                   </>

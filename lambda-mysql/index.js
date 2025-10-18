@@ -212,17 +212,18 @@ async function syncIngredientInventoryForUser(userId) {
   }
 }
 
-// ✅ Route: Submit Goods In
 app.post("/api/submit", async (req, res) => {
-  const { 
-    date, 
-    ingredient, 
-    stockReceived, 
-    unit,            // new unit field
-    barCode, 
-    expiryDate, 
-    temperature, 
-    cognito_id 
+  const {
+    date,
+    ingredient,
+    stockReceived,
+    unit, // new unit field (required)
+    barCode,
+    expiryDate,
+    temperature,
+    cognito_id,
+    invoiceNumber, // optional: camelCase
+    invoice_number, // optional: snake_case fallback
   } = req.body;
 
   // Set CORS headers explicitly
@@ -232,12 +233,26 @@ app.post("/api/submit", async (req, res) => {
   try {
     console.log("Raw request body:", req.body);
 
-    // Validate required fields, including unit
-    if (!date || !ingredient || !stockReceived || !unit || !barCode || !expiryDate || 
-        temperature === undefined || temperature === null || !cognito_id) {
-      console.error("❌ Missing fields in request body:", { date, ingredient, stockReceived, unit, barCode, expiryDate, temperature, cognito_id });
-      return res.status(400).json({ 
-        error: "All fields are required",
+    // Normalize invoice value: treat empty string as null
+    const invoiceVal = (invoiceNumber ?? invoice_number ?? null);
+    const invoice_sql_value = (typeof invoiceVal === "string" && invoiceVal.trim() === "") ? null : invoiceVal;
+
+    // Validate required fields (invoice is optional)
+    if (
+      !date ||
+      !ingredient ||
+      (stockReceived === undefined || stockReceived === null) ||
+      !unit ||
+      !barCode ||
+      !expiryDate ||
+      temperature === undefined || temperature === null ||
+      !cognito_id
+    ) {
+      console.error("❌ Missing fields in request body:", {
+        date, ingredient, stockReceived, unit, barCode, expiryDate, temperature, cognito_id, invoiceVal
+      });
+      return res.status(400).json({
+        error: "All required fields are missing or invalid (invoiceNumber is optional)",
         received: req.body
       });
     }
@@ -246,25 +261,26 @@ app.post("/api/submit", async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      // Insert into goods_in (including unit)
+      // Insert into goods_in (including invoice_number)
       const goodsInQuery = `
-        INSERT INTO goods_in 
-        (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO goods_in
+          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsInResult] = await connection.execute(goodsInQuery, [
         date,
         ingredient,
-        stockReceived,
-        stockReceived, // Initial stockRemaining equals stockReceived
+        Number(stockReceived) || 0,
+        Number(stockReceived) || 0, // Initial stockRemaining equals stockReceived
         barCode,
         expiryDate,
         temperature,
-        unit,          // pass unit
+        unit,               // pass unit
         cognito_id,
+        invoice_sql_value,  // invoice_number (NULL if not provided)
       ]);
 
-      // Update ingredient_inventory (including unit)
+      // Update ingredient_inventory (unchanged structure; invoice is not part of inventory)
       const ingredientInventoryQuery = `
         INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit)
         VALUES (?, ?, ?, ?)
@@ -272,17 +288,17 @@ app.post("/api/submit", async (req, res) => {
       `;
       await connection.execute(ingredientInventoryQuery, [
         ingredient,
-        stockReceived,
+        Number(stockReceived) || 0,
         barCode,
         unit,           // pass unit
-        stockReceived
+        Number(stockReceived) || 0
       ]);
 
       await connection.commit();
-      res.status(200).json({ 
+      res.status(200).json({
         success: true,
-        message: "Data saved successfully", 
-        id: goodsInResult.insertId 
+        message: "Data saved successfully",
+        id: goodsInResult.insertId
       });
     } catch (err) {
       await connection.rollback();
@@ -297,7 +313,6 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-// POST /api/submit/batch
 app.post("/api/submit/batch", async (req, res) => {
   const { entries, cognito_id } = req.body;
 
@@ -323,6 +338,7 @@ app.post("/api/submit/batch", async (req, res) => {
       if (!e.barCode) missing.push("barCode");
       if (!e.expiryDate) missing.push("expiryDate");
       if (e.temperature === undefined || e.temperature === null) missing.push("temperature");
+      // invoiceNumber is optional — do not validate it
       return missing.length ? { index: i, missing } : null;
     })
     .filter(Boolean);
@@ -340,10 +356,14 @@ app.post("/api/submit/batch", async (req, res) => {
       // Normalize numeric stock
       const stock = Number(entry.stockReceived) || 0;
 
+      // Normalize invoice value: treat empty string as null
+      const invVal = (entry.invoiceNumber ?? entry.invoice_number ?? null);
+      const invSql = (typeof invVal === "string" && invVal.trim() === "") ? null : invVal;
+
       const goodsInQuery = `
         INSERT INTO goods_in
-          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsRes] = await connection.execute(goodsInQuery, [
         entry.date,
@@ -355,10 +375,11 @@ app.post("/api/submit/batch", async (req, res) => {
         entry.temperature,
         entry.unit,
         cognito_id,
+        invSql, // invoice_number (NULL if not provided)
       ]);
       insertedIds.push(goodsRes.insertId);
 
-      // upsert inventory
+      // upsert inventory (unchanged)
       const ingredientInventoryQuery = `
         INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit)
         VALUES (?, ?, ?, ?)
@@ -386,7 +407,6 @@ app.post("/api/submit/batch", async (req, res) => {
     connection.release();
   }
 });
-
 
 app.get("/api/ingredients", async (req, res) => {
   try {
