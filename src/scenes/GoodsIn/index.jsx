@@ -41,11 +41,11 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-// extended unit options including kilograms and litres
+// unit options that match the GoodsIn form exactly
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
-  { value: "kilograms", label: "Kilograms (kg)" },
   { value: "ml", label: "Milliliters (ml)" },
+  { value: "kg", label: "Kilograms (Kg)" },
   { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
@@ -86,10 +86,15 @@ const GoodsIn = () => {
 
           // stable internal id: combine barcode (if exists) + index
           const serverBar = row.barCode ? String(row.barCode) : null;
-          const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+          const _id = serverBar
+            ? `${serverBar}-${idx}`
+            : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
           // invoice may be returned as invoice_number (snake) or invoiceNumber (camel)
           const invoiceNumber = row.invoice_number ?? row.invoiceNumber ?? null;
+
+          // normalize unit: prefer explicit field, fallback to empty string
+          const unit = row.unit ?? row.unitName ?? row.unit_label ?? "";
 
           return {
             ...row,
@@ -100,6 +105,7 @@ const GoodsIn = () => {
             processed: Number(stockRemaining) === 0 ? "Yes" : "No",
             barCode: serverBar || row.barCode || null,
             invoiceNumber,
+            unit,
             _id,
           };
         });
@@ -114,7 +120,7 @@ const GoodsIn = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
-  // columns
+  // columns — note: unit column is intentionally NOT included, so user doesn't see it.
   const columns = useMemo(
     () => [
       { field: "date", headerName: "Date", flex: 1, editable: false },
@@ -128,7 +134,6 @@ const GoodsIn = () => {
         headerAlign: "left",
         align: "left",
         editable: false,
-        // optionally show unit for received as well if desired; keeping numeric for now
       },
       {
         field: "stockRemaining",
@@ -138,16 +143,21 @@ const GoodsIn = () => {
         headerAlign: "left",
         align: "left",
         editable: false,
-        // Render the numeric value and append the unit string from the row (keeps sorting numeric)
+        // Render the numeric value and append the unit string from the row.
+        // Use Typography with the same variant used by DataGrid cells to ensure consistent size/positioning.
         renderCell: (params) => {
           const val = params.row?.stockRemaining ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
-          return <Typography sx={{ whiteSpace: "nowrap" }}>{`${val}${unit ? ` ${unit}` : ""}`}</Typography>;
+          return (
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center" }}>
+              <Typography variant="body2" sx={{ color: brand.text }}>
+                {`${val}${unit ? ` ${unit}` : ""}`}
+              </Typography>
+            </Box>
+          );
         },
       },
-      // keep the unit field on the row data but hide it from the grid view
-      { field: "unit", headerName: "Unit", flex: 1, editable: false, hide: true },
-      // new Invoice column
+      // Invoice column
       { field: "invoiceNumber", headerName: "Invoice #", flex: 1, editable: false },
       { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
       {
@@ -225,7 +235,7 @@ const GoodsIn = () => {
     const map = new Map();
     for (const r of active) {
       const key = r.ingredient;
-      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
+      const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date, unit: r.unit };
       const amount = prev.amount + Number(r.stockRemaining || 0);
 
       let nextBarcode = prev.barcode;
@@ -239,7 +249,7 @@ const GoodsIn = () => {
         }
       } catch {}
 
-      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
+      map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate, unit: r.unit });
     }
 
     const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
@@ -287,22 +297,25 @@ const GoodsIn = () => {
       }
 
       const json = await response.json().catch(() => null);
-      const serverRow = (json && json.updated) ? json.updated : (json || null);
+      const serverRow = json && json.updated ? json.updated : json || null;
 
       const normalizedResult = {
         ...newRow,
         ...(serverRow ? serverRow : {}),
         stockReceived: Number((serverRow && serverRow.stockReceived) ?? newRow.stockReceived ?? 0),
         stockRemaining: Number((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining ?? 0),
-        processed: Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
+        processed:
+          Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
         // prefer server-provided invoice (snake or camel), otherwise use newRow value
         invoiceNumber: (serverRow && (serverRow.invoice_number ?? serverRow.invoiceNumber)) ?? newRow.invoiceNumber ?? null,
+        // normalize unit returned from server (if any)
+        unit: (serverRow && (serverRow.unit ?? serverRow.unit_label ?? serverRow.unitName)) ?? newRow.unit ?? "",
       };
 
       normalizedResult._id =
         oldId ||
         newRow._id ||
-        (serverRow && serverRow.barCode ? `${serverRow.barCode}-${Date.now()}` : `gen-${Date.now()}-${Math.random().toString(36).slice(2,6)}`);
+        (serverRow && serverRow.barCode ? `${serverRow.barCode}-${Date.now()}` : `gen-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
 
       normalizedResult.barCode = (serverRow && serverRow.barCode) ? serverRow.barCode : (newRow.barCode || null);
 
@@ -408,9 +421,10 @@ const GoodsIn = () => {
         if (!row) throw new Error("Row not found");
         const patched = {
           ...row,
-          [activeCell.field]: activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
-            ? Number(editValue || 0)
-            : editValue,
+          [activeCell.field]:
+            activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
+              ? Number(editValue || 0)
+              : editValue,
         };
         if (patched.stockRemaining !== undefined) patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
@@ -444,7 +458,12 @@ const GoodsIn = () => {
       return (
         <FormControl fullWidth>
           <InputLabel id="unit-edit-label">Unit</InputLabel>
-          <Select labelId="unit-edit-label" value={value ?? ""} label="Unit" onChange={(e) => onChange(e.target.value)}>
+          <Select
+            labelId="unit-edit-label"
+            value={value ?? ""}
+            label="Unit"
+            onChange={(e) => onChange(e.target.value)}
+          >
             {unitOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
                 {opt.label}
@@ -536,8 +555,26 @@ const GoodsIn = () => {
         }
       `}</style>
 
-      <Box sx={{ mt: 2, border: `1px solid ${brand.border}`, borderRadius: 16, background: brand.surface, boxShadow: brand.shadow, overflow: "hidden" }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: `1px solid ${brand.border}` }}>
+      <Box
+        sx={{
+          mt: 2,
+          border: `1px solid ${brand.border}`,
+          borderRadius: 16,
+          background: brand.surface,
+          boxShadow: brand.shadow,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 2,
+            py: 1.25,
+            borderBottom: `1px solid ${brand.border}`,
+          }}
+        >
           <Typography sx={{ fontWeight: 800, color: brand.text }}>Goods In</Typography>
 
           <Box sx={{ display: "flex", gap: 1 }}>
@@ -578,17 +615,28 @@ const GoodsIn = () => {
           </Box>
         </Box>
 
-        <Box sx={{
-          height: "70vh",
-          "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#fbfcfd", color: brand.subtext, borderBottom: `1px solid ${brand.border}`, fontWeight: 800 },
-          "& .MuiDataGrid-columnSeparator": { display: "none" },
-          "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
-          "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-          "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
-          "& .barCode-column--cell": { color: brand.primary },
-          "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": { outline: `2px solid ${brand.primary}`, outlineOffset: "-2px", boxShadow: `0 0 0 4px ${brand.focusRing}` }
-        }}>
+        <Box
+          sx={{
+            height: "70vh",
+            "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
+            "& .MuiDataGrid-columnHeaders": {
+              backgroundColor: "#fbfcfd",
+              color: brand.subtext,
+              borderBottom: `1px solid ${brand.border}`,
+              fontWeight: 800,
+            },
+            "& .MuiDataGrid-columnSeparator": { display: "none" },
+            "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
+            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+            "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
+            "& .barCode-column--cell": { color: brand.primary },
+            "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {
+              outline: `2px solid ${brand.primary}`,
+              outlineOffset: "-2px",
+              boxShadow: `0 0 0 4px ${brand.focusRing}`,
+            },
+          }}
+        >
           <DataGrid
             rows={goodsInRows || []}
             getRowId={(row) => row._id}
@@ -605,21 +653,37 @@ const GoodsIn = () => {
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
             onCellClick={handleCellClick}
             /* <-- ADD alternating row classes here */
-            getRowClassName={(params) =>
-              // indexRelativeToCurrentPage is 0-based; even => even-row
-              (params.indexRelativeToCurrentPage % 2 === 0) ? "even-row" : "odd-row"
-            }
+            getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row")}
           />
         </Box>
       </Box>
 
-      <Dialog open={editDialogOpen} onClose={() => { setEditDialogOpen(false); setEditingRow(null); setActiveCell(null); setEditValue(""); setOriginalBarcode(null); setOriginalId(null); }} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>{activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}</DialogTitle>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => {
+          setEditDialogOpen(false);
+          setEditingRow(null);
+          setActiveCell(null);
+          setEditValue("");
+          setOriginalBarcode(null);
+          setOriginalId(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          {activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}
+        </DialogTitle>
 
         <DialogContent dividers>
           {activeCell && activeCell.field && !editingRow && (
             <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ color: brand.subtext }}>Original Bar Code: {originalBarcode || activeCell.id}</Typography>
+              <Typography variant="caption" sx={{ color: brand.subtext }}>
+                Original Bar Code: {originalBarcode || activeCell.id}
+              </Typography>
               <Box sx={{ mt: 1 }}>{renderEditInputForField(activeCell.field, editValue, setEditValue)}</Box>
             </Box>
           )}
@@ -631,15 +695,43 @@ const GoodsIn = () => {
                 if (!row) return null;
                 return (
                   <>
-                    <TextField label="Ingredient" fullWidth value={editingRow?.ingredient ?? row.ingredient ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))} />
-                    <TextField label="Date" fullWidth type="date" value={editingRow?.date ?? row.date ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))} />
+                    <TextField
+                      label="Ingredient"
+                      fullWidth
+                      value={editingRow?.ingredient ?? row.ingredient ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))}
+                    />
+                    <TextField
+                      label="Date"
+                      fullWidth
+                      type="date"
+                      value={editingRow?.date ?? row.date ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))}
+                    />
                     <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                      <TextField label="Stock Received" fullWidth type="number" value={editingRow?.stockReceived ?? row.stockReceived ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))} />
-                      <TextField label="Stock Remaining" fullWidth type="number" value={editingRow?.stockRemaining ?? row.stockRemaining ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))} />
+                      <TextField
+                        label="Stock Received"
+                        fullWidth
+                        type="number"
+                        value={editingRow?.stockReceived ?? row.stockReceived ?? ""}
+                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))}
+                      />
+                      <TextField
+                        label="Stock Remaining"
+                        fullWidth
+                        type="number"
+                        value={editingRow?.stockRemaining ?? row.stockRemaining ?? ""}
+                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))}
+                      />
                     </Box>
                     <FormControl fullWidth>
                       <InputLabel id="unit-edit-label">Unit</InputLabel>
-                      <Select labelId="unit-edit-label" value={editingRow?.unit ?? row.unit ?? ""} label="Unit" onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unit: e.target.value }))}>
+                      <Select
+                        labelId="unit-edit-label"
+                        value={editingRow?.unit ?? row.unit ?? ""}
+                        label="Unit"
+                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unit: e.target.value }))}
+                      >
                         {unitOptions.map((opt) => (
                           <MenuItem key={opt.value} value={opt.value}>
                             {opt.label}
@@ -647,11 +739,32 @@ const GoodsIn = () => {
                         ))}
                       </Select>
                     </FormControl>
-                    <TextField label="Bar Code" fullWidth value={editingRow?.barCode ?? row.barCode ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))} />
+                    <TextField
+                      label="Bar Code"
+                      fullWidth
+                      value={editingRow?.barCode ?? row.barCode ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))}
+                    />
                     {/* Invoice Number field added to edit dialog */}
-                    <TextField label="Invoice Number" fullWidth value={editingRow?.invoiceNumber ?? row.invoiceNumber ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), invoiceNumber: e.target.value }))} />
-                    <TextField label="Expiry Date" fullWidth type="date" value={editingRow?.expiryDate ?? row.expiryDate ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))} />
-                    <TextField label="Temperature (℃)" fullWidth value={editingRow?.temperature ?? row.temperature ?? ""} onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))} />
+                    <TextField
+                      label="Invoice Number"
+                      fullWidth
+                      value={editingRow?.invoiceNumber ?? row.invoiceNumber ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), invoiceNumber: e.target.value }))}
+                    />
+                    <TextField
+                      label="Expiry Date"
+                      fullWidth
+                      type="date"
+                      value={editingRow?.expiryDate ?? row.expiryDate ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))}
+                    />
+                    <TextField
+                      label="Temperature (℃)"
+                      fullWidth
+                      value={editingRow?.temperature ?? row.temperature ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))}
+                    />
                   </>
                 );
               })()}
@@ -660,21 +773,69 @@ const GoodsIn = () => {
         </DialogContent>
 
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => { setEditDialogOpen(false); setEditingRow(null); setActiveCell(null); setEditValue(""); setOriginalBarcode(null); setOriginalId(null); }} sx={{ textTransform: "none" }} disabled={updating}>Cancel</Button>
-          <Button onClick={handleConfirmEdit} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null} disabled={updating}>
+          <Button
+            onClick={() => {
+              setEditDialogOpen(false);
+              setEditingRow(null);
+              setActiveCell(null);
+              setEditValue("");
+              setOriginalBarcode(null);
+              setOriginalId(null);
+            }}
+            sx={{ textTransform: "none" }}
+            disabled={updating}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmEdit}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
+            disabled={updating}
+          >
             {updating ? "Updating…" : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog} PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
+      <Dialog
+        open={openConfirmDialog}
+        onClose={handleCloseConfirmDialog}
+        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}
+      >
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
         <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}?</Typography>
+          <Typography sx={{ color: brand.subtext }}>
+            Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}?
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseConfirmDialog} sx={{ textTransform: "none" }}>Cancel</Button>
-          <Button onClick={handleDeleteSelectedRows} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>Delete</Button>
+          <Button onClick={handleCloseConfirmDialog} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteSelectedRows}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={<DeleteIcon />}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
