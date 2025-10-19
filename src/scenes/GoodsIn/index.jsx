@@ -134,22 +134,33 @@ const GoodsIn = () => {
         headerAlign: "left",
         align: "left",
         editable: false,
+        // show unit after value (same style as stockRemaining)
+        renderCell: (params) => {
+          const val = params.row?.stockReceived ?? params.value ?? 0;
+          const unit = params.row?.unit ?? "";
+          return (
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center" }}>
+              <Typography variant="body2" sx={{ color: brand.text }}>
+                {`${val}${unit ? ` ${unit}` : ""}`}
+              </Typography>
+            </Box>
+          );
+        },
       },
       {
         field: "stockRemaining",
         headerName: "Stock Remaining",
         type: "number",
         flex: 1,
-        headerAlign: "left",
-        align: "left",
+        headerAlign: "center",
+        align: "center",
         editable: false,
-        // Render the numeric value and append the unit string from the row.
-        // Use Typography with the same variant used by DataGrid cells to ensure consistent size/positioning.
+        // Render numeric value and append unit; center the content and use same typography as other cells
         renderCell: (params) => {
           const val = params.row?.stockRemaining ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
           return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center" }}>
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Typography variant="body2" sx={{ color: brand.text }}>
                 {`${val}${unit ? ` ${unit}` : ""}`}
               </Typography>
