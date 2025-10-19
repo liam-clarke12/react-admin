@@ -82,6 +82,24 @@ const StockUsage = () => {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
 
+  // Helper: format input to YYYY-MM-DD (tries to be robust)
+  const formatToYYYYMMDD = (val) => {
+    if (val === undefined || val === null) return "";
+    try {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        // use toISOString to ensure zero-padded month/day
+        return d.toISOString().slice(0, 10);
+      }
+    } catch (_) {}
+    const s = String(val);
+    // try to extract yyyy-mm-dd pattern if present
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+    // fallback: take first 10 chars (may be yyyy-mm-dd or other)
+    return s.slice(0, 10);
+  };
+
   const fetchStockUsage = useCallback(async () => {
     if (!cognitoId) return;
 
@@ -95,11 +113,14 @@ const StockUsage = () => {
         // Expect API to provide a list of underlying stock_usage IDs for this usage group
         const usageIds = item?.ids || item?.stock_usage_ids || [];
 
-        const key = `${item.recipe_name}-${item.production_log_date}-${item.batchCode}`;
+        // format date to YYYY-MM-DD (no time)
+        const formattedDate = formatToYYYYMMDD(item.production_log_date ?? item.date ?? "");
+
+        const key = `${item.recipe_name}-${formattedDate}-${item.batchCode}`;
         if (!groupedData[key]) {
           groupedData[key] = {
             id: key,
-            date: item.production_log_date,
+            date: formattedDate,
             recipeName: item.recipe_name,
             batchCode: item.batchCode,
             batchesProduced: item.batchesProduced,
@@ -114,6 +135,7 @@ const StockUsage = () => {
         if (!Array.isArray(item.ingredients)) return;
         item.ingredients.forEach((ingredient) => {
           const totalQuantity = ingredient.quantity * item.batchesProduced;
+          // Format ingredient quantities as plain text; keep existing format but date now normalized elsewhere
           groupedData[key].ingredients.push(
             `${ingredient.ingredient_name}: ${totalQuantity}`
           );

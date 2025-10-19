@@ -80,6 +80,21 @@ const GoodsOut = () => {
     }
   };
 
+  // format date to YYYY-MM-DD (robust)
+  const formatToYYYYMMDD = (val) => {
+    if (val === undefined || val === null || val === "") return "";
+    try {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().slice(0, 10);
+      }
+    } catch (_) {}
+    const s = String(val);
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+    return s.slice(0, 10);
+  };
+
   // Normalize into [{ code, units }] — interpret quantities as UNITS
   const normalizeRowPairs = (row) => {
     dgroup("normalizeRowPairs()");
@@ -196,7 +211,16 @@ const GoodsOut = () => {
         const arr = Array.isArray(data) ? data : [];
         dlog("Goods-out rows:", arr.length);
         dlog("Preview first 3 rows:", arr.slice(0, 3));
-        setGoodsOut(arr);
+
+        // Normalize dates to YYYY-MM-DD so UI never shows times
+        const normalized = arr.map((row, idx) => {
+          const sourceDate =
+            row.date ?? row.production_log_date ?? row.created_at ?? row.createdAt ?? "";
+          const formatted = formatToYYYYMMDD(sourceDate);
+          return { ...row, date: formatted };
+        });
+
+        setGoodsOut(normalized);
       } catch (error) {
         console.error("[GoodsOut] Error fetching goods out:", error);
       } finally {
@@ -211,10 +235,17 @@ const GoodsOut = () => {
   const handleDrawerOpenForRow = (row) => {
     dgroup("handleDrawerOpenForRow()");
     dlog("Clicked row:", row);
-    const items = buildDrawerItems(row);
+
+    // ensure row has formatted date (if it came from another source)
+    const rowWithDate = {
+      ...row,
+      date: formatToYYYYMMDD(row.date ?? row.production_log_date ?? row.created_at ?? ""),
+    };
+
+    const items = buildDrawerItems(rowWithDate);
     setDrawerHeader("Batchcodes");
     setDrawerItems(items);
-    setSelectedRow(row ?? null);
+    setSelectedRow(rowWithDate);
     setSearchTerm("");
     setDrawerOpen(true);
     dgroupEnd();
@@ -263,12 +294,17 @@ const GoodsOut = () => {
         throw new Error(`Delete failed: ${res.status} ${t}`);
       }
 
-      // refetch table
+      // refetch table (keep dates normalized)
       const refreshed = await fetch(
         `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
       );
       const rows = refreshed.ok ? await refreshed.json() : [];
-      setGoodsOut(Array.isArray(rows) ? rows : []);
+      const normalized = (Array.isArray(rows) ? rows : []).map((row, idx) => {
+        const sourceDate =
+          row.date ?? row.production_log_date ?? row.created_at ?? row.createdAt ?? "";
+        return { ...row, date: formatToYYYYMMDD(sourceDate) };
+      });
+      setGoodsOut(normalized);
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
