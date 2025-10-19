@@ -134,6 +134,12 @@ const GoodsIn = () => {
         headerAlign: "left",
         align: "left",
         editable: false,
+        // Render the numeric value and append the unit string from the row (keeps sorting numeric)
+        renderCell: (params) => {
+          const val = params.row?.stockRemaining ?? params.value ?? 0;
+          const unit = params.row?.unit ?? "";
+          return <Typography sx={{ whiteSpace: "nowrap" }}>{`${val}${unit ? ` ${unit}` : ""}`}</Typography>;
+        },
       },
       { field: "unit", headerName: "Unit", flex: 1, editable: false },
       // new Invoice column
