@@ -41,9 +41,12 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
+// extended unit options including kilograms and litres
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
+  { value: "kilograms", label: "Kilograms (kg)" },
   { value: "ml", label: "Milliliters (ml)" },
+  { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 
@@ -125,6 +128,7 @@ const GoodsIn = () => {
         headerAlign: "left",
         align: "left",
         editable: false,
+        // optionally show unit for received as well if desired; keeping numeric for now
       },
       {
         field: "stockRemaining",
@@ -141,7 +145,8 @@ const GoodsIn = () => {
           return <Typography sx={{ whiteSpace: "nowrap" }}>{`${val}${unit ? ` ${unit}` : ""}`}</Typography>;
         },
       },
-      { field: "unit", headerName: "Unit", flex: 1, editable: false },
+      // keep the unit field on the row data but hide it from the grid view
+      { field: "unit", headerName: "Unit", flex: 1, editable: false, hide: true },
       // new Invoice column
       { field: "invoiceNumber", headerName: "Invoice #", flex: 1, editable: false },
       { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
