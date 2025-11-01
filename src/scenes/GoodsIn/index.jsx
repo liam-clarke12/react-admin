@@ -23,6 +23,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 
+
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const brand = {
