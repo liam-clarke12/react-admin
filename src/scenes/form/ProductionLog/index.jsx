@@ -39,6 +39,7 @@ const productionLogSchema = yup.object().shape({
     .required("Units of waste is required")
     .min(0, "Cannot be negative"),
   batchCode: yup.string().required("Batch Code is required"),
+  producerName: yup.string().nullable(), // optional field
 });
 
 /* ===== Initial values ===== */
@@ -48,6 +49,7 @@ const initialValues = {
   batchesProduced: "",
   unitsOfWaste: 0,
   batchCode: "",
+  producerName: "",
 };
 
 /* ===== Tiny toast ===== */
@@ -386,7 +388,8 @@ const ProductionLogForm = () => {
 
   // --- Form submit with precheck ---
   const handleFormSubmit = async (values, { resetForm }) => {
-    const payload = { ...values, cognito_id: cognitoId };
+    // include producerName in payload (even if empty)
+    const payload = { ...values, cognito_id: cognitoId, producerName: values.producerName ?? "" };
 
     try {
       const problems = await checkAvailability(values.recipe, values.batchesProduced);
@@ -631,6 +634,24 @@ const ProductionLogForm = () => {
                   />
                   {touched.batchCode && errors.batchCode && (
                     <div className="plf-error">{errors.batchCode}</div>
+                  )}
+                </div>
+
+                {/* Producer Name (NEW) */}
+                <div className="plf-field span-4">
+                  <label className="plf-label" htmlFor="producerName">Produced by (Name)</label>
+                  <input
+                    id="producerName"
+                    name="producerName"
+                    type="text"
+                    className="plf-input"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.producerName}
+                    placeholder="Name of person who produced this batch"
+                  />
+                  {touched.producerName && errors.producerName && (
+                    <div className="plf-error">{errors.producerName}</div>
                   )}
                 </div>
               </div>

@@ -104,6 +104,9 @@ const ProductionLog = () => {
           const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining - unitsOfWaste)) || 0;
           const batchesRemaining = upb > 0 ? Number(unitsRemaining) / Number(upb) : null;
 
+          // producer name may come from producer_name (snake) or producerName (camel)
+          const producerName = row.producer_name ?? row.producerName ?? "";
+
           return {
             date: formatDateYMD(row.date),
             recipe: row.recipe,
@@ -114,6 +117,7 @@ const ProductionLog = () => {
             batchesRemaining,
             batchCode: row.batchCode || `gen-${idx}`,
             id: row.batchCode || `gen-${idx}-${Date.now()}`,
+            producerName,
           };
         });
 
@@ -151,6 +155,14 @@ const ProductionLog = () => {
         field: "unitsRemaining",
         headerName: "Units Remaining",
         type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      // NEW: producerName column
+      {
+        field: "producerName",
+        headerName: "Produced by",
         flex: 1,
         align: "left",
         headerAlign: "left",
@@ -206,6 +218,8 @@ const ProductionLog = () => {
       // send unitsOfWaste and unitsRemaining if present — server will compute batchRemaining accordingly
       unitsOfWaste: Number(updatedRow.unitsOfWaste || 0),
       unitsRemaining: Number(updatedRow.unitsRemaining || 0),
+      // include producer name (snake_case expected by backend)
+      producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
       cognito_id: cognitoId,
     };
 
@@ -243,6 +257,7 @@ const ProductionLog = () => {
         if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(activeCell.field)) {
           patched[activeCell.field] = Number(editValue || 0);
         }
+        // producerName is text — leave as string
       } else {
         // full-row editing: editingRow holds string values; ensure types and date format
         const r = editingRow || (activeCell ? activeCell.row : null);
@@ -254,6 +269,7 @@ const ProductionLog = () => {
           batchesProduced: Number(r.batchesProduced || 0),
           unitsOfWaste: Number(r.unitsOfWaste || 0),
           unitsRemaining: Number(r.unitsRemaining || 0),
+          producerName: r.producerName ?? r.producer_name ?? "",
           // DO NOT include batchRemaining
         };
       }
@@ -264,7 +280,7 @@ const ProductionLog = () => {
       // prefer the server-returned updated object if available
       const updatedServer = result && (result.updated || result.updatedRow || result.updatedLog || result);
       let newRow;
-      if (updatedServer && updatedServer.batchCode) {
+      if (updatedServer && (updatedServer.batchCode || updatedServer.batch_code)) {
         // server returned a DB row: normalize to our local shape (format date, ensure numeric types)
         newRow = {
           date: formatDateYMD(updatedServer.date),
@@ -278,8 +294,9 @@ const ProductionLog = () => {
                 updatedServer.units_remaining ??
                 (Number(updatedServer.batchRemaining || 0) - Number(updatedServer.units_of_waste || 0))
             ) || 0,
-          batchCode: updatedServer.batchCode,
-          id: updatedServer.batchCode || patched.id,
+          batchCode: updatedServer.batchCode ?? updatedServer.batch_code,
+          id: updatedServer.batchCode ?? updatedServer.batch_code ?? patched.id,
+          producerName: updatedServer.producer_name ?? updatedServer.producerName ?? "",
         };
       } else {
         // fallback: merge patched into existing
@@ -341,7 +358,7 @@ const ProductionLog = () => {
     if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(fieldName)) {
       return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
     }
-    // default
+    // producerName falls through to default (text)
     return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
   };
 
@@ -471,6 +488,13 @@ const ProductionLog = () => {
                       type="number"
                       value={editingRow?.unitsRemaining ?? row.unitsRemaining ?? 0}
                       onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsRemaining: e.target.value }))}
+                    />
+
+                    <TextField
+                      label="Produced by (Name)"
+                      fullWidth
+                      value={editingRow?.producerName ?? row.producerName ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), producerName: e.target.value }))}
                     />
 
                     <TextField

@@ -1152,8 +1152,14 @@ app.post("/api/add-production-log", async (req, res) => {
     batchesProduced,
     batchCode,
     unitsOfWaste,
-    cognito_id
+    cognito_id,
+    // accept both camelCase and snake_case from the client
+    producerName: producerNameFromBody,
+    producer_name: producerNameSnake,
   } = req.body;
+
+  // prefer camelCase if provided, otherwise snake_case; fall back to null
+  const producerName = producerNameFromBody ?? producerNameSnake ?? null;
 
   console.log("📥 Received /add-production-log request:", req.body);
 
@@ -1231,14 +1237,16 @@ app.post("/api/add-production-log", async (req, res) => {
       batchRemaining,
       batchCode,
       user_id: cognito_id,
-      units_of_waste: finalUnitsOfWaste
+      units_of_waste: finalUnitsOfWaste,
+      producer_name: producerName,
     });
 
+    // Insert into production_log including producer_name (nullable)
     const [productionLogResult] = await connection.execute(
       `
       INSERT INTO production_log
-        (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         date,
@@ -1247,7 +1255,8 @@ app.post("/api/add-production-log", async (req, res) => {
         batchRemaining,
         batchCode,
         cognito_id,
-        finalUnitsOfWaste
+        finalUnitsOfWaste,
+        producerName,
       ]
     );
 
@@ -1266,7 +1275,7 @@ app.post("/api/add-production-log", async (req, res) => {
       JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE ri.recipe_id = ?
       `,
-      [batchesProduced, recipeId]
+      [Number(batchesProduced), recipeId]
     );
 
     if (ingredients.length === 0) {
@@ -1352,7 +1361,8 @@ app.post("/api/add-production-log", async (req, res) => {
     console.log("✅ Transaction committed.");
     res.status(200).json({
       message: "Production log saved successfully",
-      id: productionLogId
+      id: productionLogId,
+      producer_name: producerName,
     });
   } catch (err) {
     await connection.rollback();
@@ -1458,9 +1468,21 @@ app.get("/api/production-log/active", async (req, res) => {
 
   try {
     // compute derived fields server-side so clients see canonical values
+    // include producer_name explicitly (and a camelCase alias producerName for client convenience)
     const query = `
       SELECT
-        pl.*,
+        pl.id,
+        pl.date,
+        pl.recipe,
+        pl.batchesProduced,
+        pl.batchRemaining,
+        pl.batchCode,
+        pl.user_id,
+        pl.units_of_waste,
+        pl.deleted_at,
+        pl.deleted_by,
+        pl.producer_name,
+        COALESCE(pl.producer_name, '') AS producerName,
         COALESCE(r.units_per_batch, 0) AS units_per_batch,
         (pl.batchRemaining - COALESCE(pl.units_of_waste, 0)) AS unitsRemaining,
         CASE
@@ -1480,7 +1502,6 @@ app.get("/api/production-log/active", async (req, res) => {
     return res.status(500).json({ error: "Database error", details: err.message });
   }
 });
-
 
 app.post("/api/delete-production-log", async (req, res) => {
   console.log("[/api/delete-production-log] Received:", req.body);
@@ -1547,6 +1568,8 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     unitsOfWaste,
     // client-editable value (NOT a DB column): when present, this drives batchRemaining
     unitsRemaining,
+    producer_name,    // snake_case (preferred)
+    producerName,     // camelCase (clients might send this)
     cognito_id,
   } = body;
 
@@ -1578,6 +1601,12 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       units_of_waste !== undefined ? Number(units_of_waste)
       : unitsOfWaste !== undefined ? Number(unitsOfWaste)
       : Number(existing.units_of_waste || 0);
+
+    // resolve producer name preference (do not force update unless provided)
+    const producerProvided = producer_name !== undefined || producerName !== undefined;
+    const newProducerName = producer_name !== undefined
+      ? producer_name
+      : (producerName !== undefined ? producerName : existing.producer_name ?? existing.producerName ?? null);
 
     // Determine recipe to use for the lookup (body.recipe overrides existing.recipe)
     const recipeToUse = (recipe !== undefined && recipe !== null && String(recipe).trim() !== "")
@@ -1638,6 +1667,12 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       params.push(Number(newUnitsOfWaste));
     }
 
+    // Update producer_name only if provided by client
+    if (producerProvided) {
+      updateCols.push("producer_name = ?");
+      params.push(newProducerName);
+    }
+
     if (updateCols.length === 0) {
       await conn.rollback();
       console.warn("[PUT.production-log] nothing to update");
@@ -1681,6 +1716,8 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
       success: true,
       updated: {
         ...updated,
+        // make sure producer_name is included in the returned object (it comes from DB if present)
+        producer_name: updated.producer_name ?? updated.producerName ?? null,
         unitsRemaining: returnedUnitsRemaining,
         batchesRemaining: returnedBatchesRemaining,
       },
