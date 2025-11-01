@@ -46,22 +46,22 @@ import { AuthProvider } from "./contexts/AuthContext";
 
 Amplify.configure(awsExports);
 
-/** Brand tokens (Pantone 13-4520 TCX / soft teal) */
+/** Brand tokens (Nory purple) */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
-  inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  // Pantone 13-4520 TCX (soft teal/cyan)
-  primary: "#A3CDD5",
-  primaryDark: "#82A4AA",
-  focusRing: "rgba(163,205,213,0.35)",
+  danger: "#dc2626",
+  primary: "#7C3AED",      // Nory purple
+  primaryDark: "#5B21B6",  // darker purple
+  focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  inputBg: "#ffffff",
 };
 
-/** Amplify UI theme overrides (updated to teal accents) */
+/** Amplify UI theme overrides (updated to Nory purple accents) */
 const noryTheme = {
   name: "nory",
   tokens: {
@@ -70,11 +70,11 @@ const noryTheme = {
       font: { primary: { value: brand.text }, secondary: { value: brand.subtext } },
       border: { primary: { value: brand.border } },
       brand: {
-        // lighter / mid / darker teal palette
+        // purple palette
         primary: {
-          10: { value: "#eaf9fa" },
-          20: { value: "#cfeff0" },
-          60: { value: "#7fbfc2" },
+          10: { value: "#f5f3ff" },
+          20: { value: "#ede9fe" },
+          60: { value: "#a78bfa" },
           80: { value: brand.primary },
           90: { value: brand.primaryDark },
         },
@@ -99,8 +99,8 @@ const noryTheme = {
         borderRadius: { value: "{radii.medium}" },
         _focus: {
           borderColor: { value: "{colors.brand.primary.80}" },
-          // use our new soft teal focus ring
-          boxShadow: { value: "0 0 0 4px rgba(163,205,213,0.35)" },
+          // use our new soft purple focus ring
+          boxShadow: { value: `0 0 0 4px ${brand.focusRing}` },
         },
       },
       button: {
@@ -228,7 +228,7 @@ function LoginLayout({ children }) {
           position: relative;
           overflow: hidden;
           background:
-            radial-gradient(800px 400px at 80% -20%, rgba(163,205,213,0.18) 0%, rgba(163,205,213,0) 60%),
+            radial-gradient(800px 400px at 80% -20%, ${brand.focusRing} 0%, rgba(124,58,237,0) 60%),
             linear-gradient(180deg, #fff 0%, ${brand.surfaceMuted} 100%);
           border-right: 1px solid ${brand.border};
           display: grid;

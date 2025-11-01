@@ -22,10 +22,10 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  // Updated to Pantone 13-4520 TCX
-  primary: "#A3CDD5",
-  primaryDark: "#82A4AA",
-  focusRing: "rgba(163,205,213,0.35)",
+  // Nory purple
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
+  focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
@@ -403,8 +403,7 @@ ${form.message}`;
                     fontWeight: 800,
                     textTransform: "none",
                     background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                    boxShadow:
-                      "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                    boxShadow: "0 8px 16px rgba(124,58,237,0.18), 0 2px 4px rgba(16,24,40,0.06)",
                     "&:hover": {
                       background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
                     },

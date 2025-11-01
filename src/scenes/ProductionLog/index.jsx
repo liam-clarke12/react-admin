@@ -18,18 +18,18 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 
-/** Nory-like brand tokens */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
-  inputBg: "#ffffff",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#A3CDD5",
-  primaryDark: "#82A4AA",
-  focusRing: "rgba(163,205,213,0.35)",
+  danger: "#dc2626",
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
+  focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  inputBg: "#ffffff"
 };
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";

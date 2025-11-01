@@ -33,15 +33,16 @@ const LandingPage = () => {
 
   const goHome = () => navigate("/");
 
-  // Brand tokens (Pantone-accent update)
+  // Brand tokens (Nory purple)
   const brand = {
     text: "#0f172a",
     subtext: "#334155",
     border: "#e5e7eb",
     surface: "#ffffff",
     surfaceMuted: "#f8fafc",
-    primary: "#A3CDD5", // Pantone 13-4520 TCX
-    primaryDark: "#82A4AA",
+    // Nory purple
+    primary: "#7C3AED", // purple
+    primaryDark: "#5B21B6",
   };
 
   return (
@@ -131,7 +132,7 @@ const LandingPage = () => {
           gridTemplateColumns: { xs: "1fr", md: "46% 1fr" },
           minHeight: "90vh",
           background:
-            `radial-gradient(800px 400px at 80% -20%, rgba(163,205,213,0.18) 0%, rgba(163,205,213,0) 60%), linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
+            `radial-gradient(800px 400px at 80% -20%, rgba(124,58,237,0.14) 0%, rgba(124,58,237,0) 60%), linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
         }}
       >
         {/* Left Hero Text */}
