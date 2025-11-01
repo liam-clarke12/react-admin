@@ -9,9 +9,12 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#e11d48",
-  primaryDark: "#be123c",
+  danger: "#dc2626",
+  primary: "#7C3AED",     // Nory purple
+  primaryDark: "#5B21B6", // darker purple
+  focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  inputBg: "#ffffff"
 };
 
 const BarChart = ({

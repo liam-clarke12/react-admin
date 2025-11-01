@@ -12,7 +12,7 @@ import BarChart from "../../components/BarChart";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/** Brand tokens (scoped) — updated to Pantone 13-4520 TCX */
+/** Brand tokens (scoped) — updated to Pantone 13-4520 TCX / Nory purple) */
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -20,12 +20,21 @@ const brand = {
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
   danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
+  primary: "#7C3AED",     // Nory purple
+  primaryDark: "#5B21B6", // darker purple
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
   inputBg: "#ffffff"
 };
+
+// small helper palette (you can expand or modify)
+const chartPalette = [
+  brand.primary,
+  brand.primaryDark,
+  "#C084FC", // lilac
+  "#E9D5FF", // soft lavender
+  "#DDD6FE", // pale purple
+];
 
 // Minimal KPI card
 function KpiCard({ label, value }) {
@@ -60,7 +69,12 @@ function RingChart({ data, height = "260px" }) {
         innerRadius={0.6}
         padAngle={1}
         cornerRadius={3}
-        colors={{ scheme: "pink_yellowGreen" }}
+        // use custom function so we always map in-brand colors
+        colors={(d) => {
+          // d: { id, value, data, index, ... }
+          const idx = typeof d.index === "number" ? d.index : (d.data && d.data.index) || 0;
+          return chartPalette[idx % chartPalette.length];
+        }}
         borderWidth={1}
         borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
         enableArcLabels={false}
@@ -68,6 +82,12 @@ function RingChart({ data, height = "260px" }) {
         arcLinkLabelsTextColor={brand.subtext}
         arcLinkLabelsThickness={2}
         arcLinkLabelsColor={{ from: "color" }}
+        tooltip={({ datum }) => (
+          <div style={{ padding: 8, background: "#fff", border: `1px solid ${brand.border}`, borderRadius: 8 }}>
+            <div style={{ fontWeight: 800 }}>{datum.id}</div>
+            <div style={{ color: brand.subtext }}>{datum.value.toLocaleString()}</div>
+          </div>
+        )}
       />
     </Box>
   );
@@ -201,10 +221,10 @@ const Dashboard = () => {
     const ringData = [...inventory]
       .sort((a, b) => (b.stockOnHand || 0) - (a.stockOnHand || 0))
       .slice(0, 5)
-      .map((r) => ({
-        id: r.ingredient,
-        label: r.ingredient,
-        value: r.stockOnHand,
+      .map((r, i) => ({
+        id: r.ingredient || `Item ${i + 1}`,
+        label: r.ingredient || `Item ${i + 1}`,
+        value: r.stockOnHand || 0,
       }));
 
     // Bar chart → batches produced per recipe (last 7 days)
@@ -288,12 +308,14 @@ const Dashboard = () => {
               <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
                 Batches Produced (Last 7 Days)
               </Typography>
+              {/* pass colors prop to BarChart so it can use brand palette */}
               <BarChart
                 data={barData}
                 keys={["batches"]}
                 indexBy="recipe"
                 height="260px"
                 width="95%"
+                colors={chartPalette}
               />
             </Box>
 
