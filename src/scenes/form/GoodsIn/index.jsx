@@ -623,7 +623,7 @@ const GoodsInForm = () => {
                         fullWidth
                         variant="outlined"
                         type="text"
-                        label="Bar Code"
+                        label="Batch Code"
                         name="barCode"
                         onBlur={handleBlur}
                         onChange={handleChange}
@@ -913,7 +913,7 @@ const GoodsInForm = () => {
                                       fullWidth
                                       variant="outlined"
                                       type="text"
-                                      label="Bar Code"
+                                      label="Batch Code"
                                       name={`items.${idx}.barCode`}
                                       value={it.barCode}
                                       onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
@@ -1061,7 +1061,7 @@ const GoodsInForm = () => {
                 <TableCell sx={{ fontWeight: 800 }}>Ingredient</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Quantity</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Unit</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Barcode</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Batchcode</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Expiry</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Temp</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>

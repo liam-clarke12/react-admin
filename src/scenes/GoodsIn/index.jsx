@@ -173,7 +173,7 @@ const GoodsIn = () => {
       { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
       {
         field: "barCode",
-        headerName: "Bar Code",
+        headerName: "Batch Code",
         flex: 1,
         cellClassName: "barCode-column--cell",
         editable: false,
@@ -751,7 +751,7 @@ const GoodsIn = () => {
                       </Select>
                     </FormControl>
                     <TextField
-                      label="Bar Code"
+                      label="Batch Code"
                       fullWidth
                       value={editingRow?.barCode ?? row.barCode ?? ""}
                       onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))}
