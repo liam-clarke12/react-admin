@@ -19,10 +19,12 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  primary: "#A3CDD5",      // Pantone 13-4520 TCX
-  primaryDark: "#82A4AA",  // companion darker tone
-  focusRing: "rgba(163,205,213,0.18)",
+  danger: "#dc2626",
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
+  focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  inputBg: "#ffffff"
 };
 
 // Minimal KPI card
