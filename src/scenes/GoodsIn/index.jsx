@@ -118,27 +118,27 @@ const GoodsIn = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
-  // columns — note: unit column is intentionally NOT included, so user doesn't see it.
+  // columns — removed "Processed" and "File Attachment" as requested
   const columns = useMemo(
     () => [
       { field: "date", headerName: "Date", flex: 1, editable: false },
-      { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
+      { field: "ingredient", headerName: "Ingredient", flex: 1.5, editable: false },
       { field: "temperature", headerName: "Temperature", flex: 1, editable: false },
       {
         field: "stockReceived",
         headerName: "Stock Received",
         type: "number",
         flex: 1,
-        headerAlign: "left",
-        align: "left",
+        headerAlign: "center",
+        align: "center",
         editable: false,
-        // show unit after value (same style as stockRemaining)
+        // centered, slightly stronger weight to differentiate
         renderCell: (params) => {
           const val = params.row?.stockReceived ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
           return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text }}>
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Typography variant="body2" sx={{ color: brand.text, fontWeight: 700 }}>
                 {`${val}${unit ? ` ${unit}` : ""}`}
               </Typography>
             </Box>
@@ -153,13 +153,13 @@ const GoodsIn = () => {
         headerAlign: "center",
         align: "center",
         editable: false,
-        // Render numeric value and append unit; center the content and use same typography as other cells
+        // centered, not bold (fontWeight: 400)
         renderCell: (params) => {
           const val = params.row?.stockRemaining ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
           return (
             <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text }}>
+              <Typography variant="body2" sx={{ color: brand.text, fontWeight: 400 }}>
                 {`${val}${unit ? ` ${unit}` : ""}`}
               </Typography>
             </Box>
@@ -175,41 +175,6 @@ const GoodsIn = () => {
         flex: 1,
         cellClassName: "barCode-column--cell",
         editable: false,
-      },
-      // HIDDEN: keep processed for internal logic, but hide from user
-      { field: "processed", headerName: "Processed", flex: 1, editable: false, hide: true },
-      // HIDDEN: fileAttachment kept but not shown to user
-      {
-        field: "fileAttachment",
-        headerName: "File Attachment",
-        sortable: false,
-        filterable: false,
-        align: "center",
-        flex: 1,
-        renderCell: (params) => {
-          const file = params.row.file;
-          return file ? (
-            <Button
-              variant="outlined"
-              onClick={() => handleFileOpen(file)}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                borderColor: brand.border,
-                color: brand.primary,
-                borderRadius: 10,
-                "&:hover": { borderColor: brand.primary, background: brand.surfaceMuted },
-              }}
-            >
-              View File
-            </Button>
-          ) : (
-            <Typography variant="body2" sx={{ color: brand.subtext }}>
-              No File
-            </Typography>
-          );
-        },
-        hide: true,
       },
       {
         field: "actions",
@@ -664,7 +629,6 @@ const GoodsIn = () => {
             processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow)}
             onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
             onCellClick={handleCellClick}
-            /* <-- ADD alternating row classes here */
             getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row")}
           />
         </Box>
