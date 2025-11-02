@@ -383,40 +383,73 @@ export default function GoodsIn() {
     } catch (e) {}
   }, [goodsInRows, location]);
 
-  /* Tiny complementary "chart": totals of stockRemaining by ingredient (top 5) */
+  /* Tiny complementary "chart": totals of stockRemaining by ingredient (top 5) and keep unit info */
   const totalsByIngredient = useMemo(() => {
     const map = new Map();
+    // For each ingredient accumulate amount and track unit counts
     (goodsInRows || []).forEach((r) => {
       const key = r.ingredient || "—";
-      map.set(key, (map.get(key) || 0) + Number(r.stockRemaining || 0));
+      const entry = map.get(key) || { amount: 0, unitCounts: new Map() };
+      entry.amount += Number(r.stockRemaining || 0);
+      const u = r.unit || "";
+      entry.unitCounts.set(u, (entry.unitCounts.get(u) || 0) + 1);
+      map.set(key, entry);
     });
-    const arr = Array.from(map.entries()).map(([ingredient, amount]) => ({ ingredient, amount }));
+    const arr = Array.from(map.entries()).map(([ingredient, { amount, unitCounts }]) => {
+      // pick the most common unit for that ingredient (fallback to first)
+      let mostCommonUnit = "";
+      let best = -1;
+      for (const [u, count] of unitCounts.entries()) {
+        if (count > best) {
+          best = count;
+          mostCommonUnit = u;
+        }
+      }
+      return { ingredient, amount, unit: mostCommonUnit || "" };
+    });
     arr.sort((a, b) => b.amount - a.amount);
     return arr.slice(0, 5);
   }, [goodsInRows]);
 
-  /* small helper to render SVG bars */
+  // totals by unit (for filtered view) — used in footer and stats
+  const totalsByUnit = useMemo(() => {
+    const map = new Map();
+    (filteredRows || []).forEach((r) => {
+      const u = r.unit || "";
+      map.set(u, (map.get(u) || 0) + Number(r.stockRemaining || 0));
+    });
+    // produce array with readable labels
+    return Array.from(map.entries()).map(([unit, amount]) => ({ unit: unit || "—", amount }));
+  }, [filteredRows]);
+
+  /* small helper to render SVG-like bars with unit in label */
   const SmallBarChart = ({ data = [] }) => {
     if (!data || data.length === 0) return <Typography variant="caption" color="text.secondary">No data</Typography>;
     const max = Math.max(...data.map((d) => d.amount), 1);
     return (
-      <Box sx={{ width: 240, display: "flex", flexDirection: "column", gap: 1 }}>
+      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1 }}>
         {data.map((d) => (
           <Box key={d.ingredient} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography sx={{ fontSize: 12, minWidth: 80, color: brand.subtext }}>{d.ingredient}</Typography>
+            <Typography sx={{ fontSize: 12, minWidth: 80, color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.ingredient}</Typography>
             <Box sx={{ flex: 1, height: 10, background: brand.surfaceMuted, borderRadius: 999, overflow: "hidden" }}>
               <Box sx={{ width: `${(d.amount / max) * 100}%`, height: "100%", background: brand.primary }} />
             </Box>
-            <Typography sx={{ fontSize: 12, width: 40, textAlign: "right" }}>{d.amount}</Typography>
+            <Typography sx={{ fontSize: 12, width: 60, textAlign: "right" }}>
+              {d.amount} {d.unit}
+            </Typography>
           </Box>
         ))}
+        {/* units legend at the bottom */}
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="caption" color="text.secondary">Units: {Array.from(new Set(data.map(d => d.unit).filter(Boolean))).join(", ") || "—"}</Typography>
+        </Box>
       </Box>
     );
   };
 
   /* small styles for header/card */
   return (
-    <Box m={2}>
+    <Box m={2} sx={{ overflowX: "hidden" }}>
       <style>{`
         .highlight-row { animation: highlightPulse 2.4s ease forwards; }
         @keyframes highlightPulse {
@@ -424,12 +457,11 @@ export default function GoodsIn() {
           50% { background-color: rgba(251,191,36,0.12); }
           100% { background-color: transparent; }
         }
-        /* alternating row backgrounds handled inline */
       `}</style>
 
       <Box maxWidth="1200px" mx="auto" display="flex" flexDirection="column" gap={2}>
         {/* Header */}
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <Box display="flex" alignItems="center" gap={2}>
             <Box sx={{ width: 52, height: 52, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center",
                         background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, boxShadow: "0 8px 20px rgba(124,58,237,0.12)" }}>
@@ -497,9 +529,10 @@ export default function GoodsIn() {
         {/* Main table + small chart on the right for wide screens */}
         <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
           <Paper sx={{ flex: 1, overflow: "hidden", borderRadius: 2, border: `1px solid ${brand.border}`, boxShadow: brand.shadow }}>
-            {/* responsive scroll wrapper */}
-            <TableContainer sx={{ maxHeight: "60vh", overflowX: "auto" }}>
-              <Table stickyHeader>
+            {/* responsive wrapper; overflowX hidden to avoid horizontal scrollbar */}
+            <TableContainer sx={{ maxHeight: "60vh", overflowX: "hidden" }}>
+              {/* fixed table layout so columns shrink and ellipsis applied */}
+              <Table stickyHeader sx={{ tableLayout: "fixed", minWidth: 0 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ width: 56 }}>
@@ -509,15 +542,15 @@ export default function GoodsIn() {
                         onChange={toggleSelectAll}
                       />
                     </TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Ingredient</TableCell>
-                    <TableCell>Temperature</TableCell>
-                    <TableCell align="center">Stock Received</TableCell>
-                    <TableCell align="center">Stock Remaining</TableCell>
-                    <TableCell>Invoice #</TableCell>
-                    <TableCell>Expiry Date</TableCell>
-                    <TableCell>Batch Code</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    <TableCell sx={{ width: "10%" }}>Date</TableCell>
+                    <TableCell sx={{ width: "20%" }}>Ingredient</TableCell>
+                    <TableCell sx={{ width: "8%" }}>Temperature</TableCell>
+                    <TableCell sx={{ width: "10%", textAlign: "center" }}>Stock Received</TableCell>
+                    <TableCell sx={{ width: "10%", textAlign: "center" }}>Stock Remaining</TableCell>
+                    <TableCell sx={{ width: "12%" }}>Invoice #</TableCell>
+                    <TableCell sx={{ width: "10%" }}>Expiry Date</TableCell>
+                    <TableCell sx={{ width: "10%" }}>Batch Code</TableCell>
+                    <TableCell sx={{ width: "10%", textAlign: "right" }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
 
@@ -545,16 +578,20 @@ export default function GoodsIn() {
                           "&:hover": { backgroundColor: "#fbf8ff" },
                         }}
                       >
-                        <TableCell>
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>
                           <Checkbox checked={selectedRows.includes(row._id)} onChange={() => toggleRowSelection(row._id)} />
                         </TableCell>
 
-                        <TableCell sx={{ color: brand.subtext }}>{row.date || "-"}</TableCell>
-                        <TableCell sx={{ color: brand.text, fontWeight: 700 }}>{row.ingredient || "-"}</TableCell>
-                        <TableCell sx={{ color: brand.subtext }}>{row.temperature ? `${row.temperature}℃` : "-"}</TableCell>
+                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.date || "-"}</TableCell>
+
+                        <TableCell sx={{ color: brand.text, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {row.ingredient || "-"}
+                        </TableCell>
+
+                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.temperature ? `${row.temperature}℃` : "-"}</TableCell>
 
                         {/* stockReceived centered, bold */}
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                           <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#ecfdf5" }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
                               {row.stockReceived}
@@ -564,7 +601,7 @@ export default function GoodsIn() {
                         </TableCell>
 
                         {/* stockRemaining centered, NOT bold */}
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                           <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#f8fafc" }}>
                             <Typography variant="body2" sx={{ fontWeight: 400, color: brand.text }}>
                               {row.stockRemaining}
@@ -573,13 +610,15 @@ export default function GoodsIn() {
                           </Box>
                         </TableCell>
 
-                        <TableCell sx={{ color: brand.subtext }}>{row.invoiceNumber || "-"}</TableCell>
-                        <TableCell sx={{ color: brand.subtext }}>{row.expiryDate || "-"}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.invoiceNumber || "-"}</TableCell>
+
+                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.expiryDate || "-"}</TableCell>
+
+                        <TableCell sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           <Chip label={row.barCode || "-"} variant="outlined" sx={{ bgcolor: "#f9f5ff", color: brand.primary, borderColor: "#eee" }} />
                         </TableCell>
 
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleEditRow(row)}>
                               <EditOutlinedIcon sx={{ color: brand.primary }} />
@@ -604,12 +643,19 @@ export default function GoodsIn() {
               </Typography>
 
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Total Remaining:
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: brand.text }}>
-                  {filteredRows.reduce((sum, r) => sum + Number(r.stockRemaining || 0), 0)}
-                </Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Total Remaining</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: brand.text }}>
+                    {/* Show main total by default (sum of numeric values without conversion is meaningless across units),
+                        so we present a compact breakdown below and show the grand total count if single unit exists */}
+                    {totalsByUnit.length === 1 ? `${totalsByUnit[0].amount} ${totalsByUnit[0].unit}` : `${filteredRows.reduce((sum, r) => sum + Number(r.stockRemaining || 0), 0)} (mixed units)`}
+                  </Typography>
+
+                  {/* Units breakdown */}
+                  <Typography variant="caption" color="text.secondary">
+                    {totalsByUnit.length === 0 ? "—" : totalsByUnit.map(t => `${t.amount} ${t.unit}`).join(" · ")}
+                  </Typography>
+                </Box>
 
                 {/* simple pagination controls */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 2 }}>
@@ -643,6 +689,10 @@ export default function GoodsIn() {
               <Typography variant="caption" color="text.secondary">Top ingredients by remaining stock</Typography>
               <Box sx={{ mt: 2 }}>
                 <SmallBarChart data={totalsByIngredient} />
+                {/* Units at bottom (based on filteredRows units) */}
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary">Units (displayed): {totalsByUnit.map(t => t.unit).filter(Boolean).join(", ") || "—"}</Typography>
+                </Box>
               </Box>
             </Paper>
 
