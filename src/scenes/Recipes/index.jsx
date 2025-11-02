@@ -293,35 +293,42 @@ const Recipes = () => {
       if (!right) {
         return { raw: str, name: left, qty: "", unit: "" };
       }
-      // Attempt to split right into quantity and unit (first token numeric-ish = qty)
-      const tokens = right.split(/\s+/).filter(Boolean);
-      // If first token looks like a number (or fraction), treat as qty
-      let qty = right;
+
+      // Clean right-hand string: remove trailing semicolons/commas and trim
+      const cleanedRight = right.replace(/^[\s;,:]+|[\s;,:]+$/g, "").trim();
+
+      // Attempt to split cleanedRight into quantity and unit (first token numeric-ish = qty)
+      const tokens = cleanedRight.split(/\s+/).filter(Boolean);
+
+      let qty = cleanedRight;
       let unit = "";
+
       if (tokens.length > 0) {
-        const first = tokens[0];
+        // normalize first token (strip punctuation)
+        const first = tokens[0].replace(/[;,:]+$/g, "");
         // allow numbers, decimals, fractions (e.g. "1/2"), or numeric-like
-        if (/^[\d,.\/]+$/.test(first)) {
+        if (/^[\d.,\/]+$/.test(first)) {
           qty = first;
           unit = tokens.slice(1).join(" ");
         } else {
-          // otherwise assume whole right is qty (e.g., "200g" or "to taste")
-          // try to split trailing letters from numbers
-          const m = right.match(/^([\d.,\/]+)([a-zA-Z%µμ]*)\s*(.*)$/);
+          // try to extract a leading numeric portion from strings like "7.00g" or "200g"
+          const m = cleanedRight.match(/^([\d.,\/]+)([a-zA-Z%µμ]*)\s*(.*)$/);
           if (m) {
             qty = m[1];
-            unit = (m[2] || "").trim() + (m[3] ? " " + m[3].trim() : "");
+            unit = ((m[2] || "") + (m[3] ? " " + m[3].trim() : "")).trim();
           } else {
-            qty = right;
+            // nothing numeric — treat whole cleanedRight as qty (no unit)
+            qty = cleanedRight;
             unit = "";
           }
         }
       }
+
       return {
         raw: str,
         name: left,
-        qty: qty,
-        unit: unit,
+        qty,
+        unit,
       };
     });
   };
