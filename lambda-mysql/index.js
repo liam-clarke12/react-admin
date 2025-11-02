@@ -852,6 +852,7 @@ app.post("/api/add-recipe", async (req, res) => {
 });
 
 // **Fetch all recipes**
+// server route: GET /api/recipes
 app.get("/api/recipes", async (req, res) => {
   const { cognito_id } = req.query;
 
@@ -861,14 +862,25 @@ app.get("/api/recipes", async (req, res) => {
   }
 
   try {
-    const [results] = await db.promise().query(`
-      SELECT r.id as recipe_id, r.recipe_name as recipe, r.units_per_batch, i.ingredient_name as ingredient, ri.quantity
+    const [results] = await db.promise().query(
+      `
+      SELECT
+        r.id AS recipe_id,
+        r.recipe_name AS recipe,
+        r.units_per_batch,
+        i.ingredient_name AS ingredient,
+        ri.quantity,
+        IFNULL(ri.unit, '') AS unit
       FROM recipes r
       JOIN recipe_ingredients ri ON r.id = ri.recipe_id
       JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE r.user_id = ?
-    `, [cognito_id]);
+      ORDER BY r.id, ri.id
+      `,
+      [cognito_id]
+    );
 
+    // results will now include a "unit" property for each ingredient row
     res.json(results);
   } catch (err) {
     console.error("Failed to fetch recipes:", err);
