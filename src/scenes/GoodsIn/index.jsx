@@ -1,6 +1,8 @@
 // src/scenes/data/GoodsIn/index.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
+  Paper,
   IconButton,
   Button,
   Dialog,
@@ -14,12 +16,23 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Checkbox,
+  Chip,
+  Stack,
+  Tooltip,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
-import { useData } from "../../contexts/DataContext";
-import { useEffect, useMemo, useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import PackageIcon from "@mui/icons-material/Inventory2";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import SearchIcon from "@mui/icons-material/Search";
+import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 
@@ -31,15 +44,12 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
   primary: "#7C3AED",
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
 };
 
-// unit options that match the GoodsIn form exactly
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -48,27 +58,40 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
-const GoodsIn = () => {
+export default function GoodsIn() {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
-  const [selectedRows, setSelectedRows] = useState([]); // array of selected _id's
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const { cognitoId } = useAuth();
   const location = useLocation();
 
-  // Editing state
-  const [activeCell, setActiveCell] = useState(null);
+  // UI state
+  const [selectedRows, setSelectedRows] = useState([]); // array of _id
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // edit modal
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editValue, setEditValue] = useState("");
-  const [editingRow, setEditingRow] = useState(null); // when editing full row
-  const [originalBarcode, setOriginalBarcode] = useState(null); // server identifier
-  const [originalId, setOriginalId] = useState(null); // internal _id
+  const [editingRow, setEditingRow] = useState(null);
+  const [originalBarcode, setOriginalBarcode] = useState(null);
+  const [originalId, setOriginalId] = useState(null);
   const [updating, setUpdating] = useState(false);
 
-  // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
+  // delete confirm
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+
+  // Loading state for initial fetch
+  const [loading, setLoading] = useState(false);
+
+  /* --------------------------
+     Fetch goods-in data (same API path you've been using)
+     Preserves normalization & computeInventory
+     -------------------------- */
   useEffect(() => {
     const fetchGoodsInData = async () => {
       try {
         if (!cognitoId) return;
+        setLoading(true);
         const response = await fetch(
           `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
         );
@@ -82,16 +105,12 @@ const GoodsIn = () => {
           const stockReceived = Number(row.stockReceived || 0);
           const stockRemaining = Number(row.stockRemaining || 0);
 
-          // stable internal id: combine barcode (if exists) + index
           const serverBar = row.barCode ? String(row.barCode) : null;
           const _id = serverBar
             ? `${serverBar}-${idx}`
             : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-          // invoice may be returned as invoice_number (snake) or invoiceNumber (camel)
           const invoiceNumber = row.invoice_number ?? row.invoiceNumber ?? null;
-
-          // normalize unit: prefer explicit field, fallback to empty string
           const unit = row.unit ?? row.unitName ?? row.unit_label ?? "";
 
           return {
@@ -112,101 +131,15 @@ const GoodsIn = () => {
         computeAndSetIngredientInventory(normalized);
       } catch (error) {
         console.error("Error fetching Goods In data:", error);
+      } finally {
+        setLoading(false);
       }
     };
     if (cognitoId) fetchGoodsInData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
-  // columns — removed "Processed" and "File Attachment" as requested
-  const columns = useMemo(
-    () => [
-      { field: "date", headerName: "Date", flex: 1, editable: false },
-      { field: "ingredient", headerName: "Ingredient", flex: 1.5, editable: false },
-      { field: "temperature", headerName: "Temperature", flex: 1, editable: false },
-      {
-        field: "stockReceived",
-        headerName: "Stock Received",
-        type: "number",
-        flex: 1,
-        headerAlign: "center",
-        align: "center",
-        editable: false,
-        // centered, slightly stronger weight to differentiate
-        renderCell: (params) => {
-          const val = params.row?.stockReceived ?? params.value ?? 0;
-          const unit = params.row?.unit ?? "";
-          return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text, fontWeight: 700 }}>
-                {`${val}${unit ? ` ${unit}` : ""}`}
-              </Typography>
-            </Box>
-          );
-        },
-      },
-      {
-        field: "stockRemaining",
-        headerName: "Stock Remaining",
-        type: "number",
-        flex: 1,
-        headerAlign: "center",
-        align: "center",
-        editable: false,
-        // centered, not bold (fontWeight: 400)
-        renderCell: (params) => {
-          const val = params.row?.stockRemaining ?? params.value ?? 0;
-          const unit = params.row?.unit ?? "";
-          return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text, fontWeight: 400 }}>
-                {`${val}${unit ? ` ${unit}` : ""}`}
-              </Typography>
-            </Box>
-          );
-        },
-      },
-      // Invoice column
-      { field: "invoiceNumber", headerName: "Invoice #", flex: 1, editable: false },
-      { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
-      {
-        field: "barCode",
-        headerName: "Batch Code",
-        flex: 1,
-        cellClassName: "barCode-column--cell",
-        editable: false,
-      },
-      {
-        field: "actions",
-        headerName: "Actions",
-        sortable: false,
-        filterable: false,
-        width: 96,
-        align: "center",
-        renderCell: (params) => {
-          return (
-            <IconButton
-              size="small"
-              aria-label="Edit row"
-              onClick={() => {
-                setEditingRow(params.row);
-                setOriginalBarcode(params.row.barCode);
-                setOriginalId(params.row._id);
-                setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
-                setEditValue(null);
-                setEditDialogOpen(true);
-              }}
-            >
-              <EditOutlinedIcon sx={{ color: brand.primary }} />
-            </IconButton>
-          );
-        },
-      },
-    ],
-    []
-  );
-
-  // helper: compute ingredient inventory from rows and set it
+  /* compute inventory (same logic) */
   const computeAndSetIngredientInventory = (rows) => {
     const active = (Array.isArray(rows) ? rows : []).filter((r) => Number(r.stockRemaining) > 0);
     const map = new Map();
@@ -233,7 +166,7 @@ const GoodsIn = () => {
     setIngredientInventory(inventory);
   };
 
-  // processRowUpdate - robust immutable updater, accepts both newRow & oldRow
+  /* processRowUpdate -> calls your API PUT (same path & payload mapping) */
   const processRowUpdate = async (newRow, oldRow) => {
     const oldBar = oldRow && oldRow.barCode ? String(oldRow.barCode) : undefined;
     const oldId = oldRow && oldRow._id ? String(oldRow._id) : undefined;
@@ -247,7 +180,6 @@ const GoodsIn = () => {
       unit: newRow.unit,
       expiryDate: newRow.expiryDate,
       barCode: newRow.barCode,
-      // send invoice using snake_case to match backend column
       invoice_number: newRow.invoiceNumber ?? null,
       cognito_id: cognitoId,
     };
@@ -265,12 +197,7 @@ const GoodsIn = () => {
       if (!response.ok) {
         const text = await response.text().catch(() => "");
         console.error("[processRowUpdate] server returned non-OK:", response.status, text);
-        try {
-          const jsonErr = JSON.parse(text || "{}");
-          throw new Error(JSON.stringify(jsonErr));
-        } catch {
-          throw new Error(text || `Failed to update row (status ${response.status})`);
-        }
+        throw new Error(text || `Failed to update row (status ${response.status})`);
       }
 
       const json = await response.json().catch(() => null);
@@ -281,11 +208,8 @@ const GoodsIn = () => {
         ...(serverRow ? serverRow : {}),
         stockReceived: Number((serverRow && serverRow.stockReceived) ?? newRow.stockReceived ?? 0),
         stockRemaining: Number((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining ?? 0),
-        processed:
-          Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
-        // prefer server-provided invoice (snake or camel), otherwise use newRow value
+        processed: Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
         invoiceNumber: (serverRow && (serverRow.invoice_number ?? serverRow.invoiceNumber)) ?? newRow.invoiceNumber ?? null,
-        // normalize unit returned from server (if any)
         unit: (serverRow && (serverRow.unit ?? serverRow.unit_label ?? serverRow.unitName)) ?? newRow.unit ?? "",
       };
 
@@ -296,6 +220,7 @@ const GoodsIn = () => {
 
       normalizedResult.barCode = (serverRow && serverRow.barCode) ? serverRow.barCode : (newRow.barCode || null);
 
+      // update local state
       setGoodsInRows((prev = []) => {
         const list = Array.isArray(prev) ? prev.slice() : [];
         let found = false;
@@ -326,12 +251,13 @@ const GoodsIn = () => {
     }
   };
 
-  // Bulk soft delete — selectedRows contain _id values
+  /* Bulk soft delete (calls backend /delete-row as you used previously) */
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
 
     try {
       const rowsToDelete = (goodsInRows || []).filter((r) => selectedRows.includes(r._id));
+
       await Promise.all(
         rowsToDelete.map((row) =>
           fetch(`${API_BASE}/delete-row`, {
@@ -361,65 +287,21 @@ const GoodsIn = () => {
     }
   };
 
-  const handleOpenConfirmDialog = () => setOpenConfirmDialog(true);
-  const handleCloseConfirmDialog = () => setOpenConfirmDialog(false);
-  const handleFileOpen = (fileUrl) => window.open(fileUrl, "_blank");
-
-  const handleCellClick = (params) => {
-    if (params.field === "__check__") return;
-    setActiveCell({
-      id: params.row.barCode,
-      field: params.field,
-      value: params.value,
-      row: params.row,
-    });
-  };
-
-  const openEditForActiveCell = () => {
-    if (!activeCell) return;
-    setEditValue(activeCell.value ?? "");
-    setEditingRow(activeCell.row ?? null);
-    setOriginalBarcode(activeCell.row?.barCode ?? null);
-    setOriginalId(activeCell.row?._id ?? null);
+  /* Edit handling */
+  const handleEditRow = (row) => {
+    setEditingRow({ ...row });
+    setOriginalBarcode(row.barCode);
+    setOriginalId(row._id);
     setEditDialogOpen(true);
   };
 
   const handleConfirmEdit = async () => {
-    if (!editingRow && !activeCell) {
-      setEditDialogOpen(false);
-      return;
-    }
-
+    if (!editingRow) return;
     setUpdating(true);
     try {
-      let result;
-      if (activeCell && activeCell.field && !editingRow) {
-        const row = (goodsInRows || []).find((r) => r._id === (activeCell.row?._id) || r.barCode === activeCell.id);
-        if (!row) throw new Error("Row not found");
-        const patched = {
-          ...row,
-          [activeCell.field]:
-            activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
-              ? Number(editValue || 0)
-              : editValue,
-        };
-        if (patched.stockRemaining !== undefined) patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
-
-        result = await processRowUpdate(patched, { barCode: originalBarcode || activeCell.id, _id: originalId || row._id });
-      } else {
-        const patched = { ...editingRow };
-        if (activeCell && activeCell.field) patched[activeCell.field] = editValue;
-        patched.stockReceived = Number(patched.stockReceived || 0);
-        patched.stockRemaining = Number(patched.stockRemaining || 0);
-        patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
-
-        result = await processRowUpdate(patched, { barCode: originalBarcode, _id: originalId });
-      }
-
+      await processRowUpdate(editingRow, { barCode: originalBarcode, _id: originalId });
       setEditDialogOpen(false);
       setEditingRow(null);
-      setActiveCell(null);
-      setEditValue("");
       setOriginalBarcode(null);
       setOriginalId(null);
     } catch (err) {
@@ -430,44 +312,50 @@ const GoodsIn = () => {
     }
   };
 
-  const renderEditInputForField = (fieldName, value, onChange) => {
-    if (fieldName === "unit") {
-      return (
-        <FormControl fullWidth>
-          <InputLabel id="unit-edit-label">Unit</InputLabel>
-          <Select
-            labelId="unit-edit-label"
-            value={value ?? ""}
-            label="Unit"
-            onChange={(e) => onChange(e.target.value)}
-          >
-            {unitOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+  /* Search / filter / sort / pagination (client-side) */
+  const filteredRows = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    let rows = Array.isArray(goodsInRows) ? goodsInRows.slice() : [];
+    if (q) {
+      rows = rows.filter((r) =>
+        ["date", "ingredient", "barCode", "invoiceNumber", "unit", "temperature"]
+          .some((k) => String(r[k] ?? "").toLowerCase().includes(q))
       );
     }
 
-    if (fieldName === "expiryDate" || fieldName === "date") {
-      return <TextField fullWidth type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
-    }
+    const dir = sortBy.dir === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      const fa = a[sortBy.field] ?? "";
+      const fb = b[sortBy.field] ?? "";
+      if (sortBy.field === "stockRemaining" || sortBy.field === "stockReceived") {
+        return (Number(fa) - Number(fb)) * dir;
+      }
+      return String(fa).localeCompare(String(fb)) * dir;
+    });
 
-    if (fieldName === "stockReceived" || fieldName === "stockRemaining") {
-      return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
-    }
+    return rows;
+  }, [goodsInRows, searchQuery, sortBy]);
 
-    // invoiceNumber is a plain text input (falls through to default)
-    return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
+  const visibleRows = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredRows.slice(start, start + rowsPerPage);
+  }, [filteredRows, page, rowsPerPage]);
+
+  const toggleSelectAll = () => {
+    if (selectedRows.length === filteredRows.length && filteredRows.length > 0) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(filteredRows.map((r) => r._id));
+    }
   };
 
-  // NEW: focus & highlight flow — reacts to location.state.focusBar or ?focusBar=...
+  const toggleRowSelection = (id) => {
+    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  /* focusBar behavior from URL param or location.state */
   useEffect(() => {
-    const focusBar =
-      (location && location.state && location.state.focusBar) ||
-      new URLSearchParams(window.location.search).get("focusBar");
+    const focusBar = (location && location.state && location.state.focusBar) || new URLSearchParams(window.location.search).get("focusBar");
     if (!focusBar) return;
     if (!goodsInRows || goodsInRows.length === 0) return;
 
@@ -475,347 +363,357 @@ const GoodsIn = () => {
     if (!target) return;
     const targetId = target._id;
 
-    // set selection (controlled)
-    try {
-      setSelectedRows([targetId]);
-    } catch (e) {}
+    setSelectedRows([targetId]);
 
-    // scroll + highlight after grid rendered rows
     setTimeout(() => {
-      // MUI DataGrid renders a row element with data-id attribute equal to row id
-      const el = document.querySelector(`[data-id="${targetId}"]`);
+      const el = document.querySelector(`[data-row-id="${targetId}"]`);
       if (el) {
-        try {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        } catch {}
-        el.classList.add("plf-row-highlight");
-        setTimeout(() => el.classList.remove("plf-row-highlight"), 2500);
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-row");
+        setTimeout(() => el.classList.remove("highlight-row"), 2500);
       }
     }, 250);
-
-    // clear location state so this doesn't run repeatedly on back/forward
+    // attempt clear query param (best-effort)
     try {
       if (window && window.history && window.history.replaceState) {
         const url = new URL(window.location.href);
         url.searchParams.delete("focusBar");
-        window.history.replaceState({}, document.title, url.pathname + url.search);
+        window.history.replaceState({}, document.title, url.pathname + url.search || "");
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }, [goodsInRows, location]);
 
+  /* Tiny complementary "chart": totals of stockRemaining by ingredient (top 5) */
+  const totalsByIngredient = useMemo(() => {
+    const map = new Map();
+    (goodsInRows || []).forEach((r) => {
+      const key = r.ingredient || "—";
+      map.set(key, (map.get(key) || 0) + Number(r.stockRemaining || 0));
+    });
+    const arr = Array.from(map.entries()).map(([ingredient, amount]) => ({ ingredient, amount }));
+    arr.sort((a, b) => b.amount - a.amount);
+    return arr.slice(0, 5);
+  }, [goodsInRows]);
+
+  /* small helper to render SVG bars */
+  const SmallBarChart = ({ data = [] }) => {
+    if (!data || data.length === 0) return <Typography variant="caption" color="text.secondary">No data</Typography>;
+    const max = Math.max(...data.map((d) => d.amount), 1);
+    return (
+      <Box sx={{ width: 240, display: "flex", flexDirection: "column", gap: 1 }}>
+        {data.map((d) => (
+          <Box key={d.ingredient} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography sx={{ fontSize: 12, minWidth: 80, color: brand.subtext }}>{d.ingredient}</Typography>
+            <Box sx={{ flex: 1, height: 10, background: brand.surfaceMuted, borderRadius: 999, overflow: "hidden" }}>
+              <Box sx={{ width: `${(d.amount / max) * 100}%`, height: "100%", background: brand.primary }} />
+            </Box>
+            <Typography sx={{ fontSize: 12, width: 40, textAlign: "right" }}>{d.amount}</Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
+
+  /* small styles for header/card */
   return (
-    <Box m="20px">
+    <Box m={2}>
       <style>{`
-        .plf-row-highlight {
-          animation: plfHighlight 2.4s ease forwards;
-        }
-        @keyframes plfHighlight {
-          0% { background-color: rgba(255, 239, 213, 0.95); }
-          10% { background-color: rgba(255, 239, 213, 0.95); }
-          90% { background-color: transparent; }
+        .highlight-row { animation: highlightPulse 2.4s ease forwards; }
+        @keyframes highlightPulse {
+          0% { background-color: rgba(251,191,36,0.12); }
+          50% { background-color: rgba(251,191,36,0.12); }
           100% { background-color: transparent; }
         }
-
-        /* alternating row coloring */
-        .even-row {
-          background-color: ${brand.surfaceMuted} !important;
-        }
-        .odd-row {
-          background-color: ${brand.surface} !important;
-        }
-
-        /* keep barCode colored */
-        .barCode-column--cell {
-          color: ${brand.primary};
-        }
+        /* alternating row backgrounds handled inline */
       `}</style>
 
-      <Box
-        sx={{
-          mt: 2,
-          border: `1px solid ${brand.border}`,
-          borderRadius: 16,
-          background: brand.surface,
-          boxShadow: brand.shadow,
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 2,
-            py: 1.25,
-            borderBottom: `1px solid ${brand.border}`,
-          }}
-        >
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>Goods In</Typography>
-
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <IconButton
-              aria-label="Edit selected cell"
-              onClick={openEditForActiveCell}
-              disabled={!activeCell}
-              title={activeCell ? `Edit ${activeCell.field}` : "Select a cell to edit"}
-              sx={{
-                color: "#fff",
-                borderRadius: 999,
-                width: 40,
-                height: 40,
-                background: activeCell ? `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` : "#f1f5f9",
-                boxShadow: activeCell && "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              }}
-            >
-              <EditOutlinedIcon />
-            </IconButton>
-
-            <IconButton
-              aria-label="Delete selected"
-              onClick={handleOpenConfirmDialog}
-              disabled={selectedRows.length === 0}
-              sx={{
-                color: "#fff",
-                borderRadius: 999,
-                width: 40,
-                height: 40,
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-                opacity: selectedRows.length === 0 ? 0.5 : 1,
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
+      <Box maxWidth="1200px" mx="auto" display="flex" flexDirection="column" gap={2}>
+        {/* Header */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Box sx={{ width: 52, height: 52, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center",
+                        background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, boxShadow: "0 8px 20px rgba(124,58,237,0.12)" }}>
+              <PackageIcon sx={{ color: "white" }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>Goods In Management</Typography>
+              <Typography variant="caption" color="text.secondary">Track and manage incoming inventory</Typography>
+            </Box>
           </Box>
+
+          <Stack direction="row" spacing={1} alignItems="center">
+            {selectedRows.length > 0 && (
+              <Chip label={`${selectedRows.length} selected`} color="default" />
+            )}
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => setOpenConfirmDialog(true)}
+              disabled={selectedRows.length === 0}
+            >
+              Delete ({selectedRows.length})
+            </Button>
+          </Stack>
         </Box>
 
-        <Box
-          sx={{
-            height: "70vh",
-            "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#fbfcfd",
-              color: brand.subtext,
-              borderBottom: `1px solid ${brand.border}`,
-              fontWeight: 800,
-            },
-            "& .MuiDataGrid-columnSeparator": { display: "none" },
-            "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
-            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-            "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
-            "& .barCode-column--cell": { color: brand.primary },
-            "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {
-              outline: `2px solid ${brand.primary}`,
-              outlineOffset: "-2px",
-              boxShadow: `0 0 0 4px ${brand.focusRing}`,
-            },
-          }}
-        >
-          <DataGrid
-            rows={goodsInRows || []}
-            getRowId={(row) => row._id}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[10, 25, 50]}
-            checkboxSelection
-            rowSelectionModel={selectedRows}
-            onRowSelectionModelChange={(model) => setSelectedRows(Array.isArray(model) ? model : [])}
-            disableRowSelectionOnClick
-            editMode="row"
-            experimentalFeatures={{ newEditingApi: true }}
-            processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow)}
-            onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
-            onCellClick={handleCellClick}
-            getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row")}
-          />
+        {/* Search & Filters */}
+        <Paper variant="outlined" sx={{ p: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 240 }}>
+            <SearchIcon color="action" />
+            <TextField
+              placeholder="Search by ingredient, batch code, invoice..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              size="small"
+              fullWidth
+            />
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Button variant="outlined" startIcon={<FilterListIcon />}>Filters</Button>
+
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Sort</InputLabel>
+              <Select
+                value={`${sortBy.field}:${sortBy.dir}`}
+                label="Sort"
+                onChange={(e) => {
+                  const [field, dir] = String(e.target.value).split(":");
+                  setSortBy({ field, dir });
+                }}
+              >
+                <MenuItem value="date:desc">Date (new → old)</MenuItem>
+                <MenuItem value="date:asc">Date (old → new)</MenuItem>
+                <MenuItem value="ingredient:asc">Ingredient A→Z</MenuItem>
+                <MenuItem value="ingredient:desc">Ingredient Z→A</MenuItem>
+                <MenuItem value="stockRemaining:desc">Stock Remaining (high → low)</MenuItem>
+                <MenuItem value="stockRemaining:asc">Stock Remaining (low → high)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Paper>
+
+        {/* Main table + small chart on the right for wide screens */}
+        <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
+          <Paper sx={{ flex: 1, overflow: "hidden", borderRadius: 2, border: `1px solid ${brand.border}`, boxShadow: brand.shadow }}>
+            {/* responsive scroll wrapper */}
+            <TableContainer sx={{ maxHeight: "60vh", overflowX: "auto" }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: 56 }}>
+                      <Checkbox
+                        checked={selectedRows.length > 0 && selectedRows.length === filteredRows.length && filteredRows.length > 0}
+                        indeterminate={selectedRows.length > 0 && selectedRows.length < filteredRows.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Ingredient</TableCell>
+                    <TableCell>Temperature</TableCell>
+                    <TableCell align="center">Stock Received</TableCell>
+                    <TableCell align="center">Stock Remaining</TableCell>
+                    <TableCell>Invoice #</TableCell>
+                    <TableCell>Expiry Date</TableCell>
+                    <TableCell>Batch Code</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                        <CircularProgress />
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>Loading goods in...</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : visibleRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                        <Typography color="text.secondary">No records found</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleRows.map((row, idx) => (
+                      <TableRow
+                        key={row._id}
+                        data-row-id={row._id}
+                        sx={{
+                          backgroundColor: (page * rowsPerPage + idx) % 2 === 0 ? "white" : brand.surfaceMuted,
+                          "&:hover": { backgroundColor: "#fbf8ff" },
+                        }}
+                      >
+                        <TableCell>
+                          <Checkbox checked={selectedRows.includes(row._id)} onChange={() => toggleRowSelection(row._id)} />
+                        </TableCell>
+
+                        <TableCell sx={{ color: brand.subtext }}>{row.date || "-"}</TableCell>
+                        <TableCell sx={{ color: brand.text, fontWeight: 700 }}>{row.ingredient || "-"}</TableCell>
+                        <TableCell sx={{ color: brand.subtext }}>{row.temperature ? `${row.temperature}℃` : "-"}</TableCell>
+
+                        {/* stockReceived centered, bold */}
+                        <TableCell align="center">
+                          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#ecfdf5" }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
+                              {row.stockReceived}
+                            </Typography>
+                            {row.unit ? <Typography variant="caption" sx={{ ml: 0.5, color: brand.subtext }}>{` ${row.unit}`}</Typography> : null}
+                          </Box>
+                        </TableCell>
+
+                        {/* stockRemaining centered, NOT bold */}
+                        <TableCell align="center">
+                          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#f8fafc" }}>
+                            <Typography variant="body2" sx={{ fontWeight: 400, color: brand.text }}>
+                              {row.stockRemaining}
+                            </Typography>
+                            {row.unit ? <Typography variant="caption" sx={{ ml: 0.5, color: brand.subtext }}>{` ${row.unit}`}</Typography> : null}
+                          </Box>
+                        </TableCell>
+
+                        <TableCell sx={{ color: brand.subtext }}>{row.invoiceNumber || "-"}</TableCell>
+                        <TableCell sx={{ color: brand.subtext }}>{row.expiryDate || "-"}</TableCell>
+                        <TableCell>
+                          <Chip label={row.barCode || "-"} variant="outlined" sx={{ bgcolor: "#f9f5ff", color: brand.primary, borderColor: "#eee" }} />
+                        </TableCell>
+
+                        <TableCell align="right">
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => handleEditRow(row)}>
+                              <EditOutlinedIcon sx={{ color: brand.primary }} />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* footer: pagination & stats */}
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderTop: `1px solid ${brand.border}`, background: "#fbfbff" }}>
+              <Typography variant="caption" color="text.secondary">
+                Showing <strong style={{ color: brand.text }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>
+                {" - "}
+                <strong style={{ color: brand.text }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong>
+                {" of "}
+                <strong style={{ color: brand.text }}>{filteredRows.length}</strong>
+              </Typography>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Total Remaining:
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: brand.text }}>
+                  {filteredRows.reduce((sum, r) => sum + Number(r.stockRemaining || 0), 0)}
+                </Typography>
+
+                {/* simple pagination controls */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 2 }}>
+                  <Button variant="outlined" size="small" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}>Prev</Button>
+                  <Typography variant="caption">{page + 1}</Typography>
+                  <Button variant="outlined" size="small" onClick={() => {
+                    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
+                    setPage(Math.min(maxPage, page + 1));
+                  }} disabled={(page + 1) * rowsPerPage >= filteredRows.length}>Next</Button>
+
+                  <FormControl size="small" sx={{ minWidth: 88 }}>
+                    <Select
+                      value={rowsPerPage}
+                      onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                    >
+                      <MenuItem value={5}>5</MenuItem>
+                      <MenuItem value={10}>10</MenuItem>
+                      <MenuItem value={25}>25</MenuItem>
+                      <MenuItem value={50}>50</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* Right column: small stats + chart */}
+          <Box sx={{ width: { xs: "100%", md: 320 } }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: brand.shadow }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick Stats</Typography>
+              <Typography variant="caption" color="text.secondary">Top ingredients by remaining stock</Typography>
+              <Box sx={{ mt: 2 }}>
+                <SmallBarChart data={totalsByIngredient} />
+              </Box>
+            </Paper>
+
+            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: brand.shadow }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Legend</Typography>
+              <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                <Chip label="Selected" color="default" size="small" />
+                <Chip label="Low stock" size="small" sx={{ bgcolor: "#fff7ed", color: "#92400e" }} />
+              </Box>
+            </Paper>
+          </Box>
         </Box>
       </Box>
 
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-          setEditingRow(null);
-          setActiveCell(null);
-          setEditValue("");
-          setOriginalBarcode(null);
-          setOriginalId(null);
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          {activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}
-        </DialogTitle>
-
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 800 }}>Edit Goods In Record</DialogTitle>
         <DialogContent dividers>
-          {activeCell && activeCell.field && !editingRow && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ color: brand.subtext }}>
-                Original Bar Code: {originalBarcode || activeCell.id}
-              </Typography>
-              <Box sx={{ mt: 1 }}>{renderEditInputForField(activeCell.field, editValue, setEditValue)}</Box>
-            </Box>
-          )}
-
-          {(editingRow || (activeCell && activeCell.field === null)) && (
+          {editingRow ? (
             <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
-              {(() => {
-                const row = editingRow || (activeCell ? activeCell.row : null);
-                if (!row) return null;
-                return (
-                  <>
-                    <TextField
-                      label="Ingredient"
-                      fullWidth
-                      value={editingRow?.ingredient ?? row.ingredient ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))}
-                    />
-                    <TextField
-                      label="Date"
-                      fullWidth
-                      type="date"
-                      value={editingRow?.date ?? row.date ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))}
-                    />
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                      <TextField
-                        label="Stock Received"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.stockReceived ?? row.stockReceived ?? ""}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))}
-                      />
-                      <TextField
-                        label="Stock Remaining"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.stockRemaining ?? row.stockRemaining ?? ""}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))}
-                      />
-                    </Box>
-                    <FormControl fullWidth>
-                      <InputLabel id="unit-edit-label">Unit</InputLabel>
-                      <Select
-                        labelId="unit-edit-label"
-                        value={editingRow?.unit ?? row.unit ?? ""}
-                        label="Unit"
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unit: e.target.value }))}
-                      >
-                        {unitOptions.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <TextField
-                      label="Batch Code"
-                      fullWidth
-                      value={editingRow?.barCode ?? row.barCode ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))}
-                    />
-                    {/* Invoice Number field added to edit dialog */}
-                    <TextField
-                      label="Invoice Number"
-                      fullWidth
-                      value={editingRow?.invoiceNumber ?? row.invoiceNumber ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), invoiceNumber: e.target.value }))}
-                    />
-                    <TextField
-                      label="Expiry Date"
-                      fullWidth
-                      type="date"
-                      value={editingRow?.expiryDate ?? row.expiryDate ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))}
-                    />
-                    <TextField
-                      label="Temperature (℃)"
-                      fullWidth
-                      value={editingRow?.temperature ?? row.temperature ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))}
-                    />
-                  </>
-                );
-              })()}
+              <TextField label="Ingredient" fullWidth value={editingRow.ingredient || ""} onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })} />
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                <TextField label="Date" type="date" value={editingRow.date || ""} onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })} fullWidth />
+                <TextField label="Temperature (℃)" value={editingRow.temperature || ""} onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })} fullWidth />
+              </Box>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                <TextField label="Stock Received" type="number" value={editingRow.stockReceived || ""} onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })} fullWidth />
+                <TextField label="Stock Remaining" type="number" value={editingRow.stockRemaining || ""} onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })} fullWidth />
+              </Box>
+
+              <FormControl fullWidth>
+                <InputLabel>Unit</InputLabel>
+                <Select value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
+                  {unitOptions.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+                </Select>
+              </FormControl>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                <TextField label="Batch Code" value={editingRow.barCode || ""} onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })} fullWidth />
+                <TextField label="Invoice Number" value={editingRow.invoiceNumber || ""} onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })} fullWidth />
+              </Box>
+
+              <TextField label="Expiry Date" type="date" value={editingRow.expiryDate || ""} onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })} fullWidth />
             </Box>
+          ) : (
+            <Typography color="text.secondary">No row selected.</Typography>
           )}
         </DialogContent>
 
         <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => {
-              setEditDialogOpen(false);
-              setEditingRow(null);
-              setActiveCell(null);
-              setEditValue("");
-              setOriginalBarcode(null);
-              setOriginalId(null);
-            }}
-            sx={{ textTransform: "none" }}
-            disabled={updating}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmEdit}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
-            disabled={updating}
-          >
-            {updating ? "Updating…" : "Confirm"}
+          <Button variant="outlined" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</Button>
+          <Button variant="contained" onClick={handleConfirmEdit} disabled={updating}>
+            {updating ? <CircularProgress size={18} /> : "Save Changes"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={openConfirmDialog}
-        onClose={handleCloseConfirmDialog}
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
+        <DialogTitle sx={{ fontWeight: 800 }}>Confirm Deletion</DialogTitle>
         <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>
-            Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}?
-          </Typography>
+          <Typography color="text.secondary">Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}? This action will soft-delete them.</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseConfirmDialog} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteSelectedRows}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={<DeleteIcon />}
-          >
+          <Button variant="outlined" onClick={() => setOpenConfirmDialog(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDeleteSelectedRows}>
             Delete
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
-};
-
-export default GoodsIn;
+}
