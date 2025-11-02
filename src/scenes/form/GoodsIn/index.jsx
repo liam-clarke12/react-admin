@@ -1,845 +1,677 @@
 // src/scenes/form/GoodsIn/index.jsx
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Formik, FieldArray, getIn } from "formik";
-import * as yup from "yup";
-
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Label } from "./components/ui/label";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
   Dialog,
+  DialogActions,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
-} from "./components/ui/dialog";
-import {
+  Divider,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
-import {
+  Slider,
+  Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
-  TableHeader,
   TableRow,
-} from "./components/ui/table";
-import { Badge } from "./components/ui/badge";
-import { ScrollArea } from "./components/ui/scroll-area";
-import { Checkbox } from "./components/ui/checkbox";
-import { toast } from "sonner@2.0.3";
-import { Toaster } from "./components/ui/sonner";
-
+  Tabs,
+  Tab,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
 import {
-  PackagePlus,
-  Package as PackageIcon,
-  Plus,
-  Trash2,
-  Check,
-  Loader2,
-  CalendarDays,
-  Thermometer,
-  Barcode,
-  Scale,
-  FileText,
-  Slider as SliderIcon,
-} from "lucide-react";
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  FilterList as FilterIcon,
+  Inventory2 as PackageIcon,
+  PlaylistAdd as PackagePlusIcon,
+  Save as SaveIcon,
+  CalendarToday as CalendarIcon,
+  Thermostat as ThermometerIcon,
+  Barcode as BarcodeIcon,
+  Scale as ScaleIcon,
+  Description as FileTextIcon,
+  Tune as SliderIcon,
+} from "@mui/icons-material";
+import { toast, Toaster } from "sonner";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
-  { value: "ml", label: "Milliliters (ml)" },
   { value: "kg", label: "Kilograms (Kg)" },
+  { value: "ml", label: "Milliliters (ml)" },
   { value: "l", label: "Litres (L)" },
   { value: "units", label: "Units" },
 ];
 
-// Mock auth context replacement (use your real auth in production)
-const useAuth = () => ({ cognitoId: "mock-cognito-id" });
+const useAuthMock = () => ({ cognitoId: "mock-cognito-id" });
 
-// Validation schema (mirrors original)
-const itemSchema = yup.object().shape({
-  date: yup.string().required("Date is required"),
-  ingredient: yup.string().required("Ingredient is required"),
-  stockReceived: yup
-    .number()
-    .typeError("Must be a number")
-    .required("Stock amount is required")
-    .positive("Must be positive"),
-  unit: yup.string().required("Metric unit is required"),
-  barCode: yup.string().required("Batch code is required"),
-  expiryDate: yup.string().required("Expiry date is required"),
-  temperature: yup.string().required("Temperature is required"),
-  invoiceNumber: yup.string().notRequired(),
-});
+const initialSingle = {
+  date: new Date().toISOString().slice(0, 10),
+  ingredient: "",
+  stockReceived: "",
+  unit: "grams",
+  barCode: "",
+  expiryDate: new Date().toISOString().slice(0, 10),
+  temperature: "N/A",
+  invoiceNumber: "",
+};
 
-const batchSchema = yup.object().shape({
-  items: yup.array().of(itemSchema).min(1, "At least one good is required"),
-});
+const initialBatchItem = { ...initialSingle };
 
 export default function GoodsInForm() {
-  const { cognitoId } = useAuth();
-  const [activeTab, setActiveTab] = useState("single");
+  const theme = useTheme();
+  const { cognitoId } = useAuthMock();
+
+  // UI state
+  const [tab, setTab] = useState(0);
+  const [colWidthMultiplier, setColWidthMultiplier] = useState(1);
+  const [addIngredientOpen, setAddIngredientOpen] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState("");
+  const [batchPreviewOpen, setBatchPreviewOpen] = useState(false);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+
+  // data
   const [masterIngredients, setMasterIngredients] = useState([]);
   const [customIngredients, setCustomIngredients] = useState([]);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
-  const [addIngredientOpen, setAddIngredientOpen] = useState(false);
-  const [newIngredientName, setNewIngredientName] = useState("");
-  const [addingIngredient, setAddingIngredient] = useState(false);
+  // Single form
+  const [singleForm, setSingleForm] = useState(initialSingle);
+  const [singleErrors, setSingleErrors] = useState({});
 
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [batchPreviewItems, setBatchPreviewItems] = useState([]);
-  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  // Multiple form (array)
+  const [multipleItems, setMultipleItems] = useState([initialBatchItem]);
+  const [multipleErrors, setMultipleErrors] = useState([{}]);
 
-  const addGoodRef = useRef(null);
+  // preview items (for confirm dialog)
+  const [previewItems, setPreviewItems] = useState([]);
 
-  // slider for column min width multiplier (1..2.5)
-  const [colWidthMultiplier, setColWidthMultiplier] = useState(1.0);
-
-  // selected rows (for main table style example / selection)
+  // selection demo
   const [selectedRows, setSelectedRows] = useState([]);
 
-  // load ingredients (preserve original API usage)
+  // Fetch ingredients (mock fallback if API unreachable)
   useEffect(() => {
     if (!cognitoId) return;
     setLoadingIngredients(true);
     fetch(`${API_BASE}/ingredients?cognito_id=${encodeURIComponent(cognitoId)}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject("Failed")))
+      .then((r) => (r.ok ? r.json() : Promise.reject("no api")))
       .then((data) => {
-        // Expecting an array of { id, name }
-        setMasterIngredients(Array.isArray(data) ? data : []);
+        if (Array.isArray(data) && data.length) {
+          setMasterIngredients(data.map((d, i) => ({ id: d.id ?? String(i), name: d.name ?? d })));
+        } else {
+          // fallback mock
+          setMasterIngredients([
+            { id: "1", name: "Organic Flour" },
+            { id: "2", name: "Fresh Milk" },
+            { id: "3", name: "Cane Sugar" },
+            { id: "4", name: "Butter" },
+            { id: "5", name: "Vanilla Extract" },
+            { id: "6", name: "Fresh Eggs" },
+          ]);
+        }
       })
       .catch(() => {
-        // fallback mock if API not available
         setMasterIngredients([
           { id: "1", name: "Organic Flour" },
           { id: "2", name: "Fresh Milk" },
           { id: "3", name: "Cane Sugar" },
           { id: "4", name: "Butter" },
           { id: "5", name: "Vanilla Extract" },
+          { id: "6", name: "Fresh Eggs" },
         ]);
       })
       .finally(() => setLoadingIngredients(false));
 
-    // fetch custom
+    // fetch custom ingredients (attempt)
     fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject("Failed custom")))
-      .then((data) => setCustomIngredients(Array.isArray(data) ? data.map(ci => ({ id: `c-${ci.id}`, name: ci.name })) : []))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setCustomIngredients(data.map((d) => ({ id: `c-${d.id ?? Date.now()}`, name: d.name ?? d })));
+      })
       .catch(() => setCustomIngredients([]));
   }, [cognitoId]);
 
-  const ingredients = useMemo(
-    () => [
-      ...masterIngredients.map((i) => ({ ...i, source: "master" })),
-      ...customIngredients.map((i) => ({ ...i, source: "custom" })),
-    ],
-    [masterIngredients, customIngredients]
-  );
+  const ingredients = useMemo(() => [...masterIngredients, ...customIngredients], [masterIngredients, customIngredients]);
 
-  // helper to find ingredient name from id
+  // helpers
   const getIngredientName = (id) => {
-    if (!id) return id;
-    const f = ingredients.find(i => String(i.id) === String(id));
-    return f ? f.name : id;
+    if (!id) return "";
+    const found = ingredients.find((i) => String(i.id) === String(id));
+    return found ? found.name : id;
   };
 
-  // initial single and batch items
-  const initialSingle = {
-    date: new Date().toISOString().split("T")[0],
-    ingredient: "",
-    stockReceived: "",
-    unit: "grams",
-    barCode: "",
-    expiryDate: new Date().toISOString().split("T")[0],
-    temperature: "N/A",
-    invoiceNumber: "",
+  // validation (simple)
+  const validateSingle = (values = singleForm) => {
+    const e = {};
+    if (!values.date) e.date = "Date required";
+    if (!values.ingredient) e.ingredient = "Ingredient required";
+    if (!values.stockReceived || Number(values.stockReceived) <= 0) e.stockReceived = "Stock must be > 0";
+    if (!values.unit) e.unit = "Unit required";
+    if (!values.barCode) e.barCode = "Batch code required";
+    if (!values.expiryDate) e.expiryDate = "Expiry date required";
+    if (!values.temperature) e.temperature = "Temperature required";
+    setSingleErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const initialBatchItem = { ...initialSingle };
+  const validateMultiple = (items = multipleItems) => {
+    const errs = [];
+    let ok = true;
+    items.forEach((it) => {
+      const e = {};
+      if (!it.date) e.date = "Date required";
+      if (!it.ingredient) e.ingredient = "Ingredient required";
+      if (!it.stockReceived || Number(it.stockReceived) <= 0) e.stockReceived = "Stock must be > 0";
+      if (!it.unit) e.unit = "Unit required";
+      if (!it.barCode) e.barCode = "Batch code required";
+      if (!it.expiryDate) e.expiryDate = "Expiry required";
+      if (!it.temperature) e.temperature = "Temperature required";
+      errs.push(e);
+      if (Object.keys(e).length) ok = false;
+    });
+    setMultipleErrors(errs);
+    return ok;
+  };
 
-  // add ingredient
-  const handleAddIngredient = async () => {
-    if (!newIngredientName.trim() || !cognitoId) {
-      toast.error("Enter an ingredient name");
+  const handleSingleSubmit = async () => {
+    if (!validateSingle()) {
+      toast.error("Fix errors before submitting");
       return;
     }
-    setAddingIngredient(true);
-    try {
-      // try to POST to API
-      const resp = await fetch(`${API_BASE}/custom-ingredients`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredientName.trim() }),
-      });
-      if (!resp.ok) throw new Error("API failed");
-      // re-fetch custom list
-      const updated = await fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`).then(r => r.ok ? r.json() : []);
-      setCustomIngredients(Array.isArray(updated) ? updated.map(ci => ({ id: `c-${ci.id}`, name: ci.name })) : []);
-      toast.success("Ingredient added");
-      setAddIngredientOpen(false);
-      setNewIngredientName("");
-    } catch (err) {
-      // fallback: local append
-      const newIng = { id: `c-${Date.now()}`, name: newIngredientName.trim() };
-      setCustomIngredients(prev => [...prev, newIng]);
-      toast.success("Ingredient added (local)");
-      setAddIngredientOpen(false);
-      setNewIngredientName("");
-    } finally {
-      setAddingIngredient(false);
-    }
-  };
-
-  // SUBMIT helpers (single + batch)
-  const submitSingle = async (values, { resetForm }) => {
-    const payload = {
-      ...values,
-      ingredient: getIngredientName(values.ingredient) || values.ingredient,
-      ingredientId: values.ingredient || null,
-      cognito_id: cognitoId,
-      invoiceNumber: values.invoiceNumber || null,
-    };
-
+    const payload = { ...singleForm, cognito_id: cognitoId };
     try {
       const res = await fetch(`${API_BASE}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      if (!res.ok) {
-        // fallback: attempt parsing or throw
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Submit failed ${res.status}`);
-      }
-
-      resetForm();
-      toast.success("Stock recorded");
+      if (!res.ok) throw new Error("Server rejected");
+      toast.success("Recorded");
+      setSingleForm(initialSingle);
     } catch (err) {
-      console.error("submitSingle error:", err);
-      toast.error("Submit failed. See console.");
+      console.error(err);
+      toast.error("Submit failed — check console");
     }
   };
 
-  const submitBatch = async (values, { resetForm }) => {
-    // expand ingredient names
-    const items = (values.items || []).map(it => ({
-      ...it,
-      ingredient: getIngredientName(it.ingredient) || it.ingredient,
-      ingredientId: it.ingredient || null,
-      invoiceNumber: it.invoiceNumber || null,
-    }));
+  const handleAddIngredient = async () => {
+    if (!newIngredientName.trim()) {
+      toast.error("Enter ingredient name");
+      return;
+    }
+    // attempt to save via API
+    try {
+      const res = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newIngredientName.trim(), cognito_id: cognitoId }),
+      });
+      if (res.ok) {
+        // try to refresh list
+        const updated = await fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`).then((r) =>
+          r.ok ? r.json() : []
+        );
+        setCustomIngredients(Array.isArray(updated) ? updated.map((d) => ({ id: `c-${d.id ?? Date.now()}`, name: d.name ?? d })) : []);
+        toast.success("Ingredient added");
+        setNewIngredientName("");
+        setAddIngredientOpen(false);
+        return;
+      }
+    } catch (err) {
+      // fallback: add locally
+      setCustomIngredients((prev) => [...prev, { id: `c-${Date.now()}`, name: newIngredientName.trim() }]);
+      toast.success("Ingredient added (local)");
+      setNewIngredientName("");
+      setAddIngredientOpen(false);
+    }
+  };
 
+  // multiple handlers
+  const addMultipleItem = () => {
+    setMultipleItems((prev) => [...prev, { ...initialBatchItem }]);
+    setMultipleErrors((prev) => [...prev, {}]);
+  };
+
+  const removeMultipleItem = (index) => {
+    if (multipleItems.length === 1) {
+      toast.error("At least one item required");
+      return;
+    }
+    setMultipleItems((prev) => prev.filter((_, i) => i !== index));
+    setMultipleErrors((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePreviewBatch = () => {
+    if (!validateMultiple()) {
+      toast.error("Fix validation errors first");
+      return;
+    }
+    setPreviewItems(multipleItems.map((it) => ({ ...it })));
+    setBatchPreviewOpen(true);
+  };
+
+  const handleConfirmBatch = async () => {
+    setBatchSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/submit/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: items, cognito_id: cognitoId }),
+        body: JSON.stringify({ entries: previewItems, cognito_id: cognitoId }),
       });
-
-      if (res.ok) {
-        resetForm();
-        toast.success("Batch submitted");
-        return;
-      }
-
-      // fallback to sequential submit
-      for (const it of items) {
-        const r = await fetch(`${API_BASE}/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...it, cognito_id: cognitoId }),
-        });
-        if (!r.ok) {
-          console.error("item submit failed:", await r.text().catch(() => r.status));
+      if (!res.ok) {
+        // fallback: post each individually
+        for (const it of previewItems) {
+          await fetch(`${API_BASE}/submit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...it, cognito_id: cognitoId }),
+          });
         }
       }
-      resetForm();
-      toast.success("Batch submitted (fallback)");
+      toast.success("Batch submitted");
+      setBatchPreviewOpen(false);
+      setMultipleItems([{ ...initialBatchItem }]);
     } catch (err) {
-      console.error("submitBatch error:", err);
+      console.error(err);
       toast.error("Batch submit failed");
-    }
-  };
-
-  // Helper to open confirm preview for batch after validation
-  const openBatchConfirmDialog = async ({ validateForm, values, setTouched, resetForm }) => {
-    const errors = await validateForm();
-    if (errors && Object.keys(errors).length) {
-      // mark touched for all items so user sees errors
-      const touchedItems = (values.items || []).map(() => ({
-        date: true,
-        ingredient: true,
-        stockReceived: true,
-        unit: true,
-        barCode: true,
-        expiryDate: true,
-        temperature: true,
-        invoiceNumber: true,
-      }));
-      setTouched({ items: touchedItems }, false);
-      toast.error("Fix validation errors first");
-      return;
-    }
-    // set preview and keep resetForm for final submit
-    setBatchPreviewItems(values.items || []);
-    // store a small handler closure for confirm
-    setConfirmDialogOpen(true);
-    // keep reset form ref inside closure via batchSubmitting flow
-    // we will call submitBatch when user confirms
-    // store resetForm on state for handleConfirmMultiple if needed
-    // (we will just call submitBatch without resetForm reference; Formik will handle it earlier)
-  };
-
-  const handleConfirmMultiple = async () => {
-    if (!batchPreviewItems || batchPreviewItems.length === 0) {
-      setConfirmDialogOpen(false);
-      return;
-    }
-    setBatchSubmitting(true);
-    try {
-      // attempt batch submit (we'll call submitBatch with local structure)
-      await submitBatch({ items: batchPreviewItems }, { resetForm: () => {} });
-      setConfirmDialogOpen(false);
-      setBatchPreviewItems([]);
-    } catch (err) {
-      console.error("confirm multiple error:", err);
-      toast.error("Confirmation submit failed");
     } finally {
       setBatchSubmitting(false);
     }
   };
 
-  // ---------------------------
-  // Totals & Unit normalization
-  // ---------------------------
-  // Accepts an array of items with { stockRemaining, unit } and returns:
-  // { total: number, display: "1.23", unitLabel: "kg", breakdown: { grams: x, kg: y, ... } }
-  const computeNormalizedTotals = (rows = []) => {
-    // We'll normalize into base units:
-    // mass base: grams
-    // volume base: ml
-    // unit base: units (no conversion)
-    const massUnits = ["grams", "kg"];
-    const volUnits = ["ml", "l"];
-    const unitBuckets = {}; // { unit: sumInBase }
+  // selection demo
+  const toggleSelect = (id) => {
+    setSelectedRows((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  };
 
-    let massSumGrams = 0;
-    let volSumMl = 0;
-    let unitsSum = 0;
+  // -----------------------
+  // Unit normalization logic
+  // -----------------------
+  const computeNormalizedTotals = (rows = []) => {
+    let massGrams = 0;
+    let volMl = 0;
+    let units = 0;
 
     for (const r of rows) {
       const val = Number(r.stockRemaining ?? r.stockReceived ?? 0) || 0;
       const u = (r.unit || "").toLowerCase();
-      if (massUnits.includes(u)) {
-        if (u === "kg") massSumGrams += val * 1000;
-        else massSumGrams += val;
-      } else if (volUnits.includes(u)) {
-        if (u === "l") volSumMl += val * 1000;
-        else volSumMl += val;
-      } else if (u === "units") {
-        unitsSum += val;
-      } else {
-        // unknown -> try parse suffix (g, kg, ml, l)
-        if (u === "g") massSumGrams += val;
-        else if (u === "kg") massSumGrams += val * 1000;
-        else unitsSum += val;
+      if (u === "kg") massGrams += val * 1000;
+      else if (u === "grams" || u === "g") massGrams += val;
+      else if (u === "l") volMl += val * 1000;
+      else if (u === "ml") volMl += val;
+      else if (u === "units") units += val;
+      else {
+        // unknown treat as units
+        units += val;
       }
     }
 
-    // Decide display units:
-    // For mass: if massSumGrams >= 1000 → show kg, else grams
-    let massDisplay = null;
-    if (massSumGrams > 0) {
-      if (massSumGrams >= 1000) {
-        massDisplay = { total: +(massSumGrams / 1000).toFixed(3), unitLabel: "kg" };
-      } else {
-        massDisplay = { total: +massSumGrams.toFixed(2), unitLabel: "g" };
-      }
-    }
+    const massDisplay = massGrams
+      ? massGrams >= 1000
+        ? { total: +(massGrams / 1000).toFixed(3), label: "kg" }
+        : { total: +massGrams.toFixed(2), label: "g" }
+      : null;
 
-    // For volume:
-    let volDisplay = null;
-    if (volSumMl > 0) {
-      if (volSumMl >= 1000) {
-        volDisplay = { total: +(volSumMl / 1000).toFixed(3), unitLabel: "L" };
-      } else {
-        volDisplay = { total: +volSumMl.toFixed(2), unitLabel: "ml" };
-      }
-    }
+    const volDisplay = volMl
+      ? volMl >= 1000
+        ? { total: +(volMl / 1000).toFixed(3), label: "L" }
+        : { total: +volMl.toFixed(2), label: "ml" }
+      : null;
 
-    let unitsDisplay = null;
-    if (unitsSum > 0) unitsDisplay = { total: +unitsSum.toFixed(2), unitLabel: "units" };
+    const unitsDisplay = units ? { total: +units.toFixed(2), label: "units" } : null;
 
     return { massDisplay, volDisplay, unitsDisplay };
   };
 
-  // Example area: quickly compute totals from batchPreviewItems (or empty)
-  // But we also want to show "quick stats" for the page; we'll compute based on batchPreviewItems if set else no items
-  const pageRowsForTotals = batchPreviewItems.length ? batchPreviewItems : [];
+  // compute totals either from preview items (if present) or current multipleItems
+  const totalsSource = previewItems.length ? previewItems : multipleItems;
+  const normalizedTotals = useMemo(() => computeNormalizedTotals(totalsSource), [totalsSource]);
 
-  const normalizedTotals = useMemo(() => computeNormalizedTotals(pageRowsForTotals), [pageRowsForTotals]);
+  // CSS helpers to avoid horizontal scroll and allow wrapping columns
+  const colMinPx = Math.max(100, Math.round(120 * colWidthMultiplier));
 
-  // ---------------------------
-  // Responsive table column sizing helpers
-  // ---------------------------
-  // We will use CSS variable --col-min-w and set it via the slider multiplier
-  const colMinWidth = `${Math.max(120, Math.round(120 * colWidthMultiplier))}px`;
-
-  // ---------------------------
-  // Simple toggle row selection for demonstration in page table
-  // ---------------------------
-  const toggleRowSelection = (id) => {
-    setSelectedRows(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
-  };
-
-  // ---------------------------
-  // UI: render
-  // ---------------------------
+  // ----- render -----
   return (
-    <>
-      <Toaster position="top-right" />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-4 md:p-8">
-        <style>{`
-          /* Ensure the page itself never horizontal-scrolls */
-          html, body, #root { overflow-x: hidden; }
-          /* set CSS variable for column min width */
-          :root { --col-min-w: ${colMinWidth}; }
-          /* small helper: responsive table cells will wrap below min width to avoid horizontal scroll */
-          .wrap-table-grid {
-            display: grid;
-            grid-template-columns: minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr) minmax(var(--col-min-w), 1fr);
-            gap: 8px;
-          }
-          @media (max-width: 1100px) {
-            .wrap-table-grid {
-              grid-template-columns: 1fr 1fr 1fr; /* stack into 3 columns on narrow screens */
-            }
-          }
-          @media (max-width: 640px) {
-            .wrap-table-grid {
-              grid-template-columns: 1fr; /* single column on mobile */
-            }
-          }
+    <Box sx={{ p: 3, overflowX: "hidden" }}>
+      <Toaster />
+      <Box sx={{ maxWidth: 1400, mx: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+        {/* header */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+            <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: "primary.main", display: "flex", alignItems: "center", justifyContent: "center", color: "primary.contrastText", boxShadow: 3 }}>
+              <PackageIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6">Goods In Management</Typography>
+              <Typography variant="body2" color="text.secondary">Track and manage incoming inventory</Typography>
+            </Box>
+          </Box>
 
-          .stat-box { min-width: 140px; }
-        `}</style>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Card variant="outlined" sx={{ p: 1.25, minWidth: 140 }}>
+              <Typography variant="caption" color="text.secondary">Total (mass)</Typography>
+              <Typography variant="h6">{normalizedTotals.massDisplay ? normalizedTotals.massDisplay.total : "—"}</Typography>
+              <Typography variant="caption" color="text.secondary">{normalizedTotals.massDisplay ? normalizedTotals.massDisplay.label : ""}</Typography>
+            </Card>
+            <Card variant="outlined" sx={{ p: 1.25, minWidth: 140 }}>
+              <Typography variant="caption" color="text.secondary">Total (volume)</Typography>
+              <Typography variant="h6">{normalizedTotals.volDisplay ? normalizedTotals.volDisplay.total : "—"}</Typography>
+              <Typography variant="caption" color="text.secondary">{normalizedTotals.volDisplay ? normalizedTotals.volDisplay.label : ""}</Typography>
+            </Card>
+            <Card variant="outlined" sx={{ p: 1.25, minWidth: 140 }}>
+              <Typography variant="caption" color="text.secondary">Total (units)</Typography>
+              <Typography variant="h6">{normalizedTotals.unitsDisplay ? normalizedTotals.unitsDisplay.total : "—"}</Typography>
+              <Typography variant="caption" color="text.secondary">{normalizedTotals.unitsDisplay ? normalizedTotals.unitsDisplay.label : ""}</Typography>
+            </Card>
 
-        <div className="max-w-[1400px] mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-3 justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                <PackageIcon className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-slate-900 text-lg font-bold">Goods In</h1>
-                <p className="text-slate-600 text-sm">Record inbound inventory — single or multiple entries</p>
-              </div>
-            </div>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "background.paper", borderRadius: 1, p: 1 }}>
+              <SliderIcon />
+              <Slider
+                value={colWidthMultiplier}
+                min={0.8}
+                max={2}
+                step={0.05}
+                onChange={(e, v) => setColWidthMultiplier(v)}
+                sx={{ width: 140 }}
+              />
+            </Box>
+          </Stack>
+        </Box>
 
-            {/* Quick stats + slider */}
-            <div className="flex items-center gap-4">
-              <div className="bg-white rounded-lg border border-slate-200 px-4 py-2 flex items-center gap-3 stat-box">
-                <div>
-                  <div className="text-xs text-slate-500">Quick total (mass)</div>
-                  <div className="text-xl font-extrabold text-slate-900">
-                    {normalizedTotals.massDisplay ? normalizedTotals.massDisplay.total : "—"}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{normalizedTotals.massDisplay ? normalizedTotals.massDisplay.unitLabel : ""}</div>
-                </div>
-              </div>
+        {/* Tabs */}
+        <Card>
+          <CardHeader title={<Tabs value={tab} onChange={(e, v) => setTab(v)} aria-label="goodsin-tabs">
+            <Tab label="Single Entry" />
+            <Tab label="Multiple Entry" />
+          </Tabs>} subheader="" />
+          <Divider />
+          <CardContent>
+            {tab === 0 && (
+              <Box component="form" noValidate autoComplete="off" sx={{ display: "grid", gap: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <InputLabel>Date</InputLabel>
+                    <TextField fullWidth type="date" value={singleForm.date} onChange={(e) => setSingleForm((s) => ({ ...s, date: e.target.value }))} />
+                    {singleErrors.date && <Typography color="error" variant="caption">{singleErrors.date}</Typography>}
+                  </Grid>
 
-              <div className="bg-white rounded-lg border border-slate-200 px-4 py-2 flex items-center gap-3 stat-box">
-                <div>
-                  <div className="text-xs text-slate-500">Quick total (volume)</div>
-                  <div className="text-xl font-extrabold text-slate-900">
-                    {normalizedTotals.volDisplay ? normalizedTotals.volDisplay.total : "—"}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{normalizedTotals.volDisplay ? normalizedTotals.volDisplay.unitLabel : ""}</div>
-                </div>
-              </div>
+                  <Grid item xs={12} md={4}>
+                    <InputLabel>Ingredient</InputLabel>
+                    <Select fullWidth value={singleForm.ingredient} onChange={(e) => setSingleForm((s) => ({ ...s, ingredient: e.target.value }))}>
+                      <MenuItem value="">Select ingredient</MenuItem>
+                      {ingredients.map((ing) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
+                    </Select>
+                    {singleErrors.ingredient && <Typography color="error" variant="caption">{singleErrors.ingredient}</Typography>}
+                    <Box sx={{ mt: 1 }}>
+                      <Button size="small" variant="outlined" onClick={() => setAddIngredientOpen(true)} startIcon={<AddIcon />}>Add ingredient</Button>
+                    </Box>
+                  </Grid>
 
-              <div className="bg-white rounded-lg border border-slate-200 px-4 py-2 flex items-center gap-3 stat-box">
-                <div>
-                  <div className="text-xs text-slate-500">Quick total (units)</div>
-                  <div className="text-xl font-extrabold text-slate-900">
-                    {normalizedTotals.unitsDisplay ? normalizedTotals.unitsDisplay.total : "—"}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{normalizedTotals.unitsDisplay ? normalizedTotals.unitsDisplay.unitLabel : ""}</div>
-                </div>
-              </div>
+                  <Grid item xs={12} md={4}>
+                    <InputLabel>Invoice #</InputLabel>
+                    <TextField fullWidth value={singleForm.invoiceNumber} onChange={(e) => setSingleForm((s) => ({ ...s, invoiceNumber: e.target.value }))} />
+                  </Grid>
 
-              <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 flex items-center gap-2">
-                <SliderIcon className="w-4 h-4 text-slate-500" />
-                <input
-                  aria-label="Column width"
-                  type="range"
-                  min="0.8"
-                  max="2.0"
-                  step="0.05"
-                  value={colWidthMultiplier}
-                  onChange={(e) => setColWidthMultiplier(Number(e.target.value))}
-                  style={{ width: 160 }}
-                />
-              </div>
-            </div>
-          </div>
+                  <Grid item xs={12} md={3}>
+                    <InputLabel>Stock Received</InputLabel>
+                    <TextField fullWidth type="number" value={singleForm.stockReceived} onChange={(e) => setSingleForm((s) => ({ ...s, stockReceived: e.target.value }))} />
+                    {singleErrors.stockReceived && <Typography color="error" variant="caption">{singleErrors.stockReceived}</Typography>}
+                  </Grid>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="single" className="gap-2">
-                <PackageIcon className="w-4 h-4" />
-                Single Entry
-              </TabsTrigger>
-              <TabsTrigger value="multiple" className="gap-2">
-                <PackagePlus className="w-4 h-4" />
-                Multiple Entries
-              </TabsTrigger>
-            </TabsList>
+                  <Grid item xs={12} md={3}>
+                    <InputLabel>Unit</InputLabel>
+                    <Select fullWidth value={singleForm.unit} onChange={(e) => setSingleForm((s) => ({ ...s, unit: e.target.value }))}>
+                      {unitOptions.map((u) => <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>)}
+                    </Select>
+                    {singleErrors.unit && <Typography color="error" variant="caption">{singleErrors.unit}</Typography>}
+                  </Grid>
 
-            {/* SINGLE */}
-            <TabsContent value="single" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Single Stock Entry</CardTitle>
-                  <CardDescription>Record one item at a time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Formik
-                    initialValues={initialSingle}
-                    validationSchema={itemSchema}
-                    onSubmit={submitSingle}
-                  >
-                    {({ values, errors, touched, handleBlur, handleChange, handleSubmit, setFieldValue, validateForm, setTouched }) => {
-                      const onPrimary = async () => {
-                        const errs = await validateForm();
-                        if (errs && Object.keys(errs).length) {
-                          // mark touched
-                          setTouched({
-                            date: true,
-                            ingredient: true,
-                            stockReceived: true,
-                            unit: true,
-                            barCode: true,
-                            expiryDate: true,
-                            temperature: true,
-                            invoiceNumber: true,
-                          }, false);
-                          toast.error("Fix validation errors");
-                          return;
+                  <Grid item xs={12} md={3}>
+                    <InputLabel>Batch Code</InputLabel>
+                    <TextField fullWidth value={singleForm.barCode} onChange={(e) => setSingleForm((s) => ({ ...s, barCode: e.target.value }))} />
+                    {singleErrors.barCode && <Typography color="error" variant="caption">{singleErrors.barCode}</Typography>}
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
+                    <InputLabel>Expiry Date</InputLabel>
+                    <TextField fullWidth type="date" value={singleForm.expiryDate} onChange={(e) => setSingleForm((s) => ({ ...s, expiryDate: e.target.value }))} />
+                    {singleErrors.expiryDate && <Typography color="error" variant="caption">{singleErrors.expiryDate}</Typography>}
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
+                    <InputLabel>Temperature (℃)</InputLabel>
+                    <TextField fullWidth value={singleForm.temperature} onChange={(e) => setSingleForm((s) => ({ ...s, temperature: e.target.value }))} />
+                    {singleErrors.temperature && <Typography color="error" variant="caption">{singleErrors.temperature}</Typography>}
+                  </Grid>
+
+                  <Grid item xs={12} md={9}></Grid>
+
+                  <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSingleSubmit}>Record Stock</Button>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+
+            {tab === 1 && (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle1">Multiple Stock Entries</Typography>
+                  <Stack direction="row" spacing={1}>
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={addMultipleItem}>Add Item</Button>
+                    <Button variant="contained" startIcon={<PackagePlusIcon />} onClick={handlePreviewBatch}>Preview & Confirm</Button>
+                  </Stack>
+                </Stack>
+
+                <Box sx={{ display: "grid", gap: 2 }}>
+                  {multipleItems.map((it, idx) => (
+                    <Card variant="outlined" key={idx}>
+                      <CardHeader
+                        title={`Item ${idx + 1}`}
+                        action={
+                          <IconButton onClick={() => removeMultipleItem(idx)} disabled={multipleItems.length === 1}>
+                            <DeleteIcon />
+                          </IconButton>
                         }
-                        await handleSubmit();
-                      };
+                      />
+                      <CardContent>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Date</InputLabel>
+                            <TextField fullWidth type="date" value={it.date} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], date: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
 
-                      return (
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                          <div className="wrap-table-grid">
-                            {/* Date */}
-                            <div>
-                              <Label>Date *</Label>
-                              <Input
-                                type="date"
-                                name="date"
-                                value={values.date}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                aria-invalid={!!(touched.date && errors.date)}
-                                data-field="date"
-                              />
-                              {touched.date && errors.date && <div className="text-xs text-red-600 mt-1">{errors.date}</div>}
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Ingredient</InputLabel>
+                            <Select fullWidth value={it.ingredient} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], ingredient: e.target.value };
+                              setMultipleItems(copy);
+                            }}>
+                              <MenuItem value="">Select</MenuItem>
+                              {ingredients.map((ing) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
+                            </Select>
+                          </Grid>
 
-                            {/* Ingredient */}
-                            <div>
-                              <Label>Ingredient *</Label>
-                              <Select
-                                value={values.ingredient}
-                                onValueChange={(v) => setFieldValue("ingredient", v)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select ingredient" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {loadingIngredients ? (
-                                    <SelectItem value="">Loading…</SelectItem>
-                                  ) : (
-                                    ingredients.map((ing) => (
-                                      <SelectItem key={ing.id} value={ing.id}>
-                                        {ing.name}
-                                      </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              {touched.ingredient && errors.ingredient && <div className="text-xs text-red-600 mt-1">{errors.ingredient}</div>}
-                              <div className="text-right mt-1">
-                                <Button variant="outline" size="sm" onClick={() => setAddIngredientOpen(true)}>Add Ingredient +</Button>
-                              </div>
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Stock Received</InputLabel>
+                            <TextField fullWidth type="number" value={it.stockReceived} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], stockReceived: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
 
-                            {/* Invoice */}
-                            <div>
-                              <Label>Invoice #</Label>
-                              <Input name="invoiceNumber" value={values.invoiceNumber} onChange={handleChange} onBlur={handleBlur} />
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Unit</InputLabel>
+                            <Select fullWidth value={it.unit} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], unit: e.target.value };
+                              setMultipleItems(copy);
+                            }}>
+                              {unitOptions.map((u) => <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>)}
+                            </Select>
+                          </Grid>
 
-                            {/* Stock Received */}
-                            <div>
-                              <Label>Stock Received *</Label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <Input
-                                  type="number"
-                                  name="stockReceived"
-                                  value={values.stockReceived}
-                                  onChange={handleChange}
-                                  onBlur={handleBlur}
-                                />
-                                <Select value={values.unit} onValueChange={(v) => setFieldValue("unit", v)}>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {unitOptions.map((u) => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {touched.stockReceived && errors.stockReceived && <div className="text-xs text-red-600 mt-1">{errors.stockReceived}</div>}
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Batch Code</InputLabel>
+                            <TextField fullWidth value={it.barCode} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], barCode: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
 
-                            {/* Batch Code */}
-                            <div>
-                              <Label>Batch Code *</Label>
-                              <Input name="barCode" value={values.barCode} onChange={handleChange} onBlur={handleBlur} />
-                              {touched.barCode && errors.barCode && <div className="text-xs text-red-600 mt-1">{errors.barCode}</div>}
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Expiry Date</InputLabel>
+                            <TextField fullWidth type="date" value={it.expiryDate} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], expiryDate: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
 
-                            {/* Expiry */}
-                            <div>
-                              <Label>Expiry Date *</Label>
-                              <Input type="date" name="expiryDate" value={values.expiryDate} onChange={handleChange} onBlur={handleBlur} />
-                              {touched.expiryDate && errors.expiryDate && <div className="text-xs text-red-600 mt-1">{errors.expiryDate}</div>}
-                            </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Temperature (℃)</InputLabel>
+                            <TextField fullWidth value={it.temperature} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], temperature: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
 
-                            {/* Temperature */}
-                            <div>
-                              <Label>Temperature (℃) *</Label>
-                              <Input name="temperature" value={values.temperature} onChange={handleChange} onBlur={handleBlur} />
-                              {touched.temperature && errors.temperature && <div className="text-xs text-red-600 mt-1">{errors.temperature}</div>}
-                            </div>
-                          </div>
+                          <Grid item xs={12} md={3}>
+                            <InputLabel>Invoice #</InputLabel>
+                            <TextField fullWidth value={it.invoiceNumber} onChange={(e) => {
+                              const copy = [...multipleItems];
+                              copy[idx] = { ...copy[idx], invoiceNumber: e.target.value };
+                              setMultipleItems(copy);
+                            }} />
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
 
-                          <div className="flex justify-end pt-4 border-t">
-                            <Button onClick={onPrimary}>
-                              <Check className="w-4 h-4 mr-2" />
-                              Record Stock
-                            </Button>
-                          </div>
-                        </form>
-                      );
-                    }}
-                  </Formik>
-                </CardContent>
-              </Card>
-            </TabsContent>
+        {/* preview table (small inline table) */}
+        <Box>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Current Items (preview)</Typography>
 
-            {/* MULTIPLE */}
-            <TabsContent value="multiple" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Multiple Stock Entries</span>
-                    <Badge variant="secondary">Dynamic</Badge>
-                  </CardTitle>
-                  <CardDescription>Record many entries at once</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Formik initialValues={{ items: [initialBatchItem] }} validationSchema={batchSchema} onSubmit={submitBatch}>
-                    {({ values, validateForm, setTouched, resetForm, setFieldValue }) => (
-                      <form>
-                        <FieldArray name="items">
-                          {({ push, remove }) => {
-                            // expose add-good for FAB
-                            addGoodRef.current = () => {
-                              const last = (values.items || [])[values.items.length - 1] || initialBatchItem;
-                              push({ ...initialBatchItem, invoiceNumber: last?.invoiceNumber ?? "" , date: last?.date ?? initialBatchItem.date });
-                            };
+          <TableContainer sx={{ maxHeight: 360, overflowX: "auto" }}>
+            <Table stickyHeader size="small" sx={{ minWidth: Math.max(800, colMinPx * 6) }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ minWidth: colMinPx }}>Date</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx }}>Ingredient</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx, textAlign: "center" }}>Stock Received</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx, textAlign: "center" }}>Unit</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx }}>Batch</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx }}>Expiry</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx }}>Temp</TableCell>
+                  <TableCell sx={{ minWidth: colMinPx, textAlign: "right" }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                { (tab === 1 ? multipleItems : [singleForm]).map((r, i) => (
+                  <TableRow key={i} hover selected={selectedRows.includes(r.barCode || String(i))}>
+                    <TableCell>{r.date}</TableCell>
+                    <TableCell>{getIngredientName(r.ingredient) || r.ingredient}</TableCell>
+                    <TableCell align="center">{r.stockReceived}</TableCell>
+                    <TableCell align="center">{r.unit}</TableCell>
+                    <TableCell>{r.barCode}</TableCell>
+                    <TableCell>{r.expiryDate}</TableCell>
+                    <TableCell>{r.temperature}</TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" onClick={() => toggleSelect(r.barCode || String(i))}><EditIcon /></IconButton>
+                      <IconButton size="small" onClick={() => { /* optional per-row edit */ }}><DeleteIcon /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                )) }
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
 
-                            return (
-                              <>
-                                <div className="space-y-4">
-                                  {(values.items || []).map((it, idx) => {
-                                    const base = `items.${idx}`;
-                                    const err = (path) => getIn((values._formik ? values._formik.errors : {}) , path); // fallback unused; we display validation via Formik's touched in original but our simplified UI keeps error display below
+        {/* dialogs */}
+        <Dialog open={addIngredientOpen} onClose={() => setAddIngredientOpen(false)} fullWidth maxWidth="sm">
+          <DialogTitle>Add Ingredient</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+              <TextField label="Ingredient name" value={newIngredientName} onChange={(e) => setNewIngredientName(e.target.value)} fullWidth onKeyDown={(e) => e.key === "Enter" && handleAddIngredient()} />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAddIngredientOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddIngredient} variant="contained" startIcon={<AddIcon />}>Add</Button>
+          </DialogActions>
+        </Dialog>
 
-                                    return (
-                                      <Card key={idx} className="relative">
-                                        <CardHeader>
-                                          <div className="flex items-center justify-between">
-                                            <CardTitle className="text-base">Item {idx + 1}</CardTitle>
-                                            <Button variant="ghost" size="sm" onClick={() => remove(idx)} disabled={values.items.length === 1}>
-                                              <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                          </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div className="wrap-table-grid">
-                                            <div>
-                                              <Label>Date *</Label>
-                                              <Input type="date" value={it.date} onChange={(e) => setFieldValue(`${base}.date`, e.target.value)} />
-                                            </div>
-
-                                            <div>
-                                              <Label>Ingredient *</Label>
-                                              <Select value={it.ingredient} onValueChange={(v) => setFieldValue(`${base}.ingredient`, v)}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                  {ingredients.map(ing => <SelectItem key={ing.id} value={ing.id}>{ing.name}</SelectItem>)}
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
-
-                                            <div>
-                                              <Label>Invoice #</Label>
-                                              <Input value={it.invoiceNumber} onChange={(e) => setFieldValue(`${base}.invoiceNumber`, e.target.value)} />
-                                            </div>
-
-                                            <div>
-                                              <Label>Stock Received *</Label>
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <Input type="number" value={it.stockReceived} onChange={(e) => setFieldValue(`${base}.stockReceived`, e.target.value)} />
-                                                <Select value={it.unit} onValueChange={(v) => setFieldValue(`${base}.unit`, v)}>
-                                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                                  <SelectContent>{unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent>
-                                                </Select>
-                                              </div>
-                                            </div>
-
-                                            <div>
-                                              <Label>Batch Code *</Label>
-                                              <Input value={it.barCode} onChange={(e) => setFieldValue(`${base}.barCode`, e.target.value)} />
-                                            </div>
-
-                                            <div>
-                                              <Label>Expiry Date *</Label>
-                                              <Input type="date" value={it.expiryDate} onChange={(e) => setFieldValue(`${base}.expiryDate`, e.target.value)} />
-                                            </div>
-
-                                            <div>
-                                              <Label>Temperature (℃) *</Label>
-                                              <Input value={it.temperature} onChange={(e) => setFieldValue(`${base}.temperature`, e.target.value)} />
-                                            </div>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="flex items-center justify-between pt-4 border-t">
-                                  <div>
-                                    <Button variant="outline" onClick={() => addGoodRef.current && addGoodRef.current()}>
-                                      <Plus className="w-4 h-4 mr-2" />
-                                      Add Item
-                                    </Button>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <Button onClick={() => openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })}>
-                                      Preview & Confirm ({values.items.length})
-                                    </Button>
-                                  </div>
-                                </div>
-                              </>
-                            );
-                          }}
-                        </FieldArray>
-                      </form>
-                    )}
-                  </Formik>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          {/* Batch confirm dialog */}
-          <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[80vh]">
-              <DialogHeader>
-                <DialogTitle>Confirm Submission</DialogTitle>
-                <DialogDescription>Review items before final submission</DialogDescription>
-              </DialogHeader>
-
-              <ScrollArea className="max-h-[460px] mt-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Ingredient</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Batch</TableHead>
-                      <TableHead>Expiry</TableHead>
-                      <TableHead>Temp</TableHead>
-                      <TableHead>Invoice</TableHead>
+        <Dialog open={batchPreviewOpen} onClose={() => setBatchPreviewOpen(false)} fullWidth maxWidth="lg">
+          <DialogTitle>Confirm Submission</DialogTitle>
+          <DialogContent dividers>
+            <TableContainer sx={{ maxHeight: 440 }}>
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>#</TableCell>
+                    <TableCell>Ingredient</TableCell>
+                    <TableCell align="center">Quantity</TableCell>
+                    <TableCell>Unit</TableCell>
+                    <TableCell>Batch</TableCell>
+                    <TableCell>Expiry</TableCell>
+                    <TableCell>Temp</TableCell>
+                    <TableCell>Invoice</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {previewItems.map((it, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell>{getIngredientName(it.ingredient) || it.ingredient}</TableCell>
+                      <TableCell align="center">{it.stockReceived}</TableCell>
+                      <TableCell>{it.unit}</TableCell>
+                      <TableCell><Chip label={it.barCode} variant="outlined" size="small" /></TableCell>
+                      <TableCell>{it.expiryDate}</TableCell>
+                      <TableCell>{it.temperature}℃</TableCell>
+                      <TableCell>{it.invoiceNumber || "—"}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {batchPreviewItems.map((it, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell>{getIngredientName(it.ingredient)}</TableCell>
-                        <TableCell>{it.stockReceived} {it.unit}</TableCell>
-                        <TableCell><Badge variant="outline">{it.barCode}</Badge></TableCell>
-                        <TableCell>{it.expiryDate}</TableCell>
-                        <TableCell>{it.temperature}℃</TableCell>
-                        <TableCell className="text-slate-500">{it.invoiceNumber || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleConfirmMultiple} disabled={batchSubmitting}>
-                  {batchSubmitting ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</>) : "Confirm & Submit"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Add Ingredient Dialog */}
-          <Dialog open={addIngredientOpen} onOpenChange={setAddIngredientOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Ingredient</DialogTitle>
-                <DialogDescription>Add a custom ingredient to your list</DialogDescription>
-              </DialogHeader>
-
-              <div className="py-4">
-                <Label>Ingredient Name</Label>
-                <Input value={newIngredientName} onChange={(e) => setNewIngredientName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddIngredient()} />
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAddIngredientOpen(false)} disabled={addingIngredient}>Cancel</Button>
-                <Button onClick={handleAddIngredient} disabled={addingIngredient}>
-                  {addingIngredient ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding...</>) : "Add"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-    </>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBatchPreviewOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleConfirmBatch} startIcon={<SaveIcon />} disabled={batchSubmitting}>
+              {batchSubmitting ? "Submitting..." : "Confirm & Submit"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </Box>
   );
 }
