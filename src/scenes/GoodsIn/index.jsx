@@ -406,13 +406,17 @@ const GoodsIn = () => {
         type: "number",
         flex: 1,
         minWidth: 110,
+        headerAlign: "center",
+        align: "center",
         renderCell: (params) => {
           const val = params.row?.stockReceived ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
           return (
-            <Typography variant="body2" sx={{ color: brand.text }}>
-              {`${val}${unit ? ` ${unit}` : ""}`}
-            </Typography>
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Typography variant="body2" sx={{ color: brand.text }}>
+                {`${val}${unit ? ` ${unit}` : ""}`}
+              </Typography>
+            </Box>
           );
         },
       },
@@ -422,13 +426,17 @@ const GoodsIn = () => {
         type: "number",
         flex: 1,
         minWidth: 120,
+        headerAlign: "center",
+        align: "center",
         renderCell: (params) => {
           const val = params.row?.stockRemaining ?? params.value ?? 0;
           const unit = params.row?.unit ?? "";
           return (
-            <Typography variant="body2" sx={{ color: brand.text, fontWeight: 800 }}>
-              {`${val}${unit ? ` ${unit}` : ""}`}
-            </Typography>
+            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Typography variant="body2" sx={{ color: brand.text, fontWeight: 400 }}>
+                {`${val}${unit ? ` ${unit}` : ""}`}
+              </Typography>
+            </Box>
           );
         },
       },
@@ -705,7 +713,7 @@ const GoodsIn = () => {
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2">Remaining</Typography>
-                  <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{detailRow.stockRemaining} {detailRow.unit}</Typography>
+                  <Typography sx={{ fontWeight: 400, fontSize: 20 }}>{detailRow.stockRemaining} {detailRow.unit}</Typography>
                 </Box>
               </Box>
 
