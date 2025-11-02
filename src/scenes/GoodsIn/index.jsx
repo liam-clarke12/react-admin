@@ -1,5 +1,5 @@
 // src/scenes/data/GoodsIn/index.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   IconButton,
@@ -18,7 +18,7 @@ import {
   Stack,
   Tooltip,
 } from "@mui/material";
-import { DataGrid, GridToolbarContainer } from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { useData } from "../../contexts/DataContext";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -27,14 +27,14 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 
 /**
- * Redesigned GoodsIn table:
- *  - Search (debounced)
- *  - Unit filter
- *  - Export CSV
- *  - Responsive + horizontal scroll
- *  - Pagination
- *  - Row detail modal with small chart
- *  - Kept existing processRowUpdate() logic and delete
+ * Redesigned GoodsIn table (fixed toolbar error).
+ * - Search (debounced)
+ * - Unit filter
+ * - Export CSV
+ * - Responsive + horizontal scroll
+ * - Pagination
+ * - Row detail modal with small chart
+ * - Kept existing processRowUpdate() logic and delete
  */
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
@@ -516,9 +516,9 @@ const GoodsIn = () => {
     } catch (e) {}
   }, [goodsInRows, location]);
 
-  // small custom toolbar (above datagrid)
+  // Custom toolbar implemented with Box (DO NOT use GridToolbarContainer here)
   const CustomToolbar = ({ search, unit, onSearchChange, onUnitChange, onExport }) => (
-    <GridToolbarContainer sx={{ display: "flex", gap: 1, p: 1, alignItems: "center", justifyContent: "space-between" }}>
+    <Box sx={{ display: "flex", gap: 1, p: 1, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
         <TextField
           size="small"
@@ -555,7 +555,7 @@ const GoodsIn = () => {
         </FormControl>
         <Button onClick={() => { setSearchTerm(""); setUnitFilter(""); }} sx={{ textTransform: "none" }}>Reset</Button>
       </Box>
-    </GridToolbarContainer>
+    </Box>
   );
 
   return (
@@ -712,9 +712,7 @@ const GoodsIn = () => {
               {/* Small inline bar chart (SVG) comparing Received vs Remaining */}
               <Box sx={{ mt: 1 }}>
                 <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none">
-                  {/* Background */}
                   <rect x="0" y="0" width="300" height="60" fill="#fff" />
-                  {/* Bars */}
                   {(() => {
                     const r = Number(detailRow.stockReceived || 0);
                     const rem = Number(detailRow.stockRemaining || 0);
