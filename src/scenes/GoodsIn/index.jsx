@@ -58,6 +58,60 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
+/* ---------- Unit conversion helpers ----------
+   We treat grams/kg and ml/l as convertible groups.
+   - grams base: g
+   - ml base: ml
+   - units: units (no conversion)
+   Conversion rules: grams <-> kg (1000), ml <-> l (1000)
+   Display rule: if base total >= 1000 -> show in kg (or L) with 2 decimals, else show in g (or ml) integer.
+-------------------------------------------------*/
+
+const UNIT_GROUP = {
+  GRAMS: "grams_group", // grams / kg
+  ML: "ml_group", // ml / l
+  UNITS: "units_group",
+};
+
+function toBaseAmount(amount, unit) {
+  if (!unit) return amount || 0;
+  const u = unit.toLowerCase();
+  if (u === "kg") return Number(amount || 0) * 1000;
+  if (u === "grams" || u === "g") return Number(amount || 0);
+  if (u === "l") return Number(amount || 0) * 1000;
+  if (u === "ml") return Number(amount || 0);
+  // fallback: return raw number
+  return Number(amount || 0);
+}
+
+function detectUnitGroup(unit) {
+  if (!unit) return UNIT_GROUP.UNITS;
+  const u = unit.toLowerCase();
+  if (u === "kg" || u === "grams" || u === "g") return UNIT_GROUP.GRAMS;
+  if (u === "l" || u === "ml") return UNIT_GROUP.ML;
+  return UNIT_GROUP.UNITS;
+}
+
+function formatDisplayAmount(baseAmount, group) {
+  // baseAmount is in grams for GRAMS, in ml for ML, and raw number for UNITS.
+  if (group === UNIT_GROUP.GRAMS) {
+    if (Math.abs(baseAmount) >= 1000) {
+      return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "kg" };
+    } else {
+      return { amount: Math.round(baseAmount), unit: "g" };
+    }
+  }
+  if (group === UNIT_GROUP.ML) {
+    if (Math.abs(baseAmount) >= 1000) {
+      return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "l" };
+    } else {
+      return { amount: Math.round(baseAmount), unit: "ml" };
+    }
+  }
+  // units group: keep integer
+  return { amount: Math.round(baseAmount), unit: "units" };
+}
+
 export default function GoodsIn() {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
   const { cognitoId } = useAuth();
@@ -383,65 +437,83 @@ export default function GoodsIn() {
     } catch (e) {}
   }, [goodsInRows, location]);
 
-  /* Tiny complementary "chart": totals of stockRemaining by ingredient (top 5) and keep unit info */
-  const totalsByIngredient = useMemo(() => {
-    const map = new Map();
-    // For each ingredient accumulate amount and track unit counts
-    (goodsInRows || []).forEach((r) => {
-      const key = r.ingredient || "—";
-      const entry = map.get(key) || { amount: 0, unitCounts: new Map() };
-      entry.amount += Number(r.stockRemaining || 0);
-      const u = r.unit || "";
-      entry.unitCounts.set(u, (entry.unitCounts.get(u) || 0) + 1);
-      map.set(key, entry);
-    });
-    const arr = Array.from(map.entries()).map(([ingredient, { amount, unitCounts }]) => {
-      // pick the most common unit for that ingredient (fallback to first)
-      let mostCommonUnit = "";
-      let best = -1;
-      for (const [u, count] of unitCounts.entries()) {
-        if (count > best) {
-          best = count;
-          mostCommonUnit = u;
-        }
-      }
-      return { ingredient, amount, unit: mostCommonUnit || "" };
-    });
-    arr.sort((a, b) => b.amount - a.amount);
-    return arr.slice(0, 5);
-  }, [goodsInRows]);
+  /* ---------- Normalization utilities for UI totals & chart ---------- */
 
-  // totals by unit (for filtered view) — used in footer and stats
-  const totalsByUnit = useMemo(() => {
-    const map = new Map();
+  // totals across filteredRows by unit family in base amounts
+  const totalsByBaseUnitGroup = useMemo(() => {
+    const acc = {
+      [UNIT_GROUP.GRAMS]: 0,
+      [UNIT_GROUP.ML]: 0,
+      [UNIT_GROUP.UNITS]: 0,
+    };
+
     (filteredRows || []).forEach((r) => {
-      const u = r.unit || "";
-      map.set(u, (map.get(u) || 0) + Number(r.stockRemaining || 0));
+      const group = detectUnitGroup(r.unit);
+      const base = toBaseAmount(Number(r.stockRemaining || 0), r.unit);
+      acc[group] = (acc[group] || 0) + base;
     });
-    // produce array with readable labels
-    return Array.from(map.entries()).map(([unit, amount]) => ({ unit: unit || "—", amount }));
+
+    return acc;
   }, [filteredRows]);
 
-  /* small helper to render SVG-like bars with unit in label */
+  // produce display totals (converted to preferred display units)
+  const displayTotalsByGroup = useMemo(() => {
+    return {
+      gramsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0, UNIT_GROUP.GRAMS),
+      mlGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0, UNIT_GROUP.ML),
+      unitsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0, UNIT_GROUP.UNITS),
+    };
+  }, [totalsByBaseUnitGroup]);
+
+  // per-ingredient totals for chart (normalized to display units per ingredient)
+  const totalsByIngredient = useMemo(() => {
+    const map = new Map();
+    (goodsInRows || []).forEach((r) => {
+      const key = r.ingredient || "—";
+      const prev = map.get(key) || { baseAmount: 0, unitSamples: new Map() };
+      const base = toBaseAmount(Number(r.stockRemaining || 0), r.unit);
+      prev.baseAmount += base;
+      const u = r.unit || "";
+      prev.unitSamples.set(u, (prev.unitSamples.get(u) || 0) + 1);
+      map.set(key, prev);
+    });
+
+    const arr = Array.from(map.entries()).map(([ingredient, { baseAmount, unitSamples }]) => {
+      // choose display group for this ingredient based on its unit samples (prefer grams or ml if present)
+      let chosenGroup = UNIT_GROUP.UNITS;
+      for (const u of unitOptions.map((o) => o.value)) {
+        if (unitSamples.has(u)) {
+          chosenGroup = detectUnitGroup(u);
+          break;
+        }
+      }
+      const disp = formatDisplayAmount(baseAmount, chosenGroup);
+      return { ingredient, amount: disp.amount, unit: disp.unit, baseAmount };
+    });
+
+    arr.sort((a, b) => b.baseAmount - a.baseAmount);
+    return arr.slice(0, 6); // top 6 for chart
+  }, [goodsInRows]);
+
+  /* small helper to render bars (uses normalized amounts) */
   const SmallBarChart = ({ data = [] }) => {
     if (!data || data.length === 0) return <Typography variant="caption" color="text.secondary">No data</Typography>;
-    const max = Math.max(...data.map((d) => d.amount), 1);
+    const max = Math.max(...data.map((d) => Number(d.amount) || 0), 1);
     return (
       <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1 }}>
         {data.map((d) => (
           <Box key={d.ingredient} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Typography sx={{ fontSize: 12, minWidth: 80, color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.ingredient}</Typography>
             <Box sx={{ flex: 1, height: 10, background: brand.surfaceMuted, borderRadius: 999, overflow: "hidden" }}>
-              <Box sx={{ width: `${(d.amount / max) * 100}%`, height: "100%", background: brand.primary }} />
+              <Box sx={{ width: `${(Number(d.amount) / max) * 100}%`, height: "100%", background: brand.primary }} />
             </Box>
-            <Typography sx={{ fontSize: 12, width: 60, textAlign: "right" }}>
+            <Typography sx={{ fontSize: 12, width: 72, textAlign: "right" }}>
               {d.amount} {d.unit}
             </Typography>
           </Box>
         ))}
-        {/* units legend at the bottom */}
         <Box sx={{ mt: 1 }}>
-          <Typography variant="caption" color="text.secondary">Units: {Array.from(new Set(data.map(d => d.unit).filter(Boolean))).join(", ") || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary">Units shown: {Array.from(new Set(data.map(d => d.unit).filter(Boolean))).join(", ") || "—"}</Typography>
         </Box>
       </Box>
     );
@@ -646,14 +718,38 @@ export default function GoodsIn() {
                 <Box>
                   <Typography variant="caption" color="text.secondary">Total Remaining</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 800, color: brand.text }}>
-                    {/* Show main total by default (sum of numeric values without conversion is meaningless across units),
-                        so we present a compact breakdown below and show the grand total count if single unit exists */}
-                    {totalsByUnit.length === 1 ? `${totalsByUnit[0].amount} ${totalsByUnit[0].unit}` : `${filteredRows.reduce((sum, r) => sum + Number(r.stockRemaining || 0), 0)} (mixed units)`}
+                    {/* If only one non-empty group has amount, show it directly; otherwise show 'mixed units' and breakdown */}
+                    {(() => {
+                      const groups = [];
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0) > 0) groups.push(displayTotalsByGroup.gramsGroup);
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0) > 0) groups.push(displayTotalsByGroup.mlGroup);
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0) > 0) groups.push(displayTotalsByGroup.unitsGroup);
+
+                      if (groups.length === 0) return "—";
+                      if (groups.length === 1) return `${groups[0].amount} ${groups[0].unit}`;
+                      // mixed: show combined count with breakdown underneath
+                      return `${groups.map(g => `${g.amount} ${g.unit}`).join(" · ")}`;
+                    })()}
                   </Typography>
 
-                  {/* Units breakdown */}
+                  {/* Units breakdown (normalized values) */}
                   <Typography variant="caption" color="text.secondary">
-                    {totalsByUnit.length === 0 ? "—" : totalsByUnit.map(t => `${t.amount} ${t.unit}`).join(" · ")}
+                    {(() => {
+                      const parts = [];
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0) > 0) {
+                        const g = displayTotalsByGroup.gramsGroup;
+                        parts.push(`${g.amount} ${g.unit}`);
+                      }
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0) > 0) {
+                        const m = displayTotalsByGroup.mlGroup;
+                        parts.push(`${m.amount} ${m.unit}`);
+                      }
+                      if ((totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0) > 0) {
+                        const u = displayTotalsByGroup.unitsGroup;
+                        parts.push(`${u.amount} ${u.unit}`);
+                      }
+                      return parts.length === 0 ? "—" : parts.join(" · ");
+                    })()}
                   </Typography>
                 </Box>
 
@@ -686,13 +782,9 @@ export default function GoodsIn() {
           <Box sx={{ width: { xs: "100%", md: 320 } }}>
             <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: brand.shadow }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick Stats</Typography>
-              <Typography variant="caption" color="text.secondary">Top ingredients by remaining stock</Typography>
+              <Typography variant="caption" color="text.secondary">Top ingredients by remaining stock (normalized)</Typography>
               <Box sx={{ mt: 2 }}>
                 <SmallBarChart data={totalsByIngredient} />
-                {/* Units at bottom (based on filteredRows units) */}
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="caption" color="text.secondary">Units (displayed): {totalsByUnit.map(t => t.unit).filter(Boolean).join(", ") || "—"}</Typography>
-                </Box>
               </Box>
             </Paper>
 
