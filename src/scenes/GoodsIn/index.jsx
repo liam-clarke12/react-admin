@@ -14,15 +14,15 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Checkbox,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useData } from "../../contexts/DataContext";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
-
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -37,7 +37,7 @@ const brand = {
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
+  inputBg: "#ffffff",
 };
 
 // unit options that match the GoodsIn form exactly
@@ -57,19 +57,23 @@ const GoodsIn = () => {
   const location = useLocation();
 
   // Editing state
-  const [activeCell, setActiveCell] = useState(null);
+  const [activeCell, setActiveCell] = useState(null); // { id, field, value, row }
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [editingRow, setEditingRow] = useState(null); // when editing full row
   const [originalBarcode, setOriginalBarcode] = useState(null); // server identifier
   const [originalId, setOriginalId] = useState(null); // internal _id
   const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const containerRef = useRef(null);
 
   // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
   useEffect(() => {
     const fetchGoodsInData = async () => {
       try {
         if (!cognitoId) return;
+        setLoading(true);
         const response = await fetch(
           `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
         );
@@ -113,131 +117,13 @@ const GoodsIn = () => {
         computeAndSetIngredientInventory(normalized);
       } catch (error) {
         console.error("Error fetching Goods In data:", error);
+      } finally {
+        setLoading(false);
       }
     };
     if (cognitoId) fetchGoodsInData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
-
-  // columns — note: unit column is intentionally NOT included, so user doesn't see it.
-  const columns = useMemo(
-    () => [
-      { field: "date", headerName: "Date", flex: 1, editable: false },
-      { field: "ingredient", headerName: "Ingredient", flex: 1, editable: false },
-      { field: "temperature", headerName: "Temperature", flex: 1, editable: false },
-      {
-        field: "stockReceived",
-        headerName: "Stock Received",
-        type: "number",
-        flex: 1,
-        headerAlign: "left",
-        align: "left",
-        editable: false,
-        // show unit after value (same style as stockRemaining)
-        renderCell: (params) => {
-          const val = params.row?.stockReceived ?? params.value ?? 0;
-          const unit = params.row?.unit ?? "";
-          return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text }}>
-                {`${val}${unit ? ` ${unit}` : ""}`}
-              </Typography>
-            </Box>
-          );
-        },
-      },
-      {
-        field: "stockRemaining",
-        headerName: "Stock Remaining",
-        type: "number",
-        flex: 1,
-        headerAlign: "center",
-        align: "center",
-        editable: false,
-        // Render numeric value and append unit; center the content and use same typography as other cells
-        renderCell: (params) => {
-          const val = params.row?.stockRemaining ?? params.value ?? 0;
-          const unit = params.row?.unit ?? "";
-          return (
-            <Box sx={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Typography variant="body2" sx={{ color: brand.text }}>
-                {`${val}${unit ? ` ${unit}` : ""}`}
-              </Typography>
-            </Box>
-          );
-        },
-      },
-      // Invoice column
-      { field: "invoiceNumber", headerName: "Invoice #", flex: 1, editable: false },
-      { field: "expiryDate", headerName: "Expiry Date", flex: 1, editable: false },
-      {
-        field: "barCode",
-        headerName: "Batch Code",
-        flex: 1,
-        cellClassName: "barCode-column--cell",
-        editable: false,
-      },
-      { field: "processed", headerName: "Processed", flex: 1, editable: false },
-      {
-        field: "fileAttachment",
-        headerName: "File Attachment",
-        sortable: false,
-        filterable: false,
-        align: "center",
-        flex: 1,
-        renderCell: (params) => {
-          const file = params.row.file;
-          return file ? (
-            <Button
-              variant="outlined"
-              onClick={() => handleFileOpen(file)}
-              sx={{
-                textTransform: "none",
-                fontWeight: 700,
-                borderColor: brand.border,
-                color: brand.primary,
-                borderRadius: 10,
-                "&:hover": { borderColor: brand.primary, background: brand.surfaceMuted },
-              }}
-            >
-              View File
-            </Button>
-          ) : (
-            <Typography variant="body2" sx={{ color: brand.subtext }}>
-              No File
-            </Typography>
-          );
-        },
-      },
-      {
-        field: "actions",
-        headerName: "Actions",
-        sortable: false,
-        filterable: false,
-        width: 96,
-        align: "center",
-        renderCell: (params) => {
-          return (
-            <IconButton
-              size="small"
-              aria-label="Edit row"
-              onClick={() => {
-                setEditingRow(params.row);
-                setOriginalBarcode(params.row.barCode);
-                setOriginalId(params.row._id);
-                setActiveCell({ id: params.row.barCode, field: null, value: null, row: params.row });
-                setEditValue(null);
-                setEditDialogOpen(true);
-              }}
-            >
-              <EditOutlinedIcon sx={{ color: brand.primary }} />
-            </IconButton>
-          );
-        },
-      },
-    ],
-    []
-  );
 
   // helper: compute ingredient inventory from rows and set it
   const computeAndSetIngredientInventory = (rows) => {
@@ -398,13 +284,14 @@ const GoodsIn = () => {
   const handleCloseConfirmDialog = () => setOpenConfirmDialog(false);
   const handleFileOpen = (fileUrl) => window.open(fileUrl, "_blank");
 
-  const handleCellClick = (params) => {
-    if (params.field === "__check__") return;
+  // clicking a cell sets activeCell (and allows opening edit dialog via button)
+  // our custom cells will call this with (row, field, value)
+  const handleCellClick = (row, field, value) => {
     setActiveCell({
-      id: params.row.barCode,
-      field: params.field,
-      value: params.value,
-      row: params.row,
+      id: row.barCode,
+      field,
+      value,
+      row,
     });
   };
 
@@ -513,10 +400,9 @@ const GoodsIn = () => {
       setSelectedRows([targetId]);
     } catch (e) {}
 
-    // scroll + highlight after grid rendered rows
+    // scroll + highlight after list rendered rows
     setTimeout(() => {
-      // MUI DataGrid renders a row element with data-id attribute equal to row id
-      const el = document.querySelector(`[data-id="${targetId}"]`);
+      const el = containerRef.current && containerRef.current.querySelector(`[data-row-id="${targetId}"]`);
       if (el) {
         try {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -538,6 +424,20 @@ const GoodsIn = () => {
     }
   }, [goodsInRows, location]);
 
+  // header for custom table
+  const ColumnHeaders = () => (
+    <Box sx={{ display: "grid", gridTemplateColumns: "48px 1fr 110px 120px 120px 120px 140px 96px", gap: 12, px: 1, py: 1 }}>
+      <Box />
+      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Ingredient</Typography>
+      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Temp</Typography>
+      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Received</Typography>
+      <Typography sx={{ color: brand.subtext, fontWeight: 800, textAlign: "center" }}>Remaining</Typography>
+      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Invoice #</Typography>
+      <Typography sx={{ color: brand.subtext, fontWeight: 800, textAlign: "right" }}>Batch / Expiry</Typography>
+      <Box />
+    </Box>
+  );
+
   return (
     <Box m="20px">
       <style>{`
@@ -552,17 +452,10 @@ const GoodsIn = () => {
         }
 
         /* alternating row coloring */
-        .even-row {
-          background-color: ${brand.surfaceMuted} !important;
-        }
-        .odd-row {
-          background-color: ${brand.surface} !important;
-        }
+        .gi-even { background-color: ${brand.surface} !important; }
+        .gi-odd  { background-color: ${brand.surfaceMuted} !important; }
 
-        /* keep barCode colored */
-        .barCode-column--cell {
-          color: ${brand.primary};
-        }
+        .gi-row:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(16,24,40,0.06); }
       `}</style>
 
       <Box
@@ -625,49 +518,171 @@ const GoodsIn = () => {
           </Box>
         </Box>
 
+        <Box sx={{ px: 1, py: 1 }}>
+          <ColumnHeaders />
+        </Box>
+
         <Box
+          ref={containerRef}
           sx={{
             height: "70vh",
-            "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#fbfcfd",
-              color: brand.subtext,
-              borderBottom: `1px solid ${brand.border}`,
-              fontWeight: 800,
-            },
-            "& .MuiDataGrid-columnSeparator": { display: "none" },
-            "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
-            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-            "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
-            "& .barCode-column--cell": { color: brand.primary },
-            "& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within": {
-              outline: `2px solid ${brand.primary}`,
-              outlineOffset: "-2px",
-              boxShadow: `0 0 0 4px ${brand.focusRing}`,
-            },
+            overflow: "auto",
+            px: 1,
+            pb: 2,
+            "&::-webkit-scrollbar": { height: 8 },
           }}
         >
-          <DataGrid
-            rows={goodsInRows || []}
-            getRowId={(row) => row._id}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[10, 25, 50]}
-            checkboxSelection
-            rowSelectionModel={selectedRows}
-            onRowSelectionModelChange={(model) => setSelectedRows(Array.isArray(model) ? model : [])}
-            disableRowSelectionOnClick
-            editMode="row"
-            experimentalFeatures={{ newEditingApi: true }}
-            processRowUpdate={(newRow, oldRow) => processRowUpdate(newRow, oldRow)}
-            onProcessRowUpdateError={(error) => console.error("Row update failed:", error)}
-            onCellClick={handleCellClick}
-            /* <-- ADD alternating row classes here */
-            getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row")}
-          />
+          {loading ? (
+            <Box sx={{ display: "grid", placeItems: "center", height: "100%" }}>
+              <CircularProgress />
+            </Box>
+          ) : (goodsInRows || []).length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: brand.subtext }}>No Goods In rows found.</Typography>
+            </Box>
+          ) : (
+            (goodsInRows || []).map((row, idx) => {
+              const selected = selectedRows.includes(row._id);
+              const rowClass = idx % 2 === 0 ? "gi-even" : "gi-odd";
+              return (
+                <Box
+                  key={row._id}
+                  data-row-id={row._id}
+                  className={`gi-row ${rowClass}`}
+                  sx={{
+                    mx: 1,
+                    my: 1,
+                    p: 1.25,
+                    borderRadius: 2,
+                    display: "grid",
+                    gridTemplateColumns: "48px 1fr 110px 120px 120px 120px 140px 96px",
+                    gap: 12,
+                    alignItems: "center",
+                    transition: "transform .12s ease, box-shadow .12s ease",
+                    cursor: "default",
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Checkbox
+                      checked={selected}
+                      onChange={() =>
+                        setSelectedRows((prev) => (prev.includes(row._id) ? prev.filter((id) => id !== row._id) : [...prev, row._id]))
+                      }
+                      inputProps={{ "aria-label": `select row ${row.barCode || row._id}` }}
+                      sx={{ color: brand.primary }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Box>
+
+                  {/* Ingredient + date */}
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                    <Typography sx={{ fontWeight: 800, color: brand.text }}>{row.ingredient ?? "-"}</Typography>
+                    <Typography sx={{ color: brand.subtext, fontSize: 13 }}>{row.date ?? "-"}</Typography>
+                  </Box>
+
+                  {/* Temperature */}
+                  <Box
+                    sx={{ cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCellClick(row, "temperature", row.temperature);
+                    }}
+                  >
+                    <Typography sx={{ color: brand.text }}>{row.temperature ?? "-"}</Typography>
+                  </Box>
+
+                  {/* Stock Received */}
+                  <Box
+                    sx={{ cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCellClick(row, "stockReceived", row.stockReceived);
+                    }}
+                  >
+                    <Typography sx={{ color: brand.text }}>{String(row.stockReceived ?? 0) + (row.unit ? ` ${row.unit}` : "")}</Typography>
+                  </Box>
+
+                  {/* Stock Remaining (centered) */}
+                  <Box
+                    sx={{ cursor: "pointer", display: "flex", justifyContent: "center" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCellClick(row, "stockRemaining", row.stockRemaining);
+                    }}
+                  >
+                    <Typography sx={{ color: brand.text, fontWeight: 800 }}>
+                      {String(row.stockRemaining ?? 0) + (row.unit ? ` ${row.unit}` : "")}
+                    </Typography>
+                  </Box>
+
+                  {/* Invoice # */}
+                  <Box
+                    sx={{ cursor: "pointer" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCellClick(row, "invoiceNumber", row.invoiceNumber);
+                    }}
+                  >
+                    <Typography sx={{ color: brand.subtext }}>{row.invoiceNumber ?? "-"}</Typography>
+                  </Box>
+
+                  {/* Batch + expiry + actions */}
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "flex-end" }}>
+                    <Box sx={{ textAlign: "right", mr: 1 }}>
+                      <Typography
+                        sx={{
+                          color: brand.primary,
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          wordBreak: "break-word",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // select this row quickly
+                          setSelectedRows((prev) => (prev.includes(row._id) ? prev : [...prev, row._id]));
+                        }}
+                      >
+                        {row.barCode ?? "-"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: brand.subtext }}>
+                        {row.expiryDate ?? "-"}
+                      </Typography>
+                    </Box>
+
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingRow(row);
+                        setOriginalBarcode(row.barCode);
+                        setOriginalId(row._id);
+                        setActiveCell({ id: row.barCode, field: null, value: null, row });
+                        setEditDialogOpen(true);
+                      }}
+                      aria-label="Edit row"
+                    >
+                      <EditOutlinedIcon sx={{ color: brand.primary }} />
+                    </IconButton>
+
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (row.file) handleFileOpen(row.file);
+                      }}
+                      aria-label="View file"
+                    >
+                      <VisibilityIcon sx={{ color: row.file ? brand.primary : brand.subtext }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              );
+            })
+          )}
         </Box>
       </Box>
 
+      {/* Edit dialog */}
       <Dialog
         open={editDialogOpen}
         onClose={() => {
