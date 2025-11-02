@@ -241,7 +241,7 @@ const StockUsage = () => {
       { field: "batchCode", headerName: "Batch Code", flex: 1 },
       {
         field: "barcodes",
-        headerName: "Barcodes",
+        headerName: "Ingredient Batchcodes Used",
         flex: 1,
         renderCell: (params) => (
           <Typography
@@ -252,7 +252,7 @@ const StockUsage = () => {
               "&:hover": { color: brand.primaryDark },
             }}
             onClick={() =>
-              handleDrawerOpen("Barcodes", params.row.barcodes, {
+              handleDrawerOpen("Batchcodes", params.row.barcodes, {
                 recipe: params.row.recipeName,
                 date: params.row.date,
                 batchCode: params.row.batchCode,
@@ -260,7 +260,7 @@ const StockUsage = () => {
               })
             }
           >
-            Show Barcodes
+            Show Batchcodes
           </Typography>
         ),
       },
