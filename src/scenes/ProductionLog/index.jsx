@@ -46,6 +46,21 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
+/** Build stable identifiers:
+ * - prefer server numeric `id` (DB PK) when present
+ * - else prefer server `batchCode` if present
+ * - else create a deterministic fallback using recipe+date+producerName (no Date.now or array index)
+ */
+const makeStableId = (row) => {
+  if (!row) return null;
+  if (row.id || row.id === 0) return String(row.id);
+  if (row.batchCode) return String(row.batchCode);
+  // deterministic fallback (slugify small set of columns)
+  const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`;
+  // remove unsafe chars
+  return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
+};
+
 const ProductionLog = () => {
   const theme = useTheme();
   const { cognitoId } = useAuth();
@@ -94,10 +109,13 @@ const ProductionLog = () => {
         const data = await response.json();
         if (!Array.isArray(data)) return;
 
-        const sanitized = data.map((row, idx) => {
+        const sanitized = data.map((row) => {
+          // keep original DB id when present; stable id will be computed below
+          const dbId = row.id ?? row.ID ?? null;
+
           const batchesProduced = Number(row.batchesProduced) || 0;
           const batchRemaining = Number(row.batchRemaining) || 0; // stored in DB as units
-          const unitsOfWaste = Number(row.units_of_waste || row.unitsOfWaste) || 0;
+          const unitsOfWaste = Number(row.units_of_waste ?? row.unitsOfWaste) || 0;
           const upb = recipesMap[row.recipe] ?? Number(row.units_per_batch || 0);
 
           // compute unitsRemaining from stored units (batchRemaining) minus waste
@@ -107,18 +125,29 @@ const ProductionLog = () => {
           // producer name may come from producer_name (snake) or producerName (camel)
           const producerName = row.producer_name ?? row.producerName ?? "";
 
-          return {
-            date: formatDateYMD(row.date),
-            recipe: row.recipe,
+          // ensure stable identifiers for DataGrid row id
+          const normalizedRow = {
+            // keep raw DB id if present (so we can persist it later)
+            id: dbId ?? (row.batchCode ?? null),
+            batchCode: row.batchCode ?? row.batch_code ?? null,
+            recipe: row.recipe ?? "",
+            date: row.date ?? null,
             batchesProduced,
-            batchRemaining, // stored value in DB (units)
+            batchRemaining,
             unitsOfWaste,
             unitsRemaining,
             batchesRemaining,
-            batchCode: row.batchCode || `gen-${idx}`,
-            id: row.batchCode || `gen-${idx}-${Date.now()}`,
             producerName,
+            // keep original row so updates can merge server values if needed
+            __raw: row,
           };
+
+          // compute a stable rowId for the grid if server didn't provide numeric id
+          const stableId = makeStableId(normalizedRow);
+          // always set id to stable string so DataGrid getRowId can use it
+          normalizedRow.id = String(normalizedRow.id ?? stableId);
+
+          return normalizedRow;
         });
 
         setProductionLogs(sanitized);
@@ -159,7 +188,7 @@ const ProductionLog = () => {
         align: "left",
         headerAlign: "left",
       },
-      // NEW: producerName column
+      // producerName column
       {
         field: "producerName",
         headerName: "Produced by",
@@ -216,14 +245,17 @@ const ProductionLog = () => {
       recipe: updatedRow.recipe,
       batchesProduced: Number(updatedRow.batchesProduced || 0),
       // send unitsOfWaste and unitsRemaining if present — server will compute batchRemaining accordingly
-      unitsOfWaste: Number(updatedRow.unitsOfWaste || 0),
-      unitsRemaining: Number(updatedRow.unitsRemaining || 0),
+      units_of_waste: Number(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste ?? 0),
+      unitsRemaining: Number(updatedRow.unitsRemaining ?? 0),
       // include producer name (snake_case expected by backend)
       producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
       cognito_id: cognitoId,
     };
 
-    const url = `${API_BASE}/production-log/${encodeURIComponent(updatedRow.batchCode)}`;
+    const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code;
+    if (!batchCodeForPath) throw new Error("batchCode is required to update production_log");
+
+    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`;
     console.info("[processRowUpdate] PUT", url, "payload:", payload);
 
     const res = await fetch(url, {
@@ -250,7 +282,7 @@ const ProductionLog = () => {
       let patched;
       if (activeCell && activeCell.field && !editingRow) {
         // single-cell edit
-        const row = (productionLogs || []).find((r) => r.batchCode === activeCell.id);
+        const row = (productionLogs || []).find((r) => r.id === activeCell.row?.id || r.batchCode === activeCell.id);
         if (!row) throw new Error("Row not found locally");
         patched = { ...row, [activeCell.field]: activeCell.field === "date" ? formatDateYMD(editValue) : editValue };
         // coerce numbers for numeric fields (batchRemaining removed from editable list)
@@ -267,7 +299,7 @@ const ProductionLog = () => {
           ...r,
           date: formatDateYMD(r.date),
           batchesProduced: Number(r.batchesProduced || 0),
-          unitsOfWaste: Number(r.unitsOfWaste || 0),
+          unitsOfWaste: Number(r.unitsOfWaste || r.units_of_waste || 0),
           unitsRemaining: Number(r.unitsRemaining || 0),
           producerName: r.producerName ?? r.producer_name ?? "",
           // DO NOT include batchRemaining
@@ -280,32 +312,57 @@ const ProductionLog = () => {
       // prefer the server-returned updated object if available
       const updatedServer = result && (result.updated || result.updatedRow || result.updatedLog || result);
       let newRow;
-      if (updatedServer && (updatedServer.batchCode || updatedServer.batch_code)) {
+      if (updatedServer && (updatedServer.batchCode || updatedServer.batch_code || updatedServer.id)) {
         // server returned a DB row: normalize to our local shape (format date, ensure numeric types)
+        const serverBatchCode = updatedServer.batchCode ?? updatedServer.batch_code ?? null;
+        const serverId = updatedServer.id ?? updatedServer.ID ?? serverBatchCode ?? null;
+        const upb = Number(updatedServer.units_per_batch || 0);
+
+        const returnedBatchRemainingUnits = Number(updatedServer.batchRemaining || updatedServer.batch_remaining || 0);
+        const returnedUnitsOfWaste = Number(updatedServer.units_of_waste ?? updatedServer.unitsOfWaste ?? 0);
+        const returnedUnitsRemaining = returnedBatchRemainingUnits - returnedUnitsOfWaste;
+        const returnedBatchesRemaining = upb > 0 ? Number(returnedUnitsRemaining) / upb : null;
+
         newRow = {
+          id: String(serverId ?? makeStableId(updatedServer)),
+          batchCode: serverBatchCode,
           date: formatDateYMD(updatedServer.date),
           recipe: updatedServer.recipe,
-          batchesProduced: Number(updatedServer.batchesProduced || 0),
-          batchRemaining: Number(updatedServer.batchRemaining || 0), // stored units
-          unitsOfWaste: Number(updatedServer.units_of_waste ?? updatedServer.unitsOfWaste ?? 0),
-          unitsRemaining:
-            Number(
-              updatedServer.unitsRemaining ??
-                updatedServer.units_remaining ??
-                (Number(updatedServer.batchRemaining || 0) - Number(updatedServer.units_of_waste || 0))
-            ) || 0,
-          batchCode: updatedServer.batchCode ?? updatedServer.batch_code,
-          id: updatedServer.batchCode ?? updatedServer.batch_code ?? patched.id,
+          batchesProduced: Number(updatedServer.batchesProduced ?? updatedServer.batches_produced ?? 0),
+          batchRemaining: Number(updatedServer.batchRemaining ?? updatedServer.batch_remaining ?? 0),
+          unitsOfWaste: returnedUnitsOfWaste,
+          unitsRemaining: returnedUnitsRemaining,
+          batchesRemaining: returnedBatchesRemaining,
           producerName: updatedServer.producer_name ?? updatedServer.producerName ?? "",
+          __raw: updatedServer,
         };
       } else {
         // fallback: merge patched into existing
-        newRow = { ...patched };
-        newRow.date = formatDateYMD(newRow.date);
+        newRow = {
+          ...patched,
+          id: String(patched.id ?? makeStableId(patched)),
+          date: formatDateYMD(patched.date),
+          producerName: patched.producerName ?? patched.producer_name ?? "",
+        };
       }
 
-      // update local state by batchCode
-      setProductionLogs((prev) => (prev || []).map((p) => (p.batchCode === newRow.batchCode ? { ...p, ...newRow } : p)));
+      // update local state by id (stable) or batchCode as fallback
+      setProductionLogs((prev) => {
+        const list = Array.isArray(prev) ? prev.slice() : [];
+        const found = list.some((p, i) => {
+          if (p.id && newRow.id && String(p.id) === String(newRow.id)) {
+            list[i] = { ...p, ...newRow };
+            return true;
+          }
+          if (p.batchCode && newRow.batchCode && String(p.batchCode) === String(newRow.batchCode)) {
+            list[i] = { ...p, ...newRow };
+            return true;
+          }
+          return false;
+        });
+        if (!found) list.push(newRow);
+        return list;
+      });
 
       // clear states
       setEditDialogOpen(false);
@@ -323,7 +380,8 @@ const ProductionLog = () => {
   // Delete selected rows (soft-delete)
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
-    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(r.id));
+    // selectedRows contains DataGrid row ids (we used string ids)
+    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(String(r.id)));
     try {
       await Promise.all(
         rowsToDelete.map((row) =>
@@ -341,7 +399,7 @@ const ProductionLog = () => {
       );
 
       // remove locally
-      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(r.id)));
+      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(String(r.id))));
       setSelectedRows([]);
       setOpenConfirmDialog(false);
     } catch (err) {
@@ -401,9 +459,14 @@ const ProductionLog = () => {
         <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", minWidth: "750px" } }}>
           <DataGrid
             rows={productionLogs}
-            getRowId={(row) => row.id}
+            getRowId={(row) => String(row.id)}
             checkboxSelection
-            onRowSelectionModelChange={(model) => setSelectedRows(model)}
+            rowSelectionModel={selectedRows}
+            onRowSelectionModelChange={(model) => {
+              // normalize to array of strings
+              const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
+              setSelectedRows(arr);
+            }}
             columns={columns}
             onCellClick={handleCellClick}
             disableSelectionOnClick={true}
