@@ -555,8 +555,10 @@ export default function GoodsIn() {
 
         <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
           <Paper sx={{ flex: 1, overflow: "hidden", borderRadius: 2, border: `1px solid ${brand.border}`, boxShadow: brand.shadow }}>
-            <TableContainer sx={{ maxHeight: "60vh", overflowX: "hidden" }}>
-              <Table stickyHeader sx={{ tableLayout: "fixed", minWidth: 0 }}>
+            {/* TABLE CONTAINER: horizontal scrollbar enabled here */}
+            <TableContainer sx={{ maxHeight: "60vh", overflowX: "auto" }}>
+              {/* give the table a larger minWidth so horizontal slider appears when needed */}
+              <Table stickyHeader sx={{ tableLayout: "fixed", minWidth: 1200 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ width: "4%", minWidth: 56 }}><Checkbox
@@ -638,6 +640,7 @@ export default function GoodsIn() {
                           </Tooltip>
                         </TableCell>
 
+                        {/* Stock Received: centered + bold */}
                         <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                           <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#ecfdf5" }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
@@ -647,6 +650,7 @@ export default function GoodsIn() {
                           </Box>
                         </TableCell>
 
+                        {/* Stock Remaining: centered + NOT bold */}
                         <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                           <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#f8fafc" }}>
                             <Typography variant="body2" sx={{ fontWeight: 400, color: brand.text }}>
