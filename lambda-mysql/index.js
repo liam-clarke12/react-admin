@@ -1774,6 +1774,7 @@ async function syncProductionInventoryForUser(cognito_id, connArg = null) {
   }
 }
 
+// GET /api/stock-usage/:cognitoId
 app.get('/api/stock-usage/:cognitoId', (req, res) => {
   const cognitoId = req.params.cognitoId;
   console.log(`[GET] /api/stock-usage/${cognitoId}`);
@@ -1781,7 +1782,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
   const sqlQuery = `
     SELECT 
       su.production_log_id,
-      GROUP_CONCAT(DISTINCT su.id ORDER BY su.id) AS stock_usage_ids,   -- ✅ add IDs to delete
+      GROUP_CONCAT(DISTINCT su.id ORDER BY su.id) AS stock_usage_ids,   -- IDs for deletion
       pl.date AS production_log_date,
       r.recipe_name,
       pl.batchCode,
@@ -1791,6 +1792,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
       i.id AS ingredient_id,
       i.ingredient_name,
       ri.quantity,
+      ri.unit,                                           -- <-- include unit
       pl.batchesProduced,
       GROUP_CONCAT(DISTINCT gi.barCode ORDER BY gi.id SEPARATOR ', ') AS ingredient_barcodes
     FROM stock_usage su
@@ -1802,7 +1804,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
     WHERE su.user_id = ?
     GROUP BY
       su.production_log_id, pl.date, pl.batchCode, pl.batchRemaining,
-      pl.user_id, r.id, i.id, i.ingredient_name, ri.quantity, pl.batchesProduced
+      pl.user_id, r.id, i.id, i.ingredient_name, ri.quantity, ri.unit, pl.batchesProduced
   `;
 
   console.log('[GET /api/stock-usage] Executing SQL:\n', sqlQuery);
@@ -1813,7 +1815,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
       return res.status(500).json({ error: 'Database query failed' });
     }
 
-    // Each row = one ingredient line for a production_log, with a comma string of su.id's for that line
+    // Each row = one ingredient line for a production_log
     const formatted = (results || []).map((row) => {
       // Parse "1,2,3" -> [1,2,3]
       const ids =
@@ -1821,6 +1823,11 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
           .split(',')
           .map((s) => Number(s.trim()))
           .filter((n) => Number.isFinite(n));
+
+      const qtyNum = Number(row.quantity) || 0;
+      const batches = Number(row.batchesProduced) || 0;
+      const unit = row.unit ?? ""; // unit from recipe_ingredients
+      const totalQuantity = qtyNum * batches;
 
       return {
         production_log_id: row.production_log_id,
@@ -1831,14 +1838,15 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
         production_log_user_id: row.production_log_user_id,
         recipe_id: row.recipe_id,
         batchesProduced: row.batchesProduced,
-        ids, // ✅ carry the array of stock_usage ids
+        ids, // carry array of stock_usage ids
         ingredients: [
           {
             ingredient_id: row.ingredient_id,
             ingredient_name: row.ingredient_name,
             ingredient_barcodes: row.ingredient_barcodes,
-            quantity: row.quantity,
-            total_quantity: (Number(row.quantity) || 0) * (Number(row.batchesProduced) || 0),
+            quantity: qtyNum,
+            unit: unit,
+            total_quantity: totalQuantity,
           },
         ],
       };
@@ -1859,7 +1867,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
           production_log_user_id: row.production_log_user_id,
           recipe_id: row.recipe_id,
           batchesProduced: row.batchesProduced,
-          ids: [...row.ids],                 // ✅ start with this row’s ids
+          ids: [...row.ids],
           ingredients: [...row.ingredients], // first ingredient
         };
         acc.push(group);
@@ -1868,7 +1876,7 @@ app.get('/api/stock-usage/:cognitoId', (req, res) => {
         const merged = new Set([...(group.ids || []), ...row.ids]);
         group.ids = Array.from(merged);
 
-        // add ingredient if new
+        // add ingredient if new (check by ingredient_id)
         const incoming = row.ingredients[0];
         if (!group.ingredients.some((ing) => ing.ingredient_id === incoming.ingredient_id)) {
           group.ingredients.push(incoming);
