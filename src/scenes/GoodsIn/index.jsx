@@ -23,7 +23,6 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 
-
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const brand = {
@@ -177,7 +176,9 @@ const GoodsIn = () => {
         cellClassName: "barCode-column--cell",
         editable: false,
       },
-      { field: "processed", headerName: "Processed", flex: 1, editable: false },
+      // HIDDEN: keep processed for internal logic, but hide from user
+      { field: "processed", headerName: "Processed", flex: 1, editable: false, hide: true },
+      // HIDDEN: fileAttachment kept but not shown to user
       {
         field: "fileAttachment",
         headerName: "File Attachment",
@@ -208,6 +209,7 @@ const GoodsIn = () => {
             </Typography>
           );
         },
+        hide: true,
       },
       {
         field: "actions",
