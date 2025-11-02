@@ -134,12 +134,20 @@ const StockUsage = () => {
         if (!Array.isArray(item.ingredients)) return;
         item.ingredients.forEach((ingredient) => {
           const totalQuantity = ingredient.quantity * item.batchesProduced;
-          // Format ingredient quantities as plain text; keep existing format but date now normalized elsewhere
+
+          // include unit when available — support possible unit field names
+          const unit = ingredient.unit ?? ingredient.unit_name ?? ingredient.unitLabel ?? "";
+          const unitSuffix = unit ? ` ${unit}` : "";
+
+          // Format ingredient quantities as plain text containing the unit (if provided)
           groupedData[key].ingredients.push(
-            `${ingredient.ingredient_name}: ${totalQuantity}`
+            `${ingredient.ingredient_name}: ${totalQuantity}${unitSuffix}`
           );
+
+          // barcodes: keep the original mapping (may be a CSV/array or string)
+          // show ingredient name + barcodes (raw)
           groupedData[key].barcodes.push(
-            `${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes}`
+            `${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes ?? ""}`
           );
         });
       });
@@ -629,7 +637,7 @@ const StockUsage = () => {
                 if (drawerMode === "ingredients" && typeof raw === "string" && raw.includes(":")) {
                   const [name, qty] = raw.split(":");
                   primaryText = name.trim();
-                  pill = (qty || "").trim();
+                  pill = (qty || "").trim(); // qty already contains unit suffix if available
                 } else if (drawerMode === "barcodes" && typeof raw === "string" && raw.includes(":")) {
                   const [name, codes] = raw.split(":");
                   primaryText = name.trim();
