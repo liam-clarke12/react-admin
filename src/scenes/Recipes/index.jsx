@@ -116,11 +116,12 @@ const Recipes = () => {
     fetchRecipeData();
   }, [cognitoId, setRows]);
 
-  // Drawer helpers (unchanged)
+  // Drawer helpers
   const handleDrawerOpen = (header, list, meta = {}) => {
     setDrawerHeader(header);
     let items = [];
     if (Array.isArray(list)) {
+      // Keep raw array but ensure strings
       items = list.map((l) => (typeof l === "string" ? l : String(l)));
     } else if (typeof list === "string" && list.length) {
       items = list.split("; ").filter(Boolean);
@@ -260,16 +261,20 @@ const Recipes = () => {
     [cognitoId]
   );
 
-  // Build displayItems for drawer (unchanged)
+  // Build displayItems (now robustly extracts unit for both structured and string inputs)
   const buildDisplayItems = () => {
     const isQuantities = drawerHeader.toLowerCase().includes("quantit");
+
+    // If it's the Quantities drawer and we have structured arrays in selectedRowMeta, use them (preferred)
     if (isQuantities && selectedRowMeta?.ingredientsArray) {
       const ingArr = selectedRowMeta.ingredientsArray || [];
       const qtyArr = selectedRowMeta.quantitiesArray || [];
       const unitArr = selectedRowMeta.unitsArray || [];
       return ingArr.map((ing, i) => {
-        const qty = qtyArr?.[i] ?? "N/A";
-        const unit = unitArr?.[i] ? String(unitArr[i]).trim() : "";
+        const rawQty = qtyArr?.[i] ?? "";
+        const unitRaw = unitArr?.[i] ?? "";
+        const qty = rawQty !== null && rawQty !== undefined ? String(rawQty) : "";
+        const unit = unitRaw !== null && unitRaw !== undefined ? String(unitRaw).trim() : "";
         return {
           raw: `${ing}: ${qty}${unit ? " " + unit : ""}`,
           name: ing,
@@ -278,14 +283,45 @@ const Recipes = () => {
         };
       });
     }
+
+    // Fallback: parse the stored drawerContent strings into { name, qty, unit }
     return (drawerContent || []).map((raw) => {
       const str = String(raw);
-      const [left, right] = str.split(":");
+      const parts = str.split(":");
+      const left = parts[0] ? parts[0].trim() : str;
+      const right = parts.slice(1).join(":").trim(); // preserve ":" inside values if any
+      if (!right) {
+        return { raw: str, name: left, qty: "", unit: "" };
+      }
+      // Attempt to split right into quantity and unit (first token numeric-ish = qty)
+      const tokens = right.split(/\s+/).filter(Boolean);
+      // If first token looks like a number (or fraction), treat as qty
+      let qty = right;
+      let unit = "";
+      if (tokens.length > 0) {
+        const first = tokens[0];
+        // allow numbers, decimals, fractions (e.g. "1/2"), or numeric-like
+        if (/^[\d,.\/]+$/.test(first)) {
+          qty = first;
+          unit = tokens.slice(1).join(" ");
+        } else {
+          // otherwise assume whole right is qty (e.g., "200g" or "to taste")
+          // try to split trailing letters from numbers
+          const m = right.match(/^([\d.,\/]+)([a-zA-Z%µμ]*)\s*(.*)$/);
+          if (m) {
+            qty = m[1];
+            unit = (m[2] || "").trim() + (m[3] ? " " + m[3].trim() : "");
+          } else {
+            qty = right;
+            unit = "";
+          }
+        }
+      }
       return {
         raw: str,
-        name: left ? left.trim() : str,
-        qty: right ? right.trim() : "",
-        unit: "",
+        name: left,
+        qty: qty,
+        unit: unit,
       };
     });
   };
@@ -324,7 +360,7 @@ const Recipes = () => {
     try {
       const rowsOut = [["Item", drawerHeader.includes("Quantit") ? "Quantity" : "Value"]];
       displayItems.forEach((it) => {
-        rowsOut.push([it.name, it.qty + (it.unit ? ` ${it.unit}` : "")]);
+        rowsOut.push([it.name, (it.qty || "") + (it.unit ? ` ${it.unit}` : "")]);
       });
       const csv = rowsOut.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
@@ -466,7 +502,7 @@ const Recipes = () => {
         </Box>
       </Box>
 
-      {/* Drawer (ingredients/quantities) - unchanged */}
+      {/* Drawer (ingredients/quantities) */}
       <Drawer anchor="right" open={drawerOpen} onClose={handleDrawerClose}
         PaperProps={{ sx: { width: 420, borderRadius: "20px 0 0 20px", border: `1px solid ${brand.border}`, boxShadow: "0 24px 48px rgba(15,23,42,0.12)", overflow: "hidden" } }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 2, py: 1.25, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` }}>
