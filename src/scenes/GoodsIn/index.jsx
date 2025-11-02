@@ -1,4 +1,5 @@
 // src/scenes/data/GoodsIn/index.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Box,
   IconButton,
@@ -14,15 +15,27 @@ import {
   Select,
   MenuItem,
   CircularProgress,
-  Checkbox,
+  Stack,
+  Tooltip,
 } from "@mui/material";
-import VisibilityIcon from "@mui/icons-material/Visibility";
+import { DataGrid, GridToolbarContainer } from "@mui/x-data-grid";
 import { useData } from "../../contexts/DataContext";
-import { useEffect, useMemo, useState, useRef } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLocation } from "react-router-dom";
+
+/**
+ * Redesigned GoodsIn table:
+ *  - Search (debounced)
+ *  - Unit filter
+ *  - Export CSV
+ *  - Responsive + horizontal scroll
+ *  - Pagination
+ *  - Row detail modal with small chart
+ *  - Kept existing processRowUpdate() logic and delete
+ */
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -40,8 +53,8 @@ const brand = {
   inputBg: "#ffffff",
 };
 
-// unit options that match the GoodsIn form exactly
 const unitOptions = [
+  { value: "", label: "All units" },
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
   { value: "kg", label: "Kilograms (Kg)" },
@@ -51,52 +64,45 @@ const unitOptions = [
 
 const GoodsIn = () => {
   const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
-  const [selectedRows, setSelectedRows] = useState([]); // array of selected _id's
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const { cognitoId } = useAuth();
   const location = useLocation();
 
-  // Editing state
-  const [activeCell, setActiveCell] = useState(null); // { id, field, value, row }
+  // selection & editing
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [activeCell, setActiveCell] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editValue, setEditValue] = useState("");
-  const [editingRow, setEditingRow] = useState(null); // when editing full row
-  const [originalBarcode, setOriginalBarcode] = useState(null); // server identifier
-  const [originalId, setOriginalId] = useState(null); // internal _id
+  const [editingRow, setEditingRow] = useState(null);
+  const [originalBarcode, setOriginalBarcode] = useState(null);
+  const [originalId, setOriginalId] = useState(null);
   const [updating, setUpdating] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const containerRef = useRef(null);
+  // UI controls
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [unitFilter, setUnitFilter] = useState("");
+  const [pageSize, setPageSize] = useState(10);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailRow, setDetailRow] = useState(null);
 
-  // Fetch ACTIVE goods-in rows (soft-deleted filtered out by the API)
+  // Keep your existing fetching logic (normalization)
   useEffect(() => {
     const fetchGoodsInData = async () => {
       try {
         if (!cognitoId) return;
-        setLoading(true);
-        const response = await fetch(
-          `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const response = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!response.ok) throw new Error("Failed to fetch Goods In data");
         const data = await response.json();
 
         const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
           const date = row.date ? String(row.date).slice(0, 10) : row.date;
           const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
-
           const stockReceived = Number(row.stockReceived || 0);
           const stockRemaining = Number(row.stockRemaining || 0);
-
-          // stable internal id: combine barcode (if exists) + index
           const serverBar = row.barCode ? String(row.barCode) : null;
           const _id = serverBar
             ? `${serverBar}-${idx}`
             : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-          // invoice may be returned as invoice_number (snake) or invoiceNumber (camel)
           const invoiceNumber = row.invoice_number ?? row.invoiceNumber ?? null;
-
-          // normalize unit: prefer explicit field, fallback to empty string
           const unit = row.unit ?? row.unitName ?? row.unit_label ?? "";
 
           return {
@@ -117,15 +123,13 @@ const GoodsIn = () => {
         computeAndSetIngredientInventory(normalized);
       } catch (error) {
         console.error("Error fetching Goods In data:", error);
-      } finally {
-        setLoading(false);
       }
     };
     if (cognitoId) fetchGoodsInData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cognitoId]);
 
-  // helper: compute ingredient inventory from rows and set it
+  // compute inventory (unchanged)
   const computeAndSetIngredientInventory = (rows) => {
     const active = (Array.isArray(rows) ? rows : []).filter((r) => Number(r.stockRemaining) > 0);
     const map = new Map();
@@ -133,7 +137,6 @@ const GoodsIn = () => {
       const key = r.ingredient;
       const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date, unit: r.unit };
       const amount = prev.amount + Number(r.stockRemaining || 0);
-
       let nextBarcode = prev.barcode;
       let nextDate = prev._date;
       try {
@@ -144,15 +147,13 @@ const GoodsIn = () => {
           nextDate = r.date;
         }
       } catch {}
-
       map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate, unit: r.unit });
     }
-
     const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
     setIngredientInventory(inventory);
   };
 
-  // processRowUpdate - robust immutable updater, accepts both newRow & oldRow
+  // Process row update (kept intact — uses your backend)
   const processRowUpdate = async (newRow, oldRow) => {
     const oldBar = oldRow && oldRow.barCode ? String(oldRow.barCode) : undefined;
     const oldId = oldRow && oldRow._id ? String(oldRow._id) : undefined;
@@ -166,7 +167,6 @@ const GoodsIn = () => {
       unit: newRow.unit,
       expiryDate: newRow.expiryDate,
       barCode: newRow.barCode,
-      // send invoice using snake_case to match backend column
       invoice_number: newRow.invoiceNumber ?? null,
       cognito_id: cognitoId,
     };
@@ -202,9 +202,7 @@ const GoodsIn = () => {
         stockRemaining: Number((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining ?? 0),
         processed:
           Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
-        // prefer server-provided invoice (snake or camel), otherwise use newRow value
         invoiceNumber: (serverRow && (serverRow.invoice_number ?? serverRow.invoiceNumber)) ?? newRow.invoiceNumber ?? null,
-        // normalize unit returned from server (if any)
         unit: (serverRow && (serverRow.unit ?? serverRow.unit_label ?? serverRow.unitName)) ?? newRow.unit ?? "",
       };
 
@@ -245,10 +243,9 @@ const GoodsIn = () => {
     }
   };
 
-  // Bulk soft delete — selectedRows contain _id values
+  // Delete selected rows (keeps your backend calls)
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
-
     try {
       const rowsToDelete = (goodsInRows || []).filter((r) => selectedRows.includes(r._id));
       await Promise.all(
@@ -273,31 +270,26 @@ const GoodsIn = () => {
       });
 
       setSelectedRows([]);
-      setOpenConfirmDialog(false);
     } catch (err) {
       console.error("Soft delete error:", err);
       alert("Could not delete selected records. Check console for details.");
     }
   };
 
-  const handleOpenConfirmDialog = () => setOpenConfirmDialog(true);
-  const handleCloseConfirmDialog = () => setOpenConfirmDialog(false);
-  const handleFileOpen = (fileUrl) => window.open(fileUrl, "_blank");
-
-  // clicking a cell sets activeCell (and allows opening edit dialog via button)
-  // our custom cells will call this with (row, field, value)
-  const handleCellClick = (row, field, value) => {
+  // Cell click — used to open inline edit or detail
+  const handleCellClick = (params) => {
+    if (params.field === "__check__") return;
     setActiveCell({
-      id: row.barCode,
-      field,
-      value,
-      row,
+      id: params.row.barCode,
+      field: params.field,
+      value: params.value,
+      row: params.row,
     });
   };
 
+  // Open edit dialog for the active cell
   const openEditForActiveCell = () => {
     if (!activeCell) return;
-    setEditValue(activeCell.value ?? "");
     setEditingRow(activeCell.row ?? null);
     setOriginalBarcode(activeCell.row?.barCode ?? null);
     setOriginalId(activeCell.row?._id ?? null);
@@ -318,17 +310,15 @@ const GoodsIn = () => {
         if (!row) throw new Error("Row not found");
         const patched = {
           ...row,
-          [activeCell.field]:
-            activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
-              ? Number(editValue || 0)
-              : editValue,
+          [activeCell.field]: activeCell.field === "stockRemaining" || activeCell.field === "stockReceived"
+            ? Number(activeCell.value || 0)
+            : activeCell.value,
         };
         if (patched.stockRemaining !== undefined) patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
 
         result = await processRowUpdate(patched, { barCode: originalBarcode || activeCell.id, _id: originalId || row._id });
       } else {
         const patched = { ...editingRow };
-        if (activeCell && activeCell.field) patched[activeCell.field] = editValue;
         patched.stockReceived = Number(patched.stockReceived || 0);
         patched.stockRemaining = Number(patched.stockRemaining || 0);
         patched.processed = Number(patched.stockRemaining) === 0 ? "Yes" : "No";
@@ -339,51 +329,159 @@ const GoodsIn = () => {
       setEditDialogOpen(false);
       setEditingRow(null);
       setActiveCell(null);
-      setEditValue("");
-      setOriginalBarcode(null);
-      setOriginalId(null);
+      setUpdating(false);
     } catch (err) {
       console.error("Confirm edit failed:", err);
       alert("Update failed. See console for details.");
-    } finally {
       setUpdating(false);
     }
   };
 
-  const renderEditInputForField = (fieldName, value, onChange) => {
-    if (fieldName === "unit") {
-      return (
-        <FormControl fullWidth>
-          <InputLabel id="unit-edit-label">Unit</InputLabel>
-          <Select
-            labelId="unit-edit-label"
-            value={value ?? ""}
-            label="Unit"
-            onChange={(e) => onChange(e.target.value)}
-          >
-            {unitOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      );
-    }
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 220);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
-    if (fieldName === "expiryDate" || fieldName === "date") {
-      return <TextField fullWidth type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
-    }
+  // Filtered rows memo (search + unit filter)
+  const filteredRows = useMemo(() => {
+    const base = Array.isArray(goodsInRows) ? goodsInRows : [];
+    if (!debouncedSearch && !unitFilter) return base;
+    return base.filter((r) => {
+      const matchesUnit = unitFilter ? String(r.unit || "").toLowerCase() === unitFilter.toLowerCase() : true;
+      const hay = `${r.ingredient ?? ""} ${r.barCode ?? ""} ${r.invoiceNumber ?? ""} ${r.date ?? ""}`.toLowerCase();
+      const matchesSearch = debouncedSearch ? hay.includes(debouncedSearch) : true;
+      return matchesUnit && matchesSearch;
+    });
+  }, [goodsInRows, debouncedSearch, unitFilter]);
 
-    if (fieldName === "stockReceived" || fieldName === "stockRemaining") {
-      return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
+  // CSV export for current filtered rows
+  const exportCsv = () => {
+    try {
+      const header = ["Date", "Ingredient", "Temperature", "Received", "Remaining", "Unit", "Invoice", "Batch"];
+      const rows = filteredRows.map((r) => [
+        r.date ?? "",
+        r.ingredient ?? "",
+        r.temperature ?? "",
+        r.stockReceived ?? "",
+        r.stockRemaining ?? "",
+        r.unit ?? "",
+        r.invoiceNumber ?? "",
+        r.barCode ?? "",
+      ]);
+      const csv = [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `goods-in-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export failed", e);
+      alert("Export failed");
     }
-
-    // invoiceNumber is a plain text input (falls through to default)
-    return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
   };
 
-  // NEW: focus & highlight flow — reacts to location.state.focusBar or ?focusBar=...
+  // Detail modal (small chart)
+  const openDetailModal = (row) => {
+    setDetailRow(row);
+    setDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailRow(null);
+    setDetailModalOpen(false);
+  };
+
+  // Columns with unit formatting and actions
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1, minWidth: 110 },
+      { field: "ingredient", headerName: "Ingredient", flex: 1.6, minWidth: 180 },
+      { field: "temperature", headerName: "Temperature", flex: 0.9, minWidth: 100 },
+      {
+        field: "stockReceived",
+        headerName: "Received",
+        type: "number",
+        flex: 1,
+        minWidth: 110,
+        renderCell: (params) => {
+          const val = params.row?.stockReceived ?? params.value ?? 0;
+          const unit = params.row?.unit ?? "";
+          return (
+            <Typography variant="body2" sx={{ color: brand.text }}>
+              {`${val}${unit ? ` ${unit}` : ""}`}
+            </Typography>
+          );
+        },
+      },
+      {
+        field: "stockRemaining",
+        headerName: "Remaining",
+        type: "number",
+        flex: 1,
+        minWidth: 120,
+        renderCell: (params) => {
+          const val = params.row?.stockRemaining ?? params.value ?? 0;
+          const unit = params.row?.unit ?? "";
+          return (
+            <Typography variant="body2" sx={{ color: brand.text, fontWeight: 800 }}>
+              {`${val}${unit ? ` ${unit}` : ""}`}
+            </Typography>
+          );
+        },
+      },
+      { field: "invoiceNumber", headerName: "Invoice #", flex: 1, minWidth: 140 },
+      {
+        field: "barCode",
+        headerName: "Batch",
+        flex: 1,
+        minWidth: 140,
+        cellClassName: "barCode-column--cell",
+      },
+      {
+        field: "actions",
+        headerName: "Actions",
+        width: 96,
+        sortable: false,
+        filterable: false,
+        align: "center",
+        renderCell: (params) => {
+          return (
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+              <Tooltip title="Edit">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setEditingRow(params.row);
+                    setOriginalBarcode(params.row.barCode);
+                    setOriginalId(params.row._id);
+                    setEditDialogOpen(true);
+                  }}
+                >
+                  <EditOutlinedIcon sx={{ color: brand.primary }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Detail">
+                <IconButton
+                  size="small"
+                  onClick={() => openDetailModal(params.row)}
+                  sx={{ color: brand.primaryDark }}
+                >
+                  <FileDownloadOutlinedIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  // Focus/scroll logic (unchanged)
   useEffect(() => {
     const focusBar =
       (location && location.state && location.state.focusBar) ||
@@ -395,14 +493,12 @@ const GoodsIn = () => {
     if (!target) return;
     const targetId = target._id;
 
-    // set selection (controlled)
     try {
       setSelectedRows([targetId]);
     } catch (e) {}
 
-    // scroll + highlight after list rendered rows
     setTimeout(() => {
-      const el = containerRef.current && containerRef.current.querySelector(`[data-row-id="${targetId}"]`);
+      const el = document.querySelector(`[data-id="${targetId}"]`);
       if (el) {
         try {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -411,456 +507,237 @@ const GoodsIn = () => {
         setTimeout(() => el.classList.remove("plf-row-highlight"), 2500);
       }
     }, 250);
-
-    // clear location state so this doesn't run repeatedly on back/forward
     try {
       if (window && window.history && window.history.replaceState) {
         const url = new URL(window.location.href);
         url.searchParams.delete("focusBar");
         window.history.replaceState({}, document.title, url.pathname + url.search);
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }, [goodsInRows, location]);
 
-  // header for custom table
-  const ColumnHeaders = () => (
-    <Box sx={{ display: "grid", gridTemplateColumns: "48px 1fr 110px 120px 120px 120px 140px 96px", gap: 12, px: 1, py: 1 }}>
-      <Box />
-      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Ingredient</Typography>
-      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Temp</Typography>
-      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Received</Typography>
-      <Typography sx={{ color: brand.subtext, fontWeight: 800, textAlign: "center" }}>Remaining</Typography>
-      <Typography sx={{ color: brand.subtext, fontWeight: 800 }}>Invoice #</Typography>
-      <Typography sx={{ color: brand.subtext, fontWeight: 800, textAlign: "right" }}>Batch / Expiry</Typography>
-      <Box />
-    </Box>
+  // small custom toolbar (above datagrid)
+  const CustomToolbar = ({ search, unit, onSearchChange, onUnitChange, onExport }) => (
+    <GridToolbarContainer sx={{ display: "flex", gap: 1, p: 1, alignItems: "center", justifyContent: "space-between" }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+        <TextField
+          size="small"
+          placeholder="Search ingredient, batch or invoice"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          sx={{ minWidth: 260, background: brand.surface, borderRadius: 1 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel id="unit-select-label">Unit</InputLabel>
+          <Select
+            labelId="unit-select-label"
+            value={unit}
+            label="Unit"
+            onChange={(e) => onUnitChange(e.target.value)}
+          >
+            {unitOptions.map((u) => (
+              <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Button variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={onExport} sx={{ textTransform: "none" }}>
+          Export CSV
+        </Button>
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Typography variant="caption" sx={{ color: brand.subtext }}>Rows per page</Typography>
+        <FormControl size="small" sx={{ minWidth: 80 }}>
+          <Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+            {[10, 25, 50, 100].map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button onClick={() => { setSearchTerm(""); setUnitFilter(""); }} sx={{ textTransform: "none" }}>Reset</Button>
+      </Box>
+    </GridToolbarContainer>
   );
 
   return (
     <Box m="20px">
       <style>{`
-        .plf-row-highlight {
-          animation: plfHighlight 2.4s ease forwards;
-        }
+        .plf-row-highlight { animation: plfHighlight 2.4s ease forwards; }
         @keyframes plfHighlight {
           0% { background-color: rgba(255, 239, 213, 0.95); }
           10% { background-color: rgba(255, 239, 213, 0.95); }
           90% { background-color: transparent; }
           100% { background-color: transparent; }
         }
-
-        /* alternating row coloring */
-        .gi-even { background-color: ${brand.surface} !important; }
-        .gi-odd  { background-color: ${brand.surfaceMuted} !important; }
-
-        .gi-row:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(16,24,40,0.06); }
+        .barCode-column--cell { color: ${brand.primary}; font-weight: 700; }
+        .goodsin-card { border: 1px solid ${brand.border}; border-radius: 16px; box-shadow: ${brand.shadow}; overflow: hidden; background: ${brand.surface}; }
       `}</style>
 
-      <Box
-        sx={{
-          mt: 2,
-          border: `1px solid ${brand.border}`,
-          borderRadius: 16,
-          background: brand.surface,
-          boxShadow: brand.shadow,
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 2,
-            py: 1.25,
-            borderBottom: `1px solid ${brand.border}`,
-          }}
-        >
+      <Box className="goodsin-card" sx={{ mt: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: `1px solid ${brand.border}` }}>
           <Typography sx={{ fontWeight: 800, color: brand.text }}>Goods In</Typography>
 
           <Box sx={{ display: "flex", gap: 1 }}>
-            <IconButton
-              aria-label="Edit selected cell"
-              onClick={openEditForActiveCell}
-              disabled={!activeCell}
-              title={activeCell ? `Edit ${activeCell.field}` : "Select a cell to edit"}
-              sx={{
-                color: "#fff",
-                borderRadius: 999,
-                width: 40,
-                height: 40,
-                background: activeCell ? `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` : "#f1f5f9",
-                boxShadow: activeCell && "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              }}
-            >
-              <EditOutlinedIcon />
-            </IconButton>
+            <Tooltip title={activeCell ? `Edit ${activeCell.field}` : "Select a cell to edit"}>
+              <span>
+                <IconButton
+                  onClick={openEditForActiveCell}
+                  disabled={!activeCell}
+                  sx={{
+                    color: "#fff", borderRadius: 999, width: 40, height: 40,
+                    background: activeCell ? `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` : "#f1f5f9",
+                  }}
+                >
+                  <EditOutlinedIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
 
-            <IconButton
-              aria-label="Delete selected"
-              onClick={handleOpenConfirmDialog}
-              disabled={selectedRows.length === 0}
-              sx={{
-                color: "#fff",
-                borderRadius: 999,
-                width: 40,
-                height: 40,
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-                opacity: selectedRows.length === 0 ? 0.5 : 1,
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
+            <Tooltip title={selectedRows.length ? "Delete selected" : "Select rows to delete"}>
+              <span>
+                <IconButton
+                  onClick={() => setSelectedRows(selectedRows.length ? selectedRows : [])}
+                  disabled={selectedRows.length === 0}
+                  sx={{
+                    color: "#fff", borderRadius: 999, width: 40, height: 40,
+                    background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, opacity: selectedRows.length === 0 ? 0.5 : 1,
+                  }}
+                  onDoubleClick={handleDeleteSelectedRows}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
         </Box>
 
-        <Box sx={{ px: 1, py: 1 }}>
-          <ColumnHeaders />
-        </Box>
+        {/* Toolbar */}
+        <CustomToolbar
+          search={searchTerm}
+          unit={unitFilter}
+          onSearchChange={setSearchTerm}
+          onUnitChange={setUnitFilter}
+          onExport={exportCsv}
+        />
 
-        <Box
-          ref={containerRef}
-          sx={{
-            height: "70vh",
-            overflow: "auto",
-            px: 1,
-            pb: 2,
-            "&::-webkit-scrollbar": { height: 8 },
-          }}
-        >
-          {loading ? (
-            <Box sx={{ display: "grid", placeItems: "center", height: "100%" }}>
-              <CircularProgress />
-            </Box>
-          ) : (goodsInRows || []).length === 0 ? (
-            <Box sx={{ p: 4, textAlign: "center" }}>
-              <Typography sx={{ color: brand.subtext }}>No Goods In rows found.</Typography>
-            </Box>
-          ) : (
-            (goodsInRows || []).map((row, idx) => {
-              const selected = selectedRows.includes(row._id);
-              const rowClass = idx % 2 === 0 ? "gi-even" : "gi-odd";
-              return (
-                <Box
-                  key={row._id}
-                  data-row-id={row._id}
-                  className={`gi-row ${rowClass}`}
-                  sx={{
-                    mx: 1,
-                    my: 1,
-                    p: 1.25,
-                    borderRadius: 2,
-                    display: "grid",
-                    gridTemplateColumns: "48px 1fr 110px 120px 120px 120px 140px 96px",
-                    gap: 12,
-                    alignItems: "center",
-                    transition: "transform .12s ease, box-shadow .12s ease",
-                    cursor: "default",
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Checkbox
-                      checked={selected}
-                      onChange={() =>
-                        setSelectedRows((prev) => (prev.includes(row._id) ? prev.filter((id) => id !== row._id) : [...prev, row._id]))
-                      }
-                      inputProps={{ "aria-label": `select row ${row.barCode || row._id}` }}
-                      sx={{ color: brand.primary }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </Box>
-
-                  {/* Ingredient + date */}
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
-                    <Typography sx={{ fontWeight: 800, color: brand.text }}>{row.ingredient ?? "-"}</Typography>
-                    <Typography sx={{ color: brand.subtext, fontSize: 13 }}>{row.date ?? "-"}</Typography>
-                  </Box>
-
-                  {/* Temperature */}
-                  <Box
-                    sx={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCellClick(row, "temperature", row.temperature);
-                    }}
-                  >
-                    <Typography sx={{ color: brand.text }}>{row.temperature ?? "-"}</Typography>
-                  </Box>
-
-                  {/* Stock Received */}
-                  <Box
-                    sx={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCellClick(row, "stockReceived", row.stockReceived);
-                    }}
-                  >
-                    <Typography sx={{ color: brand.text }}>{String(row.stockReceived ?? 0) + (row.unit ? ` ${row.unit}` : "")}</Typography>
-                  </Box>
-
-                  {/* Stock Remaining (centered) */}
-                  <Box
-                    sx={{ cursor: "pointer", display: "flex", justifyContent: "center" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCellClick(row, "stockRemaining", row.stockRemaining);
-                    }}
-                  >
-                    <Typography sx={{ color: brand.text, fontWeight: 800 }}>
-                      {String(row.stockRemaining ?? 0) + (row.unit ? ` ${row.unit}` : "")}
-                    </Typography>
-                  </Box>
-
-                  {/* Invoice # */}
-                  <Box
-                    sx={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCellClick(row, "invoiceNumber", row.invoiceNumber);
-                    }}
-                  >
-                    <Typography sx={{ color: brand.subtext }}>{row.invoiceNumber ?? "-"}</Typography>
-                  </Box>
-
-                  {/* Batch + expiry + actions */}
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "flex-end" }}>
-                    <Box sx={{ textAlign: "right", mr: 1 }}>
-                      <Typography
-                        sx={{
-                          color: brand.primary,
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          wordBreak: "break-word",
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // select this row quickly
-                          setSelectedRows((prev) => (prev.includes(row._id) ? prev : [...prev, row._id]));
-                        }}
-                      >
-                        {row.barCode ?? "-"}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: brand.subtext }}>
-                        {row.expiryDate ?? "-"}
-                      </Typography>
-                    </Box>
-
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingRow(row);
-                        setOriginalBarcode(row.barCode);
-                        setOriginalId(row._id);
-                        setActiveCell({ id: row.barCode, field: null, value: null, row });
-                        setEditDialogOpen(true);
-                      }}
-                      aria-label="Edit row"
-                    >
-                      <EditOutlinedIcon sx={{ color: brand.primary }} />
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (row.file) handleFileOpen(row.file);
-                      }}
-                      aria-label="View file"
-                    >
-                      <VisibilityIcon sx={{ color: row.file ? brand.primary : brand.subtext }} />
-                    </IconButton>
-                  </Box>
-                </Box>
-              );
-            })
-          )}
+        {/* DataGrid container — horizontal scroll enabled by minWidth */}
+        <Box sx={{ width: "100%", overflowX: "auto", p: 2 }}>
+          <Box sx={{ minWidth: 980, height: `calc(70vh - 64px)` }}>
+            <DataGrid
+              rows={filteredRows}
+              columns={columns}
+              getRowId={(r) => r._id}
+              pagination
+              pageSize={pageSize}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              checkboxSelection
+              rowSelectionModel={selectedRows}
+              onRowSelectionModelChange={(model) => setSelectedRows(Array.isArray(model) ? model : [])}
+              disableRowSelectionOnClick
+              editMode="row"
+              processRowUpdate={processRowUpdate}
+              onProcessRowUpdateError={(err) => console.error("Row update failed:", err)}
+              onCellClick={handleCellClick}
+              onRowDoubleClick={(params) => openDetailModal(params.row)}
+              sx={{
+                border: "none",
+                "& .MuiDataGrid-columnHeaders": { backgroundColor: "#fbfcfd", color: brand.subtext, borderBottom: `1px solid ${brand.border}`, fontWeight: 800 },
+                "& .MuiDataGrid-cell": { borderBottom: `1px solid ${brand.border}`, color: brand.text },
+                "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+                "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${brand.border}`, background: brand.surface },
+                "& .MuiDataGrid-virtualScroller": { background: brand.surface },
+              }}
+              getRowClassName={(params) => (params.indexRelativeToCurrentPage % 2 === 0 ? "even-row" : "odd-row")}
+            />
+          </Box>
         </Box>
       </Box>
 
-      {/* Edit dialog */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-          setEditingRow(null);
-          setActiveCell(null);
-          setEditValue("");
-          setOriginalBarcode(null);
-          setOriginalId(null);
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow },
-        }}
-      >
+      {/* Edit Dialog (small) */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          {activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}
+          {editingRow ? `Edit: ${editingRow.ingredient}` : "Edit Row"}
         </DialogTitle>
-
         <DialogContent dividers>
-          {activeCell && activeCell.field && !editingRow && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ color: brand.subtext }}>
-                Original Bar Code: {originalBarcode || activeCell.id}
-              </Typography>
-              <Box sx={{ mt: 1 }}>{renderEditInputForField(activeCell.field, editValue, setEditValue)}</Box>
-            </Box>
-          )}
-
-          {(editingRow || (activeCell && activeCell.field === null)) && (
+          {editingRow ? (
             <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
-              {(() => {
-                const row = editingRow || (activeCell ? activeCell.row : null);
-                if (!row) return null;
-                return (
-                  <>
-                    <TextField
-                      label="Ingredient"
-                      fullWidth
-                      value={editingRow?.ingredient ?? row.ingredient ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), ingredient: e.target.value }))}
-                    />
-                    <TextField
-                      label="Date"
-                      fullWidth
-                      type="date"
-                      value={editingRow?.date ?? row.date ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: e.target.value }))}
-                    />
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                      <TextField
-                        label="Stock Received"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.stockReceived ?? row.stockReceived ?? ""}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockReceived: e.target.value }))}
-                      />
-                      <TextField
-                        label="Stock Remaining"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.stockRemaining ?? row.stockRemaining ?? ""}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), stockRemaining: e.target.value }))}
-                      />
-                    </Box>
-                    <FormControl fullWidth>
-                      <InputLabel id="unit-edit-label">Unit</InputLabel>
-                      <Select
-                        labelId="unit-edit-label"
-                        value={editingRow?.unit ?? row.unit ?? ""}
-                        label="Unit"
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unit: e.target.value }))}
-                      >
-                        {unitOptions.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <TextField
-                      label="Batch Code"
-                      fullWidth
-                      value={editingRow?.barCode ?? row.barCode ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), barCode: e.target.value }))}
-                    />
-                    {/* Invoice Number field added to edit dialog */}
-                    <TextField
-                      label="Invoice Number"
-                      fullWidth
-                      value={editingRow?.invoiceNumber ?? row.invoiceNumber ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), invoiceNumber: e.target.value }))}
-                    />
-                    <TextField
-                      label="Expiry Date"
-                      fullWidth
-                      type="date"
-                      value={editingRow?.expiryDate ?? row.expiryDate ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), expiryDate: e.target.value }))}
-                    />
-                    <TextField
-                      label="Temperature (℃)"
-                      fullWidth
-                      value={editingRow?.temperature ?? row.temperature ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), temperature: e.target.value }))}
-                    />
-                  </>
-                );
-              })()}
+              <TextField label="Ingredient" fullWidth value={editingRow.ingredient} onChange={(e) => setEditingRow((p) => ({ ...p, ingredient: e.target.value }))} />
+              <TextField label="Date" type="date" fullWidth value={editingRow.date} onChange={(e) => setEditingRow((p) => ({ ...p, date: e.target.value }))} />
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                <TextField label="Received" type="number" value={editingRow.stockReceived} onChange={(e) => setEditingRow((p) => ({ ...p, stockReceived: e.target.value }))} />
+                <TextField label="Remaining" type="number" value={editingRow.stockRemaining} onChange={(e) => setEditingRow((p) => ({ ...p, stockRemaining: e.target.value }))} />
+              </Box>
+              <FormControl fullWidth>
+                <InputLabel id="unit-edit">Unit</InputLabel>
+                <Select labelId="unit-edit" value={editingRow.unit ?? ""} label="Unit" onChange={(e) => setEditingRow((p) => ({ ...p, unit: e.target.value }))}>
+                  {unitOptions.slice(1).map((u) => <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Batch Code" fullWidth value={editingRow.barCode} onChange={(e) => setEditingRow((p) => ({ ...p, barCode: e.target.value }))} />
+              <TextField label="Invoice #" fullWidth value={editingRow.invoiceNumber ?? ""} onChange={(e) => setEditingRow((p) => ({ ...p, invoiceNumber: e.target.value }))} />
+              <TextField label="Temperature" fullWidth value={editingRow.temperature ?? ""} onChange={(e) => setEditingRow((p) => ({ ...p, temperature: e.target.value }))} />
             </Box>
+          ) : (
+            <Typography sx={{ color: brand.subtext }}>Loading…</Typography>
           )}
         </DialogContent>
-
         <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => {
-              setEditDialogOpen(false);
-              setEditingRow(null);
-              setActiveCell(null);
-              setEditValue("");
-              setOriginalBarcode(null);
-              setOriginalId(null);
-            }}
-            sx={{ textTransform: "none" }}
-            disabled={updating}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmEdit}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
-            disabled={updating}
-          >
-            {updating ? "Updating…" : "Confirm"}
+          <Button onClick={() => setEditDialogOpen(false)} sx={{ textTransform: "none" }} disabled={updating}>Cancel</Button>
+          <Button onClick={handleConfirmEdit} sx={{ textTransform: "none", fontWeight: 800, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` }} disabled={updating}>
+            {updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={openConfirmDialog}
-        onClose={handleCloseConfirmDialog}
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>
-            Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}?
-          </Typography>
+      {/* Detail Modal */}
+      <Dialog open={detailModalOpen} onClose={closeDetailModal} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Detail view</DialogTitle>
+        <DialogContent dividers>
+          {!detailRow ? (
+            <Typography sx={{ color: brand.subtext }}>No detail.</Typography>
+          ) : (
+            <Box sx={{ display: "grid", gap: 2 }}>
+              <Typography sx={{ fontWeight: 800 }}>{detailRow.ingredient}</Typography>
+              <Typography variant="caption" sx={{ color: brand.subtext }}>{detailRow.date} · Batch: {detailRow.barCode}</Typography>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2">Received</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{detailRow.stockReceived} {detailRow.unit}</Typography>
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2">Remaining</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{detailRow.stockRemaining} {detailRow.unit}</Typography>
+                </Box>
+              </Box>
+
+              {/* Small inline bar chart (SVG) comparing Received vs Remaining */}
+              <Box sx={{ mt: 1 }}>
+                <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="none">
+                  {/* Background */}
+                  <rect x="0" y="0" width="300" height="60" fill="#fff" />
+                  {/* Bars */}
+                  {(() => {
+                    const r = Number(detailRow.stockReceived || 0);
+                    const rem = Number(detailRow.stockRemaining || 0);
+                    const maxv = Math.max(1, r, rem);
+                    const rw = Math.round((r / maxv) * 120);
+                    const remw = Math.round((rem / maxv) * 120);
+                    return (
+                      <>
+                        <rect x="10" y="10" width={rw} height="18" fill="#7C3AED" rx="4" />
+                        <rect x="10" y="34" width={remw} height="12" fill="#60a5fa" rx="3" />
+                        <text x={140} y="22" fontSize="10" fill="#334155">Received: {r} {detailRow.unit}</text>
+                        <text x={140} y="46" fontSize="10" fill="#334155">Remaining: {rem} {detailRow.unit}</text>
+                      </>
+                    );
+                  })()}
+                </svg>
+              </Box>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseConfirmDialog} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteSelectedRows}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={<DeleteIcon />}
-          >
-            Delete
-          </Button>
+          <Button onClick={closeDetailModal} sx={{ textTransform: "none" }}>Close</Button>
+          <Button onClick={() => { navigator.clipboard?.writeText(JSON.stringify(detailRow)); }} sx={{ textTransform: "none", fontWeight: 800, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` }}>Copy JSON</Button>
         </DialogActions>
       </Dialog>
     </Box>
