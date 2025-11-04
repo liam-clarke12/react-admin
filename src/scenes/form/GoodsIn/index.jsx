@@ -1177,4 +1177,5 @@ const GoodsInForm = () => {
   );
 };
 
+
 export default GoodsInForm;
