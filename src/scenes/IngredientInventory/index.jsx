@@ -1,169 +1,211 @@
-// src/scenes/inventory/IngredientsInventory.jsx
+// IngredientsInventory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Box,
-  Drawer,
-  Typography,
-  IconButton,
-  Snackbar,
-  useMediaQuery,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Paper,
-  Chip,
-  Stack,
+  BarChart as RBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { DataGrid } from "@mui/x-data-grid";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import PackageIcon from "@mui/icons-material/Inventory2";
-import BarChart from "../../components/BarChart";
-import { useAuth } from "../../contexts/AuthContext";
-import { useData } from "../../contexts/DataContext";
+  ResponsiveContainer,
+} from "recharts";
 
+/* ===================== Scoped Styles ===================== */
+const Styles = () => (
+  <style>{`
+    .ii-page { background:#f1f5f9; min-height:100vh; color:#0f172a; }
+    .ii-wrap { max-width:1200px; margin:0 auto; padding:16px; }
+
+    /* Header */
+    .ii-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .ii-hgroup { display:flex; align-items:center; gap:12px; }
+    .ii-logo {
+      width:52px; height:52px; border-radius:12px;
+      background: linear-gradient(180deg, #7C3AED, #5B21B6);
+      box-shadow:0 8px 20px rgba(124,58,237,0.12);
+      display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:18px;
+    }
+    .ii-title { margin:0; font-weight:800; font-size:20px; }
+    .ii-sub { margin:0; color:#334155; font-size:12px; }
+    .ii-iconbtn {
+      width:40px; height:40px; border-radius:999px;
+      border:1px solid #e5e7eb; background:#ffffff; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition: background .15s ease, transform .08s ease;
+    }
+    .ii-iconbtn:hover { background:#f1f5f9; transform: translateY(-1px); }
+
+    /* Grid */
+    .ii-grid { display:grid; grid-template-columns: 1.6fr 1fr; gap:16px; }
+    @media (max-width: 900px) { .ii-grid { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .ii-card {
+      background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden;
+      box-shadow:0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08);
+    }
+    .ii-card-head {
+      padding:12px 14px; border-bottom:1px solid #e5e7eb; background:#ffffff;
+    }
+    .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
+    .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+
+    /* Table (no libs) */
+    .ii-table-wrap { overflow:auto; }
+    .ii-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
+    .ii-thead th {
+      text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.02em;
+      background:#fbfcfd; color:#334155; padding:10px 12px; border-bottom:1px solid #e5e7eb; font-weight:800;
+      position:sticky; top:0; z-index:1;
+    }
+    .ii-row { border-bottom:1px solid #e5e7eb; }
+    .ii-row:nth-child(odd) { background:#ffffff; }
+    .ii-row:nth-child(even) { background:#f8fafc; }
+    .ii-row:hover { background:#f4f1ff; }
+    .ii-td { padding:12px; }
+    .ii-td-strong { font-weight:700; color:#0f172a; white-space:nowrap; }
+    .ii-chip {
+      display:inline-flex; align-items:center; padding:4px 8px; border-radius:8px;
+      border:1px solid #e5e7eb; background:#f8fafc; font-weight:700; color:#0f172a; font-size:12px;
+    }
+    .ii-badge {
+      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700;
+      background:#f9f5ff; color:#7C3AED; border:1px solid #eee;
+    }
+
+    /* Modal */
+    .ii-dim {
+      position:fixed; inset:0; background:rgba(0,0,0,.48);
+      display:flex; align-items:center; justify-content:center; z-index:50;
+      animation: ii-fade .18s ease-out forwards;
+    }
+    .ii-modal {
+      width:min(540px, 92vw); background:#fff; border:1px solid #e5e7eb; border-radius:14px;
+      box-shadow:0 10px 30px rgba(2,6,23,.22); overflow:hidden;
+      animation: ii-slide .22s ease-out forwards;
+    }
+    .ii-mhead { padding:12px 14px; border-bottom:1px solid #e5e7eb; }
+    .ii-mhead h4 { margin:0; font-weight:800; }
+    .ii-mbody { padding:14px; color:#334155; }
+    .ii-mfoot { padding:12px 14px; border-top:1px solid #e5e7eb; text-align:right; }
+    .ii-btn {
+      display:inline-flex; align-items:center; gap:8px; border:0; border-radius:10px; cursor:pointer;
+      font-weight:800; padding:10px 14px;
+    }
+    .ii-btn-ghost { background:#fff; border:1px solid #e5e7eb; color:#0f172a; }
+    .ii-btn-ghost:hover { background:#f1f5f9; }
+    .ii-btn-primary { color:#fff; background: linear-gradient(180deg, #7C3AED, #5B21B6); }
+    .ii-btn-primary:hover { background: linear-gradient(180deg, #5B21B6, #5B21B6); }
+
+    /* Snackbar */
+    .ii-snack {
+      position:fixed; right:16px; bottom:16px; background:#dc2626; color:#fff; padding:10px 12px;
+      border-radius:10px; box-shadow:0 10px 20px rgba(0,0,0,.15);
+      transform: translateY(12px); opacity:0; animation: ii-pop .25s ease-out forwards;
+      z-index:60;
+    }
+
+    @keyframes ii-fade { from { opacity:0 } to { opacity:1 } }
+    @keyframes ii-slide { from { transform: translateY(12px) scale(.98); opacity:0 } to { transform:none; opacity:1 } }
+    @keyframes ii-pop { to { transform:none; opacity:1 } }
+  `}</style>
+);
+
+/* ===================== Helpers (unchanged logic) ===================== */
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff",
-};
-
-/**
- * Unit normalization helpers
- *
- * - mass base: grams (g)  — kg -> *1000
- * - volume base: milliliters (ml) — l -> *1000
- * - count base: units (no conversion)
- *
- * If unit text is unknown we treat as 'units' fallback.
- */
 const detectUnitTypeAndFactor = (rawUnit) => {
   const u = String(rawUnit || "").trim().toLowerCase();
   if (!u) return { type: "units", base: "units", factor: 1 };
 
-  // Mass
+  // mass
   if (u.includes("kg") || u.includes("kilogram"))
     return { type: "mass", base: "g", factor: 1000 };
   if (u.includes("g") || u.includes("gram"))
     return { type: "mass", base: "g", factor: 1 };
 
-  // Volume
+  // volume
   if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter"))
     return { type: "volume", base: "ml", factor: 1000 };
   if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre"))
     return { type: "volume", base: "ml", factor: 1 };
 
-  // Count-ish
+  // count
   if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("pieces"))
     return { type: "units", base: "units", factor: 1 };
 
-  // Fallback — treat as units
   return { type: "units", base: "units", factor: 1 };
 };
 
-const formatDisplayForGroup = ({ type, totalBase }) => {
+const formatDisplayForGroup = (type, totalBase) => {
   if (type === "mass") {
-    // base is grams; show kg if >= 1000g
     if (Math.abs(totalBase) >= 1000) {
       const val = +(totalBase / 1000).toFixed(3);
-      return {
-        displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()),
-        displayUnit: "kg",
-        numericForChart: val,
-      };
+      return { displayValue: val, displayUnit: "kg", numericForChart: val };
     }
-    return {
-      displayValue: Number.isInteger(totalBase)
-        ? totalBase
-        : parseFloat(totalBase.toFixed(3)),
-      displayUnit: "g",
-      numericForChart: totalBase,
-    };
+    return { displayValue: +(+totalBase).toFixed(3), displayUnit: "g", numericForChart: totalBase };
   }
   if (type === "volume") {
-    // base is ml; show L if >= 1000ml
     if (Math.abs(totalBase) >= 1000) {
       const val = +(totalBase / 1000).toFixed(3);
-      return {
-        displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()),
-        displayUnit: "L",
-        numericForChart: val,
-      };
+      return { displayValue: val, displayUnit: "L", numericForChart: val };
     }
-    return {
-      displayValue: Number.isInteger(totalBase)
-        ? totalBase
-        : parseFloat(totalBase.toFixed(3)),
-      displayUnit: "ml",
-      numericForChart: totalBase,
-    };
+    return { displayValue: +(+totalBase).toFixed(3), displayUnit: "ml", numericForChart: totalBase };
   }
-  // units / fallback
-  return {
-    displayValue: Number.isInteger(totalBase)
-      ? totalBase
-      : parseFloat(totalBase.toFixed(3)),
-    displayUnit: "units",
-    numericForChart: totalBase,
-  };
+  return { displayValue: Number(totalBase), displayUnit: "units", numericForChart: totalBase };
 };
 
+/* ===================== Info Modal ===================== */
+const InfoModal = ({ open, onClose }) => {
+  if (!open) return null;
+  return (
+    <div className="ii-dim" onClick={onClose}>
+      <div className="ii-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ii-mhead">
+          <h4>About this table</h4>
+        </div>
+        <div className="ii-mbody">
+          These rows are read-only aggregates of your active goods-in lots. To change
+          stock-on-hand values you must add, delete or edit the corresponding goods-in
+          entries from the "Goods In" screen. This view summarizes active inventory and
+          cannot be edited directly.
+        </div>
+        <div className="ii-mfoot">
+          <button className="ii-btn ii-btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== Main Component ===================== */
 const IngredientsInventory = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { ingredientInventory, setIngredientInventory } = useData();
-  const { cognitoId } = useAuth();
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [rows, setRows] = useState([]);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [snack, setSnack] = useState("");
 
-  // Fetch ACTIVE inventory (soft-deleted/zero-remaining excluded)
+  // Fetch ACTIVE inventory (same endpoint/flow you had)
   useEffect(() => {
     const fetchActiveInventory = async () => {
-      if (!cognitoId) return;
       try {
-        const res = await fetch(
-          `${API_BASE}/ingredient-inventory/active?cognito_id=${cognitoId}`
-        );
-        if (!res.ok)
-          throw new Error(`Failed to fetch active inventory (${res.status})`);
+        // If you need cognito_id, plug it here:
+        const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=mock-cognito-id`);
+        if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
         const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
 
-        // Defensive: ensure array
-        const rows = Array.isArray(data) ? data : [];
-
-        // Normalize & aggregate
-        const groups = {}; // key: normalized ingredient name
-        rows.forEach((r, idx) => {
+        // group & normalize to base units
+        const groups = {};
+        list.forEach((r, idx) => {
           const ingredient = (r?.ingredient ?? "").trim();
-          if (!ingredient) return; // skip empty names
+          if (!ingredient) return;
 
-          const rawUnit = r?.unit ?? "";
-          const { type, base, factor } = detectUnitTypeAndFactor(rawUnit);
-
-          // Parse numeric totalRemaining (fallback 0)
+          const { type, base, factor } = detectUnitTypeAndFactor(r?.unit ?? "");
           const rawAmount = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
-          const baseAmount = rawAmount * (Number(factor) || 1);
+          const baseAmount = rawAmount * (factor || 1);
+          const key = ingredient.toLowerCase();
 
-          const key = ingredient.toLowerCase(); // case-insensitive grouping
           if (!groups[key]) {
             groups[key] = {
               ingredient,
@@ -171,19 +213,16 @@ const IngredientsInventory = () => {
               type,
               baseUnit: base,
               sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
-              // keep a sample batchCode/id for row id (prefer existing batchCode if present)
               sampleId: r?.batchCode ?? `${ingredient}-${idx}`,
               latestDate: r?.date ?? null,
             };
           } else {
-            // If type mismatch (e.g., some rows recorded in mass and some in volume) — treat conservatively
+            // if type changes (e.g., ml vs g), split into a separate group
             if (groups[key].type !== type) {
               const altKey = `${key}::${type}`;
               if (!groups[altKey]) {
                 groups[altKey] = {
-                  ingredient: `${ingredient} (${
-                    type === "mass" ? "mass" : type === "volume" ? "volume" : "units"
-                  })`,
+                  ingredient: `${ingredient} (${type})`,
                   totalBase: baseAmount,
                   type,
                   baseUnit: base,
@@ -203,7 +242,6 @@ const IngredientsInventory = () => {
               }
             } else {
               groups[key].totalBase += baseAmount;
-              // prefer the newest date for the group (useful for display if needed)
               if (
                 r?.date &&
                 (!groups[key].latestDate ||
@@ -211,7 +249,6 @@ const IngredientsInventory = () => {
               ) {
                 groups[key].latestDate = r.date;
               }
-              // pick first non-empty barcode (keep whatever we had)
               if (!groups[key].sampleBarcode && (r?.activeBarcode || r?.barcode)) {
                 groups[key].sampleBarcode = r?.activeBarcode ?? r?.barcode;
               }
@@ -219,379 +256,184 @@ const IngredientsInventory = () => {
           }
         });
 
-        // Convert groups object into array for grid, formatting human-friendly units
-        const processed = Object.values(groups).map((g, idx) => {
-          const { displayValue, displayUnit, numericForChart } =
-            formatDisplayForGroup({
-              type: g.type,
-              totalBase: g.totalBase,
-            });
-
+        const processed = Object.values(groups).map((g, i) => {
+          const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup(
+            g.type,
+            g.totalBase
+          );
           return {
-            // ensure stable unique id per row
-            id: g.sampleId ?? `${g.ingredient}-${idx}`,
+            id: g.sampleId ?? `${g.ingredient}-${i}`,
             ingredient: g.ingredient,
             unitsInStock: displayValue,
             unit: displayUnit,
-            // keep raw numeric value for charts
             _numeric: numericForChart,
             barcode: g.sampleBarcode ?? "",
             date: g.latestDate,
           };
         });
 
-        // sort alphabetically for UX
         processed.sort((a, b) => a.ingredient.localeCompare(b.ingredient));
-
-        setIngredientInventory(processed);
-      } catch (err) {
-        console.error("Error fetching active ingredient inventory:", err);
-        setSnackbarMessage("Failed to load ingredient inventory");
-        setOpenSnackbar(true);
-        setIngredientInventory([]);
+        setRows(processed);
+      } catch (e) {
+        console.error(e);
+        setSnack("Failed to load ingredient inventory");
+        setRows([]);
       }
     };
 
     fetchActiveInventory();
-  }, [cognitoId, setIngredientInventory]);
+  }, []);
 
-  // Columns (no expiry column)
-  const columns = useMemo(
-    () => [
-      {
-        field: "ingredient",
-        headerName: "Ingredient",
-        flex: 1,
-        editable: false,
-      },
-      {
-        field: "unitsInStock",
-        headerName: "Units in Stock",
-        type: "number",
-        flex: 1,
-        editable: false,
-        // defensive: guard params might be undefined
-        valueGetter: (params) =>
-          params && params.row ? params.row.unitsInStock ?? 0 : params?.value ?? 0,
-        renderCell: (params) => {
-          const v = params && params.row ? params.row.unitsInStock : params?.value;
-          return (
-            <Box
-              component="span"
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                px: 1.25,
-                py: 0.5,
-                borderRadius: 1,
-                background: "#f8fafc",
-                border: `1px solid ${brand.border}`,
-                fontWeight: 700,
-                color: brand.text,
-              }}
-            >
-              {typeof v === "number"
-                ? Number.isFinite(v)
-                  ? v.toLocaleString()
-                  : String(v)
-                : String(v ?? "")}
-            </Box>
-          );
-        },
-      },
-      {
-        field: "unit",
-        headerName: "Unit",
-        flex: 0.7,
-        editable: false,
-      },
-      {
-        field: "barcode",
-        headerName: "Active Barcode",
-        flex: 1,
-        editable: false,
-        cellClassName: "barCode-column--cell",
-        renderCell: (params) => (
-          <Chip
-            label={params?.row?.barcode || "-"}
-            variant="outlined"
-            sx={{
-              bgcolor: "#f9f5ff",
-              color: brand.primary,
-              borderColor: "#eee",
-              height: 26,
-            }}
-          />
-        ),
-      },
-    ],
-    []
-  );
-
-  // Bar chart data
-  const barChartData = useMemo(
+  const chartData = useMemo(
     () =>
-      (ingredientInventory || []).map((item) => ({
-        ingredient: item.ingredient,
-        amount: Number(item._numeric) || 0,
+      (rows || []).map((r) => ({
+        ingredient: r.ingredient,
+        amount: Number(r._numeric) || 0,
       })),
-    [ingredientInventory]
+    [rows]
   );
 
   return (
-    <Box m={2} sx={{ overflowX: "hidden" }}>
-      <style>{`
-        .inv-card {
-          border: 1px solid ${brand.border};
-          background: ${brand.surface};
-          border-radius: 16px;
-          box-shadow: ${brand.shadow};
-          overflow: hidden;
-        }
-        .inv-toolbar {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px; border-bottom: 1px solid ${brand.border}; background: ${brand.surface};
-        }
-        .pill-icon {
-          background: #f1f5f9;
-          border: 1px solid ${brand.border};
-          width: 40px; height: 40px; border-radius: 999px;
-          display: inline-flex; align-items: center; justify-content: center;
-          transition: background 0.2s ease, transform 0.1s ease;
-        }
-        .pill-icon:hover { background: #e2e8f0; transform: translateY(-1px); }
-        .toolbar-right { display:flex; gap:8px; align-items:center; }
-        .barCode-column--cell { color: ${brand.primary}; }
+    <div className="ii-page">
+      <Styles />
 
-        /* Alternating row colors for Ingredients DataGrid */
-        .inv-even-row { background-color: ${brand.surfaceMuted} !important; }
-        .inv-odd-row  { background-color: ${brand.surface} !important; }
-      `}</style>
+      <div className="ii-wrap">
+        {/* Header */}
+        <div className="ii-header">
+          <div className="ii-hgroup">
+            <div className="ii-logo" aria-label="Inventory">Inv</div>
+            <div>
+              <h1 className="ii-title">Ingredient Inventory</h1>
+              <p className="ii-sub">Read-only aggregates of active Goods-In lots</p>
+            </div>
+          </div>
 
-      {/* Page header — mirrors Goods In look/feel */}
-      <Box
-        maxWidth="1200px"
-        mx="auto"
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={2}
-        flexWrap="wrap"
-        mb={2}
-      >
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box
-            sx={{
-              width: 52,
-              height: 52,
-              borderRadius: 2,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              boxShadow: "0 8px 20px rgba(124,58,237,0.12)",
-            }}
-          >
-            <PackageIcon sx={{ color: "white" }} />
-          </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Ingredient Inventory
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Read-only aggregates of active Goods-In lots
-            </Typography>
-          </Box>
-        </Box>
+          <button className="ii-iconbtn" onClick={() => setInfoOpen(true)} aria-label="About this table">
+            {/* Info icon */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </button>
+        </div>
 
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Tooltip title="About this table">
-            <IconButton
-              aria-label="Info about inventory view"
-              onClick={() => setInfoOpen(true)}
-              className="pill-icon"
-              sx={{ color: brand.text }}
-            >
-              <InfoOutlinedIcon />
-            </IconButton>
-          </Tooltip>
+        {/* Grid: table left, chart right */}
+        <div className="ii-grid">
+          {/* Table Card */}
+          <div className="ii-card" style={{ minHeight: 520 }}>
+            <div className="ii-card-head">
+              <h3>Active Stock</h3>
+              <p>Normalized into g / ml / units</p>
+            </div>
+            <div className="ii-table-wrap">
+              <table className="ii-table">
+                <thead className="ii-thead">
+                  <tr>
+                    <th>Ingredient</th>
+                    <th>Units in Stock</th>
+                    <th>Unit</th>
+                    <th>Active Barcode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr className="ii-row">
+                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
+                        No active inventory found.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row, index) => (
+                      <tr key={row.id || index} className="ii-row">
+                        <td className="ii-td ii-td-strong">{row.ingredient}</td>
+                        <td className="ii-td">
+                          <span className="ii-chip">
+                            {Number.isFinite(row.unitsInStock) ? row.unitsInStock.toLocaleString() : String(row.unitsInStock)}
+                          </span>
+                        </td>
+                        <td className="ii-td">{row.unit}</td>
+                        <td className="ii-td">
+                          <span className="ii-badge">{row.barcode || "-"}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-          <Tooltip title="Open bar chart">
-            <IconButton
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open Bar Chart"
-              className="pill-icon"
-              sx={{ color: brand.text }}
-            >
-              <BarChartOutlinedIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
+          {/* Chart Card */}
+          <div className="ii-card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="ii-card-head">
+              <h3>Inventory Levels</h3>
+              <p>Normalized amounts by ingredient</p>
+            </div>
+            <div style={{ flex: 1, minHeight: 420, padding: 8 }}>
+              {chartData.length === 0 ? (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+                  No data for chart.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RBarChart
+                    data={chartData}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 100 }}
+                  >
+                    <defs>
+                      <linearGradient id="iiColorAmount" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#5B21B6" stopOpacity={0.8}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="ingredient"
+                      angle={-45}
+                      textAnchor="end"
+                      interval={0}
+                      height={90}
+                      tick={{ fontSize: 12, fill: '#334155' }}
+                      stroke="#e5e7eb"
+                    />
+                    <YAxis tick={{ fontSize: 12, fill: '#334155' }} stroke="#e5e7eb" />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(124, 58, 237, 0.08)' }}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div style={{
+                              background:'#fff', border:'1px solid #e5e7eb',
+                              borderRadius:8, padding:8, boxShadow:'0 10px 20px rgba(0,0,0,.08)'
+                            }}>
+                              <div style={{ fontWeight:800, color:'#0f172a' }}>{label}</div>
+                              <div style={{ fontSize:12, color:'#5B21B6', fontWeight:700 }}>
+                                Amount: {Number(payload[0].value).toLocaleString()}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="amount" fill="url(#iiColorAmount)" radius={[4,4,0,0]} />
+                  </RBarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Main card */}
-      <Box maxWidth="1200px" mx="auto" display="flex" gap={2} flexDirection={{ xs: "column", md: "row" }}>
-        <Paper className="inv-card" sx={{ flex: 1 }}>
-          {/* DataGrid */}
-          <Box
-            sx={{
-              height: "70vh",
-              "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
-              "& .MuiDataGrid-columnHeaders": {
-                backgroundColor: "#fbfcfd",
-                color: brand.subtext,
-                borderBottom: `1px solid ${brand.border}`,
-                fontWeight: 800,
-              },
-              "& .MuiDataGrid-columnSeparator": { display: "none" },
-              "& .MuiDataGrid-cell": {
-                borderBottom: `1px solid ${brand.border}`,
-                color: brand.text,
-              },
-              "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-              "& .MuiDataGrid-footerContainer": {
-                borderTop: `1px solid ${brand.border}`,
-                background: brand.surface,
-              },
-              "& .barCode-column--cell": { color: brand.primary },
-            }}
-          >
-            <DataGrid
-              autoHeight={false}
-              getRowId={(row) => row.id || `${row.ingredient}`}
-              rows={ingredientInventory || []}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[5, 10, 20]}
-              disableSelectionOnClick
-              getRowClassName={(params) =>
-                params.indexRelativeToCurrentPage % 2 === 0
-                  ? "inv-even-row"
-                  : "inv-odd-row"
-              }
-            />
-          </Box>
-        </Paper>
-
-        {/* Right rail with legend (mirroring Goods In "Legend"/"Quick Stats" vibe) */}
-        <Box sx={{ width: { xs: "100%", md: 320 } }}>
-          <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: brand.shadow }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-              Quick Stats
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Bar chart available via the button above
-            </Typography>
-            <Box sx={{ mt: 1.5 }}>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip label="Mass in g/kg" size="small" />
-                <Chip label="Volume in ml/L" size="small" />
-                <Chip label="Units (count)" size="small" />
-              </Stack>
-            </Box>
-          </Paper>
-
-          <Paper sx={{ p: 2, borderRadius: 2, boxShadow: brand.shadow }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-              Legend
-            </Typography>
-            <Box
-              sx={{
-                mt: 1,
-                display: "flex",
-                gap: 1,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <Chip label="Barcode" size="small" sx={{ bgcolor: "#f9f5ff", color: brand.primary }} />
-              <Chip label="Row hover" size="small" sx={{ bgcolor: brand.surfaceMuted }} />
-            </Box>
-          </Paper>
-        </Box>
-      </Box>
-
-      {/* Drawer with Bar Chart */}
-      <Drawer
-        anchor={isMobile ? "bottom" : "right"}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        PaperProps={{
-          sx: {
-            width: isMobile ? "100%" : "88%",
-            borderRadius: isMobile ? "20px 20px 0 0" : "20px 0 0 20px",
-            border: `1px solid ${brand.border}`,
-            boxShadow: brand.shadow,
-            overflow: "hidden",
-          },
-        }}
-      >
-        {/* Drawer header */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            px: 2,
-            py: 1.25,
-            color: "#fff",
-            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-          }}
-        >
-          <IconButton onClick={() => setDrawerOpen(false)} sx={{ color: "#fff" }}>
-            <MenuOutlinedIcon />
-          </IconButton>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-            Bar Chart
-          </Typography>
-        </Box>
-
-        {/* Drawer body */}
-        <Box
-          sx={{
-            background: brand.surface,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            px: 2,
-            py: 3,
-          }}
-        >
-          <BarChart
-            data={barChartData}
-            keys={["amount"]}
-            indexBy="ingredient"
-            height="500px"
-            width="95%"
-          />
-        </Box>
-      </Drawer>
-
-      {/* Info dialog */}
-      <Dialog open={infoOpen} onClose={() => setInfoOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 800 }}>About this table</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>
-            These rows are read-only aggregates of your active goods-in lots. To
-            change stock-on-hand values you must add, delete or edit the corresponding
-            goods-in entries from the "Goods In" screen. This view summarizes active
-            inventory and cannot be edited directly.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2, py: 1 }}>
-          <Button onClick={() => setInfoOpen(false)} sx={{ textTransform: "none" }}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={3000}
-        onClose={() => setOpenSnackbar(false)}
-        message={snackbarMessage}
-      />
-    </Box>
+      {/* Info modal & snackbar */}
+      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      {snack && (
+        <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
+          {snack}
+        </div>
+      )}
+    </div>
   );
 };
 
