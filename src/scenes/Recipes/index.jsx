@@ -1,7 +1,8 @@
 // src/scenes/recipes/Recipes.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
+import RecipeForm from "../form/RecipeForm"; // NEW: embed form in modal
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -37,6 +38,12 @@ const DownloadIcon = (props) => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
   </Svg>
 );
+/* NEW: plus icon for "Add Recipe" */
+const PlusIcon = (props) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+  </Svg>
+);
 
 /* Simple unit options used in the edit modal */
 const UNIT_OPTIONS = [
@@ -57,6 +64,7 @@ const BrandStyles = () => (
   }
   .r-head { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
   .r-title { margin:0; font-weight:800; color:#0f172a; font-size:16px; }
+  .r-right { display:flex; align-items:center; gap:10px; }
   .r-pill { font-size:12px; font-weight:700; color:#7C3AED; }
   .r-btn-icon {
     border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626;
@@ -82,10 +90,12 @@ const BrandStyles = () => (
   }
   .r-btn-ghost:hover { background:#f4f1ff; }
   .r-btn-primary {
-    padding:8px 16px; font-weight:700; color:#fff; background:#7C3AED; border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 14px; font-weight:800; color:#fff; background:linear-gradient(180deg, #7C3AED, #5B21B6);
+    border:0; border-radius:999px;
+    box-shadow:0 8px 16px rgba(29,78,216,0.18), 0 2px 4px rgba(15,23,42,0.06); cursor:pointer;
   }
-  .r-btn-primary:hover { background:#5B21B6; }
+  .r-btn-primary:hover { background:linear-gradient(180deg, #5B21B6, #5B21B6); }
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
   .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
@@ -117,7 +127,7 @@ const BrandStyles = () => (
 
   /* Modal */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:60; }
-  .r-modal { background:#fff; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
+  .r-modal { background:#fff; border-radius:12px; width:100%; max-width:760px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
   .r-mbody { padding:16px; overflow:auto; }
   .r-mgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -145,6 +155,7 @@ const RecipeTable = ({
   selectedRecipeIds,
   setSelectedRecipeIds,
   onDelete,
+  onAdd, // NEW
 }) => {
   const checkboxRef = useRef(null);
   const handleSelectAll = (e) => {
@@ -169,14 +180,21 @@ const RecipeTable = ({
     <div className="r-card">
       <div className="r-head">
         <h2 className="r-title">Recipes</h2>
-        {numSelected > 0 && (
-          <div className="r-flex">
-            <span className="r-pill">{numSelected} selected</span>
-            <button className="r-btn-icon" onClick={onDelete} aria-label="Delete selected">
-              <DeleteIcon />
-            </button>
-          </div>
-        )}
+        <div className="r-right">
+          {/* NEW: Add Recipe button */}
+          <button className="r-btn-primary" onClick={onAdd} aria-label="Add Recipe">
+            <PlusIcon /> Add Recipe
+          </button>
+
+          {numSelected > 0 && (
+            <>
+              <span className="r-pill">{numSelected} selected</span>
+              <button className="r-btn-icon" onClick={onDelete} aria-label="Delete selected">
+                <DeleteIcon />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="r-table-wrap">
@@ -195,7 +213,7 @@ const RecipeTable = ({
             </tr>
           </thead>
           <tbody>
-            {recipes.map((r, idx) => (
+            {recipes.map((r) => (
               <tr key={r.id} className="r-row">
                 <td className="r-td">
                   <input
@@ -498,54 +516,58 @@ const Recipes = () => {
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  useEffect(() => {
+  /* NEW: Add modal state */
+  const [addOpen, setAddOpen] = useState(false);
+
+  const fetchRecipeData = useCallback(async () => {
     if (!cognitoId) return;
-    const fetchRecipeData = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
-        if (!res.ok) throw new Error("Failed to fetch Recipe data");
-        const data = await res.json();
+    try {
+      const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+      if (!res.ok) throw new Error("Failed to fetch Recipe data");
+      const data = await res.json();
 
-        const grouped = data.reduce((acc, row) => {
-          let entry = acc.find((r) => r.id === row.recipe_id);
-          if (entry) {
-            entry.ingredients.push(row.ingredient);
-            entry.quantities.push(row.quantity);
-            entry.units.push(row.unit);
-          } else {
-            acc.push({
-              id: row.recipe_id,
-              recipe: row.recipe,
-              upb: row.units_per_batch,
-              ingredients: [row.ingredient],
-              quantities: [row.quantity],
-              units: [row.unit],
-            });
-          }
-          return acc;
-        }, []);
-        setRows(grouped);
+      const grouped = data.reduce((acc, row) => {
+        let entry = acc.find((r) => r.id === row.recipe_id);
+        if (entry) {
+          entry.ingredients.push(row.ingredient);
+          entry.quantities.push(row.quantity);
+          entry.units.push(row.unit);
+        } else {
+          acc.push({
+            id: row.recipe_id,
+            recipe: row.recipe,
+            upb: row.units_per_batch,
+            ingredients: [row.ingredient],
+            quantities: [row.quantity],
+            units: [row.unit],
+          });
+        }
+        return acc;
+      }, []);
+      setRows(grouped);
 
-        const asRecipes = grouped.map((g) => ({
-          id: g.id,
-          name: g.recipe,
-          unitsPerBatch: g.upb,
-          ingredients: (g.ingredients || []).map((ing, i) => ({
-            id: `${g.id}_${i}`,
-            name: ing,
-            quantity: g.quantities?.[i] ?? "",
-            unit: g.units?.[i] ?? "",
-          })),
-        }));
-        setRecipes(asRecipes);
-      } catch (err) {
-        console.error("Error fetching recipes:", err);
-        setRows([]);
-        setRecipes([]);
-      }
-    };
-    fetchRecipeData();
+      const asRecipes = grouped.map((g) => ({
+        id: g.id,
+        name: g.recipe,
+        unitsPerBatch: g.upb,
+        ingredients: (g.ingredients || []).map((ing, i) => ({
+          id: `${g.id}_${i}`,
+          name: ing,
+          quantity: g.quantities?.[i] ?? "",
+          unit: g.units?.[i] ?? "",
+        })),
+      }));
+      setRecipes(asRecipes);
+    } catch (err) {
+      console.error("Error fetching recipes:", err);
+      setRows([]);
+      setRecipes([]);
+    }
   }, [cognitoId, setRows]);
+
+  useEffect(() => {
+    fetchRecipeData();
+  }, [fetchRecipeData]);
 
   const handleOpenDrawer = (recipeId, type) => {
     const r = recipes.find((x) => x.id === recipeId);
@@ -600,43 +622,7 @@ const Recipes = () => {
         const t = await resp.text().catch(() => "");
         throw new Error(t || `Update failed (${resp.status})`);
       }
-
-      const r2 = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
-      if (!r2.ok) throw new Error("Failed to refresh recipes");
-      const data = await r2.json();
-
-      const grouped = data.reduce((acc, row) => {
-        let entry = acc.find((r) => r.id === row.recipe_id);
-        if (entry) {
-          entry.ingredients.push(row.ingredient);
-          entry.quantities.push(row.quantity);
-          entry.units.push(row.unit);
-        } else {
-          acc.push({
-            id: row.recipe_id,
-            recipe: row.recipe,
-            upb: row.units_per_batch,
-            ingredients: [row.ingredient],
-            quantities: [row.quantity],
-            units: [row.unit],
-          });
-        }
-        return acc;
-      }, []);
-      setRows(grouped);
-      const asRecipes = grouped.map((g) => ({
-        id: g.id,
-        name: g.recipe,
-        unitsPerBatch: g.upb,
-        ingredients: (g.ingredients || []).map((ing, i) => ({
-          id: `${g.id}_${i}`,
-          name: ing,
-          quantity: g.quantities?.[i] ?? "",
-          unit: g.units?.[i] ?? "",
-        })),
-      }));
-      setRecipes(asRecipes);
-
+      await fetchRecipeData();
       setEditOpen(false);
       setEditingRecipe(null);
     } catch (e) {
@@ -664,8 +650,7 @@ const Recipes = () => {
           console.warn("Delete failed for", rec.name);
         }
       }
-      const remaining = recipes.filter((r) => !selectedRecipeIds.has(r.id));
-      setRecipes(remaining);
+      await fetchRecipeData();
       setSelectedRecipeIds(new Set());
     } catch (e) {
       console.error("Error deleting recipes:", e);
@@ -686,6 +671,7 @@ const Recipes = () => {
         selectedRecipeIds={selectedRecipeIds}
         setSelectedRecipeIds={setSelectedRecipeIds}
         onDelete={() => setDeleteOpen(true)}
+        onAdd={() => setAddOpen(true)} // NEW: open add modal
       />
 
       <RecipeDrawer
@@ -702,15 +688,27 @@ const Recipes = () => {
         count={selectedRecipeIds.size}
       />
 
-      <EditRecipeModal
-        isOpen={editOpen}
-        onClose={() => {
-          setEditOpen(false);
-          setEditingRecipe(null);
-        }}
-        onSave={handleSaveEdited}
-        recipe={editingRecipe}
-      />
+      {/* NEW: Add Recipe Modal with embedded form (stays on same page) */}
+      {addOpen && (
+        <div className="r-modal-dim">
+          <div className="r-modal">
+            <div className="r-mhdr">
+              <h2 className="r-title" style={{ fontSize: 18 }}>Add Recipe</h2>
+              <button className="r-btn-ghost" onClick={() => setAddOpen(false)}>
+                <CloseIcon /> Close
+              </button>
+            </div>
+            {/* Remove padding so the form's own card spacing looks tidy */}
+            <div className="r-mbody" style={{ padding: 0 }}>
+              {/* Pass a callback so we can close + refresh after save */}
+              <RecipeForm onCreated={async () => {
+                await fetchRecipeData();
+                setAddOpen(false);
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

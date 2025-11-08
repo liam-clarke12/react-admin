@@ -167,7 +167,8 @@ function ComboBox({
   );
 }
 
-const RecipeForm = () => {
+/* NEW: accept optional onCreated to notify parent after successful submit */
+const RecipeForm = ({ onCreated }) => {
   const { cognitoId } = useAuth();
 
   // master + custom ingredient lists
@@ -277,6 +278,8 @@ const RecipeForm = () => {
       await res.json();
       resetForm();
       setOpenToast(true);
+      // NEW: notify parent so it can close modal & refresh
+      if (typeof onCreated === "function") onCreated();
     } catch (err) {
       console.error("Error submitting recipe:", err);
       alert("Recipe submission failed");
