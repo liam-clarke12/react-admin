@@ -12,16 +12,23 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Paper,
+  Chip,
+  Stack,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PackageIcon from "@mui/icons-material/Inventory2";
 import BarChart from "../../components/BarChart";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
 
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const brand = {
   text: "#0f172a",
@@ -34,7 +41,7 @@ const brand = {
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
+  inputBg: "#ffffff",
 };
 
 /**
@@ -51,15 +58,20 @@ const detectUnitTypeAndFactor = (rawUnit) => {
   if (!u) return { type: "units", base: "units", factor: 1 };
 
   // Mass
-  if (u.includes("kg") || u.includes("kilogram")) return { type: "mass", base: "g", factor: 1000 };
-  if (u.includes("g") || u.includes("gram")) return { type: "mass", base: "g", factor: 1 };
+  if (u.includes("kg") || u.includes("kilogram"))
+    return { type: "mass", base: "g", factor: 1000 };
+  if (u.includes("g") || u.includes("gram"))
+    return { type: "mass", base: "g", factor: 1 };
 
   // Volume
-  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter")) return { type: "volume", base: "ml", factor: 1000 };
-  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre")) return { type: "volume", base: "ml", factor: 1 };
+  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter"))
+    return { type: "volume", base: "ml", factor: 1000 };
+  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre"))
+    return { type: "volume", base: "ml", factor: 1 };
 
   // Count-ish
-  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("pieces")) return { type: "units", base: "units", factor: 1 };
+  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("pieces"))
+    return { type: "units", base: "units", factor: 1 };
 
   // Fallback — treat as units
   return { type: "units", base: "units", factor: 1 };
@@ -70,21 +82,46 @@ const formatDisplayForGroup = ({ type, totalBase }) => {
     // base is grams; show kg if >= 1000g
     if (Math.abs(totalBase) >= 1000) {
       const val = +(totalBase / 1000).toFixed(3);
-      // trim unnecessary zeros
-      return { displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()), displayUnit: "kg", numericForChart: val };
+      return {
+        displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()),
+        displayUnit: "kg",
+        numericForChart: val,
+      };
     }
-    return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "g", numericForChart: totalBase };
+    return {
+      displayValue: Number.isInteger(totalBase)
+        ? totalBase
+        : parseFloat(totalBase.toFixed(3)),
+      displayUnit: "g",
+      numericForChart: totalBase,
+    };
   }
   if (type === "volume") {
     // base is ml; show L if >= 1000ml
     if (Math.abs(totalBase) >= 1000) {
       const val = +(totalBase / 1000).toFixed(3);
-      return { displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()), displayUnit: "L", numericForChart: val };
+      return {
+        displayValue: Number.isInteger(val) ? val : parseFloat(val.toString()),
+        displayUnit: "L",
+        numericForChart: val,
+      };
     }
-    return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "ml", numericForChart: totalBase };
+    return {
+      displayValue: Number.isInteger(totalBase)
+        ? totalBase
+        : parseFloat(totalBase.toFixed(3)),
+      displayUnit: "ml",
+      numericForChart: totalBase,
+    };
   }
   // units / fallback
-  return { displayValue: Number.isInteger(totalBase) ? totalBase : parseFloat(totalBase.toFixed(3)), displayUnit: "units", numericForChart: totalBase };
+  return {
+    displayValue: Number.isInteger(totalBase)
+      ? totalBase
+      : parseFloat(totalBase.toFixed(3)),
+    displayUnit: "units",
+    numericForChart: totalBase,
+  };
 };
 
 const IngredientsInventory = () => {
@@ -104,9 +141,10 @@ const IngredientsInventory = () => {
       if (!cognitoId) return;
       try {
         const res = await fetch(
-          `https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api/ingredient-inventory/active?cognito_id=${cognitoId}`
+          `${API_BASE}/ingredient-inventory/active?cognito_id=${cognitoId}`
         );
-        if (!res.ok) throw new Error(`Failed to fetch active inventory (${res.status})`);
+        if (!res.ok)
+          throw new Error(`Failed to fetch active inventory (${res.status})`);
         const data = await res.json();
 
         // Defensive: ensure array
@@ -138,14 +176,14 @@ const IngredientsInventory = () => {
               latestDate: r?.date ?? null,
             };
           } else {
-            // If type mismatch (e.g., some rows recorded in mass and some in volume) — treat conservatively:
+            // If type mismatch (e.g., some rows recorded in mass and some in volume) — treat conservatively
             if (groups[key].type !== type) {
-              // fallback: don't try to coerce; append unit label to ingredient name to avoid silent weird sums
-              // convert current group's data into a compound key so both remain visible
               const altKey = `${key}::${type}`;
               if (!groups[altKey]) {
                 groups[altKey] = {
-                  ingredient: `${ingredient} (${type === "mass" ? "mass" : type === "volume" ? "volume" : "units"})`,
+                  ingredient: `${ingredient} (${
+                    type === "mass" ? "mass" : type === "volume" ? "volume" : "units"
+                  })`,
                   totalBase: baseAmount,
                   type,
                   baseUnit: base,
@@ -155,14 +193,22 @@ const IngredientsInventory = () => {
                 };
               } else {
                 groups[altKey].totalBase += baseAmount;
-                if (r?.date && (!groups[altKey].latestDate || new Date(r.date) > new Date(groups[altKey].latestDate))) {
+                if (
+                  r?.date &&
+                  (!groups[altKey].latestDate ||
+                    new Date(r.date) > new Date(groups[altKey].latestDate))
+                ) {
                   groups[altKey].latestDate = r.date;
                 }
               }
             } else {
               groups[key].totalBase += baseAmount;
               // prefer the newest date for the group (useful for display if needed)
-              if (r?.date && (!groups[key].latestDate || new Date(r.date) > new Date(groups[key].latestDate))) {
+              if (
+                r?.date &&
+                (!groups[key].latestDate ||
+                  new Date(r.date) > new Date(groups[key].latestDate))
+              ) {
                 groups[key].latestDate = r.date;
               }
               // pick first non-empty barcode (keep whatever we had)
@@ -175,10 +221,11 @@ const IngredientsInventory = () => {
 
         // Convert groups object into array for grid, formatting human-friendly units
         const processed = Object.values(groups).map((g, idx) => {
-          const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup({
-            type: g.type,
-            totalBase: g.totalBase,
-          });
+          const { displayValue, displayUnit, numericForChart } =
+            formatDisplayForGroup({
+              type: g.type,
+              totalBase: g.totalBase,
+            });
 
           return {
             // ensure stable unique id per row
@@ -224,11 +271,32 @@ const IngredientsInventory = () => {
         flex: 1,
         editable: false,
         // defensive: guard params might be undefined
-        valueGetter: (params) => (params && params.row ? params.row.unitsInStock ?? 0 : params?.value ?? 0),
+        valueGetter: (params) =>
+          params && params.row ? params.row.unitsInStock ?? 0 : params?.value ?? 0,
         renderCell: (params) => {
           const v = params && params.row ? params.row.unitsInStock : params?.value;
-          if (typeof v === "number") return Number.isFinite(v) ? v.toLocaleString() : String(v);
-          return String(v ?? "");
+          return (
+            <Box
+              component="span"
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                px: 1.25,
+                py: 0.5,
+                borderRadius: 1,
+                background: "#f8fafc",
+                border: `1px solid ${brand.border}`,
+                fontWeight: 700,
+                color: brand.text,
+              }}
+            >
+              {typeof v === "number"
+                ? Number.isFinite(v)
+                  ? v.toLocaleString()
+                  : String(v)
+                : String(v ?? "")}
+            </Box>
+          );
         },
       },
       {
@@ -243,6 +311,18 @@ const IngredientsInventory = () => {
         flex: 1,
         editable: false,
         cellClassName: "barCode-column--cell",
+        renderCell: (params) => (
+          <Chip
+            label={params?.row?.barcode || "-"}
+            variant="outlined"
+            sx={{
+              bgcolor: "#f9f5ff",
+              color: brand.primary,
+              borderColor: "#eee",
+              height: 26,
+            }}
+          />
+        ),
       },
     ],
     []
@@ -259,8 +339,7 @@ const IngredientsInventory = () => {
   );
 
   return (
-    <Box m="20px">
-      {/* Scoped refinements */}
+    <Box m={2} sx={{ overflowX: "hidden" }}>
       <style>{`
         .inv-card {
           border: 1px solid ${brand.border};
@@ -277,8 +356,10 @@ const IngredientsInventory = () => {
           background: #f1f5f9;
           border: 1px solid ${brand.border};
           width: 40px; height: 40px; border-radius: 999px;
+          display: inline-flex; align-items: center; justify-content: center;
+          transition: background 0.2s ease, transform 0.1s ease;
         }
-        .pill-icon:hover { background: #e2e8f0; }
+        .pill-icon:hover { background: #e2e8f0; transform: translateY(-1px); }
         .toolbar-right { display:flex; gap:8px; align-items:center; }
         .barCode-column--cell { color: ${brand.primary}; }
 
@@ -287,23 +368,55 @@ const IngredientsInventory = () => {
         .inv-odd-row  { background-color: ${brand.surface} !important; }
       `}</style>
 
-      <Box className="inv-card" mt={2}>
-        {/* Toolbar with Bar Chart toggle and Info button */}
-        <Box className="inv-toolbar">
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Ingredient Inventory
-          </Typography>
+      {/* Page header — mirrors Goods In look/feel */}
+      <Box
+        maxWidth="1200px"
+        mx="auto"
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        flexWrap="wrap"
+        mb={2}
+      >
+        <Box display="flex" alignItems="center" gap={2}>
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              borderRadius: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              boxShadow: "0 8px 20px rgba(124,58,237,0.12)",
+            }}
+          >
+            <PackageIcon sx={{ color: "white" }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              Ingredient Inventory
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Read-only aggregates of active Goods-In lots
+            </Typography>
+          </Box>
+        </Box>
 
-          <Box className="toolbar-right">
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Tooltip title="About this table">
             <IconButton
-              aria-label="Info about goods in / editability"
+              aria-label="Info about inventory view"
               onClick={() => setInfoOpen(true)}
               className="pill-icon"
               sx={{ color: brand.text }}
             >
               <InfoOutlinedIcon />
             </IconButton>
+          </Tooltip>
 
+          <Tooltip title="Open bar chart">
             <IconButton
               onClick={() => setDrawerOpen(true)}
               aria-label="Open Bar Chart"
@@ -312,45 +425,89 @@ const IngredientsInventory = () => {
             >
               <BarChartOutlinedIcon />
             </IconButton>
-          </Box>
-        </Box>
+          </Tooltip>
+        </Stack>
+      </Box>
 
-        {/* DataGrid */}
-        <Box
-          sx={{
-            height: "70vh",
-            "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#fbfcfd",
-              color: brand.subtext,
-              borderBottom: `1px solid ${brand.border}`,
-              fontWeight: 800,
-            },
-            "& .MuiDataGrid-columnSeparator": { display: "none" },
-            "& .MuiDataGrid-cell": {
-              borderBottom: `1px solid ${brand.border}`,
-              color: brand.text,
-            },
-            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-            "& .MuiDataGrid-footerContainer": {
-              borderTop: `1px solid ${brand.border}`,
-              background: brand.surface,
-            },
-            "& .barCode-column--cell": { color: brand.primary },
-          }}
-        >
-          <DataGrid
-            autoHeight={false}
-            getRowId={(row) => row.id || `${row.ingredient}`}
-            rows={ingredientInventory || []}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[5, 10, 20]}
-            disableSelectionOnClick
-            getRowClassName={(params) =>
-              (params.indexRelativeToCurrentPage % 2 === 0) ? "inv-even-row" : "inv-odd-row"
-            }
-          />
+      {/* Main card */}
+      <Box maxWidth="1200px" mx="auto" display="flex" gap={2} flexDirection={{ xs: "column", md: "row" }}>
+        <Paper className="inv-card" sx={{ flex: 1 }}>
+          {/* DataGrid */}
+          <Box
+            sx={{
+              height: "70vh",
+              "& .MuiDataGrid-root": { border: "none", borderRadius: 0 },
+              "& .MuiDataGrid-columnHeaders": {
+                backgroundColor: "#fbfcfd",
+                color: brand.subtext,
+                borderBottom: `1px solid ${brand.border}`,
+                fontWeight: 800,
+              },
+              "& .MuiDataGrid-columnSeparator": { display: "none" },
+              "& .MuiDataGrid-cell": {
+                borderBottom: `1px solid ${brand.border}`,
+                color: brand.text,
+              },
+              "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
+              "& .MuiDataGrid-footerContainer": {
+                borderTop: `1px solid ${brand.border}`,
+                background: brand.surface,
+              },
+              "& .barCode-column--cell": { color: brand.primary },
+            }}
+          >
+            <DataGrid
+              autoHeight={false}
+              getRowId={(row) => row.id || `${row.ingredient}`}
+              rows={ingredientInventory || []}
+              columns={columns}
+              pageSize={10}
+              rowsPerPageOptions={[5, 10, 20]}
+              disableSelectionOnClick
+              getRowClassName={(params) =>
+                params.indexRelativeToCurrentPage % 2 === 0
+                  ? "inv-even-row"
+                  : "inv-odd-row"
+              }
+            />
+          </Box>
+        </Paper>
+
+        {/* Right rail with legend (mirroring Goods In "Legend"/"Quick Stats" vibe) */}
+        <Box sx={{ width: { xs: "100%", md: 320 } }}>
+          <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: brand.shadow }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Quick Stats
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Bar chart available via the button above
+            </Typography>
+            <Box sx={{ mt: 1.5 }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip label="Mass in g/kg" size="small" />
+                <Chip label="Volume in ml/L" size="small" />
+                <Chip label="Units (count)" size="small" />
+              </Stack>
+            </Box>
+          </Paper>
+
+          <Paper sx={{ p: 2, borderRadius: 2, boxShadow: brand.shadow }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Legend
+            </Typography>
+            <Box
+              sx={{
+                mt: 1,
+                display: "flex",
+                gap: 1,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <Chip label="Barcode" size="small" sx={{ bgcolor: "#f9f5ff", color: brand.primary }} />
+              <Chip label="Row hover" size="small" sx={{ bgcolor: brand.surfaceMuted }} />
+            </Box>
+          </Paper>
         </Box>
       </Box>
 
@@ -415,9 +572,9 @@ const IngredientsInventory = () => {
         <DialogTitle sx={{ fontWeight: 800 }}>About this table</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: brand.subtext }}>
-            These rows are read-only aggregates of your active goods-in lots.
-            To change stock-on-hand values you must add, delete or edit the corresponding
-            goods-in entries from the "Goods In" screen. This view only summarizes active
+            These rows are read-only aggregates of your active goods-in lots. To
+            change stock-on-hand values you must add, delete or edit the corresponding
+            goods-in entries from the "Goods In" screen. This view summarizes active
             inventory and cannot be edited directly.
           </Typography>
         </DialogContent>

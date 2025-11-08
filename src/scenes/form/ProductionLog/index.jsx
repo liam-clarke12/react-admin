@@ -242,14 +242,14 @@ const ProductionLogForm = () => {
 
     // Build two maps in BASE UNITS:
     //  - availableByIU: name+unit (canonical) -> amount (in base units)
-    //  - availableByI:  name only -> sum of all units (in base units) — used ONLY when recipe unit is empty
+    //  - availableByI:  name only -> sum of all units (in base units)
     const availableByIU = new Map();
     const availableByI = new Map();
 
     for (const r of Array.isArray(invRows) ? invRows : []) {
       const nameCanon = normalizeName(r?.ingredient ?? "");
       const unitCanon = normalizeUnit(r?.unit ?? "");
-      const rawHave = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
+      const rawHave = Number(r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0) || 0;
       const haveBase = rawHave * unitFactorToBase(unitCanon);
 
       const kIU = `${nameCanon}|${unitCanon}`;
@@ -262,23 +262,19 @@ const ProductionLogForm = () => {
     const problems = [];
     for (const { ingredient, unit, need, needBase } of required) {
       const nameCanon = normalizeName(ingredient);
-      let haveBase = 0;
 
-      if (unit) {
-        const k = `${nameCanon}|${unit}`;
-        haveBase = availableByIU.get(k) ?? 0;
-      } else {
-        haveBase = availableByI.get(nameCanon) ?? 0;
-      }
+      // ✅ Key change:
+      // Instead of requiring an exact unit match, use the SUM across ALL units for that ingredient,
+      // since both recipe need and inventory are converted to base units.
+      // This fixes cases like need=500g while inventory is 3kg.
+      const haveBaseAllUnits = availableByI.get(nameCanon) ?? 0;
 
-      if (needBase > haveBase) {
-        // report human-friendly need & have:
-        // - reportedNeed: in recipe unit (if present) else in base units
-        // - reportedHave: convert back to recipe unit if unit present, otherwise show base units
-        let reportedNeed = need;
-        let reportedHave = unit ? (haveBase / unitFactorToBase(unit)) : haveBase;
+      if (needBase > haveBaseAllUnits) {
+        // For display: convert have back into the recipe unit if it exists; otherwise show base units.
+        const displayFactor = unit ? unitFactorToBase(unit) : 1;
+        const reportedHave = displayFactor > 0 ? haveBaseAllUnits / displayFactor : haveBaseAllUnits;
+        const reportedNeed = need;
 
-        // Round small floats for readability
         const round = (n) => {
           if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
           return Math.round(n * 1000) / 1000;
@@ -451,9 +447,9 @@ const ProductionLogForm = () => {
         .plf-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
 
         .plf-fab {
-          position: relative; /* or just remove position */
+          position: relative;
           margin-top: 20px;
-          float: right; /* stick to bottom-right inside container */
+          float: right;
           display: inline-flex; 
           align-items: center; 
           gap: 8px;
@@ -467,8 +463,6 @@ const ProductionLogForm = () => {
           box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
           transition: transform .2s ease;
         }
-        .plf-fab:hover { transform: scale(1.06); background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
-
         .plf-fab:hover { transform: scale(1.06); background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
 
         /* Toast */
