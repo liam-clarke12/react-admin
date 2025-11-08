@@ -1,14 +1,5 @@
-// IngredientsInventory.jsx
+// src/scenes/IngredientInventory/index.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  BarChart as RBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 
 /* ===================== Scoped Styles ===================== */
 const Styles = () => (
@@ -44,13 +35,11 @@ const Styles = () => (
       background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden;
       box-shadow:0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08);
     }
-    .ii-card-head {
-      padding:12px 14px; border-bottom:1px solid #e5e7eb; background:#ffffff;
-    }
+    .ii-card-head { padding:12px 14px; border-bottom:1px solid #e5e7eb; background:#ffffff; }
     .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
     .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
 
-    /* Table (no libs) */
+    /* Table */
     .ii-table-wrap { overflow:auto; }
     .ii-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
     .ii-thead th {
@@ -105,36 +94,62 @@ const Styles = () => (
       z-index:60;
     }
 
+    /* Pure CSS Bar Chart */
+    .ii-chart { display:flex; flex-direction:column; height:100%; }
+    .ii-chart-body { flex:1; min-height:380px; display:flex; gap:10px; padding:8px 12px 12px; align-items:flex-end; overflow:auto; }
+    .ii-bar {
+      width:36px; min-width:36px; border-radius:8px 8px 0 0;
+      background: linear-gradient(180deg, #8b5cf6, #5B21B6);
+      box-shadow: 0 6px 14px rgba(124,58,237,.18);
+      position:relative; display:flex; align-items:flex-end; justify-content:center;
+      transition: transform .12s ease;
+    }
+    .ii-bar:hover { transform: translateY(-2px); }
+    .ii-bar-value {
+      position:absolute; top:-24px; font-size:11px; font-weight:800; color:#5B21B6;
+      background:#fff; border:1px solid #e5e7eb; padding:2px 6px; border-radius:999px; white-space:nowrap;
+      transform: translateY(-2px);
+    }
+    .ii-bar-label {
+      margin-top:6px; font-size:11px; color:#334155; max-width:60px; text-align:center;
+      word-break:break-word;
+      display:block;
+    }
+    .ii-chart-head { padding:8px 12px; border-bottom:1px solid #e5e7eb; }
+    .ii-chart-head h4 { margin:0; font-weight:800; font-size:14px; }
+    .ii-chart-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+
+    /* keyframes */
     @keyframes ii-fade { from { opacity:0 } to { opacity:1 } }
     @keyframes ii-slide { from { transform: translateY(12px) scale(.98); opacity:0 } to { transform:none; opacity:1 } }
     @keyframes ii-pop { to { transform:none; opacity:1 } }
   `}</style>
 );
 
-/* ===================== Helpers (unchanged logic) ===================== */
+/* ===================== Config & helpers ===================== */
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+// Fallback mock so UI still renders if API fails
+const mockData = [
+  { ingredient: 'All-Purpose Flour', unit: 'kg', totalRemaining: 25, barcode: 'FL-AP-123', date: '2023-10-26' },
+  { ingredient: 'Granulated Sugar', unit: 'kg', totalRemaining: 50, barcode: 'SUG-GR-456', date: '2023-10-25' },
+  { ingredient: 'Unsalted Butter', unit: 'kg', stockOnHand: 10, barcode: 'BUT-UN-789', date: '2023-10-27' },
+  { ingredient: 'Large Eggs', unit: 'units', totalRemaining: 144, barcode: 'EGG-LG-101', date: '2023-10-24' },
+  { ingredient: 'Baking Soda', unit: 'g', totalRemaining: 500, barcode: 'SOD-BK-112', date: '2023-10-20' },
+  { ingredient: 'Milk', unit: 'L', totalRemaining: 12, barcode: 'MLK-WH-113', date: '2023-10-26' },
+  { ingredient: 'All-Purpose Flour', unit: 'g', totalRemaining: 5000, barcode: 'FL-AP-124', date: '2023-10-28' },
+  { ingredient: 'Milk', unit: 'ml', totalRemaining: 2000, barcode: 'MLK-WH-114', date: '2023-10-28' },
+];
 
 const detectUnitTypeAndFactor = (rawUnit) => {
   const u = String(rawUnit || "").trim().toLowerCase();
   if (!u) return { type: "units", base: "units", factor: 1 };
-
-  // mass
-  if (u.includes("kg") || u.includes("kilogram"))
-    return { type: "mass", base: "g", factor: 1000 };
-  if (u.includes("g") || u.includes("gram"))
-    return { type: "mass", base: "g", factor: 1 };
-
-  // volume
-  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter"))
-    return { type: "volume", base: "ml", factor: 1000 };
-  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre"))
-    return { type: "volume", base: "ml", factor: 1 };
-
-  // count
-  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("pieces"))
-    return { type: "units", base: "units", factor: 1 };
-
+  if (u.includes("kg") || u.includes("kilogram")) return { type: "mass", base: "g", factor: 1000 };
+  if (u.includes("g") || u.includes("gram")) return { type: "mass", base: "g", factor: 1 };
+  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter")) return { type: "volume", base: "ml", factor: 1000 };
+  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre")) return { type: "volume", base: "ml", factor: 1 };
+  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("piece")) return { type: "units", base: "units", factor: 1 };
   return { type: "units", base: "units", factor: 1 };
 };
 
@@ -154,6 +169,24 @@ const formatDisplayForGroup = (type, totalBase) => {
     return { displayValue: +(+totalBase).toFixed(3), displayUnit: "ml", numericForChart: totalBase };
   }
   return { displayValue: Number(totalBase), displayUnit: "units", numericForChart: totalBase };
+};
+
+// Try to get cognito id from multiple places so data loads
+const resolveCognitoId = (propId) => {
+  if (propId) return propId;
+  try {
+    const url = new URL(window.location.href);
+    const qp = url.searchParams.get("cognito_id");
+    if (qp) return qp;
+  } catch {}
+  try {
+    const ls = localStorage.getItem("cognito_id") || localStorage.getItem("CognitoId");
+    if (ls) return ls;
+  } catch {}
+  try {
+    if (window && window.__COGNITO_ID) return window.__COGNITO_ID;
+  } catch {}
+  return null;
 };
 
 /* ===================== Info Modal ===================== */
@@ -180,109 +213,45 @@ const InfoModal = ({ open, onClose }) => {
 };
 
 /* ===================== Main Component ===================== */
-const IngredientsInventory = () => {
+/**
+ * Props:
+ *  - cognitoId?: string  // (optional) pass your logged-in user's cognito id
+ */
+const IngredientsInventory = ({ cognitoId: cognitoIdProp }) => {
   const [rows, setRows] = useState([]);
   const [infoOpen, setInfoOpen] = useState(false);
   const [snack, setSnack] = useState("");
 
-  // Fetch ACTIVE inventory (same endpoint/flow you had)
   useEffect(() => {
     const fetchActiveInventory = async () => {
+      // *** IMPORTANT: define cognitoId in scope before using it ***
+      const cid = resolveCognitoId(cognitoIdProp);
       try {
-        // If you need cognito_id, plug it here:
-        const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
-        if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
+        if (!cid) {
+          const processed = processInventory(mockData);
+          setRows(processed);
+          setSnack("No Cognito ID found. Showing mock data.");
+          return;
+        }
+
+        const url = `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cid)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(\`Fetch failed (\${res.status})\`);
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
-
-        // group & normalize to base units
-        const groups = {};
-        list.forEach((r, idx) => {
-          const ingredient = (r?.ingredient ?? "").trim();
-          if (!ingredient) return;
-
-          const { type, base, factor } = detectUnitTypeAndFactor(r?.unit ?? "");
-          const rawAmount = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
-          const baseAmount = rawAmount * (factor || 1);
-          const key = ingredient.toLowerCase();
-
-          if (!groups[key]) {
-            groups[key] = {
-              ingredient,
-              totalBase: baseAmount,
-              type,
-              baseUnit: base,
-              sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
-              sampleId: r?.batchCode ?? `${ingredient}-${idx}`,
-              latestDate: r?.date ?? null,
-            };
-          } else {
-            // if type changes (e.g., ml vs g), split into a separate group
-            if (groups[key].type !== type) {
-              const altKey = `${key}::${type}`;
-              if (!groups[altKey]) {
-                groups[altKey] = {
-                  ingredient: `${ingredient} (${type})`,
-                  totalBase: baseAmount,
-                  type,
-                  baseUnit: base,
-                  sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
-                  sampleId: r?.batchCode ?? `${ingredient}-${idx}-alt`,
-                  latestDate: r?.date ?? null,
-                };
-              } else {
-                groups[altKey].totalBase += baseAmount;
-                if (
-                  r?.date &&
-                  (!groups[altKey].latestDate ||
-                    new Date(r.date) > new Date(groups[altKey].latestDate))
-                ) {
-                  groups[altKey].latestDate = r.date;
-                }
-              }
-            } else {
-              groups[key].totalBase += baseAmount;
-              if (
-                r?.date &&
-                (!groups[key].latestDate ||
-                  new Date(r.date) > new Date(groups[key].latestDate))
-              ) {
-                groups[key].latestDate = r.date;
-              }
-              if (!groups[key].sampleBarcode && (r?.activeBarcode || r?.barcode)) {
-                groups[key].sampleBarcode = r?.activeBarcode ?? r?.barcode;
-              }
-            }
-          }
-        });
-
-        const processed = Object.values(groups).map((g, i) => {
-          const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup(
-            g.type,
-            g.totalBase
-          );
-          return {
-            id: g.sampleId ?? `${g.ingredient}-${i}`,
-            ingredient: g.ingredient,
-            unitsInStock: displayValue,
-            unit: displayUnit,
-            _numeric: numericForChart,
-            barcode: g.sampleBarcode ?? "",
-            date: g.latestDate,
-          };
-        });
-
-        processed.sort((a, b) => a.ingredient.localeCompare(b.ingredient));
+        const processed = processInventory(list);
         setRows(processed);
       } catch (e) {
         console.error(e);
-        setSnack("Failed to load ingredient inventory");
-        setRows([]);
+        const processed = processInventory(mockData);
+        setRows(processed);
+        setSnack("API error — showing mock data.");
       }
     };
 
     fetchActiveInventory();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cognitoIdProp]);
 
   const chartData = useMemo(
     () =>
@@ -291,6 +260,11 @@ const IngredientsInventory = () => {
         amount: Number(r._numeric) || 0,
       })),
     [rows]
+  );
+
+  const maxAmount = useMemo(
+    () => Math.max(0, ...chartData.map((d) => d.amount)),
+    [chartData]
   );
 
   return (
@@ -309,7 +283,6 @@ const IngredientsInventory = () => {
           </div>
 
           <button className="ii-iconbtn" onClick={() => setInfoOpen(true)} aria-label="About this table">
-            {/* Info icon */}
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="16" x2="12" y2="12"></line>
@@ -364,63 +337,32 @@ const IngredientsInventory = () => {
             </div>
           </div>
 
-          {/* Chart Card */}
+          {/* Chart Card (pure CSS) */}
           <div className="ii-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ii-card-head">
-              <h3>Inventory Levels</h3>
+            <div className="ii-chart-head">
+              <h4>Inventory Levels</h4>
               <p>Normalized amounts by ingredient</p>
             </div>
-            <div style={{ flex: 1, minHeight: 420, padding: 8 }}>
-              {chartData.length === 0 ? (
-                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
-                  No data for chart.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RBarChart
-                    data={chartData}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 100 }}
-                  >
-                    <defs>
-                      <linearGradient id="iiColorAmount" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#5B21B6" stopOpacity={0.8}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="ingredient"
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={90}
-                      tick={{ fontSize: 12, fill: '#334155' }}
-                      stroke="#e5e7eb"
-                    />
-                    <YAxis tick={{ fontSize: 12, fill: '#334155' }} stroke="#e5e7eb" />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(124, 58, 237, 0.08)' }}
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div style={{
-                              background:'#fff', border:'1px solid #e5e7eb',
-                              borderRadius:8, padding:8, boxShadow:'0 10px 20px rgba(0,0,0,.08)'
-                            }}>
-                              <div style={{ fontWeight:800, color:'#0f172a' }}>{label}</div>
-                              <div style={{ fontSize:12, color:'#5B21B6', fontWeight:700 }}>
-                                Amount: {Number(payload[0].value).toLocaleString()}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="amount" fill="url(#iiColorAmount)" radius={[4,4,0,0]} />
-                  </RBarChart>
-                </ResponsiveContainer>
-              )}
+
+            <div className="ii-chart">
+              <div className="ii-chart-body">
+                {chartData.length === 0 ? (
+                  <div style={{ margin:'auto', color:'#64748b' }}>No data for chart.</div>
+                ) : (
+                  chartData.map((d, i) => {
+                    const pct = maxAmount > 0 ? (d.amount / maxAmount) : 0;
+                    const h = Math.max(6, Math.round(pct * 300)); // up to 300px tall
+                    return (
+                      <div className="ii-bar-wrap" key={`${d.ingredient}-${i}`}>
+                        <div className="ii-bar" style={{ height: `${h}px` }}>
+                          <div className="ii-bar-value">{Number(d.amount).toLocaleString()}</div>
+                        </div>
+                        <span className="ii-bar-label">{d.ingredient}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -436,5 +378,75 @@ const IngredientsInventory = () => {
     </div>
   );
 };
+
+/* ===================== Processor ===================== */
+function processInventory(data) {
+  const groups = {};
+  (data || []).forEach((r, idx) => {
+    const ingredient = (r?.ingredient ?? "").trim();
+    if (!ingredient) return;
+
+    const { type, base, factor } = detectUnitTypeAndFactor(r?.unit ?? "");
+    const rawAmount = Number(r?.totalRemaining ?? r?.stockOnHand ?? 0) || 0;
+    const baseAmount = rawAmount * (factor || 1);
+    const key = ingredient.toLowerCase();
+
+    if (!groups[key]) {
+      groups[key] = {
+        ingredient,
+        totalBase: baseAmount,
+        type,
+        baseUnit: base,
+        sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
+        sampleId: r?.batchCode ?? `${ingredient}-${idx}`,
+        latestDate: r?.date ?? null,
+      };
+    } else {
+      if (groups[key].type !== type) {
+        const altKey = `${key}::${type}`;
+        if (!groups[altKey]) {
+          groups[altKey] = {
+            ingredient: `${ingredient} (${type})`,
+            totalBase: baseAmount,
+            type,
+            baseUnit: base,
+            sampleBarcode: r?.activeBarcode ?? r?.barcode ?? "",
+            sampleId: r?.batchCode ?? `${ingredient}-${idx}-alt`,
+            latestDate: r?.date ?? null,
+          };
+        } else {
+          groups[altKey].totalBase += baseAmount;
+          if (r?.date && (!groups[altKey].latestDate || new Date(r.date) > new Date(groups[altKey].latestDate))) {
+            groups[altKey].latestDate = r.date;
+          }
+        }
+      } else {
+        groups[key].totalBase += baseAmount;
+        if (r?.date && (!groups[key].latestDate || new Date(r.date) > new Date(groups[key].latestDate))) {
+          groups[key].latestDate = r.date;
+        }
+        if (!groups[key].sampleBarcode && (r?.activeBarcode || r?.barcode)) {
+          groups[key].sampleBarcode = r?.activeBarcode ?? r?.barcode;
+        }
+      }
+    }
+  });
+
+  const processed = Object.values(groups).map((g, i) => {
+    const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup(g.type, g.totalBase);
+    return {
+      id: g.sampleId ?? `${g.ingredient}-${i}`,
+      ingredient: g.ingredient,
+      unitsInStock: displayValue,
+      unit: displayUnit,
+      _numeric: numericForChart,
+      barcode: g.sampleBarcode ?? "",
+      date: g.latestDate,
+    };
+  });
+
+  processed.sort((a, b) => a.ingredient.localeCompare(b.ingredient));
+  return processed;
+}
 
 export default IngredientsInventory;
