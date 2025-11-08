@@ -43,6 +43,7 @@
     "react-pro-sidebar": "^0.7.1",
     "react-router-dom": "^6.26.2",
     "react-scripts": "^5.0.1",
+    "recharts": "^3.3.0",
     "serverless-http": "^3.2.0",
     "yup": "^1.6.1"
   },
