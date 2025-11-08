@@ -190,7 +190,7 @@ const IngredientsInventory = () => {
     const fetchActiveInventory = async () => {
       try {
         // If you need cognito_id, plug it here:
-        const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=mock-cognito-id`);
+        const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
