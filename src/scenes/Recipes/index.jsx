@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
-import RecipeForm from "../form/RecipeForm"; // NEW: embed form in modal
+import RecipeForm from "../form/Recipes"; // NEW: embed form in modal
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
