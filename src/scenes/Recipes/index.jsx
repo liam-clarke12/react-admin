@@ -1,59 +1,16 @@
 // src/scenes/recipes/Recipes.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Box,
-  useTheme,
-  IconButton,
-  Button,
-  Drawer,
-  Typography,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  TextField,
-  Stack,
-  Card,
-  CardContent,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Paper,
-} from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import DeleteIcon from "@mui/icons-material/Delete";
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import CloseIcon from "@mui/icons-material/Close";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
-};
-
+/* ------------------------------
+   Brand tailwind utility classes
+   (expects your CSS tokens e.g. bg-brand-surface)
+--------------------------------*/
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-const unitOptions = [
+/* Keep local unit options (no external dependency) */
+const UNIT_OPTIONS = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
   { value: "kg", label: "Kilograms (Kg)" },
@@ -61,26 +18,511 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
-const Recipes = () => {
-  const { cognitoId } = useAuth();
-  const theme = useTheme();
-  const { rows, setRows } = useData();
+/* ================= Icons ================= */
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const EditIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </Svg>
+);
+const DeleteIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+const MenuIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+  </Svg>
+);
+const CloseIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </Svg>
+);
+const CheckIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+const DownloadIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+  </Svg>
+);
+const AddIcon = (props) => (
+  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </Svg>
+);
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerContent, setDrawerContent] = useState([]); // array of strings for list
-  const [selectedRowMeta, setSelectedRowMeta] = useState(null);
+/* ================= Types (JSDoc) ================= */
+/**
+ * @typedef {{ id: string, name: string, quantity: number, unit: string }} Ingredient
+ * @typedef {{ id: string, recipe: string, upb: number, ingredients: string[], quantities: (string|number)[], units: string[] }} RowGroup
+ * @typedef {{ id: string, name: string, unitsPerBatch: number, ingredients: Ingredient[] }} Recipe
+ */
+
+/* ================= Recipe Table ================= */
+const RecipeTable = ({
+  recipes,
+  onOpenDrawer,
+  onEdit,
+  selectedRecipeIds,
+  setSelectedRecipeIds,
+  onDelete,
+}) => {
+  const checkboxRef = useRef(null);
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedRecipeIds(new Set(recipes.map((r) => r.id)));
+    } else {
+      setSelectedRecipeIds(new Set());
+    }
+  };
+  const handleSelectRow = (id) => {
+    const next = new Set(selectedRecipeIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRecipeIds(next);
+  };
+
+  const numSelected = selectedRecipeIds.size;
+  const rowCount = recipes.length;
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = numSelected > 0 && numSelected < rowCount;
+    }
+  }, [numSelected, rowCount]);
+
+  return (
+    <div className="bg-brand-surface rounded-xl border border-brand-border shadow-sm overflow-hidden">
+      <div className="p-4 flex items-center justify-between border-b border-brand-border">
+        <h2 className="text-lg font-bold text-brand-text">Recipes</h2>
+        {numSelected > 0 && (
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-brand-primary">{numSelected} selected</span>
+            <button
+              onClick={onDelete}
+              className="p-2 rounded-full text-brand-danger hover:bg-red-100 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+              aria-label="Delete selected recipes"
+            >
+              <DeleteIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left text-brand-subtext">
+          <thead className="bg-brand-surface-muted text-xs text-brand-subtext uppercase tracking-wider">
+            <tr>
+              <th scope="col" className="p-4">
+                <input
+                  ref={checkboxRef}
+                  type="checkbox"
+                  className="w-4 h-4 text-brand-primary bg-gray-100 border-gray-300 rounded focus:ring-brand-primary"
+                  onChange={handleSelectAll}
+                  checked={rowCount > 0 && numSelected === rowCount}
+                />
+              </th>
+              <th scope="col" className="px-6 py-3">Recipe</th>
+              <th scope="col" className="px-6 py-3">Units per Batch</th>
+              <th scope="col" className="px-6 py-3">Ingredients</th>
+              <th scope="col" className="px-6 py-3">Quantities</th>
+              <th scope="col" className="px-6 py-3 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recipes.map((r, idx) => (
+              <tr
+                key={r.id}
+                className={`${idx % 2 === 0 ? "bg-brand-surface" : "bg-brand-surface-muted"} border-b border-brand-border hover:bg-violet-50 transition-colors`}
+              >
+                <td className="w-4 p-4">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-brand-primary bg-gray-100 border-gray-300 rounded focus:ring-brand-primary"
+                    checked={selectedRecipeIds.has(r.id)}
+                    onChange={() => handleSelectRow(r.id)}
+                  />
+                </td>
+                <td className="px-6 py-4 font-semibold text-brand-text whitespace-nowrap">{r.name}</td>
+                <td className="px-6 py-4">{r.unitsPerBatch}</td>
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => onOpenDrawer(r.id, "ingredients")}
+                    className="font-medium text-brand-primary hover:text-brand-primary-dark hover:underline"
+                  >
+                    View ({r.ingredients.length})
+                  </button>
+                </td>
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => onOpenDrawer(r.id, "quantities")}
+                    className="font-medium text-brand-primary hover:text-brand-primary-dark hover:underline"
+                  >
+                    View Quantities
+                  </button>
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <button
+                    onClick={() => onEdit(r)}
+                    className="p-2 rounded-full text-brand-primary hover:bg-violet-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    aria-label={`Edit ${r.name}`}
+                  >
+                    <EditIcon className="w-5 h-5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {recipes.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-brand-subtext">
+                  No recipes found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+/* ================= Drawer ================= */
+const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [openDialog, setOpenDialog] = useState(false);
-  const [selectedRows, setSelectedRows] = useState([]);
+  const displayItems = useMemo(() => {
+    if (!recipe) return [];
+    return recipe.ingredients.map((ing) => ({
+      name: ing.name,
+      details: type === "quantities" ? `${ing.quantity} ${ing.unit}` : ing.name,
+      fullText: `${ing.name} ${ing.quantity} ${ing.unit}`.toLowerCase(),
+    }));
+  }, [recipe, type]);
 
-  // === Editor state ===
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingRecipe, setEditingRecipe] = useState(null); // { id, recipe, upb, ingredients: [{ name, quantity, unit, recipeIngredientId? }] }
-  const [editingLoading, setEditingLoading] = useState(false);
+  const filtered = useMemo(() => {
+    if (!searchTerm) return displayItems;
+    const q = searchTerm.toLowerCase();
+    return displayItems.filter((it) => it.fullText.includes(q));
+  }, [displayItems, searchTerm]);
+
+  const exportCsv = () => {
+    if (!recipe) return;
+    const headers = type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
+    const rows = recipe.ingredients.map((ing) =>
+      type === "quantities" ? [ing.name, String(ing.quantity), ing.unit] : [ing.name]
+    );
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const filename = `${(recipe?.name || "recipe").replace(/\s+/g, "_")}_${type}.csv`;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div
+        className={`fixed inset-0 bg-black bg-opacity-40 z-40 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        onClick={onClose}
+      />
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md bg-brand-surface shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <header className="p-4 text-white bg-gradient-to-br from-brand-primary to-brand-primary-dark flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center">
+                <MenuIcon className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{type === "ingredients" ? "Ingredients" : "Quantities"}</h2>
+                <p className="text-sm opacity-90">{recipe?.name || "No recipe selected"}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
+              <CloseIcon className="w-6 h-6" />
+            </button>
+          </header>
+
+          {/* Summary */}
+          <div className="p-4 flex-grow overflow-y-auto bg-slate-50">
+            <div className="bg-white p-3 rounded-lg border border-brand-border shadow-sm mb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs font-semibold text-brand-subtext uppercase">Recipe</p>
+                  <p className="text-lg font-bold text-brand-text">{recipe?.name || "—"}</p>
+                  <p className="text-xs text-brand-subtext">Units per batch: {recipe?.unitsPerBatch ?? "N/A"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold text-brand-subtext uppercase">Items</p>
+                  <p className="text-3xl font-black text-brand-primary">{filtered.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="sticky top-0 bg-slate-50 py-2">
+              <input
+                type="text"
+                placeholder="Filter items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
+              />
+            </div>
+
+            {/* Items */}
+            <ul className="mt-4 space-y-2">
+              {filtered.map((it, i) => (
+                <li key={i} className="flex items-center justify-between bg-white p-3 rounded-md border border-brand-border">
+                  <div className="flex items-center gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-violet-100 text-brand-primary rounded-full flex items-center justify-center">
+                      <CheckIcon className="w-4 h-4" />
+                    </span>
+                    <span className="font-medium text-brand-text">{it.name}</span>
+                  </div>
+                  {type === "quantities" && (
+                    <span className="text-sm font-semibold bg-slate-100 text-brand-subtext px-2.5 py-0.5 rounded-full">
+                      {it.details}
+                    </span>
+                  )}
+                </li>
+              ))}
+              {filtered.length === 0 && <li className="text-center text-brand-subtext py-8">No items found.</li>}
+            </ul>
+          </div>
+
+          {/* Footer */}
+          <footer className="p-4 border-t border-brand-border flex-shrink-0 flex items-center justify-between bg-brand-surface">
+            <button
+              onClick={exportCsv}
+              disabled={!recipe}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-primary border border-brand-border rounded-lg hover:bg-violet-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <DownloadIcon className="w-5 h-5" />
+              Export CSV
+            </button>
+            <button
+              onClick={onClose}
+              className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg shadow-sm hover:bg-brand-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+            >
+              Done
+            </button>
+          </footer>
+        </div>
+      </div>
+    </>
+  );
+};
+
+/* ================= Edit Modal ================= */
+const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
+  const [edited, setEdited] = useState(recipe);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setEdited(JSON.parse(JSON.stringify(recipe || {})));
+  }, [recipe]);
+
+  if (!isOpen) return null;
+
+  const handleField = (k, v) => setEdited((p) => ({ ...p, [k]: v }));
+  const handleIngredient = (idx, k, v) => {
+    const arr = [...(edited?.ingredients || [])];
+    arr[idx] = { ...(arr[idx] || {}), [k]: v };
+    setEdited((p) => ({ ...p, ingredients: arr }));
+  };
+  const addIngredient = () => {
+    setEdited((p) => ({
+      ...p,
+      ingredients: [
+        ...(p?.ingredients || []),
+        { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value },
+      ],
+    }));
+  };
+  const removeIngredient = (idx) => {
+    const arr = (edited?.ingredients || []).filter((_, i) => i !== idx);
+    setEdited((p) => ({ ...p, ingredients: arr }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    await onSave(edited);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-brand-border flex justify-between items-center">
+          <h2 className="text-xl font-bold text-brand-text">Edit Recipe</h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100">
+            <CloseIcon className="w-6 h-6 text-brand-subtext" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-brand-subtext mb-1">Recipe Name</label>
+              <input
+                type="text"
+                value={edited?.name || ""}
+                onChange={(e) => handleField("name", e.target.value)}
+                className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-brand-subtext mb-1">Units per Batch</label>
+              <input
+                type="number"
+                value={edited?.unitsPerBatch ?? 0}
+                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
+                className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-brand-text mb-2">Ingredients</h3>
+            <div className="space-y-3">
+              {(edited?.ingredients || []).map((ing, idx) => (
+                <div
+                  key={ing.id || idx}
+                  className="grid grid-cols-1 md:grid-cols-[2fr,1fr,1fr,auto] gap-3 items-center bg-slate-50 p-3 rounded-md border border-brand-border"
+                >
+                  <input
+                    type="text"
+                    placeholder="Ingredient Name"
+                    value={ing.name}
+                    onChange={(e) => handleIngredient(idx, "name", e.target.value)}
+                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Quantity"
+                    value={ing.quantity}
+                    onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
+                  />
+                  <select
+                    value={ing.unit}
+                    onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
+                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none bg-white"
+                  >
+                    {UNIT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => removeIngredient(idx)}
+                    className="p-2 text-brand-danger hover:bg-red-100 rounded-full transition-colors"
+                  >
+                    <DeleteIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={addIngredient}
+              className="mt-4 flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-primary rounded-lg hover:bg-violet-50 transition-colors border border-brand-border"
+            >
+              <AddIcon className="w-5 h-5" />
+              Add Ingredient
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-brand-border flex justify-end gap-3 bg-slate-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-brand-subtext bg-white border border-brand-border rounded-lg hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg shadow-sm hover:bg-brand-primary-dark disabled:bg-slate-400"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================= Delete Modal ================= */
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
+  if (!isOpen || count === 0) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+        <div className="p-6 text-center">
+          <div className="mx-auto w-12 h-12 flex items-center justify-center bg-red-100 rounded-full mb-4">
+            <DeleteIcon className="w-6 h-6 text-brand-danger" />
+          </div>
+          <h3 className="text-lg font-semibold text-brand-text">Confirm Deletion</h3>
+          <p className="text-sm text-brand-subtext mt-2">
+            Delete {count} selected recipe{count > 1 ? "s" : ""}? This action cannot be undone.
+          </p>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-brand-subtext bg-white border border-brand-border rounded-lg hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-danger rounded-lg shadow-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ================= Main Screen ================= */
+const Recipes = () => {
+  const { cognitoId } = useAuth();
+  const { rows, setRows } = useData(); // rows is grouped MUI shape in original file
+
+  // Local derived "recipes" in Tailwind component shape
+  const [recipes, setRecipes] = useState([]); // Array<Recipe>
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState(new Set());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerType, setDrawerType] = useState("ingredients"); // 'ingredients' | 'quantities'
+  const [drawerRecipe, setDrawerRecipe] = useState(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // Fetch & format (keeps original functionality) :contentReference[oaicite:1]{index=1}
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
@@ -89,8 +531,8 @@ const Recipes = () => {
         if (!res.ok) throw new Error("Failed to fetch Recipe data");
         const data = await res.json();
 
-        // Group by recipe_id
-        const formatted = data.reduce((acc, row) => {
+        // Group by recipe_id (original logic)
+        const grouped = data.reduce((acc, row) => {
           let entry = acc.find((r) => r.id === row.recipe_id);
           if (entry) {
             entry.ingredients.push(row.ingredient);
@@ -108,316 +550,93 @@ const Recipes = () => {
           }
           return acc;
         }, []);
-        setRows(formatted);
+        setRows(grouped);
+
+        // Convert to Tailwind view model
+        const asRecipes = grouped.map((g) => ({
+          id: g.id,
+          name: g.recipe,
+          unitsPerBatch: g.upb,
+          ingredients: (g.ingredients || []).map((ing, i) => ({
+            id: `${g.id}_${i}`,
+            name: ing,
+            quantity: g.quantities?.[i] ?? "",
+            unit: g.units?.[i] ?? "",
+          })),
+        }));
+        setRecipes(asRecipes);
       } catch (err) {
         console.error("Error fetching recipes:", err);
+        setRows([]);
+        setRecipes([]);
       }
     };
     fetchRecipeData();
   }, [cognitoId, setRows]);
 
-  // Drawer helpers
-  const handleDrawerOpen = (header, list, meta = {}) => {
-    setDrawerHeader(header);
-    let items = [];
-    if (Array.isArray(list)) {
-      // Keep raw array but ensure strings
-      items = list.map((l) => (typeof l === "string" ? l : String(l)));
-    } else if (typeof list === "string" && list.length) {
-      items = list.split("; ").filter(Boolean);
-    }
-    setDrawerContent(items);
-    setSelectedRowMeta(meta || null);
-    setSearchTerm("");
+  /* Drawer handlers */
+  const handleOpenDrawer = (recipeId, type) => {
+    const r = recipes.find((x) => x.id === recipeId);
+    setDrawerRecipe(r || null);
+    setDrawerType(type);
     setDrawerOpen(true);
   };
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setDrawerContent([]);
-    setSelectedRowMeta(null);
-    setSearchTerm("");
-  };
+  const handleCloseDrawer = () => setDrawerOpen(false);
 
-  // Columns with Actions: include Edit button
-  const columns = useMemo(
-    () => [
-      { field: "recipe", headerName: "Recipe", flex: 1 },
-      { field: "upb", headerName: "Units per Batch", flex: 1 },
-      {
-        field: "ingredients",
-        headerName: "Ingredients",
-        flex: 1,
-        sortable: false,
-        filterable: false,
-        renderCell: (params) => (
-          <Typography
-            sx={{
-              cursor: "pointer",
-              color: brand.primary,
-              fontWeight: 600,
-              "&:hover": { color: brand.primaryDark },
-            }}
-            onClick={() =>
-              handleDrawerOpen("Ingredients", params.row.ingredients, {
-                recipe: params.row.recipe,
-                ingredientsArray: params.row.ingredients,
-                quantitiesArray: params.row.quantities,
-                unitsArray: params.row.units,
-                upb: params.row.upb,
-              })
-            }
-          >
-            Show Ingredients
-          </Typography>
-        ),
-      },
-      {
-        field: "quantities",
-        headerName: "Quantities",
-        flex: 1,
-        sortable: false,
-        filterable: false,
-        renderCell: (params) => {
-          const { ingredients = [], quantities = [], units = [] } = params.row;
-          const list = ingredients.map((ing, i) => {
-            const q = quantities[i] ?? "N/A";
-            const u = units[i] ? ` ${units[i]}` : "";
-            return `${ing}: ${q}${u}`;
-          });
-          return (
-            <Typography
-              sx={{
-                cursor: "pointer",
-                color: brand.primary,
-                fontWeight: 600,
-                "&:hover": { color: brand.primaryDark },
-              }}
-              onClick={() =>
-                handleDrawerOpen("Quantities", list, {
-                  recipe: params.row.recipe,
-                  ingredientsArray: params.row.ingredients,
-                  quantitiesArray: params.row.quantities,
-                  unitsArray: params.row.units,
-                  upb: params.row.upb,
-                })
-              }
-            >
-              Show Quantities
-            </Typography>
-          );
-        },
-      },
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 96,
-        sortable: false,
-        filterable: false,
-        align: "center",
-        renderCell: (params) => {
-          return (
-            <IconButton
-              size="small"
-              aria-label="Edit recipe"
-              onClick={async () => {
-                // fetch full recipe details and open editor
-                try {
-                  setEditingLoading(true);
-                  const id = params.row.id;
-                  const url = `${API_BASE}/recipes/${encodeURIComponent(id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
-                  const r = await fetch(url);
-                  if (!r.ok) throw new Error(`Failed to fetch recipe ${id}`);
-                  const payload = await r.json();
-                  // payload shape: { recipe_id, recipe_name, units_per_batch, ingredients: [{ ingredient_name, quantity, unit, recipe_ingredient_id}] }
-                  setEditingRecipe({
-                    id: payload.recipe_id,
-                    recipe: payload.recipe_name,
-                    upb: payload.units_per_batch,
-                    items:
-                      Array.isArray(payload.ingredients) && payload.ingredients.length
-                        ? payload.ingredients.map((ing) => ({
-                            name: ing.ingredient_name,
-                            quantity: ing.quantity,
-                            unit: ing.unit,
-                            recipeIngredientId: ing.id,
-                          }))
-                        : [],
-                  });
-                  setEditDialogOpen(true);
-                } catch (err) {
-                  console.error("Failed to open editor:", err);
-                  alert("Could not open recipe editor. See console.");
-                } finally {
-                  setEditingLoading(false);
-                }
-              }}
-            >
-              <EditOutlinedIcon sx={{ color: brand.primary }} />
-            </IconButton>
-          );
-        },
-      },
-    ],
-    [cognitoId]
-  );
-
-  // Build displayItems (now robustly extracts unit for both structured and string inputs)
-  const buildDisplayItems = () => {
-    const isQuantities = drawerHeader.toLowerCase().includes("quantit");
-
-    // If it's the Quantities drawer and we have structured arrays in selectedRowMeta, use them (preferred)
-    if (isQuantities && selectedRowMeta?.ingredientsArray) {
-      const ingArr = selectedRowMeta.ingredientsArray || [];
-      const qtyArr = selectedRowMeta.quantitiesArray || [];
-      const unitArr = selectedRowMeta.unitsArray || [];
-      return ingArr.map((ing, i) => {
-        const rawQty = qtyArr?.[i] ?? "";
-        const unitRaw = unitArr?.[i] ?? "";
-        const qty = rawQty !== null && rawQty !== undefined ? String(rawQty) : "";
-        const unit = unitRaw !== null && unitRaw !== undefined ? String(unitRaw).trim() : "";
-        return {
-          raw: `${ing}: ${qty}${unit ? " " + unit : ""}`,
-          name: ing,
-          qty,
-          unit,
-        };
-      });
-    }
-
-    // Fallback: parse the stored drawerContent strings into { name, qty, unit }
-    return (drawerContent || []).map((raw) => {
-      const str = String(raw);
-      const parts = str.split(":");
-      const left = parts[0] ? parts[0].trim() : str;
-      const right = parts.slice(1).join(":").trim(); // preserve ":" inside values if any
-      if (!right) {
-        return { raw: str, name: left, qty: "", unit: "" };
-      }
-
-      // Clean right-hand string: remove trailing semicolons/commas and trim
-      const cleanedRight = right.replace(/^[\s;,:]+|[\s;,:]+$/g, "").trim();
-
-      // Attempt to split cleanedRight into quantity and unit (first token numeric-ish = qty)
-      const tokens = cleanedRight.split(/\s+/).filter(Boolean);
-
-      let qty = cleanedRight;
-      let unit = "";
-
-      if (tokens.length > 0) {
-        // normalize first token (strip punctuation)
-        const first = tokens[0].replace(/[;,:]+$/g, "");
-        // allow numbers, decimals, fractions (e.g. "1/2"), or numeric-like
-        if (/^[\d.,\/]+$/.test(first)) {
-          qty = first;
-          unit = tokens.slice(1).join(" ");
-        } else {
-          // try to extract a leading numeric portion from strings like "7.00g" or "200g"
-          const m = cleanedRight.match(/^([\d.,\/]+)([a-zA-Z%µμ]*)\s*(.*)$/);
-          if (m) {
-            qty = m[1];
-            unit = ((m[2] || "") + (m[3] ? " " + m[3].trim() : "")).trim();
-          } else {
-            // nothing numeric — treat whole cleanedRight as qty (no unit)
-            qty = cleanedRight;
-            unit = "";
-          }
-        }
-      }
-
-      return {
-        raw: str,
-        name: left,
-        qty,
-        unit,
+  /* Edit handlers (fetch full details before opening, like original) */
+  const handleEdit = async (recipe) => {
+    try {
+      const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipe.id}`);
+      const payload = await resp.json();
+      // payload: { recipe_id, recipe_name, units_per_batch, ingredients: [{ ingredient_name, quantity, unit, id }] }
+      const r = {
+        id: payload.recipe_id,
+        name: payload.recipe_name,
+        unitsPerBatch: payload.units_per_batch,
+        ingredients: (payload.ingredients || []).map((it, i) => ({
+          id: it.id ?? `${payload.recipe_id}_${i}`,
+          name: it.ingredient_name,
+          quantity: it.quantity,
+          unit: it.unit,
+        })),
       };
-    });
-  };
-
-  const displayItems = buildDisplayItems();
-  const filteredDisplayItems = displayItems.filter((it) =>
-    (it.raw || it.name).toLowerCase().includes(searchTerm.trim().toLowerCase())
-  );
-  const totalItemsCount = filteredDisplayItems.length;
-
-  const resetDrawerContent = () => {
-    if (!selectedRowMeta) {
-      setSearchTerm("");
-      return;
-    }
-    if (drawerHeader.toLowerCase().includes("quantit")) {
-      const { ingredientsArray = [], quantitiesArray = [], unitsArray = [] } = selectedRowMeta;
-      const rebuilt = ingredientsArray.map((ing, i) => {
-        const q = quantitiesArray?.[i] ?? "N/A";
-        const u = unitsArray?.[i] ? ` ${unitsArray[i]}` : "";
-        return `${ing}: ${q}${u}`;
-      });
-      setDrawerContent(rebuilt);
-      setSearchTerm("");
-      return;
-    }
-    if (selectedRowMeta?.ingredientsArray) {
-      setDrawerContent(selectedRowMeta.ingredientsArray.slice());
-      setSearchTerm("");
-      return;
-    }
-    setSearchTerm("");
-  };
-
-  const exportDrawerCsv = () => {
-    try {
-      const rowsOut = [["Item", drawerHeader.includes("Quantit") ? "Quantity" : "Value"]];
-      displayItems.forEach((it) => {
-        rowsOut.push([it.name, (it.qty || "") + (it.unit ? ` ${it.unit}` : "")]);
-      });
-      const csv = rowsOut.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const filenameBase = (selectedRowMeta?.recipe || "recipe").replace(/\s+/g, "-").toLowerCase();
-      a.download = `${filenameBase}-${drawerHeader.toLowerCase()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      setEditingRecipe(r);
+      setEditOpen(true);
     } catch (e) {
-      console.error("Export failed", e);
-      alert("Export failed");
+      console.error("Failed to open editor:", e);
+      alert("Could not open recipe editor.");
     }
   };
 
-  // Save edited recipe -> PUT /api/recipes/:id
-  const handleSaveRecipe = async () => {
-    if (!editingRecipe || !cognitoId) return;
-    setSaving(true);
+  const handleSaveEdited = async (edited) => {
+    if (!edited || !cognitoId) return;
     try {
-      // Prepare arrays
-      const ingredients = (editingRecipe.items || []).map((it) => it.name);
-      const quantities = (editingRecipe.items || []).map((it) => it.quantity);
-      const units = (editingRecipe.items || []).map((it) => it.unit);
-
       const payload = {
-        recipe: editingRecipe.recipe,
-        upb: editingRecipe.upb,
-        ingredients,
-        quantities,
-        units,
+        recipe: edited.name,
+        upb: edited.unitsPerBatch,
+        ingredients: edited.ingredients.map((i) => i.name),
+        quantities: edited.ingredients.map((i) => i.quantity),
+        units: edited.ingredients.map((i) => i.unit),
         cognito_id: cognitoId,
       };
-
-      const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(editingRecipe.id)}`, {
+      const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(edited.id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        const txt = await resp.text().catch(() => "");
-        throw new Error(txt || `Update failed (${resp.status})`);
+        const t = await resp.text().catch(() => "");
+        throw new Error(t || `Update failed (${resp.status})`);
       }
 
-      // refresh the recipe list
-      const refetch = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
-      if (!refetch.ok) throw new Error("Failed to refresh recipes");
-      const newData = await refetch.json();
-      const formatted = newData.reduce((acc, row) => {
+      // Refetch list to keep parity with server (original behavior) :contentReference[oaicite:2]{index=2}
+      const r2 = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+      if (!r2.ok) throw new Error("Failed to refresh recipes");
+      const data = await r2.json();
+
+      const grouped = data.reduce((acc, row) => {
         let entry = acc.find((r) => r.id === row.recipe_id);
         if (entry) {
           entry.ingredients.push(row.ingredient);
@@ -435,260 +654,91 @@ const Recipes = () => {
         }
         return acc;
       }, []);
-      setRows(formatted);
+      setRows(grouped);
+      const asRecipes = grouped.map((g) => ({
+        id: g.id,
+        name: g.recipe,
+        unitsPerBatch: g.upb,
+        ingredients: (g.ingredients || []).map((ing, i) => ({
+          id: `${g.id}_${i}`,
+          name: ing,
+          quantity: g.quantities?.[i] ?? "",
+          unit: g.units?.[i] ?? "",
+        })),
+      }));
+      setRecipes(asRecipes);
 
-      setEditDialogOpen(false);
+      setEditOpen(false);
       setEditingRecipe(null);
-    } catch (err) {
-      console.error("Save recipe failed:", err);
+    } catch (e) {
+      console.error("Save recipe failed:", e);
       alert("Save failed. See console for details.");
+    }
+  };
+
+  /* Delete */
+  const handleConfirmDelete = async () => {
+    const ids = Array.from(selectedRecipeIds);
+    if (!ids.length || !cognitoId) {
+      setDeleteOpen(false);
+      return;
+    }
+    try {
+      // call API for each selected id
+      for (const id of ids) {
+        const rec = recipes.find((r) => r.id === id);
+        if (!rec) continue;
+        const resp = await fetch(`${API_BASE}/delete-recipe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipeName: rec.name, cognito_id: cognitoId }),
+        });
+        if (!resp.ok) {
+          console.warn("Delete failed for", rec.name);
+        }
+      }
+      // update local state
+      const remaining = recipes.filter((r) => !selectedRecipeIds.has(r.id));
+      setRecipes(remaining);
+      setSelectedRecipeIds(new Set());
+    } catch (e) {
+      console.error("Error deleting recipes:", e);
+      alert("Could not delete recipes.");
     } finally {
-      setSaving(false);
+      setDeleteOpen(false);
     }
   };
 
   return (
-    <Box m="20px">
-      <style>{`
-        .recipes-card {
-          border: 1px solid ${brand.border};
-          background: ${brand.surface};
-          border-radius: 16px;
-          box-shadow: ${brand.shadow};
-          overflow: hidden;
-        }
-        .recipes-toolbar {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px; border-bottom: 1px solid ${brand.border};
-          background: ${brand.surface};
-        }
+    <div className="m-5 space-y-4">
+      <RecipeTable
+        recipes={recipes}
+        onOpenDrawer={handleOpenDrawer}
+        onEdit={handleEdit}
+        selectedRecipeIds={selectedRecipeIds}
+        setSelectedRecipeIds={setSelectedRecipeIds}
+        onDelete={() => setDeleteOpen(true)}
+      />
 
-        /* Alternating row colors for recipes DataGrid */
-        .recipes-even-row { background-color: ${brand.surface} !important; }
-        .recipes-odd-row  { background-color: ${brand.surfaceMuted} !important; }
-        /* preserve hover visibility (hover will override briefly) */
-        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
-      `}</style>
+      <RecipeDrawer isOpen={drawerOpen} onClose={handleCloseDrawer} recipe={drawerRecipe} type={drawerType} />
 
-      <Box className="recipes-card" mt={2}>
-        <Box className="recipes-toolbar">
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>Recipes</Typography>
+      <DeleteConfirmationModal
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        count={selectedRecipeIds.size}
+      />
 
-          <IconButton
-            aria-label="Delete selected"
-            onClick={() => setOpenDialog(true)}
-            disabled={selectedRows.length === 0}
-            sx={{
-              color: "#fff",
-              borderRadius: 999,
-              width: 40,
-              height: 40,
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
-              opacity: selectedRows.length === 0 ? 0.5 : 1,
-            }}
-          >
-            <DeleteIcon />
-          </IconButton>
-        </Box>
-
-        <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", minWidth: "650px" } }}>
-          <DataGrid
-            rows={rows || []}
-            columns={columns}
-            checkboxSelection
-            onRowSelectionModelChange={(model) => setSelectedRows(model)}
-            getRowId={(r) => r.id}
-            pageSize={10}
-            rowsPerPageOptions={[10, 25, 50]}
-            getRowClassName={(params) =>
-              (params.indexRelativeToCurrentPage % 2 === 0) ? "recipes-even-row" : "recipes-odd-row"
-            }
-          />
-        </Box>
-      </Box>
-
-      {/* Drawer (ingredients/quantities) */}
-      <Drawer anchor="right" open={drawerOpen} onClose={handleDrawerClose}
-        PaperProps={{ sx: { width: 420, borderRadius: "20px 0 0 20px", border: `1px solid ${brand.border}`, boxShadow: "0 24px 48px rgba(15,23,42,0.12)", overflow: "hidden" } }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, px: 2, py: 1.25, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})` }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box sx={{ width: 44, height: 44, borderRadius: 2, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MenuOutlinedIcon sx={{ color: "#fff" }} />
-            </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>{drawerHeader}</Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>{selectedRowMeta?.recipe ? `${selectedRowMeta.recipe}` : ""}</Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <IconButton size="small" onClick={exportDrawerCsv} sx={{ color: "#fff", borderRadius: 1, border: "1px solid rgba(255,255,255,0.12)" }}>
-              <FileDownloadOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}><CloseIcon /></IconButton>
-          </Box>
-        </Box>
-
-        <Box sx={{ background: brand.surface, p: 2, height: "calc(100% - 88px)" }}>
-          <Card variant="outlined" sx={{ borderColor: brand.border, background: brand.surface, borderRadius: 2, mb: 2 }}>
-            <CardContent sx={{ p: 1.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box>
-                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>Recipe</Typography>
-                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>{selectedRowMeta?.recipe || "—"}</Typography>
-                  {selectedRowMeta?.upb && <Typography variant="caption" sx={{ color: brand.subtext }}>Units per batch: {selectedRowMeta.upb}</Typography>}
-                </Box>
-                <Box sx={{ textAlign: "right" }}>
-                  <Typography sx={{ color: "text.secondary", fontSize: 12 }}>Items</Typography>
-                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>{totalItemsCount}</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <TextField size="small" placeholder="Search item or filter" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} fullWidth
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5, background: "#fff", borderColor: brand.border } }} />
-            <Button variant="outlined" size="small" onClick={resetDrawerContent} sx={{ textTransform: "none", borderRadius: 1.5 }}>Reset</Button>
-          </Stack>
-
-          <Divider sx={{ mb: 2 }} />
-
-          <List disablePadding>
-            {filteredDisplayItems.length === 0 ? (
-              <Typography sx={{ color: brand.subtext }}>No items available.</Typography>
-            ) : (
-              filteredDisplayItems.map((it, idx) => {
-                const primaryText = it.name;
-                const qtyText = it.qty ? String(it.qty) : "";
-                const unitText = it.unit ? String(it.unit) : "";
-                const pill = qtyText ? `${qtyText}${unitText ? " " + unitText : ""}` : null;
-
-                return (
-                  <Box key={idx} sx={{ borderRadius: 2, border: `1px solid ${brand.border}`, backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface, mb: 1, overflow: "hidden" }}>
-                    <ListItem secondaryAction={pill ? (
-                      <Box component="span" sx={{ borderRadius: 999, border: `1px solid ${brand.border}`, background: "#f1f5f9", px: 1.25, py: 0.25, fontSize: 12, fontWeight: 700, color: brand.text }}>{pill}</Box>
-                    ) : null}>
-                      <ListItemIcon sx={{ minWidth: 36 }}><CheckRoundedIcon sx={{ color: brand.primary }} /></ListItemIcon>
-                      <ListItemText primary={primaryText} primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }} />
-                    </ListItem>
-                  </Box>
-                );
-              })
-            )}
-          </List>
-        </Box>
-
-        <Box sx={{ p: 2, borderTop: `1px solid ${brand.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: brand.surface }}>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button onClick={handleDrawerClose} sx={{ textTransform: "none", borderRadius: 999, px: 2, border: `1px solid ${brand.border}` }}>Close</Button>
-            <Button onClick={() => { handleDrawerClose(); }} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>Done</Button>
-          </Box>
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>{totalItemsCount} items</Typography>
-        </Box>
-      </Drawer>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm deletion</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>Delete {selectedRows.length} selected recipe{selectedRows.length === 1 ? "" : "s"}?</Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDialog(false)} sx={{ textTransform: "none" }}>Cancel</Button>
-          <Button onClick={async () => {
-              // handleDeleteRecipe logic kept similar to your earlier implementation
-              if (!selectedRows.length || !cognitoId) return;
-              try {
-                await Promise.all(selectedRows.map(async (recipeId) => {
-                  const rec = (rows || []).find((r) => r.id === recipeId);
-                  if (!rec) return;
-                  const resp = await fetch(`${API_BASE}/delete-recipe`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ recipeName: rec.recipe, cognito_id: cognitoId }),
-                  });
-                  if (resp.ok) {
-                    setRows((prev) => prev.filter((r) => r.id !== recipeId));
-                  }
-                }));
-                setSelectedRows([]);
-                setOpenDialog(false);
-              } catch (err) {
-                console.error("Error deleting recipes:", err);
-                alert("Could not delete recipes");
-              }
-            }} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} startIcon={<DeleteIcon />}>Delete</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit recipe dialog */}
-      <Dialog open={editDialogOpen} onClose={() => { setEditDialogOpen(false); setEditingRecipe(null); }} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>{editingRecipe ? `Edit Recipe: ${editingRecipe.recipe}` : "Edit Recipe"}</DialogTitle>
-        <DialogContent dividers>
-          {!editingRecipe ? (
-            <Typography sx={{ color: brand.subtext }}>Loading…</Typography>
-          ) : (
-            <Box sx={{ display: "grid", gap: 2 }}>
-              <TextField label="Recipe name" fullWidth value={editingRecipe.recipe} onChange={(e) => setEditingRecipe((p) => ({ ...p, recipe: e.target.value }))} />
-              <TextField label="Units per batch" fullWidth value={editingRecipe.upb} onChange={(e) => setEditingRecipe((p) => ({ ...p, upb: e.target.value }))} />
-
-              <Box>
-                <Typography sx={{ fontWeight: 800, mb: 1 }}>Ingredients</Typography>
-                <Stack spacing={1}>
-                  {(editingRecipe.items || []).map((it, idx) => (
-                    <Paper key={idx} sx={{ p: 1, display: "grid", gridTemplateColumns: "2fr 1fr 1fr 40px", gap: 8, alignItems: "center" }}>
-                      <TextField label="Ingredient" value={it.name} onChange={(e) => {
-                        const copy = (editingRecipe.items || []).slice();
-                        copy[idx] = { ...copy[idx], name: e.target.value };
-                        setEditingRecipe((p) => ({ ...p, items: copy }));
-                      }} />
-                      <TextField label="Quantity" type="number" value={it.quantity} onChange={(e) => {
-                        const copy = (editingRecipe.items || []).slice();
-                        copy[idx] = { ...copy[idx], quantity: e.target.value };
-                        setEditingRecipe((p) => ({ ...p, items: copy }));
-                      }} />
-                      <FormControl fullWidth>
-                        <InputLabel id={`unit-label-${idx}`}>Unit</InputLabel>
-                        <Select labelId={`unit-label-${idx}`} value={it.unit || ""} label="Unit" onChange={(e) => {
-                          const copy = (editingRecipe.items || []).slice();
-                          copy[idx] = { ...copy[idx], unit: e.target.value };
-                          setEditingRecipe((p) => ({ ...p, items: copy }));
-                        }}>
-                          {unitOptions.map((u) => (<MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>))}
-                        </Select>
-                      </FormControl>
-                      <IconButton size="small" onClick={() => {
-                        const copy = (editingRecipe.items || []).slice();
-                        copy.splice(idx, 1);
-                        setEditingRecipe((p) => ({ ...p, items: copy }));
-                      }}><CloseIcon /></IconButton>
-                    </Paper>
-                  ))}
-                </Stack>
-
-                <Box mt={1} textAlign="right">
-                  <Button startIcon={<AddOutlinedIcon />} onClick={() => {
-                    const copy = (editingRecipe.items || []).slice();
-                    copy.push({ name: "", quantity: "", unit: unitOptions[0].value });
-                    setEditingRecipe((p) => ({ ...p, items: copy }));
-                  }} sx={{ textTransform: "none" }}>Add ingredient</Button>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => { setEditDialogOpen(false); setEditingRecipe(null); }} sx={{ textTransform: "none" }} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSaveRecipe} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2, color: "#fff", background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, "&:hover": { background: brand.primaryDark } }} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      <EditRecipeModal
+        isOpen={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setEditingRecipe(null);
+        }}
+        onSave={handleSaveEdited}
+        recipe={editingRecipe}
+      />
+    </div>
   );
 };
 
