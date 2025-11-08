@@ -3,13 +3,42 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
-/* ------------------------------
-   Brand tailwind utility classes
-   (expects your CSS tokens e.g. bg-brand-surface)
---------------------------------*/
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* Keep local unit options (no external dependency) */
+/* ---------------- Icons ---------------- */
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const EditIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </Svg>
+);
+const DeleteIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+const MenuIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+  </Svg>
+);
+const CloseIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </Svg>
+);
+const CheckIcon = (props) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+const DownloadIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+  </Svg>
+);
+
+/* Simple unit options used in the edit modal */
 const UNIT_OPTIONS = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -18,52 +47,97 @@ const UNIT_OPTIONS = [
   { value: "units", label: "Units" },
 ];
 
-/* ================= Icons ================= */
-const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
-const EditIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-  </Svg>
-);
-const DeleteIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </Svg>
-);
-const MenuIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
-  </Svg>
-);
-const CloseIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-  </Svg>
-);
-const CheckIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <polyline points="20 6 9 17 4 12" />
-  </Svg>
-);
-const DownloadIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-  </Svg>
-);
-const AddIcon = (props) => (
-  <Svg width="24" height="24" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </Svg>
+/* ---------------- Style shim (scoped) ---------------- */
+const BrandStyles = () => (
+  <style>{`
+  .r-wrap { margin: 20px; }
+  .r-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+    overflow:hidden;
+  }
+  .r-head { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
+  .r-title { margin:0; font-weight:800; color:#0f172a; font-size:16px; }
+  .r-pill { font-size:12px; font-weight:700; color:#7C3AED; }
+  .r-btn-icon {
+    border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626;
+  }
+  .r-btn-icon:hover { background:#fee2e2; }
+  .r-table-wrap { overflow:auto; }
+  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
+  .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
+  .r-thead th { padding:10px 12px; text-align:left; }
+  .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
+  .r-row:nth-child(odd) { background:#ffffff; }
+  .r-row:nth-child(even) { background:#f8fafc; }
+  .r-row:hover { background:#f4f1ff; }
+  .r-td { padding:12px; }
+  .r-td--name { font-weight:700; color:#0f172a; white-space:nowrap; }
+  .r-actions { text-align:center; }
+  .r-chk { width:16px; height:16px; }
+  .r-link { color:#7C3AED; font-weight:600; background:transparent; border:0; cursor:pointer; }
+  .r-link:hover { color:#5B21B6; text-decoration:underline; }
+  .r-btn-ghost {
+    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:700; font-size:14px;
+    color:#7C3AED; border:1px solid #e5e7eb; border-radius:10px; background:#fff;
+  }
+  .r-btn-ghost:hover { background:#f4f1ff; }
+  .r-btn-primary {
+    padding:8px 16px; font-weight:700; color:#fff; background:#7C3AED; border:0; border-radius:10px;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+  }
+  .r-btn-primary:hover { background:#5B21B6; }
+  .r-btn-danger { background:#dc2626; }
+  .r-btn-danger:hover { background:#b91c1c; }
+  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+
+  /* Drawer */
+  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.4); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
+  .r-dim.open { opacity:1; pointer-events:auto; }
+  .r-drawer {
+    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px; background:#fff; box-shadow:-8px 0 24px rgba(2,6,23,.18);
+    transform:translateX(100%); transition:transform .25s ease; z-index:50; display:flex; flex-direction:column;
+  }
+  .r-drawer.open { transform:translateX(0); }
+  .r-dhdr {
+    padding:14px 16px; color:#fff; background:linear-gradient(180deg, #7C3AED, #5B21B6); display:flex; align-items:center; justify-content:space-between;
+  }
+  .r-dhdr-title { margin:0; font-weight:800; font-size:18px; }
+  .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
+  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
+  .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
+  .r-stat { text-align:right; }
+  .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
+  .r-input {
+    width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; outline:none;
+  }
+  .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
+  .r-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
+  .r-chip { font-size:12px; font-weight:700; background:#f1f5f9; color:#334155; padding:4px 8px; border-radius:999px; }
+
+  /* Modal */
+  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:60; }
+  .r-modal { background:#fff; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+  .r-mbody { padding:16px; overflow:auto; }
+  .r-mgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .r-field label { display:block; font-size:13px; color:#64748b; margin-bottom:6px; font-weight:600; }
+  .r-field input, .r-field select {
+    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
+  }
+  .r-field input:focus, .r-field select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-ing { display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:10px; align-items:center; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:10px; }
+  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
+
+  /* Small helpers */
+  .r-flex { display:flex; align-items:center; gap:10px; }
+  .r-badge { background:#ede9fe; color:#7C3AED; border:1px solid #eee; border-radius:999px; padding:2px 8px; font-size:12px; }
+  .r-muted { color:#64748b; font-size:12px; }
+  .r-strong { font-weight:800; color:#0f172a; }
+  `}</style>
 );
 
-/* ================= Types (JSDoc) ================= */
-/**
- * @typedef {{ id: string, name: string, quantity: number, unit: string }} Ingredient
- * @typedef {{ id: string, recipe: string, upb: number, ingredients: string[], quantities: (string|number)[], units: string[] }} RowGroup
- * @typedef {{ id: string, name: string, unitsPerBatch: number, ingredients: Ingredient[] }} Recipe
- */
-
-/* ================= Recipe Table ================= */
+/* ---------------- Recipe Table ---------------- */
 const RecipeTable = ({
   recipes,
   onOpenDrawer,
@@ -73,18 +147,13 @@ const RecipeTable = ({
   onDelete,
 }) => {
   const checkboxRef = useRef(null);
-
   const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedRecipeIds(new Set(recipes.map((r) => r.id)));
-    } else {
-      setSelectedRecipeIds(new Set());
-    }
+    if (e.target.checked) setSelectedRecipeIds(new Set(recipes.map((r) => r.id)));
+    else setSelectedRecipeIds(new Set());
   };
   const handleSelectRow = (id) => {
     const next = new Set(selectedRecipeIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    next.has(id) ? next.delete(id) : next.add(id);
     setSelectedRecipeIds(next);
   };
 
@@ -92,96 +161,77 @@ const RecipeTable = ({
   const rowCount = recipes.length;
 
   useEffect(() => {
-    if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = numSelected > 0 && numSelected < rowCount;
-    }
+    if (!checkboxRef.current) return;
+    checkboxRef.current.indeterminate = numSelected > 0 && numSelected < rowCount;
   }, [numSelected, rowCount]);
 
   return (
-    <div className="bg-brand-surface rounded-xl border border-brand-border shadow-sm overflow-hidden">
-      <div className="p-4 flex items-center justify-between border-b border-brand-border">
-        <h2 className="text-lg font-bold text-brand-text">Recipes</h2>
+    <div className="r-card">
+      <div className="r-head">
+        <h2 className="r-title">Recipes</h2>
         {numSelected > 0 && (
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-brand-primary">{numSelected} selected</span>
-            <button
-              onClick={onDelete}
-              className="p-2 rounded-full text-brand-danger hover:bg-red-100 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-              aria-label="Delete selected recipes"
-            >
-              <DeleteIcon className="w-5 h-5" />
+          <div className="r-flex">
+            <span className="r-pill">{numSelected} selected</span>
+            <button className="r-btn-icon" onClick={onDelete} aria-label="Delete selected">
+              <DeleteIcon />
             </button>
           </div>
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left text-brand-subtext">
-          <thead className="bg-brand-surface-muted text-xs text-brand-subtext uppercase tracking-wider">
+      <div className="r-table-wrap">
+        <table className="r-table">
+          <thead className="r-thead">
             <tr>
-              <th scope="col" className="p-4">
-                <input
-                  ref={checkboxRef}
-                  type="checkbox"
-                  className="w-4 h-4 text-brand-primary bg-gray-100 border-gray-300 rounded focus:ring-brand-primary"
-                  onChange={handleSelectAll}
-                  checked={rowCount > 0 && numSelected === rowCount}
-                />
+              <th className="r-td">
+                <input ref={checkboxRef} className="r-chk" type="checkbox" onChange={handleSelectAll}
+                       checked={rowCount > 0 && numSelected === rowCount} />
               </th>
-              <th scope="col" className="px-6 py-3">Recipe</th>
-              <th scope="col" className="px-6 py-3">Units per Batch</th>
-              <th scope="col" className="px-6 py-3">Ingredients</th>
-              <th scope="col" className="px-6 py-3">Quantities</th>
-              <th scope="col" className="px-6 py-3 text-center">Actions</th>
+              <th className="r-td">Recipe</th>
+              <th className="r-td">Units per Batch</th>
+              <th className="r-td">Ingredients</th>
+              <th className="r-td">Quantities</th>
+              <th className="r-td r-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {recipes.map((r, idx) => (
-              <tr
-                key={r.id}
-                className={`${idx % 2 === 0 ? "bg-brand-surface" : "bg-brand-surface-muted"} border-b border-brand-border hover:bg-violet-50 transition-colors`}
-              >
-                <td className="w-4 p-4">
+              <tr key={r.id} className="r-row">
+                <td className="r-td">
                   <input
+                    className="r-chk"
                     type="checkbox"
-                    className="w-4 h-4 text-brand-primary bg-gray-100 border-gray-300 rounded focus:ring-brand-primary"
                     checked={selectedRecipeIds.has(r.id)}
                     onChange={() => handleSelectRow(r.id)}
                   />
                 </td>
-                <td className="px-6 py-4 font-semibold text-brand-text whitespace-nowrap">{r.name}</td>
-                <td className="px-6 py-4">{r.unitsPerBatch}</td>
-                <td className="px-6 py-4">
-                  <button
-                    onClick={() => onOpenDrawer(r.id, "ingredients")}
-                    className="font-medium text-brand-primary hover:text-brand-primary-dark hover:underline"
-                  >
+                <td className="r-td r-td--name">{r.name}</td>
+                <td className="r-td">{r.unitsPerBatch}</td>
+                <td className="r-td">
+                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "ingredients")}>
                     View ({r.ingredients.length})
                   </button>
                 </td>
-                <td className="px-6 py-4">
-                  <button
-                    onClick={() => onOpenDrawer(r.id, "quantities")}
-                    className="font-medium text-brand-primary hover:text-brand-primary-dark hover:underline"
-                  >
+                <td className="r-td">
+                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "quantities")}>
                     View Quantities
                   </button>
                 </td>
-                <td className="px-6 py-4 text-center">
+                <td className="r-td r-actions">
                   <button
+                    className="r-btn-ghost"
                     onClick={() => onEdit(r)}
-                    className="p-2 rounded-full text-brand-primary hover:bg-violet-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary"
                     aria-label={`Edit ${r.name}`}
                   >
-                    <EditIcon className="w-5 h-5" />
+                    <EditIcon /> Edit
                   </button>
                 </td>
               </tr>
             ))}
             {recipes.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-brand-subtext">
-                  No recipes found.
+              <tr className="r-row">
+                <td className="r-td" colSpan={6} style={{ textAlign: "center" }}>
+                  <span className="r-muted">No recipes found.</span>
                 </td>
               </tr>
             )}
@@ -192,7 +242,7 @@ const RecipeTable = ({
   );
 };
 
-/* ================= Drawer ================= */
+/* ---------------- Drawer ---------------- */
 const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -206,8 +256,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   }, [recipe, type]);
 
   const filtered = useMemo(() => {
-    if (!searchTerm) return displayItems;
-    const q = searchTerm.toLowerCase();
+    const q = (searchTerm || "").toLowerCase();
     return displayItems.filter((it) => it.fullText.includes(q));
   }, [displayItems, searchTerm]);
 
@@ -222,112 +271,79 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const filename = `${(recipe?.name || "recipe").replace(/\s+/g, "_")}_${type}.csv`;
-    a.download = filename;
+    a.download = `${(recipe?.name || "recipe").replace(/\s+/g, "_")}_${type}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <>
-      <div
-        className={`fixed inset-0 bg-black bg-opacity-40 z-40 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-        onClick={onClose}
-      />
-      <div
-        className={`fixed top-0 right-0 h-full w-full max-w-md bg-brand-surface shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <header className="p-4 text-white bg-gradient-to-br from-brand-primary to-brand-primary-dark flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-white/20 flex items-center justify-center">
-                <MenuIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">{type === "ingredients" ? "Ingredients" : "Quantities"}</h2>
-                <p className="text-sm opacity-90">{recipe?.name || "No recipe selected"}</p>
-              </div>
+      <div className={`r-dim ${isOpen ? "open" : ""}`} onClick={onClose} />
+      <div className={`r-drawer ${isOpen ? "open" : ""}`}>
+        <div className="r-dhdr">
+          <div className="r-flex">
+            <span className="r-badge"><MenuIcon /></span>
+            <div>
+              <h3 className="r-dhdr-title">{type === "ingredients" ? "Ingredients" : "Quantities"}</h3>
+              <p className="r-dhdr-sub">{recipe?.name || "No recipe selected"}</p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20 transition-colors">
-              <CloseIcon className="w-6 h-6" />
-            </button>
-          </header>
+          </div>
+          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+        </div>
 
-          {/* Summary */}
-          <div className="p-4 flex-grow overflow-y-auto bg-slate-50">
-            <div className="bg-white p-3 rounded-lg border border-brand-border shadow-sm mb-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-xs font-semibold text-brand-subtext uppercase">Recipe</p>
-                  <p className="text-lg font-bold text-brand-text">{recipe?.name || "—"}</p>
-                  <p className="text-xs text-brand-subtext">Units per batch: {recipe?.unitsPerBatch ?? "N/A"}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold text-brand-subtext uppercase">Items</p>
-                  <p className="text-3xl font-black text-brand-primary">{filtered.length}</p>
-                </div>
-              </div>
+        <div className="r-dbody">
+          <div className="r-summary r-flex" style={{ justifyContent: "space-between" }}>
+            <div>
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 700 }}>Recipe</div>
+              <div className="r-strong">{recipe?.name || "—"}</div>
+              <div className="r-muted">Units per batch: {recipe?.unitsPerBatch ?? "N/A"}</div>
             </div>
-
-            {/* Search */}
-            <div className="sticky top-0 bg-slate-50 py-2">
-              <input
-                type="text"
-                placeholder="Filter items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
-              />
+            <div className="r-stat">
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 700 }}>Items</div>
+              <div className="r-strong" style={{ color: "#7C3AED", fontSize: 24 }}>{filtered.length}</div>
             </div>
-
-            {/* Items */}
-            <ul className="mt-4 space-y-2">
-              {filtered.map((it, i) => (
-                <li key={i} className="flex items-center justify-between bg-white p-3 rounded-md border border-brand-border">
-                  <div className="flex items-center gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 bg-violet-100 text-brand-primary rounded-full flex items-center justify-center">
-                      <CheckIcon className="w-4 h-4" />
-                    </span>
-                    <span className="font-medium text-brand-text">{it.name}</span>
-                  </div>
-                  {type === "quantities" && (
-                    <span className="text-sm font-semibold bg-slate-100 text-brand-subtext px-2.5 py-0.5 rounded-full">
-                      {it.details}
-                    </span>
-                  )}
-                </li>
-              ))}
-              {filtered.length === 0 && <li className="text-center text-brand-subtext py-8">No items found.</li>}
-            </ul>
           </div>
 
-          {/* Footer */}
-          <footer className="p-4 border-t border-brand-border flex-shrink-0 flex items-center justify-between bg-brand-surface">
-            <button
-              onClick={exportCsv}
-              disabled={!recipe}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-primary border border-brand-border rounded-lg hover:bg-violet-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <DownloadIcon className="w-5 h-5" />
-              Export CSV
-            </button>
-            <button
-              onClick={onClose}
-              className="px-6 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg shadow-sm hover:bg-brand-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
-            >
-              Done
-            </button>
-          </footer>
+          <div className="r-filter">
+            <input
+              className="r-input"
+              type="text"
+              placeholder="Filter items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <ul className="r-list">
+            {filtered.map((it, i) => (
+              <li key={i} className="r-item">
+                <div className="r-flex">
+                  <span className="r-badge"><CheckIcon /></span>
+                  <span className="r-strong" style={{ fontWeight: 600 }}>{it.name}</span>
+                </div>
+                {type === "quantities" && <span className="r-chip">{it.details}</span>}
+              </li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="r-item" style={{ justifyContent: "center" }}>
+                <span className="r-muted">No items found.</span>
+              </li>
+            )}
+          </ul>
+        </div>
+
+        <div className="r-footer">
+          <button className="r-btn-ghost" onClick={exportCsv} disabled={!recipe}>
+            <DownloadIcon /> Export CSV
+          </button>
+          <button className="r-btn-primary" onClick={onClose}>Done</button>
         </div>
       </div>
     </>
   );
 };
 
-/* ================= Edit Modal ================= */
+/* ---------------- Edit Modal ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const [edited, setEdited] = useState(recipe);
   const [saving, setSaving] = useState(false);
@@ -365,104 +381,74 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-brand-border flex justify-between items-center">
-          <h2 className="text-xl font-bold text-brand-text">Edit Recipe</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100">
-            <CloseIcon className="w-6 h-6 text-brand-subtext" />
-          </button>
+    <div className="r-modal-dim">
+      <div className="r-modal">
+        <div className="r-mhdr">
+          <h2 className="r-title" style={{ fontSize: 18 }}>Edit Recipe</h2>
+          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-brand-subtext mb-1">Recipe Name</label>
+        <div className="r-mbody">
+          <div className="r-mgrid">
+            <div className="r-field">
+              <label>Recipe Name</label>
               <input
                 type="text"
                 value={edited?.name || ""}
                 onChange={(e) => handleField("name", e.target.value)}
-                className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-brand-subtext mb-1">Units per Batch</label>
+            <div className="r-field">
+              <label>Units per Batch</label>
               <input
                 type="number"
                 value={edited?.unitsPerBatch ?? 0}
                 onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
-                className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
               />
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold text-brand-text mb-2">Ingredients</h3>
-            <div className="space-y-3">
+          <div style={{ marginTop: 12 }}>
+            <h3 className="r-strong" style={{ marginBottom: 8 }}>Ingredients</h3>
+            <div style={{ display: "grid", gap: 8 }}>
               {(edited?.ingredients || []).map((ing, idx) => (
-                <div
-                  key={ing.id || idx}
-                  className="grid grid-cols-1 md:grid-cols-[2fr,1fr,1fr,auto] gap-3 items-center bg-slate-50 p-3 rounded-md border border-brand-border"
-                >
+                <div key={ing.id || idx} className="r-ing">
                   <input
                     type="text"
                     placeholder="Ingredient Name"
                     value={ing.name}
                     onChange={(e) => handleIngredient(idx, "name", e.target.value)}
-                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
                   />
                   <input
                     type="number"
                     placeholder="Quantity"
                     value={ing.quantity}
                     onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none"
                   />
                   <select
                     value={ing.unit}
                     onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
-                    className="w-full px-3 py-2 border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary focus:outline-none bg-white"
                   >
                     {UNIT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => removeIngredient(idx)}
-                    className="p-2 text-brand-danger hover:bg-red-100 rounded-full transition-colors"
-                  >
-                    <DeleteIcon className="w-5 h-5" />
+                  <button className="r-btn-icon" onClick={() => removeIngredient(idx)} title="Remove">
+                    <DeleteIcon />
                   </button>
                 </div>
               ))}
             </div>
-            <button
-              onClick={addIngredient}
-              className="mt-4 flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-primary rounded-lg hover:bg-violet-50 transition-colors border border-brand-border"
-            >
-              <AddIcon className="w-5 h-5" />
-              Add Ingredient
+
+            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredient}>
+              + Add Ingredient
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-brand-border flex justify-end gap-3 bg-slate-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-brand-subtext bg-white border border-brand-border rounded-lg hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-semibold text-white bg-brand-primary rounded-lg shadow-sm hover:bg-brand-primary-dark disabled:bg-slate-400"
-          >
+        <div className="r-mfooter">
+          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className={`r-btn-primary ${saving ? "r-btn-disabled" : ""}`} onClick={save} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -471,58 +457,47 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   );
 };
 
-/* ================= Delete Modal ================= */
+/* ---------------- Delete Modal ---------------- */
 const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
   if (!isOpen || count === 0) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-        <div className="p-6 text-center">
-          <div className="mx-auto w-12 h-12 flex items-center justify-center bg-red-100 rounded-full mb-4">
-            <DeleteIcon className="w-6 h-6 text-brand-danger" />
-          </div>
-          <h3 className="text-lg font-semibold text-brand-text">Confirm Deletion</h3>
-          <p className="text-sm text-brand-subtext mt-2">
-            Delete {count} selected recipe{count > 1 ? "s" : ""}? This action cannot be undone.
-          </p>
+    <div className="r-modal-dim">
+      <div className="r-modal" style={{ maxWidth: 420 }}>
+        <div className="r-mhdr">
+          <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
+          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
         </div>
-        <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-brand-subtext bg-white border border-brand-border rounded-lg hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 text-sm font-semibold text-white bg-brand-danger rounded-lg shadow-sm hover:bg-red-700"
-          >
-            Delete
-          </button>
+        <div className="r-mbody" style={{ textAlign: "center" }}>
+          <div className="r-badge" style={{ width: 48, height: 48, display:"inline-flex", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", border:"none" }}>
+            <DeleteIcon />
+          </div>
+          <h3 className="r-strong" style={{ marginTop: 8 }}>Delete {count} recipe{count>1?"s":""}?</h3>
+          <p className="r-muted" style={{ marginTop: 6 }}>This action cannot be undone.</p>
+        </div>
+        <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
+          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>Delete</button>
         </div>
       </div>
     </div>
   );
 };
 
-/* ================= Main Screen ================= */
+/* ---------------- Main Screen ---------------- */
 const Recipes = () => {
   const { cognitoId } = useAuth();
-  const { rows, setRows } = useData(); // rows is grouped MUI shape in original file
+  const { rows, setRows } = useData();
 
-  // Local derived "recipes" in Tailwind component shape
-  const [recipes, setRecipes] = useState([]); // Array<Recipe>
+  const [recipes, setRecipes] = useState([]);
   const [selectedRecipeIds, setSelectedRecipeIds] = useState(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerType, setDrawerType] = useState("ingredients"); // 'ingredients' | 'quantities'
+  const [drawerType, setDrawerType] = useState("ingredients");
   const [drawerRecipe, setDrawerRecipe] = useState(null);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
-
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Fetch & format (keeps original functionality) :contentReference[oaicite:1]{index=1}
   useEffect(() => {
     if (!cognitoId) return;
     const fetchRecipeData = async () => {
@@ -531,7 +506,6 @@ const Recipes = () => {
         if (!res.ok) throw new Error("Failed to fetch Recipe data");
         const data = await res.json();
 
-        // Group by recipe_id (original logic)
         const grouped = data.reduce((acc, row) => {
           let entry = acc.find((r) => r.id === row.recipe_id);
           if (entry) {
@@ -552,7 +526,6 @@ const Recipes = () => {
         }, []);
         setRows(grouped);
 
-        // Convert to Tailwind view model
         const asRecipes = grouped.map((g) => ({
           id: g.id,
           name: g.recipe,
@@ -574,7 +547,6 @@ const Recipes = () => {
     fetchRecipeData();
   }, [cognitoId, setRows]);
 
-  /* Drawer handlers */
   const handleOpenDrawer = (recipeId, type) => {
     const r = recipes.find((x) => x.id === recipeId);
     setDrawerRecipe(r || null);
@@ -583,14 +555,12 @@ const Recipes = () => {
   };
   const handleCloseDrawer = () => setDrawerOpen(false);
 
-  /* Edit handlers (fetch full details before opening, like original) */
   const handleEdit = async (recipe) => {
     try {
       const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipe.id}`);
       const payload = await resp.json();
-      // payload: { recipe_id, recipe_name, units_per_batch, ingredients: [{ ingredient_name, quantity, unit, id }] }
       const r = {
         id: payload.recipe_id,
         name: payload.recipe_name,
@@ -631,7 +601,6 @@ const Recipes = () => {
         throw new Error(t || `Update failed (${resp.status})`);
       }
 
-      // Refetch list to keep parity with server (original behavior) :contentReference[oaicite:2]{index=2}
       const r2 = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
       if (!r2.ok) throw new Error("Failed to refresh recipes");
       const data = await r2.json();
@@ -676,7 +645,6 @@ const Recipes = () => {
     }
   };
 
-  /* Delete */
   const handleConfirmDelete = async () => {
     const ids = Array.from(selectedRecipeIds);
     if (!ids.length || !cognitoId) {
@@ -684,7 +652,6 @@ const Recipes = () => {
       return;
     }
     try {
-      // call API for each selected id
       for (const id of ids) {
         const rec = recipes.find((r) => r.id === id);
         if (!rec) continue;
@@ -697,7 +664,6 @@ const Recipes = () => {
           console.warn("Delete failed for", rec.name);
         }
       }
-      // update local state
       const remaining = recipes.filter((r) => !selectedRecipeIds.has(r.id));
       setRecipes(remaining);
       setSelectedRecipeIds(new Set());
@@ -710,7 +676,9 @@ const Recipes = () => {
   };
 
   return (
-    <div className="m-5 space-y-4">
+    <div className="r-wrap">
+      <BrandStyles />
+
       <RecipeTable
         recipes={recipes}
         onOpenDrawer={handleOpenDrawer}
@@ -720,7 +688,12 @@ const Recipes = () => {
         onDelete={() => setDeleteOpen(true)}
       />
 
-      <RecipeDrawer isOpen={drawerOpen} onClose={handleCloseDrawer} recipe={drawerRecipe} type={drawerType} />
+      <RecipeDrawer
+        isOpen={drawerOpen}
+        onClose={handleCloseDrawer}
+        recipe={drawerRecipe}
+        type={drawerType}
+      />
 
       <DeleteConfirmationModal
         isOpen={deleteOpen}
