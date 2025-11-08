@@ -5,6 +5,15 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
+/* ---------------- Unit options (local) ---------------- */
+const UNIT_OPTIONS = [
+  { value: "grams", label: "Grams (g)" },
+  { value: "ml", label: "Milliliters (ml)" },
+  { value: "kg", label: "Kilograms (Kg)" },
+  { value: "l", label: "Litres (L)" },
+  { value: "units", label: "Units" },
+];
+
 /* ---------------- Icons ---------------- */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
