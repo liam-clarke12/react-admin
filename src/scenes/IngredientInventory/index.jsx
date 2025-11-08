@@ -1,5 +1,6 @@
 // src/scenes/IngredientInventory/index.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 
 /* ===================== Scoped Styles ===================== */
 const Styles = () => (
@@ -132,14 +133,14 @@ const API_BASE =
 
 // Fallback mock so UI still renders if API fails
 const mockData = [
-  { ingredient: 'All-Purpose Flour', unit: 'kg', totalRemaining: 25, barcode: 'FL-AP-123', date: '2023-10-26' },
-  { ingredient: 'Granulated Sugar', unit: 'kg', totalRemaining: 50, barcode: 'SUG-GR-456', date: '2023-10-25' },
-  { ingredient: 'Unsalted Butter', unit: 'kg', stockOnHand: 10, barcode: 'BUT-UN-789', date: '2023-10-27' },
-  { ingredient: 'Large Eggs', unit: 'units', totalRemaining: 144, barcode: 'EGG-LG-101', date: '2023-10-24' },
-  { ingredient: 'Baking Soda', unit: 'g', totalRemaining: 500, barcode: 'SOD-BK-112', date: '2023-10-20' },
-  { ingredient: 'Milk', unit: 'L', totalRemaining: 12, barcode: 'MLK-WH-113', date: '2023-10-26' },
-  { ingredient: 'All-Purpose Flour', unit: 'g', totalRemaining: 5000, barcode: 'FL-AP-124', date: '2023-10-28' },
-  { ingredient: 'Milk', unit: 'ml', totalRemaining: 2000, barcode: 'MLK-WH-114', date: '2023-10-28' },
+  { ingredient: "All-Purpose Flour", unit: "kg", totalRemaining: 25, barcode: "FL-AP-123", date: "2023-10-26" },
+  { ingredient: "Granulated Sugar", unit: "kg", totalRemaining: 50, barcode: "SUG-GR-456", date: "2023-10-25" },
+  { ingredient: "Unsalted Butter", unit: "kg", stockOnHand: 10, barcode: "BUT-UN-789", date: "2023-10-27" },
+  { ingredient: "Large Eggs", unit: "units", totalRemaining: 144, barcode: "EGG-LG-101", date: "2023-10-24" },
+  { ingredient: "Baking Soda", unit: "g", totalRemaining: 500, barcode: "SOD-BK-112", date: "2023-10-20" },
+  { ingredient: "Milk", unit: "L", totalRemaining: 12, barcode: "MLK-WH-113", date: "2023-10-26" },
+  { ingredient: "All-Purpose Flour", unit: "g", totalRemaining: 5000, barcode: "FL-AP-124", date: "2023-10-28" },
+  { ingredient: "Milk", unit: "ml", totalRemaining: 2000, barcode: "MLK-WH-114", date: "2023-10-28" },
 ];
 
 const detectUnitTypeAndFactor = (rawUnit) => {
@@ -172,8 +173,8 @@ const formatDisplayForGroup = (type, totalBase) => {
 };
 
 // Try to get cognito id from multiple places so data loads
-const resolveCognitoId = (propId) => {
-  if (propId) return propId;
+const resolveCognitoId = (fromAuth) => {
+  if (fromAuth) return fromAuth;
   try {
     const url = new URL(window.location.href);
     const qp = url.searchParams.get("cognito_id");
@@ -212,172 +213,14 @@ const InfoModal = ({ open, onClose }) => {
   );
 };
 
-/* ===================== Main Component ===================== */
-/**
- * Props:
- *  - cognitoId?: string  // (optional) pass your logged-in user's cognito id
- */
-const IngredientsInventory = ({ cognitoId: cognitoIdProp }) => {
-  const [rows, setRows] = useState([]);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const [snack, setSnack] = useState("");
-
-  useEffect(() => {
-    const fetchActiveInventory = async () => {
-      // *** IMPORTANT: define cognitoId in scope before using it ***
-      const cid = resolveCognitoId(cognitoIdProp);
-      try {
-        if (!cid) {
-          const processed = processInventory(mockData);
-          setRows(processed);
-          setSnack("No Cognito ID found. Showing mock data.");
-          return;
-        }
-
-        const url = `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cid)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(\`Fetch failed (\${res.status})\`);
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
-        const processed = processInventory(list);
-        setRows(processed);
-      } catch (e) {
-        console.error(e);
-        const processed = processInventory(mockData);
-        setRows(processed);
-        setSnack("API error — showing mock data.");
-      }
-    };
-
-    fetchActiveInventory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cognitoIdProp]);
-
-  const chartData = useMemo(
-    () =>
-      (rows || []).map((r) => ({
-        ingredient: r.ingredient,
-        amount: Number(r._numeric) || 0,
-      })),
-    [rows]
-  );
-
-  const maxAmount = useMemo(
-    () => Math.max(0, ...chartData.map((d) => d.amount)),
-    [chartData]
-  );
-
-  return (
-    <div className="ii-page">
-      <Styles />
-
-      <div className="ii-wrap">
-        {/* Header */}
-        <div className="ii-header">
-          <div className="ii-hgroup">
-            <div className="ii-logo" aria-label="Inventory">Inv</div>
-            <div>
-              <h1 className="ii-title">Ingredient Inventory</h1>
-              <p className="ii-sub">Read-only aggregates of active Goods-In lots</p>
-            </div>
-          </div>
-
-          <button className="ii-iconbtn" onClick={() => setInfoOpen(true)} aria-label="About this table">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-          </button>
-        </div>
-
-        {/* Grid: table left, chart right */}
-        <div className="ii-grid">
-          {/* Table Card */}
-          <div className="ii-card" style={{ minHeight: 520 }}>
-            <div className="ii-card-head">
-              <h3>Active Stock</h3>
-              <p>Normalized into g / ml / units</p>
-            </div>
-            <div className="ii-table-wrap">
-              <table className="ii-table">
-                <thead className="ii-thead">
-                  <tr>
-                    <th>Ingredient</th>
-                    <th>Units in Stock</th>
-                    <th>Unit</th>
-                    <th>Active Barcode</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
-                    <tr className="ii-row">
-                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
-                        No active inventory found.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((row, index) => (
-                      <tr key={row.id || index} className="ii-row">
-                        <td className="ii-td ii-td-strong">{row.ingredient}</td>
-                        <td className="ii-td">
-                          <span className="ii-chip">
-                            {Number.isFinite(row.unitsInStock) ? row.unitsInStock.toLocaleString() : String(row.unitsInStock)}
-                          </span>
-                        </td>
-                        <td className="ii-td">{row.unit}</td>
-                        <td className="ii-td">
-                          <span className="ii-badge">{row.barcode || "-"}</span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Chart Card (pure CSS) */}
-          <div className="ii-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ii-chart-head">
-              <h4>Inventory Levels</h4>
-              <p>Normalized amounts by ingredient</p>
-            </div>
-
-            <div className="ii-chart">
-              <div className="ii-chart-body">
-                {chartData.length === 0 ? (
-                  <div style={{ margin:'auto', color:'#64748b' }}>No data for chart.</div>
-                ) : (
-                  chartData.map((d, i) => {
-                    const pct = maxAmount > 0 ? (d.amount / maxAmount) : 0;
-                    const h = Math.max(6, Math.round(pct * 300)); // up to 300px tall
-                    return (
-                      <div className="ii-bar-wrap" key={`${d.ingredient}-${i}`}>
-                        <div className="ii-bar" style={{ height: `${h}px` }}>
-                          <div className="ii-bar-value">{Number(d.amount).toLocaleString()}</div>
-                        </div>
-                        <span className="ii-bar-label">{d.ingredient}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Info modal & snackbar */}
-      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
-      {snack && (
-        <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
-          {snack}
-        </div>
-      )}
-    </div>
-  );
-};
+/* ===================== Simple inline icons (self-contained) ===================== */
+const InfoIcon = ({ size = 20, color = "#334155" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="16" x2="12" y2="12"></line>
+    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+  </svg>
+);
 
 /* ===================== Processor ===================== */
 function processInventory(data) {
@@ -449,4 +292,170 @@ function processInventory(data) {
   return processed;
 }
 
-export default IngredientsInventory;
+/* ===================== Main Component ===================== */
+const IngredientInventory = () => {
+  // 1) Get from useAuth (your request)
+  const { cognitoId } = useAuth() || {};
+
+  const [rows, setRows] = useState([]);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [snack, setSnack] = useState("");
+
+  useEffect(() => {
+    const fetchActiveInventory = async () => {
+      const cid = resolveCognitoId(cognitoId); // prefer useAuth(), fallback to URL/localStorage/window
+
+      try {
+        if (!cid) {
+          const processed = processInventory(mockData);
+          setRows(processed);
+          setSnack("No Cognito ID found. Showing mock data.");
+          return;
+        }
+
+        const url = `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cid)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        const processed = processInventory(list);
+        setRows(processed);
+      } catch (e) {
+        console.error("Inventory load failed:", e);
+        const processed = processInventory(mockData);
+        setRows(processed);
+        setSnack("API error — showing mock data.");
+      }
+    };
+
+    fetchActiveInventory();
+  }, [cognitoId]);
+
+  const chartData = useMemo(
+    () =>
+      (rows || []).map((r) => ({
+        ingredient: r.ingredient,
+        amount: Number(r._numeric) || 0,
+      })),
+    [rows]
+  );
+
+  const maxAmount = useMemo(
+    () => Math.max(0, ...chartData.map((d) => d.amount)),
+    [chartData]
+  );
+
+  return (
+    <div className="ii-page">
+      <Styles />
+
+      <div className="ii-wrap">
+        {/* Header */}
+        <div className="ii-header">
+          <div className="ii-hgroup">
+            <div className="ii-logo" aria-label="Inventory">Inv</div>
+            <div>
+              <h1 className="ii-title">Ingredient Inventory</h1>
+              <p className="ii-sub">Read-only aggregates of active Goods-In lots</p>
+            </div>
+          </div>
+
+          <button
+            className="ii-iconbtn"
+            onClick={() => setInfoOpen(true)}
+            aria-label="About this table"
+            title="About this table"
+          >
+            <InfoIcon />
+          </button>
+        </div>
+
+        {/* Grid: table left, chart right */}
+        <div className="ii-grid">
+          {/* Table Card */}
+          <div className="ii-card" style={{ minHeight: 520 }}>
+            <div className="ii-card-head">
+              <h3>Active Stock</h3>
+              <p>Normalized into g / ml / units</p>
+            </div>
+            <div className="ii-table-wrap">
+              <table className="ii-table">
+                <thead className="ii-thead">
+                  <tr>
+                    <th>Ingredient</th>
+                    <th>Units in Stock</th>
+                    <th>Unit</th>
+                    <th>Active Barcode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr className="ii-row">
+                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
+                        No active inventory found.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row, index) => (
+                      <tr key={row.id || index} className="ii-row">
+                        <td className="ii-td ii-td-strong">{row.ingredient}</td>
+                        <td className="ii-td">
+                          <span className="ii-chip">
+                            {Number.isFinite(row.unitsInStock) ? row.unitsInStock.toLocaleString() : String(row.unitsInStock)}
+                          </span>
+                        </td>
+                        <td className="ii-td">{row.unit}</td>
+                        <td className="ii-td">
+                          <span className="ii-badge">{row.barcode || "-"}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Chart Card (pure CSS) */}
+          <div className="ii-card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="ii-chart-head">
+              <h4>Inventory Levels</h4>
+              <p>Normalized amounts by ingredient</p>
+            </div>
+
+            <div className="ii-chart">
+              <div className="ii-chart-body">
+                {chartData.length === 0 ? (
+                  <div style={{ margin:'auto', color:'#64748b' }}>No data for chart.</div>
+                ) : (
+                  chartData.map((d, i) => {
+                    const pct = maxAmount > 0 ? (d.amount / maxAmount) : 0;
+                    const h = Math.max(6, Math.round(pct * 300)); // up to 300px tall
+                    return (
+                      <div className="ii-bar-wrap" key={`${d.ingredient}-${i}`} style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                        <div className="ii-bar" style={{ height: `${h}px` }}>
+                          <div className="ii-bar-value">{Number(d.amount).toLocaleString()}</div>
+                        </div>
+                        <span className="ii-bar-label">{d.ingredient}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Info modal & snackbar */}
+      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      {snack && (
+        <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
+          {snack}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default IngredientInventory;
