@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
-   Brand Styles (matches attached file)
+   Brand Styles (matches attached file) + horizontal scroll only on table
    ========================================================================================= */
 const BrandStyles = () => (
   <style>{`
-  .r-wrap { padding: 16px; }
+  /* page wrapper: prevent page-wide horizontal scroll */
+  .r-wrap { padding: 16px; overflow-x: hidden; }
+
   .r-card {
     background:#fff; border:1px solid #e5e7eb; border-radius:16px;
     box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
@@ -17,6 +19,8 @@ const BrandStyles = () => (
   .r-sub { margin:0; color:#64748b; font-size:12px; }
   .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
   .r-flex { display:flex; align-items:center; gap:10px; }
+
+  /* Buttons (match Recipes file) */
   .r-btn-icon { border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626; }
   .r-btn-icon:hover { background:#fee2e2; }
   .r-btn-ghost {
@@ -32,8 +36,18 @@ const BrandStyles = () => (
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
 
-  .r-table-wrap { overflow:auto; }
-  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
+  /* Add button (same as Recipes "Add") */
+  .r-actions-right { display:flex; align-items:center; gap:10px; }
+  .r-btn-add {
+    display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font-weight:800; color:#fff;
+    background:linear-gradient(180deg, #6366f1, #7c3aed); border:0; border-radius:999px;
+    box-shadow:0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06); cursor:pointer;
+  }
+  .r-btn-add:hover { filter:brightness(.95); }
+
+  /* Table: only the table scrolls horizontally */
+  .r-table-wrap { overflow-x:auto; overflow-y:visible; }
+  table.r-table { width:100%; min-width:1200px; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
   .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
   .r-thead th { padding:12px; text-align:left; }
   .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
@@ -56,17 +70,11 @@ const BrandStyles = () => (
   .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
   .r-muted { color:#64748b; font-size:12px; }
 
-  /* Modal */
+  /* Modal (shared with Recipes look) */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:720px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
   .r-mbody { padding:16px; overflow:auto; }
-  .r-mgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .r-field label { display:block; font-size:13px; color:#64748b; margin-bottom:6px; font-weight:700; }
-  .r-field input, .r-field select {
-    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
-  }
-  .r-field input:focus, .r-field select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Page layout */
@@ -83,7 +91,7 @@ const BrandStyles = () => (
   `}</style>
 );
 
-/* Tiny icons (like in your file) */
+/* Tiny icons */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -93,6 +101,11 @@ const EditIcon = (props) => (
 const DeleteIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+const PlusIcon = (props) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
   </Svg>
 );
 
@@ -218,9 +231,16 @@ export default function GoodsIn() {
   const [originalId, setOriginalId] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addFormOpen, setAddFormOpen] = useState(false); // NEW: popup for "Add Goods In" form
   const [loading, setLoading] = useState(true);
   const [fatalMsg, setFatalMsg] = useState("");
   const selectAllCheckboxRef = useRef(null);
+
+  // open full page for the form
+  const goToGoodsInFormPage = () => {
+    // adjust path to your routing; this assumes you mounted the attached form at /form/goods-in
+    window.location.href = "/form/goods-in";
+  };
 
   const computeIngredientInventory = (rows) => {
     const active = (Array.isArray(rows) ? rows : []).filter((r) => r.stockRemaining > 0);
@@ -454,7 +474,6 @@ export default function GoodsIn() {
       <div className="gi-layout">
         {/* MAIN */}
         <div className="gi-main">
-          {/* Card Header like attached file */}
           <div className="r-card">
             <div className="r-head">
               <div>
@@ -462,7 +481,12 @@ export default function GoodsIn() {
                 <p className="r-sub">Track and manage incoming inventory</p>
               </div>
 
-              <div className="r-flex">
+              <div className="r-actions-right">
+                {/* Add Goods In (matches Recipes "Add" button) */}
+                <button className="r-btn-add" onClick={() => setAddFormOpen(true)}>
+                  <PlusIcon /> Add Goods In
+                </button>
+
                 {numSelected > 0 && (
                   <div className="r-flex" style={{ background:"#eef2ff", padding:"6px 10px", borderRadius:10 }}>
                     <span className="r-pill">{numSelected} selected</span>
@@ -505,7 +529,7 @@ export default function GoodsIn() {
               </select>
             </div>
 
-            {/* TABLE */}
+            {/* TABLE (only this area scrolls horizontally if needed) */}
             <div className="r-table-wrap r-toolbar-gap">
               <table className="r-table">
                 <thead className="r-thead">
@@ -643,53 +667,62 @@ export default function GoodsIn() {
               <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}>Close</button>
             </div>
             <div className="r-mbody">
-              <div className="r-mgrid">
-                <div className="r-field" style={{ gridColumn: "span 2" }}>
-                  <label>Ingredient</label>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div style={{ gridColumn:"1 / -1" }}>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Ingredient</label>
                   <input type="text" value={editingRow.ingredient || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field">
-                  <label>Date</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Date</label>
                   <input type="date" value={editingRow.date || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field">
-                  <label>Temperature (℃)</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Temperature (℃)</label>
                   <input type="text" value={editingRow.temperature || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field">
-                  <label>Stock Received</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Stock Received</label>
                   <input type="number" value={editingRow.stockReceived || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field">
-                  <label>Stock Remaining</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Stock Remaining</label>
                   <input type="number" value={editingRow.stockRemaining || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field" style={{ gridColumn: "span 2" }}>
-                  <label>Unit</label>
+                <div style={{ gridColumn:"1 / -1" }}>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Unit</label>
                   <select value={editingRow.unit || ""}
-                          onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
+                          onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}
+                          style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }}>
                     {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
-                <div className="r-field">
-                  <label>Batch Code</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Batch Code</label>
                   <input type="text" value={editingRow.barCode || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field">
-                  <label>Invoice Number</label>
+                <div>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Invoice Number</label>
                   <input type="text" value={editingRow.invoiceNumber || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
-                <div className="r-field" style={{ gridColumn: "span 2" }}>
-                  <label>Expiry Date</label>
+                <div style={{ gridColumn:"1 / -1" }}>
+                  <label style={{ display:"block", fontSize:13, color:"#64748b", marginBottom:6, fontWeight:700 }}>Expiry Date</label>
                   <input type="date" value={editingRow.expiryDate || ""}
-                         onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })} />
+                         onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}
+                         style={{ width:"100%", padding:"10px 12px", border:"1px solid #e5e7eb", borderRadius:10, outline:"none" }} />
                 </div>
               </div>
             </div>
@@ -700,7 +733,7 @@ export default function GoodsIn() {
                 disabled={updating}
               >Cancel</button>
               <button
-                className="r-btn-primary"
+                className={`r-btn-primary`}
                 onClick={handleConfirmEdit}
                 disabled={updating}
               >{updating ? "Saving..." : "Save Changes"}</button>
@@ -709,7 +742,7 @@ export default function GoodsIn() {
         </div>
       )}
 
-      {/* DELETE CONFIRMATION MODAL (styled same as attached) */}
+      {/* DELETE CONFIRMATION MODAL (styled like attached) */}
       {deleteOpen && numSelected > 0 && (
         <div className="r-modal-dim">
           <div className="r-modal" style={{ maxWidth: 420 }}>
@@ -729,6 +762,36 @@ export default function GoodsIn() {
             <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
               <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
               <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD GOODS IN FORM POPUP (styled like Recipes Add modal). 
+          Uses your attached Goods In form page inside an iframe and offers full-page redirect. */}
+      {addFormOpen && (
+        <div className="r-modal-dim">
+          <div className="r-modal">
+            <div className="r-mhdr">
+              <h2 className="r-title" style={{ fontSize: 18 }}>Add Goods In</h2>
+              <div className="r-flex">
+                <button className="r-btn-ghost" onClick={goToGoodsInFormPage}>Open Full Page</button>
+                <button className="r-btn-ghost" onClick={() => setAddFormOpen(false)}>Close</button>
+              </div>
+            </div>
+            <div className="r-mbody" style={{ padding:0 }}>
+              {/* Adjust the src to your actual route for the attached Goods In form */}
+              <iframe
+                title="Goods In Form"
+                src="/form/goods-in"
+                style={{ width:"100%", height:"70vh", border:0, display:"block" }}
+              />
+            </div>
+            <div className="r-mfooter">
+              <button className="r-btn-ghost" onClick={() => setAddFormOpen(false)}>Done</button>
+              <button className="r-btn-primary" onClick={() => { setAddFormOpen(false); fetchGoodsInData(); }}>
+                Close & Refresh
+              </button>
             </div>
           </div>
         </div>
