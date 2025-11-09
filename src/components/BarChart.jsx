@@ -24,7 +24,8 @@ const BarChart = ({
   height = "500px",
   width = "100%",
   yLegend = "Units",
-  valueFormat = ">,.0f", // d3-format string
+  valueFormat = ">,.0f",      // d3-format string
+  unitField = "unit",         // field on each data row that holds the unit string
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -125,6 +126,12 @@ const BarChart = ({
         labelSkipWidth={16}
         labelSkipHeight={16}
         labelTextColor="#ffffff"
+        // Label on each bar: value + unit (e.g., "5 kg", "500 g")
+        label={(bar) => {
+          const nf = new Intl.NumberFormat();
+          const unit = bar.data?.[unitField] ?? "";
+          return `${nf.format(bar.value)}${unit ? ` ${unit}` : ""}`;
+        }}
         valueFormat={valueFormat}
         legends={[]}
         animate={true}
@@ -133,7 +140,7 @@ const BarChart = ({
         ariaLabel="Bar chart"
         barAriaLabel={(e) => `${e.id}: ${e.formattedValue} in ${e.indexValue}`}
         theme={nivoTheme}
-        tooltip={({ indexValue, value, color, id }) => (
+        tooltip={({ indexValue, value, color, data }) => (
           <div
             style={{
               padding: "8px 10px",
@@ -157,6 +164,7 @@ const BarChart = ({
               }}
             />
             {String(indexValue)} · {new Intl.NumberFormat().format(value)}
+            {data?.[unitField] ? ` ${data[unitField]}` : ""}
           </div>
         )}
       />
