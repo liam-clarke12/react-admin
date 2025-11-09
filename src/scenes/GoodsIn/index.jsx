@@ -278,14 +278,15 @@ const SmallBarChart = ({ data = [] }) => {
    Main Component
    ========================================================================================= */
 export default function GoodsIn() {
-  // ---- Get cognitoId from your auth context (preferred), with graceful fallbacks
-  const auth = (typeof useAuth === "function" ? useAuth() : {}) || {};
-  const cognitoIdFromAuth = auth?.cognitoId;
+  // ---- Unconditional hook call; then fall back to window/localStorage if needed
+  const { cognitoId: cognitoIdFromAuth } = useAuth() || {};
   const cognitoIdFromWindow =
     typeof window !== "undefined" && window.__COGNITO_ID__ ? window.__COGNITO_ID__ : "";
   let cognitoIdFromStorage = "";
-  try { cognitoIdFromStorage = typeof window !== "undefined" ? (localStorage.getItem("cognito_id") || "") : ""; } catch {}
-
+  try {
+    cognitoIdFromStorage =
+      typeof window !== "undefined" ? (localStorage.getItem("cognito_id") || "") : "";
+  } catch {}
   const cognitoId = cognitoIdFromAuth || cognitoIdFromWindow || cognitoIdFromStorage || "";
 
   /** @type {[GoodsInRow[], Function]} */
