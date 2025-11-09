@@ -293,6 +293,14 @@ export default function GoodsIn() {
     [masterIngredients, customIngredients]
   );
 
+  // Fast lookup: id -> name (works for both master and custom)
+  const ingredientNameById = useMemo(() => {
+    const m = new Map();
+    masterIngredients.forEach(i => m.set(String(i.id), i.name));
+    customIngredients.forEach(i => m.set(String(i.id), i.name));
+    return m;
+  }, [masterIngredients, customIngredients]);
+
   // "Add ingredient" dialog & targeting
   const [addIngOpen, setAddIngOpen] = useState(false);
   const [addingIng, setAddingIng] = useState(false);
@@ -341,6 +349,9 @@ export default function GoodsIn() {
       const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
         const stockRemaining = Number(row.stockRemaining || 0);
         const serverBar = row.barCode ? String(row.barCode) : null;
+        // Keep whatever server sends for ingredient. Could be id or name.
+        const rawIngredient = row.ingredient ?? row.ingredientName ?? row.ingredient_name ?? row.name ?? "";
+
         return {
           _id: serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           date: row.date ? String(row.date).slice(0, 10) : "",
@@ -351,7 +362,7 @@ export default function GoodsIn() {
           barCode: serverBar || row.barCode || null,
           invoiceNumber: row.invoice_number ?? row.invoiceNumber ?? null,
           unit: row.unit ?? row.unitName ?? row.unit_label ?? "",
-          ingredient: row.ingredient,
+          ingredient: rawIngredient,          // may be id or name; resolve at render
           temperature: row.temperature
         };
       });
@@ -367,7 +378,26 @@ export default function GoodsIn() {
 
   useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
 
-  // Fetch ingredients when popup opens
+  // NEW: Load ingredients on mount as well (so names are available for display even without opening Add dialog)
+  useEffect(() => {
+    if (!cognitoId) return;
+
+    setLoadingMaster(true);
+    fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
+      .then(res => { if (!res.ok) throw new Error("Failed to fetch ingredients"); return res.json(); })
+      .then(setMasterIngredients)
+      .catch(err => console.error("Ingredients master error:", err))
+      .finally(() => setLoadingMaster(false));
+
+    setLoadingCustom(true);
+    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
+      .then(res => { if (!res.ok) throw new Error("Failed to fetch custom ingredients"); return res.json(); })
+      .then(data => setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))))
+      .catch(err => console.error("Custom ingredients error:", err))
+      .finally(() => setLoadingCustom(false));
+  }, [cognitoId]);
+
+  // Keep your existing fetch-when-popup-opens (ensures freshest lists while adding)
   useEffect(() => {
     if (!addOpen || !cognitoId) return;
     setLoadingMaster(true);
@@ -507,10 +537,12 @@ export default function GoodsIn() {
     };
   }, [totalsByBaseUnitGroup]);
 
+  // UPDATED: Use resolved ingredient names for grouping and display
   const totalsByIngredient = useMemo(() => {
     const map = new Map();
     goodsInRows.forEach((r) => {
-      const key = r.ingredient || "—";
+      const displayName = ingredientNameById.get(String(r.ingredient)) || r.ingredient || "—";
+      const key = displayName;
       const prev = map.get(key) || { baseAmount: 0, unitSamples: new Map() };
       prev.baseAmount += toBaseAmount(r.stockRemaining, r.unit);
       prev.unitSamples.set(r.unit || "", (prev.unitSamples.get(r.unit || "") || 0) + 1);
@@ -526,7 +558,7 @@ export default function GoodsIn() {
     });
     arr.sort((a, b) => b.baseAmount - a.baseAmount);
     return arr.slice(0, 6);
-  }, [goodsInRows]);
+  }, [goodsInRows, ingredientNameById]);
 
   const numSelected = selectedRows.length;
 
@@ -774,31 +806,34 @@ export default function GoodsIn() {
                       </td>
                     </tr>
                   ) : (
-                    visibleRows.map((row) => (
-                      <tr key={row._id} className="r-row">
-                        <td className="r-td">
-                          <input
-                            className="r-chk"
-                            type="checkbox"
-                            checked={selectedRows.includes(row._id)}
-                            onChange={() => toggleRowSelection(row._id)}
-                          />
-                        </td>
-                        <td className="r-td">{row.date || "-"}</td>
-                        <td className="r-td r-td--name">{row.ingredient || "-"}</td>
-                        <td className="r-td">{row.temperature ? `${row.temperature}℃` : "-"}</td>
-                        <td className="r-td"><span className="r-qty-badge">{row.stockReceived} {row.unit}</span></td>
-                        <td className="r-td"><span className="r-qty-badge">{row.stockRemaining} {row.unit}</span></td>
-                        <td className="r-td" style={{ color:"#64748b" }}>{row.invoiceNumber || "-"}</td>
-                        <td className="r-td" style={{ color:"#64748b" }}>{row.expiryDate || "-"}</td>
-                        <td className="r-td"><span className="r-badge-mono">{row.barCode || "-"}</span></td>
-                        <td className="r-td r-actions">
-                          <button className="r-btn-ghost" onClick={() => handleEditRow(row)} aria-label={`Edit ${row.barCode || row.ingredient}`}>
-                            <EditIcon /> Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    visibleRows.map((row) => {
+                      const ingredientDisplay = ingredientNameById.get(String(row.ingredient)) || row.ingredient || "-";
+                      return (
+                        <tr key={row._id} className="r-row">
+                          <td className="r-td">
+                            <input
+                              className="r-chk"
+                              type="checkbox"
+                              checked={selectedRows.includes(row._id)}
+                              onChange={() => toggleRowSelection(row._id)}
+                            />
+                          </td>
+                          <td className="r-td">{row.date || "-"}</td>
+                          <td className="r-td r-td--name">{ingredientDisplay}</td>
+                          <td className="r-td">{row.temperature ? `${row.temperature}℃` : "-"}</td>
+                          <td className="r-td"><span className="r-qty-badge">{row.stockReceived} {row.unit}</span></td>
+                          <td className="r-td"><span className="r-qty-badge">{row.stockRemaining} {row.unit}</span></td>
+                          <td className="r-td" style={{ color:"#64748b" }}>{row.invoiceNumber || "-"}</td>
+                          <td className="r-td" style={{ color:"#64748b" }}>{row.expiryDate || "-"}</td>
+                          <td className="r-td"><span className="r-badge-mono">{row.barCode || "-"}</span></td>
+                          <td className="r-td r-actions">
+                            <button className="r-btn-ghost" onClick={() => handleEditRow(row)} aria-label={`Edit ${row.barCode || ingredientDisplay}`}>
+                              <EditIcon /> Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
