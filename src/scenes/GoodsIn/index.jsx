@@ -1,7 +1,6 @@
 // src/scenes/GoodsIn/index.jsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-// MUI just for the ingredient dropdown + add-custom dialog in the Add Good(s) popup
 import Autocomplete from "@mui/material/Autocomplete";
 import {
   Dialog,
@@ -11,20 +10,15 @@ import {
   TextField,
   Button,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Tabs,
   Tab,
   IconButton,
   Snackbar,
   Alert,
-  Box,
 } from "@mui/material";
 
 /* =========================================================================================
-   Brand Styles (unchanged look)
+   Brand Styles
    ========================================================================================= */
 const BrandStyles = () => (
   <style>{`
@@ -52,7 +46,7 @@ const BrandStyles = () => (
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
 
-  /* Table (no horizontal scroll on page or table) */
+  /* Table (no horizontal scroll) */
   .r-table-wrap { overflow-x: hidden; }
   table.r-table { width:100%; table-layout: fixed; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
   .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
@@ -89,11 +83,9 @@ const BrandStyles = () => (
   .gi-layout { display:flex; gap:24px; align-items:flex-start; }
   .gi-main { flex:1 1 0%; min-width:0; }
   .gi-side { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
-
-  /* Side cards */
   .gi-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); padding:16px; }
 
-  /* Thin modal overlay for our existing popups */
+  /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
@@ -109,10 +101,8 @@ const BrandStyles = () => (
   .ag-input, .ag-select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; }
   .ag-input:focus, .ag-select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
 
-  /* Row card in multiple */
   .ag-row { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff; }
   .ag-row:nth-child(odd){ background:#f8fafc; }
-
   `}</style>
 );
 
@@ -238,14 +228,14 @@ export default function GoodsIn() {
   const [updating, setUpdating] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // ADD GOODS POPUP — keep your popup, we just enhance the ingredient field
+  // ADD GOODS POPUP
   const [addOpen, setAddOpen] = useState(false);
-  const [addTab, setAddTab] = useState(0); // 0 = Single, 1 = Multiple
+  const [addTab, setAddTab] = useState(0); // 0 single, 1 multiple
 
   // single entry state
   const [single, setSingle] = useState({
     date: new Date().toISOString().slice(0,10),
-    ingredient: "", // will store selected ingredient id OR custom text
+    ingredient: "", // id of ingredient or custom name
     invoiceNumber: "",
     stockReceived: "",
     unit: "grams",
@@ -254,7 +244,7 @@ export default function GoodsIn() {
     temperature: "N/A",
   });
 
-  // multiple entry state
+  // multiple entry state (array of items)
   const blankItem = () => ({
     date: new Date().toISOString().slice(0,10),
     ingredient: "",
@@ -267,7 +257,7 @@ export default function GoodsIn() {
   });
   const [multi, setMulti] = useState([blankItem()]);
 
-  // Ingredient sources (from your attached form file behavior)
+  // Ingredients (master + custom) and loading states
   const [masterIngredients, setMasterIngredients] = useState([]);
   const [customIngredients, setCustomIngredients] = useState([]);
   const [loadingMaster, setLoadingMaster] = useState(false);
@@ -280,12 +270,13 @@ export default function GoodsIn() {
     [masterIngredients, customIngredients]
   );
 
-  // Add custom ingredient dialog
+  // "Add ingredient" dialog & targeting (which slot should receive the new ingredient)
   const [addIngOpen, setAddIngOpen] = useState(false);
-  const [newIngredientName, setNewIngredientName] = useState("");
   const [addingIng, setAddingIng] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState("");
+  const [ingTarget, setIngTarget] = useState(null); // { mode: 'single' } or { mode: 'multi', index: number }
 
-  // Toast after successful submit
+  // Toast
   const [toastOpen, setToastOpen] = useState(false);
 
   // Helpers
@@ -353,7 +344,7 @@ export default function GoodsIn() {
 
   useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
 
-  // Fetch ingredients when popup opens (or when cognitoId changes)
+  // Fetch ingredients when popup opens
   useEffect(() => {
     if (!addOpen || !cognitoId) return;
     setLoadingMaster(true);
@@ -517,10 +508,9 @@ export default function GoodsIn() {
   const numSelected = selectedRows.length;
 
   /* ===========================================================
-     Add Good(s) Submit — matches attached form endpoints
+     Add Good(s) Submit
      =========================================================== */
   const resolveIngredientName = (value) => {
-    // value can be ingredient id or custom text
     const opt = ingredients.find((i) => String(i.id) === String(value));
     return opt ? opt.name : value;
   };
@@ -546,7 +536,6 @@ export default function GoodsIn() {
       ingredientId: ingredients.find((i) => String(i.id) === String(it.ingredient))?.id ?? null,
       invoiceNumber: it.invoiceNumber || null,
     }));
-    // try batch first
     const res = await fetch(`${API_BASE}/submit/batch`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entries, cognito_id: cognitoId }),
@@ -597,8 +586,13 @@ export default function GoodsIn() {
   const removeMultiRow = (idx) => setMulti((arr) => arr.filter((_, i) => i !== idx));
 
   /* ===========================================================
-     Add custom ingredient (dialog)
+     Add custom ingredient (dialog) + auto-select into target
      =========================================================== */
+  const handleOpenAddIngredient = (target) => {
+    setIngTarget(target); // { mode:'single' } or { mode:'multi', index }
+    setAddIngOpen(true);
+  };
+
   const handleAddCustomIngredient = async () => {
     if (!newIngredientName.trim() || !cognitoId) return;
     setAddingIng(true);
@@ -609,13 +603,30 @@ export default function GoodsIn() {
         body: JSON.stringify({ cognito_id: cognitoId, name: newIngredientName.trim() }),
       });
       if (!res.ok) throw new Error("Failed to add ingredient");
+
       // refresh custom list
       const updated = await fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`);
       if (!updated.ok) throw new Error("Failed to refresh custom ingredients");
       const data = await updated.json();
-      setCustomIngredients(data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })));
+      const mapped = data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name }));
+      setCustomIngredients(mapped);
+
+      // try to find newly added by name
+      const justAdded = mapped.find((i) => i.name.toLowerCase() === newIngredientName.trim().toLowerCase());
+
+      // auto-select into the target slot
+      if (justAdded) {
+        if (ingTarget?.mode === "single") {
+          setSingle((s) => ({ ...s, ingredient: justAdded.id }));
+        } else if (ingTarget?.mode === "multi" && typeof ingTarget.index === "number") {
+          setMulti((arr) => arr.map((v, i) => (i === ingTarget.index ? { ...v, ingredient: justAdded.id } : v)));
+        }
+      }
+
+      // close dialog
       setAddIngOpen(false);
       setNewIngredientName("");
+      setIngTarget(null);
     } catch (err) {
       console.error("add custom ingredient error:", err);
       alert("Could not add ingredient");
@@ -921,7 +932,7 @@ export default function GoodsIn() {
         </div>
       )}
 
-      {/* ===================== ADD GOOD(S) POPUP (kept) ===================== */}
+      {/* ===================== ADD GOOD(S) POPUP ===================== */}
       {addOpen && (
         <div className="r-modal-dim">
           <div className="r-modal">
@@ -938,13 +949,11 @@ export default function GoodsIn() {
             <div className="r-mbody">
               {addTab === 0 ? (
                 <div className="ag-grid">
-                  {/* Date */}
                   <div className="ag-field">
                     <label className="ag-label">Date</label>
                     <input className="ag-input" type="date" value={single.date} onChange={(e)=>setSingle(s=>({...s, date: e.target.value}))}/>
                   </div>
 
-                  {/* Ingredient — MUI Autocomplete with master + custom + Add Ingredient + */}
                   <div className="ag-field">
                     <label className="ag-label">Ingredient</label>
                     <Autocomplete
@@ -971,23 +980,20 @@ export default function GoodsIn() {
                       )}
                     />
                     <div style={{ textAlign:"right", marginTop:8 }}>
-                      <button className="r-btn-ghost" onClick={()=>setAddIngOpen(true)}>Add Ingredient +</button>
+                      <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"single" })}>Add Ingredient +</button>
                     </div>
                   </div>
 
-                  {/* Invoice Number */}
                   <div className="ag-field">
                     <label className="ag-label">Invoice Number</label>
                     <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e)=>setSingle(s=>({...s, invoiceNumber: e.target.value}))}/>
                   </div>
 
-                  {/* Stock Received */}
                   <div className="ag-field-1">
                     <label className="ag-label">Stock Received</label>
                     <input className="ag-input" type="number" value={single.stockReceived} onChange={(e)=>setSingle(s=>({...s, stockReceived: e.target.value}))}/>
                   </div>
 
-                  {/* Unit */}
                   <div className="ag-field-1">
                     <label className="ag-label">Unit</label>
                     <select className="ag-select" value={single.unit} onChange={(e)=>setSingle(s=>({...s, unit: e.target.value}))}>
@@ -995,19 +1001,16 @@ export default function GoodsIn() {
                     </select>
                   </div>
 
-                  {/* Batch Code */}
                   <div className="ag-field">
                     <label className="ag-label">Batch Code</label>
                     <input className="ag-input" type="text" value={single.barCode} onChange={(e)=>setSingle(s=>({...s, barCode: e.target.value}))}/>
                   </div>
 
-                  {/* Expiry Date */}
                   <div className="ag-field">
                     <label className="ag-label">Expiry Date</label>
                     <input className="ag-input" type="date" value={single.expiryDate} onChange={(e)=>setSingle(s=>({...s, expiryDate: e.target.value}))}/>
                   </div>
 
-                  {/* Temperature */}
                   <div className="ag-field">
                     <label className="ag-label">Temperature (℃)</label>
                     <input className="ag-input" type="text" value={single.temperature} onChange={(e)=>setSingle(s=>({...s, temperature: e.target.value}))}/>
@@ -1026,6 +1029,7 @@ export default function GoodsIn() {
                           <label className="ag-label">Date</label>
                           <input className="ag-input" type="date" value={it.date} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, date:e.target.value} : v))}/>
                         </div>
+
                         <div className="ag-field">
                           <label className="ag-label">Ingredient</label>
                           <Autocomplete
@@ -1052,7 +1056,7 @@ export default function GoodsIn() {
                             )}
                           />
                           <div style={{ textAlign:"right", marginTop:8 }}>
-                            <button className="r-btn-ghost" onClick={()=>setAddIngOpen(true)}>Add Ingredient +</button>
+                            <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"multi", index: idx })}>Add Ingredient +</button>
                           </div>
                         </div>
 
@@ -1107,10 +1111,10 @@ export default function GoodsIn() {
         </div>
       )}
 
-      {/* Add Ingredient dialog (MUI) */}
+      {/* Add Ingredient dialog */}
       <Dialog
         open={addIngOpen}
-        onClose={()=>setAddIngOpen(false)}
+        onClose={()=>{ setAddIngOpen(false); setIngTarget(null); }}
         fullWidth
         PaperProps={{ sx:{ borderRadius: 14, border: "1px solid #e5e7eb" } }}
       >
@@ -1126,12 +1130,12 @@ export default function GoodsIn() {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={()=>setAddIngOpen(false)} disabled={addingIng} sx={{ textTransform:"none", fontWeight:700 }}>
+          <Button onClick={()=>{ setAddIngOpen(false); setIngTarget(null); }} disabled={addingIng} sx={{ textTransform:"none", fontWeight:700 }}>
             Cancel
           </Button>
           <Button
             onClick={handleAddCustomIngredient}
-            disabled={addingIng}
+            disabled={addingIng || !newIngredientName.trim()}
             variant="contained"
             sx={{
               textTransform:"none", fontWeight:800, borderRadius:999, px:3,
