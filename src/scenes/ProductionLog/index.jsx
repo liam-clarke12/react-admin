@@ -5,7 +5,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
-   Brand Styles (identical to Goods In)
+   Brand Styles (identical to Goods In) + sidebar cards
    ========================================================================================= */
 const BrandStyles = () => (
   <style>{`
@@ -49,6 +49,9 @@ const BrandStyles = () => (
   /* Page layout */
   .gi-layout { display:flex; gap:24px; align-items:flex-start; }
   .gi-main { flex:1 1 0%; min-width:0; }
+  .gi-side {
+    width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:16px;
+  }
 
   /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
@@ -78,6 +81,15 @@ const BrandStyles = () => (
 
   /* Selection chip area */
   .r-chip { background:#eef2ff; padding:6px 10px; border-radius:10px; display:flex; align-items:center; gap:10px; }
+
+  /* Sidebar stat cards */
+  .stat-card { padding:14px 16px; }
+  .stat-title { font-size:12px; color:#64748b; font-weight:800; margin:0 0 6px; }
+  .stat-value { font-weight:900; color:#0f172a; font-size:28px; line-height:1; margin:0; }
+  .stat-row { display:flex; align-items:center; justify-content:space-between; }
+  .stat-kpi { font-size:14px; font-weight:800; color:#0f172a; }
+  .stat-sub { font-size:12px; color:#64748b; }
+  .stat-accent { border:1px dashed #7C3AED66; background: #f9f7ff; }
   `}</style>
 );
 
@@ -122,6 +134,7 @@ const makeStableId = (row) => {
 };
 
 const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
+const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const Portal = ({ children }) => {
   if (typeof window === "undefined") return null;
@@ -151,7 +164,7 @@ export default function ProductionLog() {
   // Delete dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // ===== Recipes map (for units per batch if needed later) =====
+  // ===== Recipes map =====
   useEffect(() => {
     if (!cognitoId) return;
     const run = async () => {
@@ -183,7 +196,7 @@ export default function ProductionLog() {
       const sanitized = data.map((row) => {
         const dbId = row.id ?? row.ID ?? null;
         const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced);
-        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining); // stored as units
+        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining);
         const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste);
         const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
         const unitsRemaining = toNumber(row.unitsRemaining ?? (batchRemaining - unitsOfWaste));
@@ -203,7 +216,6 @@ export default function ProductionLog() {
           producerName,
           __raw: row,
         };
-        // Ensure id consistently equals batchCode where possible, to avoid duplication on update
         normalized.id = String(normalized.batchCode ?? normalized.id);
         return normalized;
       });
@@ -264,16 +276,33 @@ export default function ProductionLog() {
     return rows;
   }, [productionLogs, searchQuery, sortBy]);
 
+  // ===== Sidebar Quick Stats (computed from filteredRows) =====
+  const stats = useMemo(() => {
+    const totalUnitsRemaining = filteredRows.reduce((s, r) => s + toNumber(r.unitsRemaining), 0);
+    const totalWaste = filteredRows.reduce((s, r) => s + toNumber(r.unitsOfWaste), 0);
+    const totalBatchesProduced = filteredRows.reduce((s, r) => s + toNumber(r.batchesProduced), 0);
+    const activeBatches = filteredRows.length;
+    const byRecipe = filteredRows.reduce((acc, r) => {
+      const k = r.recipe || "Unknown";
+      acc[k] = (acc[k] || 0) + toNumber(r.unitsRemaining);
+      return acc;
+    }, {});
+    // Top 3 recipes by remaining
+    const topRecipes = Object.entries(byRecipe)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([recipe, units]) => ({ recipe, units }));
+
+    return {
+      totalUnitsRemaining,
+      totalWaste,
+      totalBatchesProduced,
+      activeBatches,
+      topRecipes,
+    };
+  }, [filteredRows]);
+
   // ===== Update row (PUT) =====
-  /**
-   * Back-end typically stores:
-   * - date (YYYY-MM-DD)
-   * - recipe
-   * - batchesProduced (or batches_produced)
-   * - units_of_waste
-   * - batchRemaining (or batch_remaining)  <-- source-of-truth for remaining
-   * We also send unitsRemaining for convenience, but derive batchRemaining if it's missing.
-   */
   const processRowUpdate = async (updatedRow) => {
     if (!cognitoId) throw new Error("Missing cognitoId");
 
@@ -285,7 +314,6 @@ export default function ProductionLog() {
     const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
     const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
     const unitsRemaining = toNumber(updatedRow.unitsRemaining);
-    // If API expects batchRemaining, derive it = unitsRemaining + unitsOfWaste
     const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? (unitsRemaining + unitsOfWaste));
 
     const payload = {
@@ -293,7 +321,6 @@ export default function ProductionLog() {
       recipe: updatedRow.recipe,
       batchesProduced,
       units_of_waste: unitsOfWaste,
-      // send BOTH to be safe across handlers
       batchRemaining,
       unitsRemaining,
       producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
@@ -311,7 +338,7 @@ export default function ProductionLog() {
       throw new Error(txt || `Server returned ${res.status}`);
     }
 
-    // Hard refresh from server to avoid client/server drift, id mismatches, and dupes
+    // Reload from server to prevent drift/dupes
     await fetchLogs();
   };
 
@@ -319,22 +346,20 @@ export default function ProductionLog() {
     if (!editingRow) { setEditOpen(false); return; }
     setUpdating(true);
     try {
-      // Normalize the local row first
       const patched = {
         ...editingRow,
         id: getRowKey(editingRow),
-        batchCode: editingRow.batchCode ?? editingRow.batch_code, // keep consistent
+        batchCode: editingRow.batchCode ?? editingRow.batch_code,
         date: formatDateYMD(editingRow.date),
         recipe: editingRow.recipe ?? "",
         batchesProduced: toNumber(editingRow.batchesProduced),
         unitsOfWaste: toNumber(editingRow.unitsOfWaste),
         unitsRemaining: toNumber(editingRow.unitsRemaining),
-        // Keep optional batchRemaining consistent if user added the field later
         batchRemaining: toNumber(editingRow.batchRemaining ?? editingRow.unitsRemaining + editingRow.unitsOfWaste),
         producerName: editingRow.producerName ?? "",
       };
 
-      // Optimistic local update (by batchCode key), then server PUT + full reload
+      // Optimistic local patch
       setProductionLogs((prev) => {
         const next = [...prev];
         const key = getRowKey(patched);
@@ -405,6 +430,7 @@ export default function ProductionLog() {
       )}
 
       <div className="gi-layout">
+        {/* MAIN TABLE */}
         <div className="gi-main">
           <div className="r-card">
             {/* Header */}
@@ -458,7 +484,7 @@ export default function ProductionLog() {
               </select>
             </div>
 
-            {/* DataGrid (inside matching container) */}
+            {/* DataGrid */}
             <div className="r-toolbar-gap dg-wrap">
               <DataGrid
                 rows={visibleRows}
@@ -479,7 +505,7 @@ export default function ProductionLog() {
               />
             </div>
 
-            {/* Footer / pagination (visual parity with Goods In) */}
+            {/* Footer / pagination */}
             <div className="r-footer">
               <span className="r-muted">
                 Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
@@ -512,9 +538,52 @@ export default function ProductionLog() {
             </div>
           </div>
         </div>
+
+        {/* RIGHT SIDEBAR: QUICK STATS */}
+        <aside className="gi-side">
+          {/* Total Remaining highlight */}
+          <div className="r-card stat-card stat-accent">
+            <p className="stat-title">Total Remaining (Units)</p>
+            <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
+            <p className="stat-sub">Based on current filters</p>
+          </div>
+
+          {/* Core KPIs */}
+          <div className="r-card stat-card">
+            <div className="stat-row" style={{ marginBottom:10 }}>
+              <span className="stat-kpi">Batches Produced</span>
+              <span className="stat-kpi">{nf(stats.totalBatchesProduced)}</span>
+            </div>
+            <div className="stat-row" style={{ marginBottom:10 }}>
+              <span className="stat-kpi">Units of Waste</span>
+              <span className="stat-kpi">{nf(stats.totalWaste)}</span>
+            </div>
+            <div className="stat-row">
+              <span className="stat-kpi">Active Batches</span>
+              <span className="stat-kpi">{nf(stats.activeBatches)}</span>
+            </div>
+          </div>
+
+          {/* Top recipes by remaining */}
+          <div className="r-card stat-card">
+            <p className="stat-title">Top Recipes by Remaining</p>
+            {stats.topRecipes.length === 0 ? (
+              <p className="stat-sub">No data</p>
+            ) : (
+              <div style={{ display:"grid", gap:8 }}>
+                {stats.topRecipes.map((t) => (
+                  <div key={t.recipe} className="stat-row">
+                    <span className="stat-sub" style={{ fontWeight:800, color:"#0f172a" }}>{t.recipe}</span>
+                    <span className="stat-kpi">{nf(t.units)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
 
-      {/* ===================== EDIT MODAL (Goods In style) ===================== */}
+      {/* ===================== EDIT MODAL ===================== */}
       {editOpen && editingRow && (
         <Portal>
           <div className="r-modal-dim">
@@ -567,7 +636,6 @@ export default function ProductionLog() {
                         setEditingRow((prev) => ({
                           ...(prev || {}),
                           unitsOfWaste,
-                          // keep batchRemaining coherent if present
                           batchRemaining: unitsRemaining + unitsOfWaste
                         }));
                       }}
@@ -586,7 +654,6 @@ export default function ProductionLog() {
                         setEditingRow((prev) => ({
                           ...(prev || {}),
                           unitsRemaining,
-                          // keep batchRemaining coherent if present
                           batchRemaining: unitsRemaining + unitsOfWaste
                         }));
                       }}
