@@ -1,5 +1,6 @@
 // src/scenes/GoodsIn/index.jsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import Autocomplete from "@mui/material/Autocomplete";
 import {
@@ -83,9 +84,9 @@ const BrandStyles = () => (
   .gi-side { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
   .gi-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); padding:16px; }
 
-  /* Modal shell */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
+  /* Modal shell (boosted z-index to beat any top bar) */
+  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .r-mbody { padding:16px; overflow:auto; background:#fff; }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
@@ -105,6 +106,7 @@ const BrandStyles = () => (
   /* Segmented toggle for Single / Multiple */
   .seg {
     display:inline-flex; gap:6px; padding:4px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px;
+    position:relative; z-index:10001; /* keep above any stray overlays */
   }
   .seg button {
     border:0; background:transparent; padding:6px 12px; border-radius:10px; font-weight:800; cursor:pointer; color:#334155;
@@ -201,6 +203,14 @@ const SmallBarList = ({ data = [] }) => {
       })}
     </div>
   );
+};
+
+/* =========================================================================================
+   Helpers
+   ========================================================================================= */
+const Portal = ({ children }) => {
+  if (typeof window === "undefined") return null;
+  return createPortal(children, document.body);
 };
 
 /* =========================================================================================
@@ -850,286 +860,292 @@ export default function GoodsIn() {
         </aside>
       </div>
 
-      {/* ===================== EDIT MODAL ===================== */}
+      {/* ===================== EDIT MODAL (PORTALED) ===================== */}
       {editDialogOpen && editingRow && (
-        <div className="r-modal-dim">
-          <div className="r-modal">
-            <div className="r-mhdr">
-              <h3 className="r-title" style={{ fontSize: 18 }}>Edit Goods In Record</h3>
-              <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}>Close</button>
-            </div>
-            <div className="r-mbody">
-              <div className="ag-grid">
-                <div className="ag-field ag-field-4">
-                  <label className="ag-label">Ingredient</label>
-                  <input className="ag-input" type="text" value={editingRow.ingredient || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}/>
-                </div>
-                <div className="ag-field">
-                  <label className="ag-label">Date</label>
-                  <input className="ag-input" type="date" value={editingRow.date || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}/>
-                </div>
-                <div className="ag-field">
-                  <label className="ag-label">Temperature (℃)</label>
-                  <input className="ag-input" type="text" value={editingRow.temperature || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}/>
-                </div>
-                <div className="ag-field-1">
-                  <label className="ag-label">Stock Received</label>
-                  <input className="ag-input" type="number" value={editingRow.stockReceived || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}/>
-                </div>
-                <div className="ag-field-1">
-                  <label className="ag-label">Stock Remaining</label>
-                  <input className="ag-input" type="number" value={editingRow.stockRemaining || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}/>
-                </div>
-                <div className="ag-field ag-field-4">
-                  <label className="ag-label">Unit</label>
-                  <select className="ag-select" value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
-                    {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                </div>
-                <div className="ag-field">
-                  <label className="ag-label">Batch Code</label>
-                  <input className="ag-input" type="text" value={editingRow.barCode || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}/>
-                </div>
-                <div className="ag-field">
-                  <label className="ag-label">Invoice Number</label>
-                  <input className="ag-input" type="text" value={editingRow.invoiceNumber || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}/>
-                </div>
-                <div className="ag-field ag-field-4">
-                  <label className="ag-label">Expiry Date</label>
-                  <input className="ag-input" type="date" value={editingRow.expiryDate || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}/>
-                </div>
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal">
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>Edit Goods In Record</h3>
+                <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}>Close</button>
               </div>
-            </div>
-            <div className="r-mfooter">
-              <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</button>
-              <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>{updating ? "Saving..." : "Save Changes"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== DELETE CONFIRM MODAL ===================== */}
-      {deleteOpen && numSelected > 0 && (
-        <div className="r-modal-dim">
-          <div className="r-modal" style={{ maxWidth: 420 }}>
-            <div className="r-mhdr">
-              <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
-              <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
-            </div>
-            <div className="r-mbody" style={{ textAlign: "center" }}>
-              <div className="r-flex" style={{ width: 60, height: 60, margin:"0 auto", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", borderRadius:999 }}>
-                <DeleteIcon />
-              </div>
-              <h3 style={{ fontWeight: 900, color:"#0f172a", marginTop: 10, fontSize:18 }}>
-                Delete {numSelected} record{numSelected>1 ? "s" : ""}?
-              </h3>
-              <p className="r-muted" style={{ marginTop: 6 }}>This is a soft-delete action.</p>
-            </div>
-            <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
-              <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
-              <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== ADD GOOD(S) POPUP ===================== */}
-      {addOpen && (
-        <div className="r-modal-dim">
-          <div className="r-modal">
-            <div className="r-mhdr">
-              <h3 className="r-title" style={{ fontSize: 18 }}>Add Good(s)</h3>
-              {/* Segmented toggle replaces MUI Tabs to ensure visibility everywhere */}
-              <div className="seg" role="tablist" aria-label="Add goods mode">
-                <button
-                  role="tab"
-                  aria-selected={addTab===0}
-                  className={addTab===0 ? "active" : ""}
-                  onClick={()=>setAddTab(0)}
-                >Single</button>
-                <button
-                  role="tab"
-                  aria-selected={addTab===1}
-                  className={addTab===1 ? "active" : ""}
-                  onClick={()=>setAddTab(1)}
-                >Multiple ({multi.length})</button>
-              </div>
-            </div>
-
-            <div className="r-mbody">
-              {addTab === 0 ? (
+              <div className="r-mbody">
                 <div className="ag-grid">
+                  <div className="ag-field ag-field-4">
+                    <label className="ag-label">Ingredient</label>
+                    <input className="ag-input" type="text" value={editingRow.ingredient || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}/>
+                  </div>
                   <div className="ag-field">
                     <label className="ag-label">Date</label>
-                    <input className="ag-input" type="date" value={single.date} onChange={(e)=>setSingle(s=>({...s, date: e.target.value}))}/>
+                    <input className="ag-input" type="date" value={editingRow.date || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}/>
                   </div>
-
-                  <div className="ag-field">
-                    <label className="ag-label">Ingredient</label>
-                    <Autocomplete
-                      options={ingredients}
-                      value={ingredients.find(i=>String(i.id)===String(single.ingredient)) || null}
-                      onChange={(_, val)=>setSingle(s=>({...s, ingredient: val ? val.id : ""}))}
-                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
-                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
-                      loading={loadingMaster || loadingCustom}
-                      renderInput={(params)=>(
-                        <TextField
-                          {...params}
-                          placeholder="Search ingredients…"
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: (
-                              <>
-                                {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
-                                {params.InputProps.endAdornment}
-                              </>
-                            ),
-                          }}
-                        />
-                      )}
-                    />
-                    <div style={{ textAlign:"right", marginTop:8 }}>
-                      <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"single" })}>Add Ingredient +</button>
-                    </div>
-                  </div>
-
-                  <div className="ag-field">
-                    <label className="ag-label">Invoice Number</label>
-                    <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e)=>setSingle(s=>({...s, invoiceNumber: e.target.value}))}/>
-                  </div>
-
-                  <div className="ag-field-1">
-                    <label className="ag-label">Stock Received</label>
-                    <input className="ag-input" type="number" value={single.stockReceived} onChange={(e)=>setSingle(s=>({...s, stockReceived: e.target.value}))}/>
-                  </div>
-
-                  <div className="ag-field-1">
-                    <label className="ag-label">Unit</label>
-                    <select className="ag-select" value={single.unit} onChange={(e)=>setSingle(s=>({...s, unit: e.target.value}))}>
-                      {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="ag-field">
-                    <label className="ag-label">Batch Code</label>
-                    <input className="ag-input" type="text" value={single.barCode} onChange={(e)=>setSingle(s=>({...s, barCode: e.target.value}))}/>
-                  </div>
-
-                  <div className="ag-field">
-                    <label className="ag-label">Expiry Date</label>
-                    <input className="ag-input" type="date" value={single.expiryDate} onChange={(e)=>setSingle(s=>({...s, expiryDate: e.target.value}))}/>
-                  </div>
-
                   <div className="ag-field">
                     <label className="ag-label">Temperature (℃)</label>
-                    <input className="ag-input" type="text" value={single.temperature} onChange={(e)=>setSingle(s=>({...s, temperature: e.target.value}))}/>
+                    <input className="ag-input" type="text" value={editingRow.temperature || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}/>
+                  </div>
+                  <div className="ag-field-1">
+                    <label className="ag-label">Stock Received</label>
+                    <input className="ag-input" type="number" value={editingRow.stockReceived || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}/>
+                  </div>
+                  <div className="ag-field-1">
+                    <label className="ag-label">Stock Remaining</label>
+                    <input className="ag-input" type="number" value={editingRow.stockRemaining || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}/>
+                  </div>
+                  <div className="ag-field ag-field-4">
+                    <label className="ag-label">Unit</label>
+                    <select className="ag-select" value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
+                      {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="ag-field">
+                    <label className="ag-label">Batch Code</label>
+                    <input className="ag-input" type="text" value={editingRow.barCode || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}/>
+                  </div>
+                  <div className="ag-field">
+                    <label className="ag-label">Invoice Number</label>
+                    <input className="ag-input" type="text" value={editingRow.invoiceNumber || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}/>
+                  </div>
+                  <div className="ag-field ag-field-4">
+                    <label className="ag-label">Expiry Date</label>
+                    <input className="ag-input" type="date" value={editingRow.expiryDate || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}/>
                   </div>
                 </div>
-              ) : (
-                <div style={{ display:"grid", gap:12 }}>
-                  {multi.map((it, idx)=>(
-                    <div key={idx} className="ag-row">
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                        <strong>Good {idx+1}</strong>
-                        <IconButton size="small" onClick={()=>removeMultiRow(idx)}><DeleteIcon /></IconButton>
-                      </div>
-                      <div className="ag-grid">
-                        <div className="ag-field">
-                          <label className="ag-label">Date</label>
-                          <input className="ag-input" type="date" value={it.date} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, date:e.target.value} : v))}/>
-                        </div>
-
-                        <div className="ag-field">
-                          <label className="ag-label">Ingredient</label>
-                          <Autocomplete
-                            options={ingredients}
-                            value={ingredients.find(i=>String(i.id)===String(it.ingredient)) || null}
-                            onChange={(_, val)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, ingredient: val ? val.id : ""} : v))}
-                            getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
-                            isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
-                            loading={loadingMaster || loadingCustom}
-                            renderInput={(params)=>(
-                              <TextField
-                                {...params}
-                                placeholder="Search ingredients…"
-                                InputProps={{
-                                  ...params.InputProps,
-                                  endAdornment: (
-                                    <>
-                                      {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
-                                      {params.InputProps.endAdornment}
-                                    </>
-                                  ),
-                                }}
-                              />
-                            )}
-                          />
-                          <div style={{ textAlign:"right", marginTop:8 }}>
-                            <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"multi", index: idx })}>Add Ingredient +</button>
-                          </div>
-                        </div>
-
-                        <div className="ag-field">
-                          <label className="ag-label">Invoice Number</label>
-                          <input className="ag-input" type="text" value={it.invoiceNumber} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, invoiceNumber: e.target.value} : v))}/>
-                        </div>
-
-                        <div className="ag-field-1">
-                          <label className="ag-label">Stock Received</label>
-                          <input className="ag-input" type="number" value={it.stockReceived} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, stockReceived: e.target.value} : v))}/>
-                        </div>
-
-                        <div className="ag-field-1">
-                          <label className="ag-label">Unit</label>
-                          <select className="ag-select" value={it.unit} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, unit: e.target.value} : v))}>
-                            {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
-                          </select>
-                        </div>
-
-                        <div className="ag-field">
-                          <label className="ag-label">Batch Code</label>
-                          <input className="ag-input" type="text" value={it.barCode} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, barCode: e.target.value} : v))}/>
-                        </div>
-
-                        <div className="ag-field">
-                          <label className="ag-label">Expiry Date</label>
-                          <input className="ag-input" type="date" value={it.expiryDate} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, expiryDate: e.target.value} : v))}/>
-                        </div>
-
-                        <div className="ag-field">
-                          <label className="ag-label">Temperature (℃)</label>
-                          <input className="ag-input" type="text" value={it.temperature} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, temperature: e.target.value} : v))}/>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <div>
-                    <button className="r-btn-ghost" onClick={addMultiRow}><PlusIcon /> Add another</button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="r-mfooter">
-              <button className="r-btn-ghost" onClick={()=>setAddOpen(false)}>Cancel</button>
-              <button className="r-btn-primary" onClick={handleAddSubmit}>
-                {addTab===0 ? "Add Good" : `Add ${multi.length} Good(s)`}
-              </button>
+              </div>
+              <div className="r-mfooter">
+                <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</button>
+                <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>{updating ? "Saving..." : "Save Changes"}</button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
-      {/* Add Ingredient dialog */}
+      {/* ===================== DELETE CONFIRM MODAL (PORTALED) ===================== */}
+      {deleteOpen && numSelected > 0 && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal" style={{ maxWidth: 420 }}>
+              <div className="r-mhdr">
+                <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
+                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
+              </div>
+              <div className="r-mbody" style={{ textAlign: "center" }}>
+                <div className="r-flex" style={{ width: 60, height: 60, margin:"0 auto", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", borderRadius:999 }}>
+                  <DeleteIcon />
+                </div>
+                <h3 style={{ fontWeight: 900, color:"#0f172a", marginTop: 10, fontSize:18 }}>
+                  Delete {numSelected} record{numSelected>1 ? "s" : ""}?
+                </h3>
+                <p className="r-muted" style={{ marginTop: 6 }}>This is a soft-delete action.</p>
+              </div>
+              <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
+                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
+                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* ===================== ADD GOOD(S) POPUP (PORTALED) ===================== */}
+      {addOpen && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal">
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>Add Good(s)</h3>
+                {/* Segmented toggle replaces MUI Tabs to ensure visibility everywhere */}
+                <div className="seg" role="tablist" aria-label="Add goods mode">
+                  <button
+                    role="tab"
+                    aria-selected={addTab===0}
+                    className={addTab===0 ? "active" : ""}
+                    onClick={()=>setAddTab(0)}
+                  >Single</button>
+                  <button
+                    role="tab"
+                    aria-selected={addTab===1}
+                    className={addTab===1 ? "active" : ""}
+                    onClick={()=>setAddTab(1)}
+                  >Multiple ({multi.length})</button>
+                </div>
+              </div>
+
+              <div className="r-mbody">
+                {addTab === 0 ? (
+                  <div className="ag-grid">
+                    <div className="ag-field">
+                      <label className="ag-label">Date</label>
+                      <input className="ag-input" type="date" value={single.date} onChange={(e)=>setSingle(s=>({...s, date: e.target.value}))}/>
+                    </div>
+
+                    <div className="ag-field">
+                      <label className="ag-label">Ingredient</label>
+                      <Autocomplete
+                        options={ingredients}
+                        value={ingredients.find(i=>String(i.id)===String(single.ingredient)) || null}
+                        onChange={(_, val)=>setSingle(s=>({...s, ingredient: val ? val.id : ""}))}
+                        getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                        isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                        loading={loadingMaster || loadingCustom}
+                        renderInput={(params)=>(
+                          <TextField
+                            {...params}
+                            placeholder="Search ingredients…"
+                            InputProps={{
+                              ...params.InputProps,
+                              endAdornment: (
+                                <>
+                                  {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
+                                  {params.InputProps.endAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                      <div style={{ textAlign:"right", marginTop:8 }}>
+                        <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"single" })}>Add Ingredient +</button>
+                      </div>
+                    </div>
+
+                    <div className="ag-field">
+                      <label className="ag-label">Invoice Number</label>
+                      <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e)=>setSingle(s=>({...s, invoiceNumber: e.target.value}))}/>
+                    </div>
+
+                    <div className="ag-field-1">
+                      <label className="ag-label">Stock Received</label>
+                      <input className="ag-input" type="number" value={single.stockReceived} onChange={(e)=>setSingle(s=>({...s, stockReceived: e.target.value}))}/>
+                    </div>
+
+                    <div className="ag-field-1">
+                      <label className="ag-label">Unit</label>
+                      <select className="ag-select" value={single.unit} onChange={(e)=>setSingle(s=>({...s, unit: e.target.value}))}>
+                        {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="ag-field">
+                      <label className="ag-label">Batch Code</label>
+                      <input className="ag-input" type="text" value={single.barCode} onChange={(e)=>setSingle(s=>({...s, barCode: e.target.value}))}/>
+                    </div>
+
+                    <div className="ag-field">
+                      <label className="ag-label">Expiry Date</label>
+                      <input className="ag-input" type="date" value={single.expiryDate} onChange={(e)=>setSingle(s=>({...s, expiryDate: e.target.value}))}/>
+                    </div>
+
+                    <div className="ag-field">
+                      <label className="ag-label">Temperature (℃)</label>
+                      <input className="ag-input" type="text" value={single.temperature} onChange={(e)=>setSingle(s=>({...s, temperature: e.target.value}))}/>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display:"grid", gap:12 }}>
+                    {multi.map((it, idx)=>(
+                      <div key={idx} className="ag-row">
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                          <strong>Good {idx+1}</strong>
+                          <IconButton size="small" onClick={()=>removeMultiRow(idx)}><DeleteIcon /></IconButton>
+                        </div>
+                        <div className="ag-grid">
+                          <div className="ag-field">
+                            <label className="ag-label">Date</label>
+                            <input className="ag-input" type="date" value={it.date} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, date:e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Ingredient</label>
+                            <Autocomplete
+                              options={ingredients}
+                              value={ingredients.find(i=>String(i.id)===String(it.ingredient)) || null}
+                              onChange={(_, val)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, ingredient: val ? val.id : ""} : v))}
+                              getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                              isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                              loading={loadingMaster || loadingCustom}
+                              renderInput={(params)=>(
+                                <TextField
+                                  {...params}
+                                  placeholder="Search ingredients…"
+                                  InputProps={{
+                                    ...params.InputProps,
+                                    endAdornment: (
+                                      <>
+                                        {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
+                                        {params.InputProps.endAdornment}
+                                      </>
+                                    ),
+                                  }}
+                                />
+                              )}
+                            />
+                            <div style={{ textAlign:"right", marginTop:8 }}>
+                              <button className="r-btn-ghost" onClick={()=>handleOpenAddIngredient({ mode:"multi", index: idx })}>Add Ingredient +</button>
+                            </div>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Invoice Number</label>
+                            <input className="ag-input" type="text" value={it.invoiceNumber} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, invoiceNumber: e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field-1">
+                            <label className="ag-label">Stock Received</label>
+                            <input className="ag-input" type="number" value={it.stockReceived} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, stockReceived: e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field-1">
+                            <label className="ag-label">Unit</label>
+                            <select className="ag-select" value={it.unit} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, unit: e.target.value} : v))}>
+                              {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Batch Code</label>
+                            <input className="ag-input" type="text" value={it.barCode} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, barCode: e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Expiry Date</label>
+                            <input className="ag-input" type="date" value={it.expiryDate} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, expiryDate: e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Temperature (℃)</label>
+                            <input className="ag-input" type="text" value={it.temperature} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, temperature: e.target.value} : v))}/>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div>
+                      <button className="r-btn-ghost" onClick={addMultiRow}><PlusIcon /> Add another</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="r-mfooter">
+                <button className="r-btn-ghost" onClick={()=>setAddOpen(false)}>Cancel</button>
+                <button className="r-btn-primary" onClick={handleAddSubmit}>
+                  {addTab===0 ? "Add Good" : `Add ${multi.length} Good(s)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Add Ingredient dialog (MUI already uses a portal) */}
       <Dialog
         open={addIngOpen}
         onClose={()=>{ setAddIngOpen(false); setIngTarget(null); }}
