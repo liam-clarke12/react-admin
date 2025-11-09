@@ -10,8 +10,6 @@ import {
   TextField,
   Button,
   CircularProgress,
-  Tabs,
-  Tab,
   IconButton,
   Snackbar,
   Alert,
@@ -88,7 +86,7 @@ const BrandStyles = () => (
   /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .r-mbody { padding:16px; overflow:auto; background:#fff; }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
 
@@ -103,6 +101,17 @@ const BrandStyles = () => (
 
   .ag-row { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff; }
   .ag-row:nth-child(odd){ background:#f8fafc; }
+
+  /* Segmented toggle for Single / Multiple */
+  .seg {
+    display:inline-flex; gap:6px; padding:4px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px;
+  }
+  .seg button {
+    border:0; background:transparent; padding:6px 12px; border-radius:10px; font-weight:800; cursor:pointer; color:#334155;
+  }
+  .seg button:hover { background:#eef2ff; }
+  .seg .active { background:#7C3AED; color:#fff; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); }
+
   `}</style>
 );
 
@@ -270,11 +279,11 @@ export default function GoodsIn() {
     [masterIngredients, customIngredients]
   );
 
-  // "Add ingredient" dialog & targeting (which slot should receive the new ingredient)
+  // "Add ingredient" dialog & targeting
   const [addIngOpen, setAddIngOpen] = useState(false);
   const [addingIng, setAddingIng] = useState(false);
   const [newIngredientName, setNewIngredientName] = useState("");
-  const [ingTarget, setIngTarget] = useState(null); // { mode: 'single' } or { mode: 'multi', index: number }
+  const [ingTarget, setIngTarget] = useState(null); // { mode: 'single' } or { mode: 'multi', index }
 
   // Toast
   const [toastOpen, setToastOpen] = useState(false);
@@ -938,11 +947,20 @@ export default function GoodsIn() {
           <div className="r-modal">
             <div className="r-mhdr">
               <h3 className="r-title" style={{ fontSize: 18 }}>Add Good(s)</h3>
-              <div>
-                <Tabs value={addTab} onChange={(_,v)=>setAddTab(v)} sx={{ minHeight: 40, "& .MuiTab-root": { textTransform:"none", fontWeight:800, minHeight:40 } }}>
-                  <Tab label="Single" />
-                  <Tab label={`Multiple (${multi.length})`} />
-                </Tabs>
+              {/* Segmented toggle replaces MUI Tabs to ensure visibility everywhere */}
+              <div className="seg" role="tablist" aria-label="Add goods mode">
+                <button
+                  role="tab"
+                  aria-selected={addTab===0}
+                  className={addTab===0 ? "active" : ""}
+                  onClick={()=>setAddTab(0)}
+                >Single</button>
+                <button
+                  role="tab"
+                  aria-selected={addTab===1}
+                  className={addTab===1 ? "active" : ""}
+                  onClick={()=>setAddTab(1)}
+                >Multiple ({multi.length})</button>
               </div>
             </div>
 
