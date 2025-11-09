@@ -114,6 +114,10 @@ const BrandStyles = () => (
   .seg button:hover { background:#eef2ff; }
   .seg .active { background:#7C3AED; color:#fff; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); }
 
+  /* Ensure MUI Autocomplete dropdown stays above our modal overlay */
+  .MuiAutocomplete-popper { z-index: 10020 !important; }
+  .MuiAutocomplete-popper .MuiPaper-root { overflow: visible; }
+
   `}</style>
 );
 
@@ -545,7 +549,7 @@ export default function GoodsIn() {
     const res = await fetch(`${API_BASE}/submit`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text().catch(()=>"Submit failed"));
+    if (!res.ok) throw new Error(await res.text().catch(()=> "Submit failed"));
   };
 
   const submitMultiple = async () => {
@@ -996,6 +1000,9 @@ export default function GoodsIn() {
                         getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                         isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                         loading={loadingMaster || loadingCustom}
+                        /* ensure popper appears above modal overlay */
+                        slotProps={{ popper: { sx: { zIndex: 10020 } } }}
+                        componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                         renderInput={(params)=>(
                           <TextField
                             {...params}
@@ -1072,6 +1079,9 @@ export default function GoodsIn() {
                               getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                               isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                               loading={loadingMaster || loadingCustom}
+                              /* ensure popper appears above modal overlay */
+                              slotProps={{ popper: { sx: { zIndex: 10020 } } }}
+                              componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                               renderInput={(params)=>(
                                 <TextField
                                   {...params}
