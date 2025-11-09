@@ -1,52 +1,126 @@
 // src/scenes/usage/StockUsage.jsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  Box,
-  Drawer,
-  Typography,
-  IconButton,
-  Button,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Divider,
-  Stack,
-  Card,
-  CardContent,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { DataGrid } from "@mui/x-data-grid";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import DeleteIcon from "@mui/icons-material/Delete";
-import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import CloseIcon from "@mui/icons-material/Close";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
-};
-
+/* ===== API ===== */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ===== Tiny toast (optional) ===== */
+/* ---------------- Shared brand styles copied from Recipes ---------------- */
+const BrandStyles = () => (
+  <style>{`
+  .r-wrap { padding: 20px; }
+  .r-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:16px;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+    overflow:hidden;
+  }
+  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
+  .r-title { margin:0; font-weight:800; color:#0f172a; font-size:18px; }
+  .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
+  .r-btn-icon { border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626; }
+  .r-btn-icon:hover { background:#fee2e2; }
+
+  .r-actions-right { display:flex; align-items:center; gap:10px; }
+  .r-btn-add {
+    display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font-weight:800; color:#fff;
+    background:linear-gradient(180deg, #6366f1, #7c3aed); border:0; border-radius:999px;
+    box-shadow:0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06); cursor:pointer;
+  }
+  .r-btn-add:hover { filter:brightness(.95); }
+
+  .r-table-wrap { overflow:auto; }
+  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
+  .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
+  .r-thead th { padding:12px; text-align:left; }
+  .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
+  .r-row:hover { background:#f4f1ff; }
+  .r-td { padding:12px; }
+  .r-td--name { font-weight:800; color:#0f172a; white-space:nowrap; }
+  .r-actions { text-align:center; }
+  .r-chk { width:16px; height:16px; }
+  .r-link { color:#7C3AED; font-weight:700; background:transparent; border:0; cursor:pointer; }
+  .r-link:hover { color:#5B21B6; text-decoration:underline; }
+  .r-btn-ghost {
+    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
+    color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
+  }
+  .r-btn-ghost:hover { background:#f4f1ff; }
+  .r-btn-primary {
+    padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+  }
+  .r-btn-primary:hover { background:#5B21B6; }
+  .r-btn-danger { background:#dc2626; }
+  .r-btn-danger:hover { background:#b91c1c; }
+  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+
+  /* Drawer (shared) */
+  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
+  .r-dim.open { opacity:1; pointer-events:auto; }
+  .r-drawer {
+    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px; background:#fff; box-shadow:-8px 0 24px rgba(2,6,23,.18);
+    transform:translateX(100%); transition:transform .25s ease; z-index:50; display:flex; flex-direction:column;
+  }
+  .r-drawer.open { transform:translateX(0); }
+  .r-dhdr {
+    padding:16px; color:#fff; background:linear-gradient(135deg, #6366f1, #7C3AED); display:flex; align-items:center; justify-content:space-between;
+  }
+  .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
+  .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
+  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
+  .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
+  .r-stat { text-align:right; }
+  .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
+  .r-input { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; background:#fff; }
+  .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
+  .r-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
+  .r-chip { font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; padding:4px 8px; border-radius:999px; }
+
+  /* Toast */
+  .su-toast {
+    position: fixed; top: 16px; right: 16px; transform: translateY(-20px); opacity: 0;
+    transition: all .2s ease; z-index: 60; pointer-events: none;
+  }
+  .su-toast.show { transform: translateY(0); opacity: 1; }
+  .su-toast-inner {
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
+    padding: 10px 12px; border-radius: 10px; font-weight: 700;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+  }
+  `}</style>
+);
+
+/* ---------------- Tiny Icons (inline SVG to avoid MUI) ---------------- */
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const DeleteIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+const MenuIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+  </Svg>
+);
+const CloseIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </Svg>
+);
+const CheckIcon = (props) => (
+  <Svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="20 6 9 17 4 12" />
+  </Svg>
+);
+const DownloadIcon = (props) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+  </Svg>
+);
+
+/* ---------------- Toast ---------------- */
 function Toast({ open, onClose, children }) {
   React.useEffect(() => {
     if (!open) return;
@@ -60,66 +134,246 @@ function Toast({ open, onClose, children }) {
   );
 }
 
-const StockUsage = () => {
-  const theme = useTheme();
-  const { cognitoId } = useAuth();
-  const [stockUsage, setStockUsage] = useState([]);
+/* ---------------- Helpers ---------------- */
+const formatToYYYYMMDD = (val) => {
+  if (val === undefined || val === null) return "";
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  } catch (_) {}
+  const s = String(val);
+  const m = s.match(/\d{4}-\d{2}-\d{2}/);
+  if (m) return m[0];
+  return s.slice(0, 10);
+};
 
-  // Drawer
+/* ---------------- Drawer ---------------- */
+const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
+  const [q, setQ] = useState("");
+
+  const parsed = useMemo(() => {
+    // items is an array of strings like "Name: value"
+    return (items || []).map((raw) => {
+      if (typeof raw === "string" && raw.includes(":")) {
+        const [left, right] = raw.split(":");
+        return {
+          name: (left || "").trim(),
+          value: (right || "").trim(),
+          full: raw.toLowerCase(),
+        };
+      }
+      return { name: String(raw || ""), value: "", full: String(raw || "").toLowerCase() };
+    });
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    const needle = (q || "").toLowerCase();
+    return parsed.filter((it) => it.full.includes(needle));
+  }, [parsed, q]);
+
+  const exportCsv = () => {
+    const rows = [["Item", "Value"]];
+    (items || []).forEach((raw) => {
+      if (typeof raw === "string" && raw.includes(":")) {
+        const [l, r] = raw.split(":");
+        rows.push([String(l).trim(), String(r || "").trim()]);
+      } else {
+        rows.push([String(raw || ""), ""]);
+      }
+    });
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const filenameBase = (meta?.recipe || meta?.batchCode || "stock-usage").replace(/\s+/g, "-").toLowerCase();
+    a.download = `${filenameBase}-${(header || mode || "items").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div className={`r-dim ${isOpen ? "open" : ""}`} onClick={onClose} />
+      <div className={`r-drawer ${isOpen ? "open" : ""}`}>
+        <div className="r-dhdr">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="r-badge"><MenuIcon /></span>
+            <div>
+              <h3 className="r-dhdr-title">{header || (mode === "barcodes" ? "Batchcodes" : "Ingredients")}</h3>
+              <p className="r-dhdr-sub">
+                {meta?.recipe ? `${meta.recipe} · ${meta?.date ?? ""}` : (meta?.batchCode || "")}
+              </p>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button className="r-btn-ghost" onClick={exportCsv}><DownloadIcon /> Export</button>
+            <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          </div>
+        </div>
+
+        <div className="r-dbody">
+          <div className="r-summary" style={{ display:"flex", justifyContent:"space-between" }}>
+            <div>
+              <div className="r-muted" style={{ textTransform:"uppercase", fontWeight:800 }}>Source</div>
+              <div className="r-strong">{meta?.recipe || "—"}</div>
+              <div className="r-muted">Batch: {meta?.batchCode ?? "—"}</div>
+            </div>
+            <div className="r-stat">
+              <div className="r-muted" style={{ textTransform:"uppercase", fontWeight:800 }}>Items</div>
+              <div className="r-strong" style={{ color:"#7C3AED", fontSize:24 }}>{filtered.length}</div>
+            </div>
+          </div>
+
+          <div className="r-filter">
+            <input className="r-input" value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Filter items..." />
+          </div>
+
+          <ul className="r-list">
+            {filtered.map((it, i) => (
+              <li key={i} className="r-item">
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span className="r-badge"><CheckIcon /></span>
+                  <span className="r-strong" style={{ fontWeight:700 }}>{it.name}</span>
+                </div>
+                {/* ingredients show qty as chip; barcodes show value as muted text */}
+                {mode === "ingredients" ? (
+                  <span className="r-chip">{it.value}</span>
+                ) : (
+                  <span className="r-muted" style={{ wordBreak:"break-word" }}>{it.value}</span>
+                )}
+              </li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="r-item" style={{ justifyContent:"center" }}>
+                <span className="r-muted">No items found.</span>
+              </li>
+            )}
+          </ul>
+        </div>
+
+        <div className="r-footer">
+          <span className="r-muted">{filtered.length} items</span>
+          <button className="r-btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+/* ---------------- Delete Modal (shared look) ---------------- */
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
+  if (!isOpen || count === 0) return null;
+  return (
+    <div className="r-modal-dim">
+      <div className="r-modal" style={{ maxWidth: 420 }}>
+        <div className="r-mhdr">
+          <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
+          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+        </div>
+        <div className="r-mbody" style={{ textAlign: "center" }}>
+          <div className="r-badge" style={{ width: 52, height: 52, alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", border:"none", margin:"0 auto" }}>
+            <DeleteIcon />
+          </div>
+          <h3 className="r-strong" style={{ marginTop: 10, fontSize:18 }}>
+            Delete {count} row{count>1?"s":""}?
+          </h3>
+          <p className="r-muted" style={{ marginTop: 6 }}>This action cannot be undone.</p>
+        </div>
+        <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
+          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ---------------- Main Component ---------------- */
+const StockUsage = () => {
+  const { cognitoId } = useAuth();
+
+  const [rows, setRows] = useState([]);          // grouped usage rows shown in table
+  const [selectedIds, setSelectedIds] = useState(new Set()); // table selections (group ids)
+
+  // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
-  const [drawerItems, setDrawerItems] = useState([]); // array of strings
   const [drawerMode, setDrawerMode] = useState("ingredients"); // 'ingredients' | 'barcodes'
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRowMeta, setSelectedRowMeta] = useState(null);
+  const [drawerItems, setDrawerItems] = useState([]);
+  const [drawerMeta, setDrawerMeta] = useState(null);
 
-  // Selection + delete prompt
-  const [selectedRows, setSelectedRows] = useState([]); // DataGrid row IDs
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  // Delete dialog
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Toast
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
 
-  // Helper: format input to YYYY-MM-DD (tries to be robust)
-  const formatToYYYYMMDD = (val) => {
-    if (val === undefined || val === null) return "";
-    try {
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
-        // use toISOString to ensure zero-padded month/day
-        return d.toISOString().slice(0, 10);
-      }
-    } catch (_) {}
-    const s = String(val);
-    // try to extract yyyy-mm-dd pattern if present
-    const m = s.match(/\d{4}-\d{2}-\d{2}/);
-    if (m) return m[0];
-    // fallback: take first 10 chars (may be yyyy-mm-dd or other)
-    return s.slice(0, 10);
+  // select-all checkbox ref to render indeterminate
+  const selectAllRef = useRef(null);
+  const numSelected = selectedIds.size;
+  const rowCount = rows.length;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = numSelected > 0 && numSelected < rowCount;
+    }
+  }, [numSelected, rowCount]);
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) setSelectedIds(new Set(rows.map((r) => r.id)));
+    else setSelectedIds(new Set());
   };
+  const toggleRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // flatten underlying stock_usage ids for selected groups
+  const flatSelectedUsageIds = useMemo(() => {
+    const map = new Map(rows.map((r) => [r.id, r]));
+    const all = [];
+    for (const id of selectedIds) {
+      const r = map.get(id);
+      if (r?.ids?.length) all.push(...r.ids);
+    }
+    return Array.from(new Set(all));
+  }, [rows, selectedIds]);
+
+  const openDrawer = (mode, list, meta) => {
+    setDrawerMode(mode);
+    setDrawerHeader(mode === "barcodes" ? "Batchcodes" : "Ingredients");
+    // list can be string "name: x; name2: y" or array; normalize to array
+    let items = [];
+    if (Array.isArray(list)) items = list;
+    else if (typeof list === "string") items = list.split("; ").filter(Boolean);
+    setDrawerItems(items);
+    setDrawerMeta(meta || null);
+    setDrawerOpen(true);
+  };
+  const closeDrawer = () => setDrawerOpen(false);
 
   const fetchStockUsage = useCallback(async () => {
     if (!cognitoId) return;
-
     try {
       const url = `${API_BASE}/stock-usage/${encodeURIComponent(cognitoId)}`;
       const response = await axios.get(url);
       if (!Array.isArray(response.data)) return;
 
-      const groupedData = {};
+      const grouped = {};
       response.data.forEach((item) => {
-        // Expect API to provide a list of underlying stock_usage IDs for this usage group
         const usageIds = item?.ids || item?.stock_usage_ids || [];
+        const date = formatToYYYYMMDD(item.production_log_date ?? item.date ?? "");
+        const key = `${item.recipe_name}-${date}-${item.batchCode}`;
 
-        // format date to YYYY-MM-DD (no time)
-        const formattedDate = formatToYYYYMMDD(item.production_log_date ?? item.date ?? "");
-
-        const key = `${item.recipe_name}-${formattedDate}-${item.batchCode}`;
-        if (!groupedData[key]) {
-          groupedData[key] = {
+        if (!grouped[key]) {
+          grouped[key] = {
             id: key,
-            date: formattedDate,
+            date,
             recipeName: item.recipe_name,
             batchCode: item.batchCode,
             batchesProduced: item.batchesProduced,
@@ -128,41 +382,29 @@ const StockUsage = () => {
             ids: Array.isArray(usageIds) ? [...usageIds] : [],
           };
         } else {
-          if (Array.isArray(usageIds)) groupedData[key].ids.push(...usageIds);
+          if (Array.isArray(usageIds)) grouped[key].ids.push(...usageIds);
         }
 
         if (!Array.isArray(item.ingredients)) return;
         item.ingredients.forEach((ingredient) => {
           const totalQuantity = ingredient.quantity * item.batchesProduced;
-
-          // include unit when available — support possible unit field names
           const unit = ingredient.unit ?? ingredient.unit_name ?? ingredient.unitLabel ?? "";
           const unitSuffix = unit ? ` ${unit}` : "";
-
-          // Format ingredient quantities as plain text containing the unit (if provided)
-          groupedData[key].ingredients.push(
-            `${ingredient.ingredient_name}: ${totalQuantity}${unitSuffix}`
-          );
-
-          // barcodes: keep the original mapping (may be a CSV/array or string)
-          // show ingredient name + barcodes (raw)
-          groupedData[key].barcodes.push(
-            `${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes ?? ""}`
-          );
+          grouped[key].ingredients.push(`${ingredient.ingredient_name}: ${totalQuantity}${unitSuffix}`);
+          grouped[key].barcodes.push(`${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes ?? ""}`);
         });
       });
 
-      // collapse + de-dupe IDs per group
-      const formattedData = Object.values(groupedData).map((entry) => ({
-        ...entry,
-        ids: Array.from(new Set(entry.ids)),
-        ingredients: entry.ingredients.join("; "),
-        barcodes: entry.barcodes.join("; "),
+      const formatted = Object.values(grouped).map((g) => ({
+        ...g,
+        ids: Array.from(new Set(g.ids)),
+        ingredients: g.ingredients.join("; "),
+        barcodes: g.barcodes.join("; "),
       }));
 
-      setStockUsage(formattedData);
-    } catch (error) {
-      console.error("[StockUsage] Error fetching stock usage:", error.message);
+      setRows(formatted);
+    } catch (e) {
+      console.error("[StockUsage] fetch failed:", e);
     }
   }, [cognitoId]);
 
@@ -170,581 +412,150 @@ const StockUsage = () => {
     fetchStockUsage();
   }, [fetchStockUsage]);
 
-  // Drawer helpers
-  const handleDrawerOpen = (header, content, meta = null) => {
-    const mode = header.toLowerCase().includes("barcode")
-      ? "barcodes"
-      : "ingredients";
-    setDrawerMode(mode);
-    setDrawerHeader(header);
-
-    let items = [];
-    if (Array.isArray(content)) {
-      items = content;
-    } else if (typeof content === "string" && content.length) {
-      items = content.split("; ").filter(Boolean);
-    }
-    setDrawerItems(items);
-    setSelectedRowMeta(meta);
-    setSearchTerm("");
-    setDrawerOpen(true);
-  };
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedRowMeta(null);
-    setDrawerItems([]);
-    setSearchTerm("");
-  };
-
-  // Selected row objects
-  const selectedRowObjs = useMemo(() => {
-    const map = new Map(stockUsage.map((r) => [r.id, r]));
-    return selectedRows.map((sid) => map.get(sid)).filter(Boolean);
-  }, [selectedRows, stockUsage]);
-
-  // Flatten all underlying stock_usage IDs from selected grouped rows
-  const flatSelectedIds = useMemo(() => {
-    const all = [];
-    for (const r of selectedRowObjs) if (Array.isArray(r?.ids)) all.push(...r.ids);
-    return Array.from(new Set(all));
-  }, [selectedRowObjs]);
-
-  const columns = useMemo(
-    () => [
-      { field: "date", headerName: "Date", flex: 1 },
-      { field: "recipeName", headerName: "Recipe Name", flex: 1 },
-      {
-        field: "ingredients",
-        headerName: "Ingredients",
-        flex: 1,
-        renderCell: (params) => (
-          <Typography
-            sx={{
-              cursor: "pointer",
-              color: brand.primary,
-              fontWeight: 600,
-              "&:hover": { color: brand.primaryDark },
-            }}
-            onClick={() =>
-              handleDrawerOpen("Ingredients", params.row.ingredients, {
-                recipe: params.row.recipeName,
-                date: params.row.date,
-                batchCode: params.row.batchCode,
-                recipients: params.row.recipeName,
-              })
-            }
-          >
-            Show Ingredients
-          </Typography>
-        ),
-      },
-      { field: "batchCode", headerName: "Batch Code", flex: 1 },
-      {
-        field: "barcodes",
-        headerName: "Ingredient Batchcodes Used",
-        flex: 1,
-        renderCell: (params) => (
-          <Typography
-            sx={{
-              cursor: "pointer",
-              color: brand.primary,
-              fontWeight: 600,
-              "&:hover": { color: brand.primaryDark },
-            }}
-            onClick={() =>
-              handleDrawerOpen("Batchcodes", params.row.barcodes, {
-                recipe: params.row.recipeName,
-                date: params.row.date,
-                batchCode: params.row.batchCode,
-                recipients: params.row.recipeName,
-              })
-            }
-          >
-            Show Batchcodes
-          </Typography>
-        ),
-      },
-    ],
-    []
-  );
-
-  /* === Delete flow (matches Production Log) === */
   const openDeletePrompt = () => {
-    if (selectedRows.length === 0) return;
-    setOpenConfirmDialog(true);
+    if (selectedIds.size === 0) return;
+    setDeleteOpen(true);
   };
 
-  const handleDeleteSelectedRows = async () => {
-    if (!cognitoId || flatSelectedIds.length === 0) {
-      setOpenConfirmDialog(false);
-      setToastMsg(flatSelectedIds.length === 0 ? "Selected rows have no deletable IDs." : "No user id.");
-      setToastOpen(true);
-      return;
-    }
-
-    console.log("[StockUsage] selected rows:", selectedRowObjs);
-    console.log("[StockUsage] sending delete ids:", flatSelectedIds, "cognito_id:", cognitoId);
-
+  const confirmDelete = async () => {
     try {
-      const payload = { ids: flatSelectedIds, cognito_id: cognitoId };
+      if (!cognitoId || flatSelectedUsageIds.length === 0) {
+        setDeleteOpen(false);
+        setToastMsg(flatSelectedUsageIds.length === 0 ? "Selected rows have no deletable IDs." : "No user id.");
+        setToastOpen(true);
+        return;
+      }
+      const payload = { ids: flatSelectedUsageIds, cognito_id: cognitoId };
       const res = await axios.post(`${API_BASE}/stock-usage/delete`, payload);
       await fetchStockUsage();
-      setSelectedRows([]);
-      setOpenConfirmDialog(false);
-      setToastMsg(`Deleted ${res?.data?.deleted ?? flatSelectedIds.length} usage row(s).`);
+      setSelectedIds(new Set());
+      setDeleteOpen(false);
+      setToastMsg(`Deleted ${res?.data?.deleted ?? flatSelectedUsageIds.length} usage row(s).`);
       setToastOpen(true);
-    } catch (err) {
-      console.error("[StockUsage] Delete failed:", err);
-      setOpenConfirmDialog(false);
+    } catch (e) {
+      console.error("[StockUsage] delete failed:", e);
+      setDeleteOpen(false);
       setToastMsg("Delete failed. Please try again.");
       setToastOpen(true);
     }
   };
 
-  // Drawer derived values
-  const filteredDrawerItems = drawerItems.filter((it) =>
-    String(it).toLowerCase().includes(searchTerm.trim().toLowerCase())
-  );
-  const totalItemsCount = filteredDrawerItems.length;
-
-  // Export helper (CSV)
-  const exportDrawerCsv = () => {
-    try {
-      const rows = [["Item", "Value"]];
-      drawerItems.forEach((raw) => {
-        if (typeof raw === "string" && raw.includes(":")) {
-          const [left, right] = raw.split(":");
-          rows.push([left.trim(), (right || "").trim()]);
-        } else {
-          rows.push([String(raw), ""]);
-        }
-      });
-      const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const filenameBase = (selectedRowMeta?.recipe || selectedRowMeta?.batchCode || "stock-usage")
-        .replace(/\s+/g, "-")
-        .toLowerCase();
-      a.download = `${filenameBase}-${drawerHeader.toLowerCase()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("Export failed", e);
-      setToastMsg("Export failed");
-      setToastOpen(true);
-    }
-  };
-
   return (
-    <Box m="20px">
-      {/* Scoped styles */}
-      <style>{`
-        .su-card {
-          border: 1px solid ${brand.border};
-          background: ${brand.surface};
-          border-radius: 16px;
-          box-shadow: ${brand.shadow};
-          overflow: hidden;
-        }
-        .su-toolbar {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px; border-bottom: 1px solid ${brand.border};
-          background: ${brand.surface};
-        }
+    <div className="r-wrap">
+      <BrandStyles />
 
-        /* Toast */
-        .su-toast {
-          position: fixed; top: 16px; right: 16px; transform: translateY(-20px); opacity: 0;
-          transition: all .2s ease; z-index: 60; pointer-events: none;
-        }
-        .su-toast.show { transform: translateY(0); opacity: 1; }
-        .su-toast-inner {
-          background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
-          padding: 10px 12px; border-radius: 10px; font-weight: 700; box-shadow: ${brand.shadow};
-        }
+      <div className="r-card">
+        <div className="r-head">
+          <h2 className="r-title">Stock Usage</h2>
+          <div className="r-actions-right">
+            {numSelected > 0 && (
+              <div className="r-actions-right" style={{ background:"#eef2ff", padding:"6px 10px", borderRadius:10 }}>
+                <span className="r-pill">{numSelected} selected</span>
+                <button className="r-btn-icon" onClick={openDeletePrompt} aria-label="Delete selected">
+                  <DeleteIcon />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        /* Alternating DataGrid rows */
-        .su-even-row { background-color: ${brand.surface} !important; }
-        .su-odd-row  { background-color: ${brand.surfaceMuted} !important; }
-        /* keep hover visible */
-        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
-      `}</style>
-
-      {/* Card */}
-      <Box className="su-card" mt={2}>
-        {/* Toolbar with gradient circular delete icon (exact look) */}
-        <Box className="su-toolbar">
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>
-            Stock Usage
-          </Typography>
-
-          <IconButton
-            aria-label="Delete selected"
-            onClick={openDeletePrompt}
-            disabled={selectedRows.length === 0}
-            sx={{
-              color: "#fff",
-              borderRadius: 999,
-              width: 40,
-              height: 40,
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              boxShadow:
-                "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              "&:hover": {
-                background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
-              },
-              opacity: selectedRows.length === 0 ? 0.5 : 1,
-            }}
-          >
-            <DeleteIcon />
-          </IconButton>
-        </Box>
-
-        {/* DataGrid */}
-        <Box
-          sx={{
-            height: "70vh",
-            "& .MuiDataGrid-root": { border: "none", minWidth: "750px" },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#fbfcfd",
-              color: brand.subtext,
-              borderBottom: `1px solid ${brand.border}`,
-              fontWeight: 800,
-            },
-            "& .MuiDataGrid-columnSeparator": { display: "none" },
-            "& .MuiDataGrid-cell": {
-              borderBottom: `1px solid ${brand.border}`,
-              color: brand.text,
-            },
-            "& .MuiDataGrid-row:hover": { backgroundColor: brand.surfaceMuted },
-            "& .MuiDataGrid-footerContainer": {
-              borderTop: `1px solid ${brand.border}`,
-              background: brand.surface,
-            },
-          }}
-        >
-          <DataGrid
-            rows={stockUsage}
-            columns={columns}
-            getRowId={(row) => row.id}
-            checkboxSelection
-            disableRowSelectionOnClick
-            onRowSelectionModelChange={(model) => setSelectedRows(model)}
-            rowSelectionModel={selectedRows}
-            getRowClassName={(params) =>
-              (params.indexRelativeToCurrentPage % 2 === 0) ? "su-even-row" : "su-odd-row"
-            }
-          />
-        </Box>
-      </Box>
-
-      {/* Delete confirmation dialog (matches Production Log) */}
-      <Dialog
-        open={openConfirmDialog}
-        onClose={() => setOpenConfirmDialog(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 14,
-            border: `1px solid ${brand.border}`,
-            boxShadow: brand.shadow,
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          Confirm Deletion
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>
-            Are you sure you want to delete the selected row(s)?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteSelectedRows}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={<DeleteIcon />}
-          >
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Toast */}
-      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
-        {toastMsg}
-      </Toast>
-
-      {/* Redesigned Drawer (supports both Ingredients & Barcodes) */}
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        PaperProps={{
-          sx: {
-            width: 420,
-            borderRadius: "20px 0 0 20px",
-            border: `1px solid ${brand.border}`,
-            boxShadow: "0 24px 48px rgba(15,23,42,0.12)",
-            overflow: "hidden",
-          },
-        }}
-      >
-        {/* Header with gradient */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            px: 2,
-            py: 1.25,
-            color: "#fff",
-            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 2,
-                background: "rgba(255,255,255,0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MenuOutlinedIcon sx={{ color: "#fff" }} />
-            </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
-                {drawerHeader}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
-                {selectedRowMeta?.recipe ? `${selectedRowMeta.recipe} · ${selectedRowMeta?.date ?? ""}` : selectedRowMeta?.batchCode ?? ""}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <IconButton
-              size="small"
-              onClick={exportDrawerCsv}
-              sx={{
-                color: "#fff",
-                borderRadius: 1,
-                border: "1px solid rgba(255,255,255,0.12)",
-              }}
-            >
-              <FileDownloadOutlinedIcon fontSize="small" />
-            </IconButton>
-
-            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </Box>
-
-        {/* Content */}
-        <Box sx={{ background: brand.surface, p: 2, height: "calc(100% - 88px)" }}>
-          {/* Meta card */}
-          <Card
-            variant="outlined"
-            sx={{
-              borderColor: brand.border,
-              background: brand.surface,
-              borderRadius: 2,
-              mb: 2,
-            }}
-          >
-            <CardContent sx={{ p: 1.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box>
-                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>
-                    Source
-                  </Typography>
-                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>
-                    {selectedRowMeta?.recipe || "—"}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: brand.subtext }}>
-                    Batch: {selectedRowMeta?.batchCode ?? "—"}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: "right" }}>
-                  <Typography sx={{ color: "text.secondary", fontSize: 12 }}>Items</Typography>
-                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>
-                    {totalItemsCount}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Search + Reset */}
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <TextField
-              size="small"
-              placeholder="Search item or filter"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              fullWidth
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 1.5,
-                  background: "#fff",
-                  borderColor: brand.border,
-                },
-              }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                setSearchTerm("");
-                // reset drawer items to original content (best-effort)
-              }}
-              sx={{ textTransform: "none", borderRadius: 1.5 }}
-            >
-              Reset
-            </Button>
-          </Stack>
-
-          <Divider sx={{ mb: 2 }} />
-
-          {/* Items list */}
-          {filteredDrawerItems.length === 0 ? (
-            <Typography sx={{ color: brand.subtext }}>No items available.</Typography>
-          ) : (
-            <List disablePadding>
-              {filteredDrawerItems.map((raw, idx) => {
-                let primaryText = raw;
-                let secondary = null;
-                let pill = null;
-
-                if (drawerMode === "ingredients" && typeof raw === "string" && raw.includes(":")) {
-                  const [name, qty] = raw.split(":");
-                  primaryText = name.trim();
-                  pill = (qty || "").trim(); // qty already contains unit suffix if available
-                } else if (drawerMode === "barcodes" && typeof raw === "string" && raw.includes(":")) {
-                  const [name, codes] = raw.split(":");
-                  primaryText = name.trim();
-                  secondary = (codes || "").trim();
-                }
-
-                return (
-                  <Box
-                    key={idx}
-                    sx={{
-                      borderRadius: 2,
-                      border: `1px solid ${brand.border}`,
-                      backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
-                      mb: 1,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <ListItem
-                      secondaryAction={
-                        pill ? (
-                          <Box
-                            component="span"
-                            sx={{
-                              borderRadius: 999,
-                              border: `1px solid ${brand.border}`,
-                              background: "#f1f5f9",
-                              px: 1.25,
-                              py: 0.25,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: brand.text,
-                              maxWidth: 220,
-                              textAlign: "right",
-                            }}
-                          >
-                            {pill}
-                          </Box>
-                        ) : null
+        <div className="r-table-wrap">
+          <table className="r-table">
+            <thead className="r-thead">
+              <tr>
+                <th className="r-td">
+                  <input
+                    ref={selectAllRef}
+                    className="r-chk"
+                    type="checkbox"
+                    onChange={handleSelectAll}
+                    checked={rowCount > 0 && numSelected === rowCount}
+                  />
+                </th>
+                <th className="r-td">Date</th>
+                <th className="r-td">Recipe</th>
+                <th className="r-td">Ingredients</th>
+                <th className="r-td">Batch Code</th>
+                <th className="r-td">Ingredient Batchcodes Used</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="r-row">
+                  <td className="r-td">
+                    <input
+                      className="r-chk"
+                      type="checkbox"
+                      checked={selectedIds.has(r.id)}
+                      onChange={() => toggleRow(r.id)}
+                    />
+                  </td>
+                  <td className="r-td">{r.date}</td>
+                  <td className="r-td r-td--name">{r.recipeName}</td>
+                  <td className="r-td">
+                    <button
+                      className="r-link"
+                      onClick={() =>
+                        openDrawer("ingredients", r.ingredients, {
+                          recipe: r.recipeName,
+                          date: r.date,
+                          batchCode: r.batchCode,
+                        })
                       }
                     >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <CheckRoundedIcon sx={{ color: brand.primary }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={primaryText}
-                        secondary={secondary}
-                        primaryTypographyProps={{ sx: { color: brand.text, fontWeight: 600 } }}
-                        secondaryTypographyProps={{ sx: { color: brand.subtext, mt: 0.5, wordBreak: "break-word" } }}
-                      />
-                    </ListItem>
-                  </Box>
-                );
-              })}
-            </List>
-          )}
-        </Box>
+                      View Ingredients
+                    </button>
+                  </td>
+                  <td className="r-td">{r.batchCode}</td>
+                  <td className="r-td">
+                    <button
+                      className="r-link"
+                      onClick={() =>
+                        openDrawer("barcodes", r.barcodes, {
+                          recipe: r.recipeName,
+                          date: r.date,
+                          batchCode: r.batchCode,
+                        })
+                      }
+                    >
+                      View Batchcodes
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr className="r-row">
+                  <td className="r-td" colSpan={6} style={{ textAlign: "center" }}>
+                    <span className="r-muted">No stock usage found.</span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-        {/* Footer actions */}
-        <Box
-          sx={{
-            p: 2,
-            borderTop: `1px solid ${brand.border}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: brand.surface,
-          }}
-        >
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              onClick={handleDrawerClose}
-              sx={{
-                textTransform: "none",
-                borderRadius: 999,
-                px: 2,
-                border: `1px solid ${brand.border}`,
-              }}
-            >
-              Close
-            </Button>
+      {/* Drawer */}
+      <UsageDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        header={drawerHeader}
+        mode={drawerMode}
+        items={drawerItems}
+        meta={drawerMeta}
+      />
 
-            <Button
-              onClick={() => {
-                // context-specific confirm action (example: close for now)
-                handleDrawerClose();
-              }}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-                borderRadius: 999,
-                px: 2,
-                color: "#fff",
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                "&:hover": { background: brand.primaryDark },
-              }}
-              startIcon={<DeleteIcon />}
-            >
-              Confirm & Close
-            </Button>
-          </Box>
+      {/* Delete confirmation */}
+      <DeleteConfirmationModal
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={confirmDelete}
+        count={selectedIds.size}
+      />
 
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-            {totalItemsCount} items
-          </Typography>
-        </Box>
-      </Drawer>
-    </Box>
+      {/* Toast */}
+      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>{toastMsg}</Toast>
+    </div>
   );
 };
 
