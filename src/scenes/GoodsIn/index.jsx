@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useAuth } from "../auth"; // ⬅️ Adjust this path to wherever your hook lives
 
 /* =========================================================================================
    Tailwind-Style CSS Shim (no Tailwind required)
@@ -159,7 +160,7 @@ const SpinnerIcon = ({ className }) => (
 );
 
 /* =========================================================================================
-   JSDoc typedefs (for editor intellisense only)
+   JSDoc typedefs (editor only, not runtime)
    ========================================================================================= */
 /**
  * @typedef {Object} GoodsInRow
@@ -180,7 +181,7 @@ const SpinnerIcon = ({ className }) => (
 /** @typedef {{ amount: number, unit: string }} DisplayTotal */
 
 /* =========================================================================================
-   Units, utils
+   Units utils
    ========================================================================================= */
 const UnitGroup = Object.freeze({
   GRAMS: "grams_group",
@@ -236,24 +237,6 @@ function formatDisplayAmount(baseAmount, group) {
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /* =========================================================================================
-   Cognito Id discovery (non-blocking; omits param if not found)
-   ========================================================================================= */
-function discoverCognitoId() {
-  try {
-    // 1) Cognito Identity Pools (AWS SDK v2 style)
-    if (window.AWS && window.AWS.config && window.AWS.config.credentials && window.AWS.config.credentials.identityId) {
-      return window.AWS.config.credentials.identityId;
-    }
-    // 2) Your own storage (if you store it)
-    const stored = window.localStorage ? window.localStorage.getItem("cognito_id") : null;
-    if (stored) return stored;
-    // 3) Easy global hook
-    if (window.__COGNITO_ID__) return window.__COGNITO_ID__;
-  } catch {}
-  return null;
-}
-
-/* =========================================================================================
    Small Bar Chart (normalized by base units)
    ========================================================================================= */
 /** @param {{data: IngredientTotal[]}} props */
@@ -295,6 +278,16 @@ const SmallBarChart = ({ data = [] }) => {
    Main Component
    ========================================================================================= */
 export default function GoodsIn() {
+  // ---- Get cognitoId from your auth context (preferred), with graceful fallbacks
+  const auth = (typeof useAuth === "function" ? useAuth() : {}) || {};
+  const cognitoIdFromAuth = auth?.cognitoId;
+  const cognitoIdFromWindow =
+    typeof window !== "undefined" && window.__COGNITO_ID__ ? window.__COGNITO_ID__ : "";
+  let cognitoIdFromStorage = "";
+  try { cognitoIdFromStorage = typeof window !== "undefined" ? (localStorage.getItem("cognito_id") || "") : ""; } catch {}
+
+  const cognitoId = cognitoIdFromAuth || cognitoIdFromWindow || cognitoIdFromStorage || "";
+
   /** @type {[GoodsInRow[], Function]} */
   const [goodsInRows, setGoodsInRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
@@ -311,6 +304,7 @@ export default function GoodsIn() {
   const [updating, setUpdating] = useState(false);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fatalMsg, setFatalMsg] = useState("");
   const selectAllCheckboxRef = useRef(null);
 
   // (kept for local calc parity)
@@ -334,19 +328,24 @@ export default function GoodsIn() {
   };
 
   const fetchGoodsInData = useCallback(async () => {
+    if (!cognitoId) {
+      setFatalMsg(
+        "Missing cognito_id. The auth context didn’t return one. Ensure useAuth() provides cognitoId, or set window.__COGNITO_ID__ / localStorage('cognito_id')."
+      );
+      setGoodsInRows([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const cognitoId = discoverCognitoId();
-
-      // Build URL with or without cognito_id param
-      const url = new URL(`${API_BASE}/goods-in/active`);
-      if (cognitoId) url.searchParams.set("cognito_id", cognitoId);
-
-      const response = await fetch(url.toString(), {
-        // If your API uses Authorization headers, they’ll already be added by your client (Amplify/SDK/interceptor).
-        // You can also add them here if needed.
-      });
-      if (!response.ok) throw new Error("Failed to fetch Goods In data");
+      const url = `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error("[GoodsIn] GET /goods-in/active 400/500:", text);
+        throw new Error(text || `Failed to fetch Goods In data (status ${response.status})`);
+      }
       const data = await response.json();
 
       const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
@@ -369,10 +368,12 @@ export default function GoodsIn() {
 
       setGoodsInRows(normalized);
       computeIngredientInventory(normalized);
+      setFatalMsg("");
     } catch (error) {
       console.error("Error fetching Goods In data:", error);
+      setFatalMsg(String(error?.message || error));
     } finally { setLoading(false); }
-  }, []);
+  }, [cognitoId]);
 
   useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
 
@@ -401,7 +402,7 @@ export default function GoodsIn() {
 
   /** @param {GoodsInRow} newRow @param {{barCode:string|null,_id:string|null}} oldRow */
   const processRowUpdate = async (newRow, oldRow) => {
-    const cognitoId = discoverCognitoId();
+    if (!cognitoId) throw new Error("Missing cognito_id for update.");
 
     const payload = {
       date: newRow.date,
@@ -413,44 +414,43 @@ export default function GoodsIn() {
       expiryDate: newRow.expiryDate,
       barCode: newRow.barCode,
       invoice_number: newRow.invoiceNumber ?? null,
-      ...(cognitoId ? { cognito_id: cognitoId } : {}), // only include if we have it
+      cognito_id: cognitoId,
     };
 
     const identifierForPath = oldRow.barCode || newRow.barCode;
     if (!identifierForPath) throw new Error("Barcode is required for update.");
     const url = `${API_BASE}/goods-in/${encodeURIComponent(identifierForPath)}`;
 
-    try {
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(text || `Failed to update row (status ${response.status})`);
-      }
-      await fetchGoodsInData();
-    } catch (error) {
-      console.error("Backend update error:", error);
-      throw error;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("[GoodsIn] PUT /goods-in/{id} 400/500:", text);
+      throw new Error(text || `Failed to update row (status ${response.status})`);
     }
+    await fetchGoodsInData();
   };
 
   const handleDeleteSelectedRows = async () => {
     if (selectedRows.length === 0) return;
+    if (!cognitoId) { alert("Missing cognito_id for delete."); return; }
+
     try {
-      const cognitoId = discoverCognitoId();
       const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r._id));
       await Promise.all(rowsToDelete.map((row) =>
         fetch(`${API_BASE}/delete-row`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            barCode: row.barCode,
-            ...(cognitoId ? { cognito_id: cognitoId } : {}),
-          }),
-        }).then(res => { if (!res.ok) throw new Error(`Soft delete failed for ${row.barCode}`); })
+          body: JSON.stringify({ barCode: row.barCode, cognito_id: cognitoId }),
+        }).then(async (res) => {
+          if (!res.ok) {
+            const t = await res.text().catch(() => "");
+            throw new Error(t || `Soft delete failed for ${row.barCode}`);
+          }
+        })
       ));
       await fetchGoodsInData();
       setSelectedRows([]); setOpenConfirmDialog(false);
@@ -533,7 +533,23 @@ export default function GoodsIn() {
   return (
     <div className="p-4 max-w-screen-2xl mx-auto">
       <StyleShim />
-      <div className="flex flex-col gap-4">
+
+      {/* Missing cognito banner */}
+      {!cognitoId && (
+        <div className="p-3 rounded-md" style={{background:"rgba(220,38,38,.08)", border:"1px solid #fecaca", color:"#b91c1c", marginBottom:"1rem"}}>
+          <strong>Can’t load data:</strong> No cognito_id detected from useAuth().
+          <div className="text-sm" style={{marginTop:".5rem"}}>
+            Ensure your auth provider sets <code>cognitoId</code> in <code>useAuth()</code>, or set <code>window.__COGNITO_ID__</code> / <code>localStorage("cognito_id")</code> for fallback.
+          </div>
+        </div>
+      )}
+      {fatalMsg && (
+        <div className="p-3 rounded-md" style={{background:"rgba(220,38,38,.08)", border:"1px solid #fecaca", color:"#b91c1c", marginBottom:"1rem"}}>
+          <strong>API error:</strong> {fatalMsg}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4" aria-disabled={!cognitoId || !!fatalMsg}>
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
