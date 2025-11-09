@@ -1,40 +1,104 @@
 // src/scenes/production/ProductionLog.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Box,
-  useTheme,
-  IconButton,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Typography,
-  TextField,
-  CircularProgress,
-} from "@mui/material";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useAuth } from "../../contexts/AuthContext";
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
-};
+/* =========================================================================================
+   Brand Styles (identical to Goods In)
+   ========================================================================================= */
+const BrandStyles = () => (
+  <style>{`
+  .r-wrap { padding: 16px; }
+  .r-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:16px;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+    overflow:hidden;
+  }
+  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
+  .r-title { margin:0; font-weight:900; color:#0f172a; font-size:20px; }
+  .r-sub { margin:0; color:#64748b; font-size:12px; }
+  .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
+  .r-flex { display:flex; align-items:center; gap:10px; }
+  .r-btn-ghost {
+    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
+    color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
+  }
+  .r-btn-ghost:hover { background:#f4f1ff; }
+  .r-btn-primary {
+    padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
+    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+  }
+  .r-btn-primary:hover { background:#5B21B6; }
+  .r-btn-danger { background:#dc2626; }
+  .r-btn-danger:hover { background:#b91c1c; }
 
+  /* Toolbar */
+  .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .r-input {
+    min-width:260px; flex:1; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
+  }
+  .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-select { padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
+  .r-toolbar-gap { margin-top:12px; }
+
+  /* Footer */
+  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+  .r-muted { color:#64748b; font-size:12px; }
+
+  /* Page layout */
+  .gi-layout { display:flex; gap:24px; align-items:flex-start; }
+  .gi-main { flex:1 1 0%; min-width:0; }
+
+  /* Modal shell */
+  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .r-mbody { padding:16px; overflow:auto; background:#fff; }
+  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
+
+  /* Grid form bits in modal */
+  .ag-grid { display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0, 1fr)); }
+  .ag-field { grid-column: span 2; }
+  .ag-field-1 { grid-column: span 1; }
+  .ag-field-4 { grid-column: span 4; }
+  .ag-label { font-size:12px; color:#64748b; font-weight:800; margin-bottom:6px; display:block; }
+  .ag-input, .ag-select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; }
+  .ag-input:focus, .ag-select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+
+  /* DataGrid look-alike row striping + hover */
+  .dg-wrap { height: 70vh; min-width: 750px; }
+  .dg-wrap .MuiDataGrid-root { border:0; font-size:14px; color:#334155; }
+  .dg-wrap .MuiDataGrid-row:nth-of-type(odd) { background:#fff; }
+  .dg-wrap .MuiDataGrid-row:nth-of-type(even) { background:#f8fafc; }
+  .dg-wrap .MuiDataGrid-row:hover { background:#f4f1ff !important; }
+
+  /* Badges like Goods In */
+  .r-qty-badge { display:inline-block; padding:2px 8px; border-radius:10px; background:#f1f5f9; color:#0f172a; font-weight:700; }
+
+  /* Selection chip area */
+  .r-chip { background:#eef2ff; padding:6px 10px; border-radius:10px; display:flex; align-items:center; gap:10px; }
+  `}</style>
+);
+
+/* Icons (match Goods In) */
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const EditIcon = (props) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </Svg>
+);
+const DeleteIcon = (props) => (
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+
+/* =========================================================================================
+   Config & utils
+   ========================================================================================= */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/** Utility to safely format dates as yyyy-mm-dd */
 const formatDateYMD = (val) => {
   if (!val) return "";
   const d = new Date(val);
@@ -46,41 +110,51 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
-/** Build stable identifiers:
- * - prefer server numeric `id` (DB PK) when present
- * - else prefer server `batchCode` if present
- * - else create a deterministic fallback using recipe+date+producerName (no Date.now or array index)
- */
+// Prefer batchCode as the key everywhere
+const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
+
 const makeStableId = (row) => {
   if (!row) return null;
-  if (row.id || row.id === 0) return String(row.id);
-  if (row.batchCode) return String(row.batchCode);
-  // deterministic fallback (slugify small set of columns)
+  const key = getRowKey(row);
+  if (key) return key;
   const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`;
-  // remove unsafe chars
   return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
 };
 
-const ProductionLog = () => {
-  const theme = useTheme();
-  const { cognitoId } = useAuth();
+const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
+
+const Portal = ({ children }) => {
+  if (typeof window === "undefined") return null;
+  return createPortal(children, document.body);
+};
+
+/* =========================================================================================
+   Component
+   ========================================================================================= */
+export default function ProductionLog() {
+  const { cognitoId } = useAuth() || {};
 
   const [productionLogs, setProductionLogs] = useState([]);
   const [recipesMap, setRecipesMap] = useState({});
-  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
+  const [fatalMsg, setFatalMsg] = useState("");
 
-  // Editing state (single cell or full row)
-  const [activeCell, setActiveCell] = useState(null); // { id: batchCode, field, value, row }
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editValue, setEditValue] = useState("");
-  const [editingRow, setEditingRow] = useState(null); // full row edit
+  // Search + sort (to match Goods In toolbar)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
   const [updating, setUpdating] = useState(false);
 
-  // Fetch recipe data for upb map
+  // Delete dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // ===== Recipes map (for units per batch if needed later) =====
   useEffect(() => {
     if (!cognitoId) return;
-    const fetchRecipeData = async () => {
+    const run = async () => {
       try {
         const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
@@ -88,176 +162,145 @@ const ProductionLog = () => {
         const map = {};
         (Array.isArray(data) ? data : []).forEach((r) => {
           const key = r.recipe_name ?? r.recipe ?? r.name ?? "unknown";
-          const upb = Number(r.units_per_batch) || 0;
-          map[key] = upb;
+          map[key] = Number(r.units_per_batch) || 0;
         });
         setRecipesMap(map);
-      } catch (err) {
-        console.error("Error fetching recipes:", err);
+      } catch (e) {
+        console.error("Recipes fetch error:", e);
       }
     };
-    fetchRecipeData();
+    run();
   }, [cognitoId]);
 
-  // Fetch production logs (only active) and normalize dates
-  useEffect(() => {
-    if (!cognitoId) return;
-    const fetchProductionLogData = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
-        if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
-        const data = await response.json();
-        if (!Array.isArray(data)) return;
+  // ===== Fetch production logs =====
+  const fetchLogs = useCallback(async () => {
+    if (!cognitoId) { setFatalMsg("Missing cognito_id."); return; }
+    try {
+      const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+      if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+      const data = await res.json();
+      if (!Array.isArray(data)) { setProductionLogs([]); return; }
+      const sanitized = data.map((row) => {
+        const dbId = row.id ?? row.ID ?? null;
+        const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced);
+        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining); // stored as units
+        const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste);
+        const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
+        const unitsRemaining = toNumber(row.unitsRemaining ?? (batchRemaining - unitsOfWaste));
+        const batchesRemaining = upb > 0 ? unitsRemaining / upb : null;
+        const producerName = row.producer_name ?? row.producerName ?? "";
 
-        const sanitized = data.map((row) => {
-          // keep original DB id when present; stable id will be computed below
-          const dbId = row.id ?? row.ID ?? null;
-
-          const batchesProduced = Number(row.batchesProduced) || 0;
-          const batchRemaining = Number(row.batchRemaining) || 0; // stored in DB as units
-          const unitsOfWaste = Number(row.units_of_waste ?? row.unitsOfWaste) || 0;
-          const upb = recipesMap[row.recipe] ?? Number(row.units_per_batch || 0);
-
-          // compute unitsRemaining from stored units (batchRemaining) minus waste
-          const unitsRemaining = Number(row.unitsRemaining ?? (batchRemaining - unitsOfWaste)) || 0;
-          const batchesRemaining = upb > 0 ? Number(unitsRemaining) / Number(upb) : null;
-
-          // producer name may come from producer_name (snake) or producerName (camel)
-          const producerName = row.producer_name ?? row.producerName ?? "";
-
-          // ensure stable identifiers for DataGrid row id
-          const normalizedRow = {
-            // keep raw DB id if present (so we can persist it later)
-            id: dbId ?? (row.batchCode ?? null),
-            batchCode: row.batchCode ?? row.batch_code ?? null,
-            recipe: row.recipe ?? "",
-            date: row.date ?? null,
-            batchesProduced,
-            batchRemaining,
-            unitsOfWaste,
-            unitsRemaining,
-            batchesRemaining,
-            producerName,
-            // keep original row so updates can merge server values if needed
-            __raw: row,
-          };
-
-          // compute a stable rowId for the grid if server didn't provide numeric id
-          const stableId = makeStableId(normalizedRow);
-          // always set id to stable string so DataGrid getRowId can use it
-          normalizedRow.id = String(normalizedRow.id ?? stableId);
-
-          return normalizedRow;
-        });
-
-        setProductionLogs(sanitized);
-      } catch (error) {
-        console.error("Error fetching production log:", error);
-      }
-    };
-
-    fetchProductionLogData();
+        const normalized = {
+          id: String(dbId ?? row.batchCode ?? row.batch_code ?? makeStableId(row)),
+          batchCode: row.batchCode ?? row.batch_code ?? null,
+          recipe: row.recipe ?? "",
+          date: formatDateYMD(row.date ?? null),
+          batchesProduced,
+          batchRemaining,
+          unitsOfWaste,
+          unitsRemaining,
+          batchesRemaining,
+          producerName,
+          __raw: row,
+        };
+        // Ensure id consistently equals batchCode where possible, to avoid duplication on update
+        normalized.id = String(normalized.batchCode ?? normalized.id);
+        return normalized;
+      });
+      setProductionLogs(sanitized);
+      setFatalMsg("");
+    } catch (e) {
+      console.error("Production log fetch error:", e);
+      setFatalMsg(String(e?.message || e));
+    }
   }, [cognitoId, recipesMap]);
 
-  // Columns (batchRemaining intentionally not editable and not shown)
-  const columns = useMemo(
-    () => [
-      { field: "date", headerName: "Date", flex: 1 },
-      { field: "recipe", headerName: "Recipe Name", flex: 1 },
-      {
-        field: "batchesProduced",
-        headerName: "Batches Produced",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsOfWaste",
-        headerName: "Units of Waste",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsRemaining",
-        headerName: "Units Remaining",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      // producerName column
-      {
-        field: "producerName",
-        headerName: "Produced by",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      { field: "batchCode", headerName: "Batch Code", flex: 1 },
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 88,
-        sortable: false,
-        filterable: false,
-        align: "center",
-        renderCell: (params) => (
-          <IconButton
-            size="small"
-            aria-label="Edit row"
-            onClick={() => {
-              setEditingRow(params.row);
-              setActiveCell({ id: params.row.batchCode, field: null, value: null, row: params.row });
-              setEditValue("");
-              setEditDialogOpen(true);
-            }}
-          >
-            <EditOutlinedIcon sx={{ color: brand.primary }} />
-          </IconButton>
-        ),
-      },
-    ],
-    []
-  );
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
-  // Cell click handler: record active cell — but ignore batchRemaining field (not editable)
-  const handleCellClick = (params) => {
-    if (params.field === "__check__") return;
-    if (params.field === "batchRemaining") return; // don't let user edit DB column
-    setActiveCell({
-      id: params.row.batchCode,
-      field: params.field,
-      value: params.value,
-      row: params.row,
+  // ===== Grid columns =====
+  const columns = useMemo(() => ([
+    { field: "date", headerName: "Date", flex: 1 },
+    { field: "recipe", headerName: "Recipe Name", flex: 1 },
+    { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, align: "left", headerAlign: "left" },
+    { field: "unitsOfWaste", headerName: "Units of Waste", type: "number", flex: 1, align: "left", headerAlign: "left" },
+    { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, align: "left", headerAlign: "left" },
+    { field: "producerName", headerName: "Produced by", flex: 1, align: "left", headerAlign: "left" },
+    { field: "batchCode", headerName: "Batch Code", flex: 1 },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 120,
+      sortable: false,
+      filterable: false,
+      align: "right",
+      renderCell: (params) => (
+        <button
+          className="r-btn-ghost"
+          aria-label="Edit row"
+          onClick={() => { setEditingRow(params.row); setEditOpen(true); }}
+        >
+          <EditIcon /> Edit
+        </button>
+      ),
+    },
+  ]), []);
+
+  // ===== Search + sort on client (like Goods In) =====
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = [...productionLogs];
+    if (q) {
+      rows = rows.filter((r) =>
+        Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))
+      );
+    }
+    const dir = sortBy.dir === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      const fa = a[sortBy.field] ?? "";
+      const fb = b[sortBy.field] ?? "";
+      if (typeof fa === "number" && typeof fb === "number") return (fa - fb) * dir;
+      return String(fa).localeCompare(String(fb)) * dir;
     });
-  };
+    return rows;
+  }, [productionLogs, searchQuery, sortBy]);
 
-  // process update call to backend (single object)
+  // ===== Update row (PUT) =====
+  /**
+   * Back-end typically stores:
+   * - date (YYYY-MM-DD)
+   * - recipe
+   * - batchesProduced (or batches_produced)
+   * - units_of_waste
+   * - batchRemaining (or batch_remaining)  <-- source-of-truth for remaining
+   * We also send unitsRemaining for convenience, but derive batchRemaining if it's missing.
+   */
   const processRowUpdate = async (updatedRow) => {
     if (!cognitoId) throw new Error("Missing cognitoId");
-
-    // build payload: DO NOT include `batchRemaining` (server computes/stores it)
-    const payload = {
-      date: updatedRow.date,
-      recipe: updatedRow.recipe,
-      batchesProduced: Number(updatedRow.batchesProduced || 0),
-      // send unitsOfWaste and unitsRemaining if present — server will compute batchRemaining accordingly
-      units_of_waste: Number(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste ?? 0),
-      unitsRemaining: Number(updatedRow.unitsRemaining ?? 0),
-      // include producer name (snake_case expected by backend)
-      producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
-      cognito_id: cognitoId,
-    };
 
     const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code;
     if (!batchCodeForPath) throw new Error("batchCode is required to update production_log");
 
-    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`;
-    console.info("[processRowUpdate] PUT", url, "payload:", payload);
+    // Coercions
+    const dateYmd = formatDateYMD(updatedRow.date);
+    const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
+    const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
+    const unitsRemaining = toNumber(updatedRow.unitsRemaining);
+    // If API expects batchRemaining, derive it = unitsRemaining + unitsOfWaste
+    const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? (unitsRemaining + unitsOfWaste));
 
+    const payload = {
+      date: dateYmd,
+      recipe: updatedRow.recipe,
+      batchesProduced,
+      units_of_waste: unitsOfWaste,
+      // send BOTH to be safe across handlers
+      batchRemaining,
+      unitsRemaining,
+      producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
+      cognito_id: cognitoId,
+    };
+
+    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`;
     const res = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -267,121 +310,52 @@ const ProductionLog = () => {
       const txt = await res.text().catch(() => "");
       throw new Error(txt || `Server returned ${res.status}`);
     }
-    const json = await res.json();
-    return json;
+
+    // Hard refresh from server to avoid client/server drift, id mismatches, and dupes
+    await fetchLogs();
   };
 
   const handleConfirmEdit = async () => {
-    if (!editingRow && !activeCell) {
-      setEditDialogOpen(false);
-      return;
-    }
-
+    if (!editingRow) { setEditOpen(false); return; }
     setUpdating(true);
     try {
-      let patched;
-      if (activeCell && activeCell.field && !editingRow) {
-        // single-cell edit
-        const row = (productionLogs || []).find((r) => r.id === activeCell.row?.id || r.batchCode === activeCell.id);
-        if (!row) throw new Error("Row not found locally");
-        patched = { ...row, [activeCell.field]: activeCell.field === "date" ? formatDateYMD(editValue) : editValue };
-        // coerce numbers for numeric fields (batchRemaining removed from editable list)
-        if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(activeCell.field)) {
-          patched[activeCell.field] = Number(editValue || 0);
-        }
-        // producerName is text — leave as string
-      } else {
-        // full-row editing: editingRow holds string values; ensure types and date format
-        const r = editingRow || (activeCell ? activeCell.row : null);
-        if (!r) throw new Error("No row to edit");
-        // IMPORTANT: do NOT trust/edit batchRemaining here — server will compute it if unitsRemaining present.
-        patched = {
-          ...r,
-          date: formatDateYMD(r.date),
-          batchesProduced: Number(r.batchesProduced || 0),
-          unitsOfWaste: Number(r.unitsOfWaste || r.units_of_waste || 0),
-          unitsRemaining: Number(r.unitsRemaining || 0),
-          producerName: r.producerName ?? r.producer_name ?? "",
-          // DO NOT include batchRemaining
-        };
-      }
+      // Normalize the local row first
+      const patched = {
+        ...editingRow,
+        id: getRowKey(editingRow),
+        batchCode: editingRow.batchCode ?? editingRow.batch_code, // keep consistent
+        date: formatDateYMD(editingRow.date),
+        recipe: editingRow.recipe ?? "",
+        batchesProduced: toNumber(editingRow.batchesProduced),
+        unitsOfWaste: toNumber(editingRow.unitsOfWaste),
+        unitsRemaining: toNumber(editingRow.unitsRemaining),
+        // Keep optional batchRemaining consistent if user added the field later
+        batchRemaining: toNumber(editingRow.batchRemaining ?? editingRow.unitsRemaining + editingRow.unitsOfWaste),
+        producerName: editingRow.producerName ?? "",
+      };
 
-      // call backend
-      const result = await processRowUpdate(patched);
-
-      // prefer the server-returned updated object if available
-      const updatedServer = result && (result.updated || result.updatedRow || result.updatedLog || result);
-      let newRow;
-      if (updatedServer && (updatedServer.batchCode || updatedServer.batch_code || updatedServer.id)) {
-        // server returned a DB row: normalize to our local shape (format date, ensure numeric types)
-        const serverBatchCode = updatedServer.batchCode ?? updatedServer.batch_code ?? null;
-        const serverId = updatedServer.id ?? updatedServer.ID ?? serverBatchCode ?? null;
-        const upb = Number(updatedServer.units_per_batch || 0);
-
-        const returnedBatchRemainingUnits = Number(updatedServer.batchRemaining || updatedServer.batch_remaining || 0);
-        const returnedUnitsOfWaste = Number(updatedServer.units_of_waste ?? updatedServer.unitsOfWaste ?? 0);
-        const returnedUnitsRemaining = returnedBatchRemainingUnits - returnedUnitsOfWaste;
-        const returnedBatchesRemaining = upb > 0 ? Number(returnedUnitsRemaining) / upb : null;
-
-        newRow = {
-          id: String(serverId ?? makeStableId(updatedServer)),
-          batchCode: serverBatchCode,
-          date: formatDateYMD(updatedServer.date),
-          recipe: updatedServer.recipe,
-          batchesProduced: Number(updatedServer.batchesProduced ?? updatedServer.batches_produced ?? 0),
-          batchRemaining: Number(updatedServer.batchRemaining ?? updatedServer.batch_remaining ?? 0),
-          unitsOfWaste: returnedUnitsOfWaste,
-          unitsRemaining: returnedUnitsRemaining,
-          batchesRemaining: returnedBatchesRemaining,
-          producerName: updatedServer.producer_name ?? updatedServer.producerName ?? "",
-          __raw: updatedServer,
-        };
-      } else {
-        // fallback: merge patched into existing
-        newRow = {
-          ...patched,
-          id: String(patched.id ?? makeStableId(patched)),
-          date: formatDateYMD(patched.date),
-          producerName: patched.producerName ?? patched.producer_name ?? "",
-        };
-      }
-
-      // update local state by id (stable) or batchCode as fallback
+      // Optimistic local update (by batchCode key), then server PUT + full reload
       setProductionLogs((prev) => {
-        const list = Array.isArray(prev) ? prev.slice() : [];
-        const found = list.some((p, i) => {
-          if (p.id && newRow.id && String(p.id) === String(newRow.id)) {
-            list[i] = { ...p, ...newRow };
-            return true;
-          }
-          if (p.batchCode && newRow.batchCode && String(p.batchCode) === String(newRow.batchCode)) {
-            list[i] = { ...p, ...newRow };
-            return true;
-          }
-          return false;
-        });
-        if (!found) list.push(newRow);
-        return list;
+        const next = [...prev];
+        const key = getRowKey(patched);
+        const idx = next.findIndex((r) => getRowKey(r) === key);
+        if (idx >= 0) next[idx] = { ...next[idx], ...patched };
+        return next;
       });
 
-      // clear states
-      setEditDialogOpen(false);
+      await processRowUpdate(patched);
+      setEditOpen(false);
       setEditingRow(null);
-      setActiveCell(null);
-      setEditValue("");
-    } catch (err) {
-      console.error("Confirm edit failed:", err);
-      alert("Update failed. See console for details.");
-    } finally {
-      setUpdating(false);
-    }
+    } catch (e) {
+      console.error("Edit failed:", e);
+      alert(`Update failed: ${e?.message || e}`);
+    } finally { setUpdating(false); }
   };
 
-  // Delete selected rows (soft-delete)
+  // ===== Delete (soft) =====
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
-    // selectedRows contains DataGrid row ids (we used string ids)
-    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(String(r.id)));
+    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(getRowKey(r)));
     try {
       await Promise.all(
         rowsToDelete.map((row) =>
@@ -397,247 +371,286 @@ const ProductionLog = () => {
           })
         )
       );
-
-      // remove locally
-      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(String(r.id))));
+      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(getRowKey(r))));
       setSelectedRows([]);
-      setOpenConfirmDialog(false);
+      setDeleteOpen(false);
     } catch (err) {
-      console.error("Error deleting rows:", err);
-      alert("Delete failed. See console.");
+      console.error("Delete failed:", err);
+      alert(`Delete failed: ${err?.message || err}`);
     }
   };
 
-  // Render input for field — note batchRemaining removed from editable list
-  const renderEditInputForField = (fieldName, value, onChange) => {
-    if (fieldName === "date") {
-      return <TextField fullWidth type="date" value={formatDateYMD(value)} onChange={(e) => onChange(e.target.value)} />;
-    }
-    if (["batchesProduced", "unitsOfWaste", "unitsRemaining"].includes(fieldName)) {
-      return <TextField fullWidth type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
-    }
-    // producerName falls through to default (text)
-    return <TextField fullWidth value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
-  };
+  // ===== Pagination helper for footer =====
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const visibleRows = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredRows.slice(start, start + rowsPerPage);
+  }, [filteredRows, page, rowsPerPage]);
 
   return (
-    <Box m="20px">
-      <style>{`
-        .pl-card { border: 1px solid ${brand.border}; background: ${brand.surface}; border-radius: 16px; box-shadow: ${brand.shadow}; overflow: hidden; }
-        .pl-toolbar { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid ${brand.border}; background:${brand.surface}; }
+    <div className="r-wrap">
+      <BrandStyles />
 
-        /* Alternating row colors */
-        .pl-even-row { background-color: ${brand.surface} !important; }
-        .pl-odd-row  { background-color: ${brand.surfaceMuted} !important; }
+      {/* Errors / Missing Cognito */}
+      {!cognitoId && (
+        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
+          <strong>Can’t load data:</strong> No cognito_id detected.
+        </div>
+      )}
+      {fatalMsg && (
+        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
+          <strong>API error:</strong> {fatalMsg}
+        </div>
+      )}
 
-        /* Keep hover highlight readable */
-        .MuiDataGrid-row:hover { background-color: ${brand.surfaceMuted} !important; }
-      `}</style>
+      <div className="gi-layout">
+        <div className="gi-main">
+          <div className="r-card">
+            {/* Header */}
+            <div className="r-head">
+              <div>
+                <h2 className="r-title">Production Log</h2>
+                <p className="r-sub">Track batches, waste and remaining units</p>
+              </div>
 
-      <Box className="pl-card" mt={2}>
-        <Box className="pl-toolbar">
-          <Typography sx={{ fontWeight: 800, color: brand.text }}>Production Log</Typography>
+              <div className="r-flex">
+                {selectedRows.length > 0 && (
+                  <div className="r-chip">
+                    <span className="r-pill">{selectedRows.length} selected</span>
+                    <button
+                      className="r-btn-ghost"
+                      onClick={() => setDeleteOpen(true)}
+                      title="Delete selected"
+                      style={{ color:"#dc2626", borderColor:"#fecaca" }}
+                    >
+                      <DeleteIcon /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <IconButton
-            aria-label="Delete selected"
-            onClick={() => setOpenConfirmDialog(true)}
-            disabled={selectedRows.length === 0}
-            sx={{
-              color: "#fff",
-              borderRadius: 999,
-              width: 40,
-              height: 40,
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-              opacity: selectedRows.length === 0 ? 0.5 : 1,
-            }}
-          >
-            <DeleteIcon />
-          </IconButton>
-        </Box>
+            {/* Toolbar */}
+            <div className="r-toolbar">
+              <input
+                className="r-input"
+                type="text"
+                placeholder="Search by recipe, batch code, producer..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              />
+              <select
+                className="r-select"
+                value={`${sortBy.field}:${sortBy.dir}`}
+                onChange={(e) => {
+                  const [field, dir] = e.target.value.split(":");
+                  setSortBy({ field, dir });
+                  setPage(0);
+                }}
+              >
+                <option value="date:desc">Date (new → old)</option>
+                <option value="date:asc">Date (old → new)</option>
+                <option value="recipe:asc">Recipe A→Z</option>
+                <option value="recipe:desc">Recipe Z→A</option>
+                <option value="unitsRemaining:desc">Units remaining (high → low)</option>
+                <option value="unitsRemaining:asc">Units remaining (low → high)</option>
+              </select>
+            </div>
 
-        <Box sx={{ height: "70vh", "& .MuiDataGrid-root": { border: "none", minWidth: "750px" } }}>
-          <DataGrid
-            rows={productionLogs}
-            getRowId={(row) => String(row.id)}
-            checkboxSelection
-            rowSelectionModel={selectedRows}
-            onRowSelectionModelChange={(model) => {
-              // normalize to array of strings
-              const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
-              setSelectedRows(arr);
-            }}
-            columns={columns}
-            onCellClick={handleCellClick}
-            disableSelectionOnClick={true}
-            experimentalFeatures={{ newEditingApi: false }}
-            getRowClassName={(params) =>
-              (params.indexRelativeToCurrentPage % 2 === 0) ? "pl-even-row" : "pl-odd-row"
-            }
-          />
-        </Box>
-      </Box>
+            {/* DataGrid (inside matching container) */}
+            <div className="r-toolbar-gap dg-wrap">
+              <DataGrid
+                rows={visibleRows}
+                columns={columns}
+                getRowId={(row) => getRowKey(row)}
+                checkboxSelection
+                rowSelectionModel={selectedRows}
+                onRowSelectionModelChange={(model) => {
+                  const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
+                  setSelectedRows(arr);
+                }}
+                disableSelectionOnClick
+                hideFooter
+                onCellDoubleClick={(params) => {
+                  setEditingRow(params.row);
+                  setEditOpen(true);
+                }}
+              />
+            </div>
 
-      {/* Edit dialog */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-          setEditingRow(null);
-          setActiveCell(null);
-          setEditValue("");
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          {activeCell && activeCell.field ? `Edit ${activeCell.field}` : "Edit Row"}
-        </DialogTitle>
+            {/* Footer / pagination (visual parity with Goods In) */}
+            <div className="r-footer">
+              <span className="r-muted">
+                Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
+                <strong>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
+                <strong>{filteredRows.length}</strong>
+              </span>
+              <div className="r-flex">
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >Prev</button>
+                <span className="r-muted">Page {page + 1}</span>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length) ? p + 1 : p)}
+                  disabled={(page + 1) * rowsPerPage >= filteredRows.length}
+                >Next</button>
+                <select
+                  className="r-select"
+                  value={rowsPerPage}
+                  onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <DialogContent dividers>
-          {activeCell && activeCell.field && !editingRow && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ color: brand.subtext }}>
-                Batch Code: {activeCell.id}
-              </Typography>
-              <Box sx={{ mt: 1 }}>
-                {renderEditInputForField(activeCell.field, editValue !== "" ? editValue : activeCell.value, setEditValue)}
-              </Box>
-            </Box>
-          )}
-
-          {(editingRow || (activeCell && activeCell.field === null)) && (
-            <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
-              {(() => {
-                const row = editingRow || (activeCell ? activeCell.row : null);
-                if (!row) return null;
-                return (
-                  <>
-                    <TextField
-                      label="Recipe"
-                      fullWidth
-                      value={editingRow?.recipe ?? row.recipe ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), recipe: e.target.value }))}
+      {/* ===================== EDIT MODAL (Goods In style) ===================== */}
+      {editOpen && editingRow && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal">
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>Edit Production Log</h3>
+                <button className="r-btn-ghost" onClick={() => { setEditOpen(false); setEditingRow(null); }}>Close</button>
+              </div>
+              <div className="r-mbody">
+                <div className="ag-grid">
+                  <div className="ag-field ag-field-4">
+                    <label className="ag-label">Recipe</label>
+                    <input
+                      className="ag-input"
+                      type="text"
+                      value={editingRow.recipe ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), recipe: e.target.value }))}
                     />
-                    <TextField
-                      label="Date"
-                      fullWidth
+                  </div>
+
+                  <div className="ag-field">
+                    <label className="ag-label">Date</label>
+                    <input
+                      className="ag-input"
                       type="date"
-                      value={editingRow?.date ?? row.date ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), date: formatDateYMD(e.target.value) }))}
+                      value={formatDateYMD(editingRow.date ?? "")}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), date: formatDateYMD(e.target.value) }))}
                     />
-                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                      <TextField
-                        label="Batches Produced"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.batchesProduced ?? row.batchesProduced ?? 0}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), batchesProduced: e.target.value }))}
-                      />
-                      {/* NOTE: batchRemaining is intentionally removed from the edit UI */}
-                      <TextField
-                        label="Units of Waste"
-                        fullWidth
-                        type="number"
-                        value={editingRow?.unitsOfWaste ?? row.unitsOfWaste ?? 0}
-                        onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsOfWaste: e.target.value }))}
-                      />
-                    </Box>
+                  </div>
 
-                    <TextField
-                      label="Units Remaining"
-                      fullWidth
+                  <div className="ag-field ag-field-1">
+                    <label className="ag-label">Batches Produced</label>
+                    <input
+                      className="ag-input"
                       type="number"
-                      value={editingRow?.unitsRemaining ?? row.unitsRemaining ?? 0}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), unitsRemaining: e.target.value }))}
+                      value={editingRow.batchesProduced ?? 0}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchesProduced: toNumber(e.target.value) }))}
                     />
+                  </div>
 
-                    <TextField
-                      label="Produced by (Name)"
-                      fullWidth
-                      value={editingRow?.producerName ?? row.producerName ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), producerName: e.target.value }))}
+                  <div className="ag-field ag-field-1">
+                    <label className="ag-label">Units of Waste</label>
+                    <input
+                      className="ag-input"
+                      type="number"
+                      value={editingRow.unitsOfWaste ?? 0}
+                      onChange={(e) => {
+                        const unitsOfWaste = toNumber(e.target.value);
+                        const unitsRemaining = toNumber(editingRow.unitsRemaining);
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          unitsOfWaste,
+                          // keep batchRemaining coherent if present
+                          batchRemaining: unitsRemaining + unitsOfWaste
+                        }));
+                      }}
                     />
+                  </div>
 
-                    <TextField
-                      label="Batch Code"
-                      fullWidth
-                      value={editingRow?.batchCode ?? row.batchCode ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || row), batchCode: e.target.value }))}
+                  <div className="ag-field ag-field-4">
+                    <label className="ag-label">Units Remaining</label>
+                    <input
+                      className="ag-input"
+                      type="number"
+                      value={editingRow.unitsRemaining ?? 0}
+                      onChange={(e) => {
+                        const unitsRemaining = toNumber(e.target.value);
+                        const unitsOfWaste = toNumber(editingRow.unitsOfWaste);
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          unitsRemaining,
+                          // keep batchRemaining coherent if present
+                          batchRemaining: unitsRemaining + unitsOfWaste
+                        }));
+                      }}
                     />
-                  </>
-                );
-              })()}
-            </Box>
-          )}
-        </DialogContent>
+                  </div>
 
-        <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => {
-              setEditDialogOpen(false);
-              setEditingRow(null);
-              setActiveCell(null);
-              setEditValue("");
-            }}
-            sx={{ textTransform: "none" }}
-            disabled={updating}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmEdit}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={updating ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
-            disabled={updating}
-          >
-            {updating ? "Updating…" : "Confirm"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                  <div className="ag-field ag-field-2">
+                    <label className="ag-label">Produced by (Name)</label>
+                    <input
+                      className="ag-input"
+                      type="text"
+                      value={editingRow.producerName ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), producerName: e.target.value }))}
+                    />
+                  </div>
 
-      {/* Delete confirmation dialog */}
-      <Dialog
-        open={openConfirmDialog}
-        onClose={() => setOpenConfirmDialog(false)}
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: brand.subtext }}>Are you sure you want to delete the selected row(s)?</Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirmDialog(false)} sx={{ textTransform: "none" }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteSelectedRows}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-            startIcon={<DeleteIcon />}
-          >
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+                  <div className="ag-field ag-field-2">
+                    <label className="ag-label">Batch Code</label>
+                    <input
+                      className="ag-input"
+                      type="text"
+                      value={editingRow.batchCode ?? ""}
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchCode: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="r-mfooter">
+                <button className="r-btn-ghost" onClick={() => { setEditOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</button>
+                <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>
+                  {updating ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* ===================== DELETE CONFIRM MODAL ===================== */}
+      {deleteOpen && selectedRows.length > 0 && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal" style={{ maxWidth: 420 }}>
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h3>
+                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
+              </div>
+              <div className="r-mbody" style={{ textAlign: "center" }}>
+                <div className="r-flex" style={{ width: 60, height: 60, margin:"0 auto", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", borderRadius:999 }}>
+                  <DeleteIcon />
+                </div>
+                <h3 style={{ fontWeight: 900, color:"#0f172a", marginTop: 10, fontSize:18 }}>
+                  Delete {selectedRows.length} record{selectedRows.length>1 ? "s" : ""}?
+                </h3>
+                <p className="r-muted" style={{ marginTop: 6 }}>This is a soft-delete action.</p>
+              </div>
+              <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
+                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
+                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+    </div>
   );
-};
-
-export default ProductionLog;
+}
