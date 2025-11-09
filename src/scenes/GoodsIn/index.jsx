@@ -45,8 +45,9 @@ const BrandStyles = () => (
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
 
-  /* Table (no horizontal scroll) */
-  .r-table-wrap { overflow-x: hidden; }
+  /* Table */
+  /* Allow horizontal scroll instead of clipping */
+  .r-table-wrap { overflow-x: auto; }
   table.r-table { width:100%; table-layout: fixed; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
   .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
   .r-thead th { padding:12px; text-align:left; white-space:nowrap; }
@@ -64,7 +65,10 @@ const BrandStyles = () => (
   .col-num{width:120px}
   .col-invoice{width:120px}
   .col-expiry{width:110px}
-  .col-batch{width:200px}
+  /* Give Ingredient column breathing room */
+  .col-ingredient{min-width:220px}
+  /* Slightly narrower batch col to help fit */
+  .col-batch{width:170px}
   .col-actions{width:160px}
 
   .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
@@ -84,7 +88,7 @@ const BrandStyles = () => (
   .gi-side { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
   .gi-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); padding:16px; }
 
-  /* Modal shell (boosted z-index to beat any top bar) */
+  /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -103,10 +107,10 @@ const BrandStyles = () => (
   .ag-row { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff; }
   .ag-row:nth-child(odd){ background:#f8fafc; }
 
-  /* Segmented toggle for Single / Multiple */
+  /* Segmented toggle */
   .seg {
     display:inline-flex; gap:6px; padding:4px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px;
-    position:relative; z-index:10001; /* keep above any stray overlays */
+    position:relative; z-index:10001;
   }
   .seg button {
     border:0; background:transparent; padding:6px 12px; border-radius:10px; font-weight:800; cursor:pointer; color:#334155;
@@ -293,7 +297,7 @@ export default function GoodsIn() {
     [masterIngredients, customIngredients]
   );
 
-  // Fast lookup: id -> name (works for both master and custom)
+  // Fast lookup: id -> name
   const ingredientNameById = useMemo(() => {
     const m = new Map();
     masterIngredients.forEach(i => m.set(String(i.id), i.name));
@@ -349,7 +353,6 @@ export default function GoodsIn() {
       const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
         const stockRemaining = Number(row.stockRemaining || 0);
         const serverBar = row.barCode ? String(row.barCode) : null;
-        // Keep whatever server sends for ingredient. Could be id or name.
         const rawIngredient = row.ingredient ?? row.ingredientName ?? row.ingredient_name ?? row.name ?? "";
 
         return {
@@ -378,7 +381,7 @@ export default function GoodsIn() {
 
   useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
 
-  // NEW: Load ingredients on mount as well (so names are available for display even without opening Add dialog)
+  // Load ingredients on mount (so names available for display)
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -397,7 +400,7 @@ export default function GoodsIn() {
       .finally(() => setLoadingCustom(false));
   }, [cognitoId]);
 
-  // Keep your existing fetch-when-popup-opens (ensures freshest lists while adding)
+  // Refresh ingredients when Add dialog opens
   useEffect(() => {
     if (!addOpen || !cognitoId) return;
     setLoadingMaster(true);
@@ -537,7 +540,7 @@ export default function GoodsIn() {
     };
   }, [totalsByBaseUnitGroup]);
 
-  // UPDATED: Use resolved ingredient names for grouping and display
+  // Group stats by resolved ingredient names
   const totalsByIngredient = useMemo(() => {
     const map = new Map();
     goodsInRows.forEach((r) => {
@@ -782,7 +785,7 @@ export default function GoodsIn() {
                       />
                     </th>
                     <th className="r-td col-date">Date</th>
-                    <th className="r-td">Ingredient</th>
+                    <th className="r-td col-ingredient">Ingredient</th>
                     <th className="r-td col-temp">Temp</th>
                     <th className="r-td col-num">Received</th>
                     <th className="r-td col-num">Remaining</th>
@@ -1035,7 +1038,6 @@ export default function GoodsIn() {
                         getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                         isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                         loading={loadingMaster || loadingCustom}
-                        /* ensure popper appears above modal overlay */
                         slotProps={{ popper: { sx: { zIndex: 10020 } } }}
                         componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                         renderInput={(params)=>(
@@ -1114,7 +1116,6 @@ export default function GoodsIn() {
                               getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                               isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                               loading={loadingMaster || loadingCustom}
-                              /* ensure popper appears above modal overlay */
                               slotProps={{ popper: { sx: { zIndex: 10020 } } }}
                               componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                               renderInput={(params)=>(
