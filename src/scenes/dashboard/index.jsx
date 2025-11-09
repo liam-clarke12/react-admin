@@ -1,342 +1,596 @@
 // src/scenes/dashboard/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Box,
-  Typography,
-  CircularProgress,
-} from "@mui/material";
-import { ResponsivePie } from "@nivo/pie";
-import { ResponsiveLine } from "@nivo/line";
 import { useAuth } from "../../contexts/AuthContext";
-import BarChart from "../../components/BarChart";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+/* ===========================
+   Inline CSS (no Tailwind)
+   =========================== */
+const DashboardStyles = () => (
+  <style>{`
+    :root{
+      --bg: #f3f4f6;         /* gray-100 */
+      --bg-card: #ffffff;    /* white */
+      --text: #111827;       /* gray-900 */
+      --text-muted: #6b7280; /* gray-500 */
+      --text-muted-2: #374151; /* gray-700 */
+      --indigo: #6366f1;     /* indigo-500 */
+      --ring: rgba(0,0,0,0.06);
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-strong: 0 10px 30px rgba(0,0,0,0.18);
+      --g50: #f9fafb;        /* gray-50 */
+      --g200: #e5e7eb;       /* gray-200 */
+      --g700: #374151;       /* gray-700 */
+      --green: #10b981;
+      --green-100: #d1fae5;
+      --green-900: #064e3b;
+      --green-300: #86efac;
+      --red: #ef4444;
+      --red-100: #fee2e2;
+      --red-900: #7f1d1d;
+      --red-300: #fca5a5;
+      --yellow: #f59e0b;
+      --overlay: rgba(0,0,0,0.2);
+      --overlay-dark: rgba(0,0,0,0.4);
+      --radius-xl: 14px;
+      --radius-full: 999px;
+      --pad: 24px;
+      --pad-sm: 12px;
+      --gap: 24px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root{
+        --bg: #111827;       /* gray-900 */
+        --bg-card: #1f2937;  /* gray-800 */
+        --text: #f9fafb;     /* gray-100 */
+        --text-muted: #9ca3af; /* gray-400 */
+        --text-muted-2: #e5e7eb; /* gray-200 */
+        --g50: rgba(55,65,81,0.5); /* gray-700/50 */
+        --g200: #374151;     /* gray-700 */
+        --g700: #374151;     /* same */
+        --shadow: 0 6px 22px rgba(0,0,0,0.35);
+        --shadow-strong: 0 16px 40px rgba(0,0,0,0.55);
+      }
+    }
 
-/** Brand tokens (scoped) — updated to Pantone 13-4520 TCX / Nory purple) */
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",     // Nory purple
-  primaryDark: "#5B21B6", // darker purple
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  inputBg: "#ffffff"
+    .dash {
+      min-height: 100vh;
+      background: var(--bg);
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .h1 {
+      font-size: 28px; 
+      font-weight: 800;
+      color: var(--text);
+      margin: 0 0 6px 0;
+    }
+    @media (min-width: 768px) {
+      .h1 { font-size: 34px; }
+    }
+    .sub {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .grid {
+      display: grid;
+      gap: var(--gap);
+    }
+    .grid-3 {
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 640px) { /* sm */
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1024px) { /* lg */
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .main-grid {
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1280px) { /* xl */
+      .main-grid { grid-template-columns: 2fr 1fr; }
+    }
+
+    .subgrid-2 {
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1024px) {
+      .subgrid-2 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      padding: var(--pad);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .card-icon {
+      color: var(--indigo);
+      margin-right: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-muted-2);
+      margin: 0;
+    }
+    .card-body {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .kpi {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    .list-empty {
+      color: var(--text-muted);
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .list-item-title {
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 4px 0;
+    }
+    .list-item-sub {
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .badge {
+      font-weight: 700;
+      border-radius: var(--radius-full);
+      padding: 6px 12px;
+      font-size: 16px;
+    }
+    .badge-green {
+      background: var(--green-100);
+      color: #065f46; /* green-700 */
+    }
+    .badge-red {
+      background: var(--red-100);
+      color: #b91c1c; /* red-700 */
+    }
+    @media (prefers-color-scheme: dark) {
+      .badge-green { background: var(--green-900); color: var(--green-300); }
+      .badge-red { background: var(--red-900); color: var(--red-300); }
+    }
+
+    .muted-box {
+      background: var(--g50);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .progress-row .name {
+      font-weight: 500;
+      color: var(--text);
+    }
+    .progress-row .qty {
+      color: var(--text-muted);
+    }
+    .progress {
+      width: 100%;
+      height: 10px;
+      background: var(--g200);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+    @media (prefers-color-scheme: dark) {
+      .progress { background: var(--g700); }
+    }
+    .bar {
+      height: 100%;
+      border-radius: var(--radius-full);
+      transition: width .3s ease;
+    }
+    .bar.green { background: #10b981; }
+    .bar.yellow { background: #f59e0b; }
+    .bar.red { background: #ef4444; }
+
+    .h-80 { height: 320px; }
+    .chart {
+      width: 100%;
+      height: 260px;
+    }
+    @media (min-width: 768px) {
+      .chart { height: 290px; }
+    }
+
+    .notes-list {
+      margin-left: 18px;
+      color: var(--text-muted);
+      font-size: 14px;
+      display: grid;
+      gap: 8px;
+      list-style: disc;
+    }
+
+    .veil {
+      position: fixed; inset: 0;
+      background: var(--overlay);
+      backdrop-filter: blur(2px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    @media (prefers-color-scheme: dark) {
+      .veil { background: var(--overlay-dark); }
+    }
+    .veil-box {
+      background: var(--bg-card);
+      color: var(--text);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-strong);
+      padding: 16px 24px;
+      font-weight: 600;
+    }
+  `}</style>
+);
+
+/* ==========================================
+   Inline components (no Tailwind classes)
+   ========================================== */
+
+// 1) Card wrapper
+const DashboardCard = ({ title, icon, children, className = "" }) => {
+  return (
+    <div className={`card ${className}`}>
+      <div className="card-header">
+        {icon && <span className="card-icon">{icon}</span>}
+        <h2 className="card-title">{title}</h2>
+      </div>
+      <div className="card-body">{children}</div>
+    </div>
+  );
 };
 
-// small helper palette (you can expand or modify)
-const chartPalette = [
-  brand.primary,
-  brand.primaryDark,
-  "#C084FC", // lilac
-  "#E9D5FF", // soft lavender
-  "#DDD6FE", // pale purple
-];
+// 2) Expiring ingredients list
+const ExpiringIngredients = ({ ingredients }) => {
+  const list = Array.isArray(ingredients) ? ingredients : [];
+  if (list.length === 0) {
+    return <div className="list-empty">No ingredients expiring soon. Good job!</div>;
+  }
 
-// Minimal KPI card
-function KpiCard({ label, value }) {
-  return (
-    <Box
-      sx={{
-        p: 2,
-        border: `1px solid ${brand.border}`,
-        background: brand.surface,
-        borderRadius: 16,
-        boxShadow: brand.shadow,
-        textAlign: "center",
-      }}
-    >
-      <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 12 }}>
-        {label}
-      </Typography>
-      <Typography sx={{ color: brand.text, fontWeight: 900, fontSize: 22, mt: 0.5 }}>
-        {value}
-      </Typography>
-    </Box>
-  );
-}
+  const getDaysRemaining = (date) => {
+    if (!date) return 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const expiry = new Date(date); expiry.setHours(0,0,0,0);
+    const diffTime = expiry.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
-// Ring Chart Component
-function RingChart({ data, height = "260px" }) {
   return (
-    <Box sx={{ height }}>
-      <ResponsivePie
-        data={data}
-        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-        innerRadius={0.6}
-        padAngle={1}
-        cornerRadius={3}
-        // use custom function so we always map in-brand colors
-        colors={(d) => {
-          // d: { id, value, data, index, ... }
-          const idx = typeof d.index === "number" ? d.index : (d.data && d.data.index) || 0;
-          return chartPalette[idx % chartPalette.length];
-        }}
-        borderWidth={1}
-        borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
-        enableArcLabels={false}
-        arcLinkLabelsSkipAngle={10}
-        arcLinkLabelsTextColor={brand.subtext}
-        arcLinkLabelsThickness={2}
-        arcLinkLabelsColor={{ from: "color" }}
-        tooltip={({ datum }) => (
-          <div style={{ padding: 8, background: "#fff", border: `1px solid ${brand.border}`, borderRadius: 8 }}>
-            <div style={{ fontWeight: 800 }}>{datum.id}</div>
-            <div style={{ color: brand.subtext }}>{datum.value.toLocaleString()}</div>
+    <div className="list h-80">
+      {list.map((ingredient) => {
+        const daysRemaining = getDaysRemaining(ingredient.expiryDate);
+        const urgencyColor =
+          daysRemaining <= 1 ? { color: "#ef4444" } :
+          daysRemaining <= 3 ? { color: "#f59e0b" } :
+          { color: "var(--text-muted)" };
+
+        return (
+          <div key={ingredient.id} className="list-item">
+            <div>
+              <p className="list-item-title">{ingredient.name}</p>
+              <p className="list-item-sub">
+                {ingredient.stock}{ingredient.unit}
+              </p>
+            </div>
+            <span className="badge" style={urgencyColor}>
+              {daysRemaining <= 0 ? "Today" : `${daysRemaining}d`}
+            </span>
           </div>
-        )}
-      />
-    </Box>
+        );
+      })}
+    </div>
   );
-}
+};
 
-// Line Chart Component
-function LineChart({ data, height = "260px" }) {
+// 3) Ingredient stock bars
+const IngredientStock = ({ ingredients }) => {
+  const list = Array.isArray(ingredients) ? ingredients : [];
+  if (list.length === 0) return <p className="list-item-sub">No ingredients in stock.</p>;
+
+  const sorted = [...list].sort((a, b) => a.stock / a.maxStock - b.stock / b.maxStock);
+
   return (
-    <Box sx={{ height }}>
-      <ResponsiveLine
-        data={[
-          {
-            id: "Waste",
-            data: data.map((d) => ({ x: d.day, y: d.waste })),
-          },
-        ]}
-        margin={{ top: 20, right: 20, bottom: 40, left: 50 }}
-        xScale={{ type: "point" }}
-        yScale={{
-          type: "linear",
-          min: "auto",
-          max: "auto",
-          stacked: false,
-          reverse: false,
-        }}
-        axisBottom={{
-          orient: "bottom",
-          tickSize: 5,
-          tickPadding: 5,
-          tickRotation: 0,
-        }}
-        axisLeft={{
-          orient: "left",
-          tickSize: 5,
-          tickPadding: 5,
-          tickRotation: 0,
-        }}
-        colors={[brand.primary]}
-        pointSize={6}
-        pointColor={{ theme: "background" }}
-        pointBorderWidth={2}
-        pointBorderColor={{ from: "serieColor" }}
-        enableArea={true}
-        areaOpacity={0.15}
-      />
-    </Box>
+    <div className="list h-80">
+      {sorted.map((ing) => {
+        const pct = Math.max(0, Math.min(100, (ing.stock / ing.maxStock) * 100));
+        const color =
+          pct < 25 ? "red" : pct < 50 ? "yellow" : "green";
+        return (
+          <div key={ing.id}>
+            <div className="progress-row">
+              <span className="name">{ing.name}</span>
+              <span className="qty">{ing.stock} / {ing.maxStock} {ing.unit}</span>
+            </div>
+            <div className="progress">
+              <div className={`bar ${color}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
-}
+};
+
+// 4) Recipe availability tiles
+const RecipeInventory = ({ recipes }) => {
+  const list = Array.isArray(recipes) ? recipes : [];
+  if (list.length === 0) return <p className="list-item-sub">No recipes available.</p>;
+
+  return (
+    <div className="list">
+      {list.map((r) => (
+        <div key={r.name} className="muted-box">
+          <span className="name" style={{ color: "var(--text)" }}>{r.name}</span>
+          <span className={`badge ${r.canMake > 0 ? "badge-green" : "badge-red"}`}>
+            x{r.canMake}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// 5) Weekly usage chart wrapper
+const WeeklyUsageChart = ({ data }) => (
+  <div className="chart">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
+        <XAxis dataKey="day" tick={{ fill: "#9CA3AF" }} />
+        <YAxis tick={{ fill: "#9CA3AF" }} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: "rgba(31, 41, 55, 0.85)",
+            borderColor: "#4B5563",
+            borderRadius: "8px",
+          }}
+          labelStyle={{ color: "#F9FAFB" }}
+        />
+        <Legend />
+        <Bar dataKey="goodsUsed" fill="#6366F1" name="Goods Used" />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+);
+
+/* ===========================
+   Dashboard container
+   =========================== */
+
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const dayShort = (d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d];
 
 const Dashboard = () => {
-  const { cognitoId } = useAuth();
+  const { cognitoId } = useAuth() || {};
   const [loading, setLoading] = useState(true);
 
-  // data
-  const [inventory, setInventory] = useState([]);
+  const [inventoryRaw, setInventoryRaw] = useState([]);
   const [prodLogs, setProdLogs] = useState([]);
+  const [goodsInRaw, setGoodsInRaw] = useState([]);
 
   useEffect(() => {
     if (!cognitoId) return;
     let mounted = true;
-
-    async function load() {
+    (async () => {
       setLoading(true);
       try {
-        // Inventory
-        const invRes = await fetch(
-          `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
-        );
+        const [invRes, plRes, giRes] = await Promise.all([
+          fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`),
+          fetch(`${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`),
+          fetch(`${API_BASE}/goods-in?cognito_id=${encodeURIComponent(cognitoId)}`),
+        ]);
         const invJson = invRes.ok ? await invRes.json() : [];
-        const inv = (Array.isArray(invJson) ? invJson : []).map((r, idx) => ({
-          ingredient: r?.ingredient ?? "",
-          unit: r?.unit ?? "",
-          stockOnHand: Number(r?.totalRemaining) || 0,
-          barcode: r?.activeBarcode ?? "",
-          _id: `${r?.ingredient ?? "row"}-${idx}`,
-        }));
-
-        // Production logs
-        const plRes = await fetch(
-          `${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
         const plJson = plRes.ok ? await plRes.json() : [];
-
+        const giJson = giRes.ok ? await giRes.json() : [];
         if (!mounted) return;
-        setInventory(inv);
+        setInventoryRaw(Array.isArray(invJson) ? invJson : []);
         setProdLogs(Array.isArray(plJson) ? plJson : []);
-      } catch (err) {
-        console.error("[Dashboard] Failed to load data:", err);
+        setGoodsInRaw(Array.isArray(giJson) ? giJson : []);
+      } catch (e) {
+        console.error("Dashboard load error:", e);
         if (!mounted) return;
-        setInventory([]);
-        setProdLogs([]);
+        setInventoryRaw([]); setProdLogs([]); setGoodsInRaw([]);
       } finally {
         if (mounted) setLoading(false);
       }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
+    })();
+    return () => { mounted = false; };
   }, [cognitoId]);
 
-  // Derived chart data
-  const { totalStock, lowStockCount, recentProduction, ringData, barData, lineData } = useMemo(() => {
-    const totalStock = inventory.reduce(
-      (sum, r) => sum + (Number(r.stockOnHand) || 0),
-      0
-    );
-    const lowStockCount = inventory.filter(
-      (r) => (Number(r.stockOnHand) || 0) <= 10
-    ).length;
+  const {
+    kpiTotalStock,
+    kpiLowStockCount,
+    kpiRecentProduction,
+    ingredientStockList,
+    expiringSoonList,
+    weeklyUsageData,
+    recipeAvailability,
+  } = useMemo(() => {
+    const invMapped = (inventoryRaw || []).map((r, i) => ({
+      id: `${r.ingredient || "item"}-${i}`,
+      name: r.ingredient || "Unknown",
+      unit: r.unit || "",
+      stock: Number(r.totalRemaining) || 0,
+      maxStock: 0,
+    }));
+    const mean = invMapped.reduce((s, it) => s + (it.stock || 0), 0) / Math.max(invMapped.length, 1);
+    const ingredientStockList = invMapped
+      .map((it) => ({ ...it, maxStock: Math.max(it.stock, Math.round(mean * 1.25), 1) }))
+      .sort((a, b) => a.stock / a.maxStock - b.stock / b.maxStock);
 
-    // Last 7 days window
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - 6);
+    const now = new Date(); const soonCut = new Date(now); soonCut.setDate(now.getDate() + 7);
+    const expiringSoonList = (goodsInRaw || [])
+      .map((r, i) => {
+        const exp = r.expiryDate || r.expiry || r.bestBefore || r.best_before || null;
+        const expDate = exp ? new Date(exp) : undefined;
+        return {
+          id: `${r.barCode || r.barcode || r.ingredient || "exp"}-${i}`,
+          name: r.ingredient || "Unknown",
+          unit: r.unit || "",
+          stock: Number(r.stockRemaining ?? r.stockOnHand ?? r.stock ?? r.qty ?? 0),
+          maxStock: 1,
+          expiryDate: expDate && !Number.isNaN(expDate.getTime()) ? expDate : undefined,
+        };
+      })
+      .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
+      .sort((a, b) => (a.expiryDate?.getTime() || 0) - (b.expiryDate?.getTime() || 0))
+      .slice(0, 30);
 
-    const recentLogs = prodLogs.filter((row) => {
+    const kpiTotalStock = ingredientStockList.reduce((s, it) => s + (it.stock || 0), 0);
+    const kpiLowStockCount = ingredientStockList.filter((it) => (it.stock || 0) <= 10).length;
+
+    const start = new Date(); start.setDate(start.getDate() - 6);
+    const recentLogs = (prodLogs || []).filter((row) => {
       const d = new Date(row?.date || row?.production_log_date || "");
-      return !isNaN(d) && d >= start;
+      return !Number.isNaN(d.getTime()) && d >= start;
     });
+    const kpiRecentProduction = recentLogs.reduce((sum, r) => sum + (Number(r.batchesProduced) || 0), 0);
 
-    const recentProduction = recentLogs.reduce(
-      (sum, r) => sum + (Number(r.batchesProduced) || 0),
-      0
-    );
+    const dayMap = new Map();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i));
+      dayMap.set(dayShort(d.getDay()), 0);
+    }
+    recentLogs.forEach((r) => {
+      const d = new Date(r?.date || r?.production_log_date || "");
+      const key = dayShort(d.getDay());
+      const inc = Number(r.batchesProduced) || 0;
+      dayMap.set(key, (dayMap.get(key) || 0) + inc);
+    });
+    const weeklyUsageData = Array.from(dayMap.entries()).map(([day, goodsUsed]) => ({ day, goodsUsed }));
 
-    // Ring chart → top ingredients by stock
-    const ringData = [...inventory]
-      .sort((a, b) => (b.stockOnHand || 0) - (a.stockOnHand || 0))
-      .slice(0, 5)
-      .map((r, i) => ({
-        id: r.ingredient || `Item ${i + 1}`,
-        label: r.ingredient || `Item ${i + 1}`,
-        value: r.stockOnHand || 0,
-      }));
-
-    // Bar chart → batches produced per recipe (last 7 days)
     const byRecipe = {};
     recentLogs.forEach((r) => {
       const name = r.recipe || r.recipe_name || "Unknown";
       byRecipe[name] = (byRecipe[name] || 0) + (Number(r.batchesProduced) || 0);
     });
-    const barData = Object.entries(byRecipe).map(([recipe, batches]) => ({
-      recipe,
-      batches,
-    }));
+    const recipeAvailability = Object.entries(byRecipe)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name, total]) => ({ name, canMake: Math.max(0, Math.round(total)) }));
 
-    // Line chart → waste trend over last 7 days
-    const wasteByDay = new Map();
-    recentLogs.forEach((row) => {
-      const d = new Date(row?.date || row?.production_log_date || "");
-      if (isNaN(d)) return;
-      const key = d.toISOString().slice(0, 10);
-      wasteByDay.set(key, (wasteByDay.get(key) || 0) + (Number(row?.units_of_waste) || 0));
-    });
-    const lineData = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
-      return { day: key.slice(5), waste: wasteByDay.get(key) || 0 };
-    });
-
-    return { totalStock, lowStockCount, recentProduction, ringData, barData, lineData };
-  }, [inventory, prodLogs]);
+    return {
+      kpiTotalStock,
+      kpiLowStockCount,
+      kpiRecentProduction,
+      ingredientStockList,
+      expiringSoonList,
+      weeklyUsageData,
+      recipeAvailability,
+    };
+  }, [inventoryRaw, goodsInRaw, prodLogs]);
 
   return (
-    <Box m="20px">
-      <style>{`
-        .grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 16px;
-        }
-      `}</style>
+    <div className="dash">
+      <DashboardStyles />
+      <div className="container header">
+        <h1 className="h1">Inventory & Production Dashboard</h1>
+        <p className="sub">Real-time view of stock, expiries, and weekly usage.</p>
+      </div>
 
-      {loading ? (
-        <Box sx={{ display: "grid", placeItems: "center", height: "300px" }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <>
-          {/* KPIs */}
-          <Box className="grid" sx={{ mb: 2 }}>
-            <KpiCard label="Total Stock" value={totalStock.toLocaleString()} />
-            <KpiCard label="Low Stock (≤ 10)" value={lowStockCount} />
-            <KpiCard label="Production (Last 7 Days)" value={recentProduction} />
-          </Box>
+      {/* KPI Row */}
+      <div className="container grid grid-3" style={{ marginBottom: 24 }}>
+        <DashboardCard title="Total Stock on Hand">
+          <div className="kpi">{kpiTotalStock.toLocaleString()}</div>
+        </DashboardCard>
+        <DashboardCard title="Low Stock (≤ 10)">
+          <div className="kpi">{kpiLowStockCount}</div>
+        </DashboardCard>
+        <DashboardCard title="Batches Produced (Last 7 Days)">
+          <div className="kpi">{kpiRecentProduction}</div>
+        </DashboardCard>
+      </div>
 
-          {/* Charts */}
-          <Box className="grid">
-            <Box
-              sx={{
-                border: `1px solid ${brand.border}`,
-                background: brand.surface,
-                borderRadius: 16,
-                boxShadow: brand.shadow,
-                p: 2,
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
-                Stock Distribution
-              </Typography>
-              <RingChart data={ringData} />
-            </Box>
+      {/* Main Grid */}
+      <div className="container grid main-grid">
+        <div className="grid subgrid-2" style={{ gap: "24px" }}>
+          <DashboardCard title="Ingredient Stock Levels">
+            <IngredientStock ingredients={ingredientStockList} />
+          </DashboardCard>
+          <DashboardCard title="Expiring Soon (next 7 days)">
+            <ExpiringIngredients ingredients={expiringSoonList} />
+          </DashboardCard>
+          <DashboardCard title="Weekly Usage">
+            <WeeklyUsageChart data={weeklyUsageData} />
+          </DashboardCard>
+          <DashboardCard title="Recipe Availability (heuristic)">
+            <RecipeInventory recipes={recipeAvailability} />
+          </DashboardCard>
+        </div>
 
-            <Box
-              sx={{
-                border: `1px solid ${brand.border}`,
-                background: brand.surface,
-                borderRadius: 16,
-                boxShadow: brand.shadow,
-                p: 2,
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
-                Batches Produced (Last 7 Days)
-              </Typography>
-              {/* pass colors prop to BarChart so it can use brand palette */}
-              <BarChart
-                data={barData}
-                keys={["batches"]}
-                indexBy="recipe"
-                height="260px"
-                width="95%"
-                colors={chartPalette}
-              />
-            </Box>
+        <div className="grid" style={{ gap: "24px" }}>
+          <DashboardCard title="Notes">
+            <ul className="notes-list">
+              <li>No Tailwind required — styles are embedded here.</li>
+              <li>Colors, spacing, shadows, and rounded corners match your Tailwind look.</li>
+              <li>Swap the recipe heuristic for real BOM logic when you’re ready.</li>
+            </ul>
+          </DashboardCard>
+        </div>
+      </div>
 
-            <Box
-              sx={{
-                border: `1px solid ${brand.border}`,
-                background: brand.surface,
-                borderRadius: 16,
-                boxShadow: brand.shadow,
-                p: 2,
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: brand.text, mb: 1 }}>
-                Waste Trend (Last 7 Days)
-              </Typography>
-              <LineChart data={lineData} />
-            </Box>
-          </Box>
-        </>
+      {loading && (
+        <div className="veil">
+          <div className="veil-box">Loading…</div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 
