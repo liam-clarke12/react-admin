@@ -105,7 +105,7 @@ const StyleShim = () => (
 );
 
 /* =========================================================================================
-   Icons (no types)
+   Icons
    ========================================================================================= */
 const PackageIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -159,7 +159,7 @@ const SpinnerIcon = ({ className }) => (
 );
 
 /* =========================================================================================
-   JSDoc typedefs to help editors (no runtime impact)
+   JSDoc typedefs (for editor intellisense only)
    ========================================================================================= */
 /**
  * @typedef {Object} GoodsInRow
@@ -175,21 +175,12 @@ const SpinnerIcon = ({ className }) => (
  * @property {string|null} invoiceNumber
  * @property {'Yes'|'No'} processed
  */
-
-/**
- * @typedef {{ value: string, label: string }} UnitOption
- */
-
-/**
- * @typedef {{ ingredient: string, amount: number, unit: string, baseAmount: number }} IngredientTotal
- */
-
-/**
- * @typedef {{ amount: number, unit: string }} DisplayTotal
- */
+/** @typedef {{ value: string, label: string }} UnitOption */
+/** @typedef {{ ingredient: string, amount: number, unit: string, baseAmount: number }} IngredientTotal */
+/** @typedef {{ amount: number, unit: string }} DisplayTotal */
 
 /* =========================================================================================
-   Units "enum" and helpers (JS version)
+   Units, utils
    ========================================================================================= */
 const UnitGroup = Object.freeze({
   GRAMS: "grams_group",
@@ -243,7 +234,24 @@ function formatDisplayAmount(baseAmount, group) {
    Config
    ========================================================================================= */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
-const COGNITO_ID_MOCK = "eu-west-1:c1536c69-a1d2-45e2-8510-410a56e30ab4";
+
+/* =========================================================================================
+   Cognito Id discovery (non-blocking; omits param if not found)
+   ========================================================================================= */
+function discoverCognitoId() {
+  try {
+    // 1) Cognito Identity Pools (AWS SDK v2 style)
+    if (window.AWS && window.AWS.config && window.AWS.config.credentials && window.AWS.config.credentials.identityId) {
+      return window.AWS.config.credentials.identityId;
+    }
+    // 2) Your own storage (if you store it)
+    const stored = window.localStorage ? window.localStorage.getItem("cognito_id") : null;
+    if (stored) return stored;
+    // 3) Easy global hook
+    if (window.__COGNITO_ID__) return window.__COGNITO_ID__;
+  } catch {}
+  return null;
+}
 
 /* =========================================================================================
    Small Bar Chart (normalized by base units)
@@ -284,7 +292,7 @@ const SmallBarChart = ({ data = [] }) => {
 };
 
 /* =========================================================================================
-   Main Component (plain JSX, no TS)
+   Main Component
    ========================================================================================= */
 export default function GoodsIn() {
   /** @type {[GoodsInRow[], Function]} */
@@ -328,9 +336,19 @@ export default function GoodsIn() {
   const fetchGoodsInData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(COGNITO_ID_MOCK)}`);
+      const cognitoId = discoverCognitoId();
+
+      // Build URL with or without cognito_id param
+      const url = new URL(`${API_BASE}/goods-in/active`);
+      if (cognitoId) url.searchParams.set("cognito_id", cognitoId);
+
+      const response = await fetch(url.toString(), {
+        // If your API uses Authorization headers, they’ll already be added by your client (Amplify/SDK/interceptor).
+        // You can also add them here if needed.
+      });
       if (!response.ok) throw new Error("Failed to fetch Goods In data");
       const data = await response.json();
+
       const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
         const stockRemaining = Number(row.stockRemaining || 0);
         const serverBar = row.barCode ? String(row.barCode) : null;
@@ -348,6 +366,7 @@ export default function GoodsIn() {
           temperature: row.temperature
         };
       });
+
       setGoodsInRows(normalized);
       computeIngredientInventory(normalized);
     } catch (error) {
@@ -382,18 +401,30 @@ export default function GoodsIn() {
 
   /** @param {GoodsInRow} newRow @param {{barCode:string|null,_id:string|null}} oldRow */
   const processRowUpdate = async (newRow, oldRow) => {
+    const cognitoId = discoverCognitoId();
+
     const payload = {
-      date: newRow.date, ingredient: newRow.ingredient, temperature: newRow.temperature,
-      stockReceived: newRow.stockReceived, stockRemaining: newRow.stockRemaining,
-      unit: newRow.unit, expiryDate: newRow.expiryDate, barCode: newRow.barCode,
-      invoice_number: newRow.invoiceNumber ?? null, cognito_id: COGNITO_ID_MOCK,
+      date: newRow.date,
+      ingredient: newRow.ingredient,
+      temperature: newRow.temperature,
+      stockReceived: newRow.stockReceived,
+      stockRemaining: newRow.stockRemaining,
+      unit: newRow.unit,
+      expiryDate: newRow.expiryDate,
+      barCode: newRow.barCode,
+      invoice_number: newRow.invoiceNumber ?? null,
+      ...(cognitoId ? { cognito_id: cognitoId } : {}), // only include if we have it
     };
+
     const identifierForPath = oldRow.barCode || newRow.barCode;
     if (!identifierForPath) throw new Error("Barcode is required for update.");
     const url = `${API_BASE}/goods-in/${encodeURIComponent(identifierForPath)}`;
+
     try {
       const response = await fetch(url, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const text = await response.text().catch(() => "");
@@ -409,11 +440,16 @@ export default function GoodsIn() {
   const handleDeleteSelectedRows = async () => {
     if (selectedRows.length === 0) return;
     try {
+      const cognitoId = discoverCognitoId();
       const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r._id));
       await Promise.all(rowsToDelete.map((row) =>
         fetch(`${API_BASE}/delete-row`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ barCode: row.barCode, cognito_id: COGNITO_ID_MOCK }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barCode: row.barCode,
+            ...(cognitoId ? { cognito_id: cognitoId } : {}),
+          }),
         }).then(res => { if (!res.ok) throw new Error(`Soft delete failed for ${row.barCode}`); })
       ));
       await fetchGoodsInData();
