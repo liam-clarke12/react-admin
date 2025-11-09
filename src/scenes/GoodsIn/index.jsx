@@ -1,56 +1,203 @@
-// src/scenes/data/GoodsIn/index.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  Box,
-  Paper,
-  IconButton,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Typography,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TableContainer,
-  Checkbox,
-  Chip,
-  Stack,
-  Tooltip,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import PackageIcon from "@mui/icons-material/Inventory2";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import SearchIcon from "@mui/icons-material/Search";
-import { useData } from "../../contexts/DataContext";
-import { useAuth } from "../../contexts/AuthContext";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+/* =========================================================================================
+   Tailwind-Style CSS Shim (no Tailwind required)
+   ========================================================================================= */
+const StyleShim = () => (
+  <style>{`
+    :root {
+      --slate-900:#0f172a; --slate-800:#1f2937; --slate-700:#334155; --slate-600:#475569;
+      --slate-500:#64748b; --slate-400:#94a3b8; --slate-300:#cbd5e1; --slate-200:#e2e8f0;
+      --slate-100:#f1f5f9; --slate-50:#f8fafc;
+      --violet-800:#5B21B6; --violet-700:#6D28D9; --violet-600:#7C3AED; --violet-500:#8B5CF6;
+      --emerald-800:#065f46; --emerald-100:#d1fae5;
+      --red-700:#b91c1c; --red-600:#dc2626; --red-300:#fca5a5;
+      --white:#fff; --black:#000;
+      --radius-sm: .375rem; --radius-md:.5rem; --radius-lg:.75rem; --radius-xl:1rem;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+      --shadow-lg: 0 10px 22px rgba(124,58,237,.18);
+    }
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-};
+    /* layout & flex */
+    .mx-auto{margin-left:auto;margin-right:auto}
+    .max-w-screen-2xl{max-width:1536px}
+    .flex{display:flex}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}
+    .items-center{align-items:center}.items-baseline{align-items:baseline}
+    .justify-between{justify-content:space-between}.justify-center{justify-content:center}
+    .flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}
+    .gap-2{gap:.5rem}.gap-4{gap:1rem}.gap-6{gap:1.5rem}
 
+    /* sizing */
+    .w-full{width:100%}.w-12{width:3rem}.w-20{width:5rem}.w-24{width:6rem}.w-80{width:20rem}
+    .h-12{height:3rem}.h-2\\.5{height:.625rem}.h-6{height:1.5rem}.h-8{height:2rem}
+    .min-w-250{min-width:250px}.min-w-1200{min-width:1200px}
 
+    /* spacing */
+    .p-3{padding:.75rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.p-8{padding:2rem}
+    .px-2{padding-left:.5rem;padding-right:.5rem}
+    .px-3{padding-left:.75rem;padding-right:.75rem}
+    .px-4{padding-left:1rem;padding-right:1rem}
+    .px-6{padding-left:1.5rem;padding-right:1.5rem}
+    .py-0\\.5{padding-top:.125rem;padding-bottom:.125rem}
+    .py-1{padding-top:.25rem;padding-bottom:.25rem}
+    .py-2{padding-top:.5rem;padding-bottom:.5rem}
+    .py-3{padding-top:.75rem;padding-bottom:.75rem}
+    .py-4{padding-top:1rem;padding-bottom:1rem}
+    .py-16{padding-top:4rem;padding-bottom:4rem}
+
+    /* text */
+    .text-xs{font-size:.75rem;line-height:1rem}
+    .text-sm{font-size:.875rem;line-height:1.25rem}
+    .text-lg{font-size:1.125rem;line-height:1.75rem}
+    .text-2xl{font-size:1.5rem;line-height:2rem}
+    .font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}
+    .text-right{text-align:right}.text-center{text-align:center}.uppercase{text-transform:uppercase}
+    .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+    /* colors */
+    .text-slate-900{color:var(--slate-900)}.text-slate-800{color:var(--slate-800)}
+    .text-slate-700{color:var(--slate-700)}.text-slate-600{color:var(--slate-600)}
+    .text-slate-500{color:var(--slate-500)}.text-slate-400{color:var(--slate-400)}
+    .text-emerald-800{color:var(--emerald-800)}.text-white{color:#fff}
+    .bg-white{background:#fff}.bg-slate-50{background:var(--slate-50)}
+    .bg-slate-100{background:var(--slate-100)}.bg-slate-200{background:var(--slate-200)}
+    .bg-emerald-100{background:var(--emerald-100)}
+    .bg-violet-100{background:rgba(124,58,237,.12)}
+    .text-violet-800{color:var(--violet-800)}
+
+    /* borders */
+    .border{border:1px solid var(--slate-200)}
+    .border-b{border-bottom:1px solid var(--slate-200)}
+    .border-slate-200{border-color:var(--slate-200)}
+    .border-slate-300{border-color:var(--slate-300)}
+    .rounded{border-radius:var(--radius-sm)}
+    .rounded-md{border-radius:var(--radius-md)}
+    .rounded-lg{border-radius:var(--radius-lg)}
+    .rounded-full{border-radius:9999px}
+
+    /* shadows */
+    .shadow-sm{box-shadow:var(--shadow-sm)}
+    .shadow-md{box-shadow:var(--shadow-md)}
+    .shadow-lg{box-shadow:var(--shadow-lg)}
+    .shadow-violet{box-shadow:0 8px 20px rgba(124,58,237,0.20)}
+
+    /* effects */
+    .hover\\:bg-slate-100:hover{background:var(--slate-100)}
+    .hover\\:bg-red-700:hover{background:var(--red-700)}
+    .hover\\:text-violet-800:hover{color:var(--violet-800)}
+    .disabled\\:opacity-50:disabled{opacity:.5}
+    .disabled\\:cursor-not-allowed:disabled{cursor:not-allowed}
+
+    /* inputs / focus */
+    .focus\\:ring-2:focus{outline:none;box-shadow:0 0 0 2px rgba(124,58,237,.35)}
+    .focus\\:ring-1:focus{outline:none;box-shadow:0 0 0 1px rgba(124,58,237,.35)}
+    .focus\\:border-violet-500:focus{border-color:var(--violet-600)}
+
+    /* helpers */
+    .bg-grad-violet{background:linear-gradient(135deg,var(--violet-600),var(--violet-800))}
+    .overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}
+    .transition{transition:all .2s ease}.transition-colors{transition:background .15s ease,color .15s ease}
+    .animate-spin{animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  `}</style>
+);
+
+/* =========================================================================================
+   Icons (no types)
+   ========================================================================================= */
+const PackageIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M16.5 9.4 7.55 4.24" />
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <path d="m3.29 7 8.71 5 8.71-5" />
+    <path d="M12 22V12" />
+  </svg>
+);
+const DeleteIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+  </svg>
+);
+const EditIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+const FilterIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+);
+const SearchIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+const SpinnerIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}>
+    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+  </svg>
+);
+
+/* =========================================================================================
+   JSDoc typedefs to help editors (no runtime impact)
+   ========================================================================================= */
+/**
+ * @typedef {Object} GoodsInRow
+ * @property {string} _id
+ * @property {string} date
+ * @property {string} ingredient
+ * @property {string|number|null} temperature
+ * @property {number} stockReceived
+ * @property {number} stockRemaining
+ * @property {string} unit
+ * @property {string|null} expiryDate
+ * @property {string|null} barCode
+ * @property {string|null} invoiceNumber
+ * @property {'Yes'|'No'} processed
+ */
+
+/**
+ * @typedef {{ value: string, label: string }} UnitOption
+ */
+
+/**
+ * @typedef {{ ingredient: string, amount: number, unit: string, baseAmount: number }} IngredientTotal
+ */
+
+/**
+ * @typedef {{ amount: number, unit: string }} DisplayTotal
+ */
+
+/* =========================================================================================
+   Units "enum" and helpers (JS version)
+   ========================================================================================= */
+const UnitGroup = Object.freeze({
+  GRAMS: "grams_group",
+  ML: "ml_group",
+  UNITS: "units_group",
+});
+
+/** @type {UnitOption[]} */
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -59,12 +206,7 @@ const unitOptions = [
   { value: "units", label: "Units" },
 ];
 
-const UNIT_GROUP = {
-  GRAMS: "grams_group",
-  ML: "ml_group",
-  UNITS: "units_group",
-};
-
+/** @param {number} amount @param {string} unit */
 function toBaseAmount(amount, unit) {
   if (!unit) return Number(amount || 0);
   const u = String(unit).toLowerCase();
@@ -75,201 +217,189 @@ function toBaseAmount(amount, unit) {
   return Number(amount || 0);
 }
 
+/** @param {string} unit */
 function detectUnitGroup(unit) {
-  if (!unit) return UNIT_GROUP.UNITS;
+  if (!unit) return UnitGroup.UNITS;
   const u = String(unit).toLowerCase();
-  if (u === "kg" || u === "grams" || u === "g") return UNIT_GROUP.GRAMS;
-  if (u === "l" || u === "ml") return UNIT_GROUP.ML;
-  return UNIT_GROUP.UNITS;
+  if (u === "kg" || u === "grams" || u === "g") return UnitGroup.GRAMS;
+  if (u === "l" || u === "ml") return UnitGroup.ML;
+  return UnitGroup.UNITS;
 }
 
+/** @param {number} baseAmount @param {string} group */
 function formatDisplayAmount(baseAmount, group) {
-  if (group === UNIT_GROUP.GRAMS) {
-    if (Math.abs(baseAmount) >= 1000) {
-      return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "kg" };
-    } else {
-      return { amount: Math.round(baseAmount), unit: "g" };
-    }
+  if (group === UnitGroup.GRAMS) {
+    if (Math.abs(baseAmount) >= 1000) return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "kg" };
+    return { amount: Math.round(baseAmount), unit: "g" };
   }
-  if (group === UNIT_GROUP.ML) {
-    if (Math.abs(baseAmount) >= 1000) {
-      return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "l" };
-    } else {
-      return { amount: Math.round(baseAmount), unit: "ml" };
-    }
+  if (group === UnitGroup.ML) {
+    if (Math.abs(baseAmount) >= 1000) return { amount: Number((baseAmount / 1000).toFixed(2)), unit: "l" };
+    return { amount: Math.round(baseAmount), unit: "ml" };
   }
   return { amount: Math.round(baseAmount), unit: "units" };
 }
 
-export default function GoodsIn() {
-  const { goodsInRows, setGoodsInRows, setIngredientInventory } = useData();
-  const { cognitoId } = useAuth();
-  const location = useLocation();
+/* =========================================================================================
+   Config
+   ========================================================================================= */
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const COGNITO_ID_MOCK = "eu-west-1:c1536c69-a1d2-45e2-8510-410a56e30ab4";
 
+/* =========================================================================================
+   Small Bar Chart (normalized by base units)
+   ========================================================================================= */
+/** @param {{data: IngredientTotal[]}} props */
+const SmallBarChart = ({ data = [] }) => {
+  if (!data || data.length === 0) {
+    return <p className="text-sm text-slate-500">No data available for chart.</p>;
+  }
+  const maxBase = Math.max(...data.map((d) => Number(d.baseAmount) || 0), 1);
+  return (
+    <div className="w-full flex flex-col gap-2">
+      {data.map((d) => {
+        const pct = (Number(d.baseAmount) / maxBase) * 100;
+        return (
+          <div key={d.ingredient} className="flex items-center gap-2"
+               title={`${d.ingredient}: ${d.amount} ${d.unit}`}>
+            <p className="text-xs text-slate-600 w-24 truncate">{d.ingredient}</p>
+            <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden border border-slate-200">
+              <div className="h-full rounded-full transition shadow-sm"
+                   style={{
+                     width: `${pct}%`,
+                     background: "linear-gradient(180deg, var(--violet-600), var(--violet-800))"
+                   }}
+                   role="meter" aria-valuemin={0} aria-valuemax={100}
+                   aria-valuenow={Math.round(pct)}
+                   aria-label={`${d.ingredient} ${d.amount} ${d.unit}`}
+              />
+            </div>
+            <p className="text-xs font-semibold text-slate-800 w-20 text-right">
+              {d.amount} {d.unit}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/* =========================================================================================
+   Main Component (plain JSX, no TS)
+   ========================================================================================= */
+export default function GoodsIn() {
+  /** @type {[GoodsInRow[], Function]} */
+  const [goodsInRows, setGoodsInRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  /** @type {[{field: string, dir: 'asc'|'desc'}, Function]} */
   const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  /** @type {[GoodsInRow|null, Function]} */
   const [editingRow, setEditingRow] = useState(null);
   const [originalBarcode, setOriginalBarcode] = useState(null);
   const [originalId, setOriginalId] = useState(null);
   const [updating, setUpdating] = useState(false);
-
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const selectAllCheckboxRef = useRef(null);
 
-  useEffect(() => {
-    const fetchGoodsInData = async () => {
-      try {
-        if (!cognitoId) return;
-        setLoading(true);
-        const response = await fetch(
-          `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch Goods In data");
-        const data = await response.json();
-
-        const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
-          const date = row.date ? String(row.date).slice(0, 10) : row.date;
-          const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
-          const stockReceived = Number(row.stockReceived || 0);
-          const stockRemaining = Number(row.stockRemaining || 0);
-          const serverBar = row.barCode ? String(row.barCode) : null;
-          const _id = serverBar
-            ? `${serverBar}-${idx}`
-            : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-          const invoiceNumber = row.invoice_number ?? row.invoiceNumber ?? null;
-          const unit = row.unit ?? row.unitName ?? row.unit_label ?? "";
-
-          return {
-            ...row,
-            date,
-            expiryDate,
-            stockReceived,
-            stockRemaining,
-            processed: Number(stockRemaining) === 0 ? "Yes" : "No",
-            barCode: serverBar || row.barCode || null,
-            invoiceNumber,
-            unit,
-            _id,
-          };
-        });
-
-        setGoodsInRows(normalized);
-        computeAndSetIngredientInventory(normalized);
-      } catch (error) {
-        console.error("Error fetching Goods In data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (cognitoId) fetchGoodsInData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cognitoId]);
-
-  const computeAndSetIngredientInventory = (rows) => {
-    const active = (Array.isArray(rows) ? rows : []).filter((r) => Number(r.stockRemaining) > 0);
+  // (kept for local calc parity)
+  /** @param {GoodsInRow[]} rows */
+  const computeIngredientInventory = (rows) => {
+    const active = (Array.isArray(rows) ? rows : []).filter((r) => r.stockRemaining > 0);
     const map = new Map();
     for (const r of active) {
       const key = r.ingredient;
       const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date, unit: r.unit };
-      const amount = prev.amount + Number(r.stockRemaining || 0);
+      const amount = prev.amount + r.stockRemaining;
       let nextBarcode = prev.barcode;
       let nextDate = prev._date;
       try {
         const prevTime = new Date(prev._date).getTime() || Infinity;
         const curTime = new Date(r.date).getTime() || Infinity;
-        if (curTime < prevTime) {
-          nextBarcode = r.barCode;
-          nextDate = r.date;
-        }
+        if (curTime < prevTime) { nextBarcode = r.barCode; nextDate = r.date; }
       } catch {}
       map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate, unit: r.unit });
     }
-    const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-    setIngredientInventory(inventory);
   };
 
+  const fetchGoodsInData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(COGNITO_ID_MOCK)}`);
+      if (!response.ok) throw new Error("Failed to fetch Goods In data");
+      const data = await response.json();
+      const normalized = (Array.isArray(data) ? data : []).map((row, idx) => {
+        const stockRemaining = Number(row.stockRemaining || 0);
+        const serverBar = row.barCode ? String(row.barCode) : null;
+        return {
+          _id: serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: row.date ? String(row.date).slice(0, 10) : "",
+          expiryDate: row.expiryDate ? String(row.expiryDate).slice(0, 10) : null,
+          stockReceived: Number(row.stockReceived || 0),
+          stockRemaining,
+          processed: stockRemaining === 0 ? "Yes" : "No",
+          barCode: serverBar || row.barCode || null,
+          invoiceNumber: row.invoice_number ?? row.invoiceNumber ?? null,
+          unit: row.unit ?? row.unitName ?? row.unit_label ?? "",
+          ingredient: row.ingredient,
+          temperature: row.temperature
+        };
+      });
+      setGoodsInRows(normalized);
+      computeIngredientInventory(normalized);
+    } catch (error) {
+      console.error("Error fetching Goods In data:", error);
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
+
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let rows = [...goodsInRows];
+    if (q) {
+      rows = rows.filter((r) => Object.values(r).some(val => String(val).toLowerCase().includes(q)));
+    }
+    const dir = sortBy.dir === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      const fa = a[sortBy.field] ?? "";
+      const fb = b[sortBy.field] ?? "";
+      if (typeof fa === 'number' && typeof fb === 'number') return (fa - fb) * dir;
+      return String(fa).localeCompare(String(fb)) * dir;
+    });
+    return rows;
+  }, [goodsInRows, searchQuery, sortBy]);
+
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate =
+        selectedRows.length > 0 && selectedRows.length < filteredRows.length;
+    }
+  }, [selectedRows, filteredRows]);
+
+  /** @param {GoodsInRow} newRow @param {{barCode:string|null,_id:string|null}} oldRow */
   const processRowUpdate = async (newRow, oldRow) => {
-    const oldBar = oldRow && oldRow.barCode ? String(oldRow.barCode) : undefined;
-    const oldId = oldRow && oldRow._id ? String(oldRow._id) : undefined;
-
     const payload = {
-      date: newRow.date,
-      ingredient: newRow.ingredient,
-      temperature: newRow.temperature,
-      stockReceived: Number(newRow.stockReceived || 0),
-      stockRemaining: Number(newRow.stockRemaining || 0),
-      unit: newRow.unit,
-      expiryDate: newRow.expiryDate,
-      barCode: newRow.barCode,
-      invoice_number: newRow.invoiceNumber ?? null,
-      cognito_id: cognitoId,
+      date: newRow.date, ingredient: newRow.ingredient, temperature: newRow.temperature,
+      stockReceived: newRow.stockReceived, stockRemaining: newRow.stockRemaining,
+      unit: newRow.unit, expiryDate: newRow.expiryDate, barCode: newRow.barCode,
+      invoice_number: newRow.invoiceNumber ?? null, cognito_id: COGNITO_ID_MOCK,
     };
-
-    const identifierForPath = oldBar || newRow.barCode;
+    const identifierForPath = oldRow.barCode || newRow.barCode;
+    if (!identifierForPath) throw new Error("Barcode is required for update.");
     const url = `${API_BASE}/goods-in/${encodeURIComponent(identifierForPath)}`;
-
     try {
       const response = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        console.error("[processRowUpdate] server returned non-OK:", response.status, text);
         throw new Error(text || `Failed to update row (status ${response.status})`);
       }
-
-      const json = await response.json().catch(() => null);
-      const serverRow = json && json.updated ? json.updated : json || null;
-
-      const normalizedResult = {
-        ...newRow,
-        ...(serverRow ? serverRow : {}),
-        stockReceived: Number((serverRow && serverRow.stockReceived) ?? newRow.stockReceived ?? 0),
-        stockRemaining: Number((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining ?? 0),
-        processed: Number(((serverRow && serverRow.stockRemaining) ?? newRow.stockRemaining) || 0) === 0 ? "Yes" : "No",
-        invoiceNumber: (serverRow && (serverRow.invoice_number ?? serverRow.invoiceNumber)) ?? newRow.invoiceNumber ?? null,
-        unit: (serverRow && (serverRow.unit ?? serverRow.unit_label ?? serverRow.unitName)) ?? newRow.unit ?? "",
-      };
-
-      normalizedResult._id =
-        oldId ||
-        newRow._id ||
-        (serverRow && serverRow.barCode ? `${serverRow.barCode}-${Date.now()}` : `gen-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-
-      normalizedResult.barCode = (serverRow && serverRow.barCode) ? serverRow.barCode : (newRow.barCode || null);
-
-      setGoodsInRows((prev = []) => {
-        const list = Array.isArray(prev) ? prev.slice() : [];
-        let found = false;
-        const next = list.map((r) => {
-          if (oldId && r._id === oldId) {
-            found = true;
-            return { ...r, ...normalizedResult };
-          }
-          if (!oldId && identifierForPath && r.barCode === identifierForPath) {
-            found = true;
-            return { ...r, ...normalizedResult };
-          }
-          return r;
-        });
-
-        if (!found) {
-          next.push(normalizedResult);
-        }
-
-        computeAndSetIngredientInventory(next);
-        return next;
-      });
-
-      return normalizedResult;
+      await fetchGoodsInData();
     } catch (error) {
       console.error("Backend update error:", error);
       throw error;
@@ -277,34 +407,17 @@ export default function GoodsIn() {
   };
 
   const handleDeleteSelectedRows = async () => {
-    if (!cognitoId || selectedRows.length === 0) return;
-
+    if (selectedRows.length === 0) return;
     try {
-      const rowsToDelete = (goodsInRows || []).filter((r) => selectedRows.includes(r._id));
-
-      await Promise.all(
-        rowsToDelete.map((row) =>
-          fetch(`${API_BASE}/delete-row`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ barCode: row.barCode, cognito_id: cognitoId }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const t = await res.text().catch(() => "");
-              throw new Error(t || `Soft delete failed for ${row.barCode}`);
-            }
-          })
-        )
-      );
-
-      setGoodsInRows((prev = []) => {
-        const remaining = prev.filter((r) => !selectedRows.includes(r._id));
-        computeAndSetIngredientInventory(remaining);
-        return remaining;
-      });
-
-      setSelectedRows([]);
-      setOpenConfirmDialog(false);
+      const rowsToDelete = goodsInRows.filter((r) => selectedRows.includes(r._id));
+      await Promise.all(rowsToDelete.map((row) =>
+        fetch(`${API_BASE}/delete-row`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ barCode: row.barCode, cognito_id: COGNITO_ID_MOCK }),
+        }).then(res => { if (!res.ok) throw new Error(`Soft delete failed for ${row.barCode}`); })
+      ));
+      await fetchGoodsInData();
+      setSelectedRows([]); setOpenConfirmDialog(false);
     } catch (err) {
       console.error("Soft delete error:", err);
       alert("Could not delete selected records. Check console for details.");
@@ -317,522 +430,461 @@ export default function GoodsIn() {
     setOriginalId(row._id);
     setEditDialogOpen(true);
   };
-
   const handleConfirmEdit = async () => {
-    if (!editingRow) return;
-    setUpdating(true);
+    if (!editingRow) return; setUpdating(true);
     try {
       await processRowUpdate(editingRow, { barCode: originalBarcode, _id: originalId });
-      setEditDialogOpen(false);
-      setEditingRow(null);
-      setOriginalBarcode(null);
-      setOriginalId(null);
+      setEditDialogOpen(false); setEditingRow(null); setOriginalBarcode(null); setOriginalId(null);
     } catch (err) {
       console.error("Confirm edit failed:", err);
       alert("Update failed. See console for details.");
-    } finally {
-      setUpdating(false);
-    }
+    } finally { setUpdating(false); }
   };
 
-  const filteredRows = useMemo(() => {
-    const q = (searchQuery || "").trim().toLowerCase();
-    let rows = Array.isArray(goodsInRows) ? goodsInRows.slice() : [];
-    if (q) {
-      rows = rows.filter((r) =>
-        ["date", "ingredient", "barCode", "invoiceNumber", "unit", "temperature"]
-          .some((k) => String(r[k] ?? "").toLowerCase().includes(q))
-      );
-    }
-
-    const dir = sortBy.dir === "asc" ? 1 : -1;
-    rows.sort((a, b) => {
-      const fa = a[sortBy.field] ?? "";
-      const fb = b[sortBy.field] ?? "";
-      if (sortBy.field === "stockRemaining" || sortBy.field === "stockReceived") {
-        return (Number(fa) - Number(fb)) * dir;
-      }
-      return String(fa).localeCompare(String(fb)) * dir;
-    });
-
-    return rows;
-  }, [goodsInRows, searchQuery, sortBy]);
-
   const visibleRows = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredRows.slice(start, start + rowsPerPage);
+    const start = page * rowsPerPage; return filteredRows.slice(start, start + rowsPerPage);
   }, [filteredRows, page, rowsPerPage]);
 
   const toggleSelectAll = () => {
-    if (selectedRows.length === filteredRows.length && filteredRows.length > 0) {
-      setSelectedRows([]);
-    } else {
-      setSelectedRows(filteredRows.map((r) => r._id));
-    }
+    if (selectedRows.length === filteredRows.length && filteredRows.length > 0) setSelectedRows([]);
+    else setSelectedRows(filteredRows.map((r) => r._id));
   };
-
   const toggleRowSelection = (id) => {
     setSelectedRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  useEffect(() => {
-    const focusBar = (location && location.state && location.state.focusBar) || new URLSearchParams(window.location.search).get("focusBar");
-    if (!focusBar) return;
-    if (!goodsInRows || goodsInRows.length === 0) return;
-
-    const target = goodsInRows.find((r) => r.barCode === focusBar);
-    if (!target) return;
-    const targetId = target._id;
-
-    setSelectedRows([targetId]);
-
-    setTimeout(() => {
-      const el = document.querySelector(`[data-row-id="${targetId}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.add("highlight-row");
-        setTimeout(() => el.classList.remove("highlight-row"), 2500);
-      }
-    }, 250);
-    try {
-      if (window && window.history && window.history.replaceState) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("focusBar");
-        window.history.replaceState({}, document.title, url.pathname + url.search || "");
-      }
-    } catch (e) {}
-  }, [goodsInRows, location]);
-
   const totalsByBaseUnitGroup = useMemo(() => {
-    const acc = {
-      [UNIT_GROUP.GRAMS]: 0,
-      [UNIT_GROUP.ML]: 0,
-      [UNIT_GROUP.UNITS]: 0,
-    };
-
-    (filteredRows || []).forEach((r) => {
+    const acc = { [UnitGroup.GRAMS]: 0, [UnitGroup.ML]: 0, [UnitGroup.UNITS]: 0, };
+    filteredRows.forEach((r) => {
       const group = detectUnitGroup(r.unit);
-      const base = toBaseAmount(Number(r.stockRemaining || 0), r.unit);
+      const base = toBaseAmount(r.stockRemaining, r.unit);
       acc[group] = (acc[group] || 0) + base;
     });
-
     return acc;
   }, [filteredRows]);
 
+  /** @type {{[k:string]: DisplayTotal}} */
   const displayTotalsByGroup = useMemo(() => {
     return {
-      gramsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0, UNIT_GROUP.GRAMS),
-      mlGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0, UNIT_GROUP.ML),
-      unitsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0, UNIT_GROUP.UNITS),
+      gramsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UnitGroup.GRAMS] || 0, UnitGroup.GRAMS),
+      mlGroup: formatDisplayAmount(totalsByBaseUnitGroup[UnitGroup.ML] || 0, UnitGroup.ML),
+      unitsGroup: formatDisplayAmount(totalsByBaseUnitGroup[UnitGroup.UNITS] || 0, UnitGroup.UNITS),
     };
   }, [totalsByBaseUnitGroup]);
 
+  /** @type {IngredientTotal[]} */
   const totalsByIngredient = useMemo(() => {
     const map = new Map();
-    (goodsInRows || []).forEach((r) => {
+    goodsInRows.forEach((r) => {
       const key = r.ingredient || "—";
       const prev = map.get(key) || { baseAmount: 0, unitSamples: new Map() };
-      const base = toBaseAmount(Number(r.stockRemaining || 0), r.unit);
-      prev.baseAmount += base;
-      const u = r.unit || "";
-      prev.unitSamples.set(u, (prev.unitSamples.get(u) || 0) + 1);
+      prev.baseAmount += toBaseAmount(r.stockRemaining, r.unit);
+      prev.unitSamples.set(r.unit || "", (prev.unitSamples.get(r.unit || "") || 0) + 1);
       map.set(key, prev);
     });
-
     const arr = Array.from(map.entries()).map(([ingredient, { baseAmount, unitSamples }]) => {
-      let chosenGroup = UNIT_GROUP.UNITS;
-      for (const u of unitOptions.map((o) => o.value)) {
-        if (unitSamples.has(u)) {
-          chosenGroup = detectUnitGroup(u);
-          break;
-        }
+      let chosenGroup = UnitGroup.UNITS;
+      for (const u of unitOptions.map(o => o.value)) {
+        if (unitSamples.has(u)) { chosenGroup = detectUnitGroup(u); break; }
       }
       const disp = formatDisplayAmount(baseAmount, chosenGroup);
       return { ingredient, amount: disp.amount, unit: disp.unit, baseAmount };
     });
-
     arr.sort((a, b) => b.baseAmount - a.baseAmount);
     return arr.slice(0, 6);
   }, [goodsInRows]);
 
-  const SmallBarChart = ({ data = [] }) => {
-    if (!data || data.length === 0) return <Typography variant="caption" color="text.secondary">No data</Typography>;
-    const max = Math.max(...data.map((d) => Number(d.amount) || 0), 1);
-    return (
-      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1 }}>
-        {data.map((d) => (
-          <Box key={d.ingredient} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography sx={{ fontSize: 12, minWidth: 80, color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.ingredient}</Typography>
-            <Box sx={{ flex: 1, height: 10, background: brand.surfaceMuted, borderRadius: 999, overflow: "hidden" }}>
-              <Box sx={{ width: `${(Number(d.amount) / max) * 100}%`, height: "100%", background: brand.primary }} />
-            </Box>
-            <Typography sx={{ fontSize: 12, width: 72, textAlign: "right" }}>
-              {d.amount} {d.unit}
-            </Typography>
-          </Box>
-        ))}
-        <Box sx={{ mt: 1 }}>
-          <Typography variant="caption" color="text.secondary">Units shown: {Array.from(new Set(data.map(d => d.unit).filter(Boolean))).join(", ") || "—"}</Typography>
-        </Box>
-      </Box>
-    );
-  };
-
   return (
-    <Box m={2} sx={{ overflowX: "hidden" }}>
-      <style>{`
-        .highlight-row { animation: highlightPulse 2.4s ease forwards; }
-        @keyframes highlightPulse {
-          0% { background-color: rgba(251,191,36,0.12); }
-          50% { background-color: rgba(251,191,36,0.12); }
-          100% { background-color: transparent; }
-        }
-      `}</style>
-
-      <Box maxWidth="1200px" mx="auto" display="flex" flexDirection="column" gap={2}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
-          <Box display="flex" alignItems="center" gap={2}>
-            <Box sx={{ width: 52, height: 52, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center",
-                        background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, boxShadow: "0 8px 20px rgba(124,58,237,0.12)" }}>
-              <PackageIcon sx={{ color: "white" }} />
-            </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>Goods In Management</Typography>
-              <Typography variant="caption" color="text.secondary">Track and manage incoming inventory</Typography>
-            </Box>
-          </Box>
-
-          <Stack direction="row" spacing={1} alignItems="center">
+    <div className="p-4 max-w-screen-2xl mx-auto">
+      <StyleShim />
+      <div className="flex flex-col gap-4">
+        {/* Header */}
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-grad-violet shadow-violet">
+              <PackageIcon className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Goods In Management</h1>
+              <p className="text-sm text-slate-500">Track and manage incoming inventory</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
             {selectedRows.length > 0 && (
-              <Chip label={`${selectedRows.length} selected`} color="default" />
+              <span className="text-sm font-medium bg-slate-200 text-slate-700 px-3 py-1 rounded-full">
+                {selectedRows.length} selected
+              </span>
             )}
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteIcon />}
+            <button
               onClick={() => setOpenConfirmDialog(true)}
               disabled={selectedRows.length === 0}
+              className="flex items-center gap-2 px-4 py-2"
+              style={{
+                background: "var(--red-600)", color: "white", borderRadius: "0.75rem",
+                boxShadow: "var(--shadow-sm)"
+              }}
+              onMouseOver={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--red-700)"; }}
+              onMouseOut={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--red-600)"; }}
             >
-              Delete ({selectedRows.length})
-            </Button>
-          </Stack>
-        </Box>
+              <DeleteIcon className="w-4 h-4" />
+              <span className="text-sm font-semibold">Delete ({selectedRows.length})</span>
+            </button>
+          </div>
+        </header>
 
-        <Paper variant="outlined" sx={{ p: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 240 }}>
-            <SearchIcon color="action" />
-            <TextField
+        {/* Toolbar */}
+        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-wrap items-center gap-4">
+          <div className="relative flex-grow min-w-250">
+            <SearchIcon className="absolute" style={{left:"0.75rem", top:"50%", transform:"translateY(-50%)"}} />
+            <input
+              type="text"
               placeholder="Search by ingredient, batch code, invoice..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-              size="small"
-              fullWidth
+              className="w-full"
+              style={{
+                padding: ".5rem 1rem .5rem 2.5rem", border:"1px solid var(--slate-300)",
+                borderRadius: "0.5rem", transition: "box-shadow .15s,border-color .15s"
+              }}
+              onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+              onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
             />
-          </Box>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+              style={{ border:"1px solid var(--slate-300)", color:"var(--slate-700)" }}
+              onMouseOver={(e)=>{ e.currentTarget.style.background="var(--slate-100)"; }}
+              onMouseOut={(e)=>{ e.currentTarget.style.background="transparent"; }}
+            >
+              <FilterIcon className="w-4 h-4" />
+              <span>Filters</span>
+            </button>
+            <select
+              value={`${sortBy.field}:${sortBy.dir}`}
+              onChange={(e) => {
+                const [field, dir] = e.target.value.split(":");
+                setSortBy({ field, dir });
+              }}
+              className="text-sm font-medium rounded-lg transition-colors"
+              style={{ padding: ".5rem .75rem", border:"1px solid var(--slate-300)", color:"var(--slate-700)" }}
+              onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+              onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+            >
+              <option value="date:desc">Date (new → old)</option>
+              <option value="date:asc">Date (old → new)</option>
+              <option value="ingredient:asc">Ingredient A→Z</option>
+              <option value="ingredient:desc">Ingredient Z→A</option>
+              <option value="stockRemaining:desc">Stock Remaining (high → low)</option>
+              <option value="stockRemaining:asc">Stock Remaining (low → high)</option>
+            </select>
+          </div>
+        </div>
 
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <Button variant="outlined" startIcon={<FilterListIcon />}>Filters</Button>
-
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Sort</InputLabel>
-              <Select
-                value={`${sortBy.field}:${sortBy.dir}`}
-                label="Sort"
-                onChange={(e) => {
-                  const [field, dir] = String(e.target.value).split(":");
-                  setSortBy({ field, dir });
-                }}
-              >
-                <MenuItem value="date:desc">Date (new → old)</MenuItem>
-                <MenuItem value="date:asc">Date (old → new)</MenuItem>
-                <MenuItem value="ingredient:asc">Ingredient A→Z</MenuItem>
-                <MenuItem value="ingredient:desc">Ingredient Z→A</MenuItem>
-                <MenuItem value="stockRemaining:desc">Stock Remaining (high → low)</MenuItem>
-                <MenuItem value="stockRemaining:asc">Stock Remaining (low → high)</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </Paper>
-
-        <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
-          <Paper sx={{ flex: 1, overflow: "hidden", borderRadius: 2, border: `1px solid ${brand.border}`, boxShadow: brand.shadow }}>
-            {/* TABLE CONTAINER: horizontal scrollbar enabled here */}
-            <TableContainer sx={{ maxHeight: "60vh", overflowX: "auto" }}>
-              {/* give the table a larger minWidth so horizontal slider appears when needed */}
-              <Table stickyHeader sx={{ tableLayout: "fixed", minWidth: 1200 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ width: "4%", minWidth: 56 }}><Checkbox
-                      checked={selectedRows.length > 0 && selectedRows.length === filteredRows.length && filteredRows.length > 0}
-                      indeterminate={selectedRows.length > 0 && selectedRows.length < filteredRows.length}
-                      onChange={toggleSelectAll}
-                    /></TableCell>
-
-                    {/* Date */}
-                    <TableCell sx={{ width: "10%", minWidth: 110 }}>Date</TableCell>
-
-                    {/* Ingredient */}
-                    <TableCell sx={{ width: "24%", minWidth: 200 }}>Ingredient</TableCell>
-
-                    {/* Temperature */}
-                    <TableCell sx={{ width: "8%", minWidth: 90 }}>Temperature</TableCell>
-
-                    {/* Stock Received */}
-                    <TableCell sx={{ width: "10%", minWidth: 110, textAlign: "center" }}>Stock Received</TableCell>
-
-                    {/* Stock Remaining */}
-                    <TableCell sx={{ width: "10%", minWidth: 110, textAlign: "center" }}>Stock Remaining</TableCell>
-
-                    {/* Invoice */}
-                    <TableCell sx={{ width: "12%", minWidth: 120 }}>Invoice #</TableCell>
-
-                    {/* Expiry Date */}
-                    <TableCell sx={{ width: "8%", minWidth: 110 }}>Expiry Date</TableCell>
-
-                    {/* Batch Code */}
-                    <TableCell sx={{ width: "7%", minWidth: 100 }}>Batch Code</TableCell>
-
-                    {/* Actions */}
-                    <TableCell sx={{ width: "7%", minWidth: 80, textAlign: "right" }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
-                        <CircularProgress />
-                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>Loading goods in...</Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : visibleRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
-                        <Typography color="text.secondary">No records found</Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    visibleRows.map((row, idx) => (
-                      <TableRow
-                        key={row._id}
-                        data-row-id={row._id}
-                        sx={{
-                          backgroundColor: (page * rowsPerPage + idx) % 2 === 0 ? "white" : brand.surfaceMuted,
-                          "&:hover": { backgroundColor: "#fbf8ff" },
+        {/* Main grid */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Table Card */}
+          <main className="flex-1 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-slate-600 min-w-1200">
+                <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                  <tr>
+                    <th scope="col" className="p-4" style={{width:"3rem"}}>
+                      <input
+                        type="checkbox"
+                        ref={selectAllCheckboxRef}
+                        className="w-4 h-4"
+                        style={{
+                          accentColor: "var(--violet-600)",
+                          background: "var(--slate-100)", border:"1px solid var(--slate-300)", borderRadius: "0.375rem"
                         }}
-                      >
-                        <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          <Checkbox checked={selectedRows.includes(row._id)} onChange={() => toggleRowSelection(row._id)} />
-                        </TableCell>
-
-                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <Tooltip title={row.date || "-"} placement="top">
-                            <span>{row.date || "-"}</span>
-                          </Tooltip>
-                        </TableCell>
-
-                        <TableCell sx={{ color: brand.text, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {row.ingredient || "-"}
-                        </TableCell>
-
-                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <Tooltip title={row.temperature ? `${row.temperature}℃` : "-"} placement="top">
-                            <span>{row.temperature ? `${row.temperature}℃` : "-"}</span>
-                          </Tooltip>
-                        </TableCell>
-
-                        {/* Stock Received: centered + bold */}
-                        <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#ecfdf5" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
-                              {row.stockReceived}
-                            </Typography>
-                            {row.unit ? <Typography variant="caption" sx={{ ml: 0.5, color: brand.subtext }}>{` ${row.unit}`}</Typography> : null}
-                          </Box>
-                        </TableCell>
-
-                        {/* Stock Remaining: centered + NOT bold */}
-                        <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 2, py: 0.5, borderRadius: 1, background: "#f8fafc" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 400, color: brand.text }}>
-                              {row.stockRemaining}
-                            </Typography>
-                            {row.unit ? <Typography variant="caption" sx={{ ml: 0.5, color: brand.subtext }}>{` ${row.unit}`}</Typography> : null}
-                          </Box>
-                        </TableCell>
-
-                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {row.invoiceNumber || "-"}
-                        </TableCell>
-
-                        <TableCell sx={{ color: brand.subtext, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <Tooltip title={row.expiryDate || "-"} placement="top">
-                            <span>{row.expiryDate || "-"}</span>
-                          </Tooltip>
-                        </TableCell>
-
-                        <TableCell sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <Chip label={row.barCode || "-"} variant="outlined" sx={{ bgcolor: "#f9f5ff", color: brand.primary, borderColor: "#eee" }} />
-                        </TableCell>
-
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                          <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => handleEditRow(row)}>
-                              <EditOutlinedIcon sx={{ color: brand.primary }} />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
+                        checked={selectedRows.length > 0 && selectedRows.length === filteredRows.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Ingredient</th>
+                    <th className="px-6 py-3">Temp</th>
+                    <th className="px-6 py-3 text-center">Received</th>
+                    <th className="px-6 py-3 text-center">Remaining</th>
+                    <th className="px-6 py-3">Invoice #</th>
+                    <th className="px-6 py-3">Expiry</th>
+                    <th className="px-6 py-3">Batch Code</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-16">
+                        <div className="flex flex-col items-center gap-2">
+                          <SpinnerIcon className="w-8 h-8 text-violet-600" />
+                          <p>Loading goods in...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : visibleRows.length === 0 ? (
+                    <tr><td colSpan={10} className="text-center py-16"><p>No records found</p></td></tr>
+                  ) : (
+                    visibleRows.map((row) => (
+                      <tr key={row._id} className="bg-white border-b"
+                          onMouseOver={(e)=>{ e.currentTarget.style.background="rgba(124,58,237,.05)"; }}
+                          onMouseOut={(e)=>{ e.currentTarget.style.background="#fff"; }}>
+                        <td className="p-4">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            style={{ accentColor:"var(--violet-600)", background:"var(--slate-100)", border:"1px solid var(--slate-300)", borderRadius: "0.375rem" }}
+                            checked={selectedRows.includes(row._id)}
+                            onChange={() => toggleRowSelection(row._id)}
+                          />
+                        </td>
+                        <td className="px-6 py-4">{row.date || "-"}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900">{row.ingredient || "-"}</td>
+                        <td className="px-6 py-4">{row.temperature ? `${row.temperature}℃` : "-"}</td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded-md"
+                                style={{ background:"var(--emerald-100)", color:"var(--emerald-800)", fontWeight:600 }}>
+                            {row.stockReceived} {row.unit}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded-md"
+                                style={{ background:"var(--slate-100)", color:"var(--slate-800)", fontWeight:500 }}>
+                            {row.stockRemaining} {row.unit}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500">{row.invoiceNumber || "-"}</td>
+                        <td className="px-6 py-4 text-slate-500">{row.expiryDate || "-"}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-0.5 bg-violet-100 text-violet-800 text-xs font-mono rounded">{row.barCode || "-"}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => handleEditRow(row)} className="text-slate-700"
+                                  onMouseOver={(e)=>{ e.currentTarget.style.color="var(--violet-800)"; }}
+                                  onMouseOut={(e)=>{ e.currentTarget.style.color="var(--slate-700)"; }}>
+                            <EditIcon className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
                     ))
                   )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </tbody>
+              </table>
+            </div>
 
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderTop: `1px solid ${brand.border}`, background: "#fbfbff" }}>
-              <Typography variant="caption" color="text.secondary">
-                Showing <strong style={{ color: brand.text }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>
-                {" - "}
-                <strong style={{ color: brand.text }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong>
-                {" of "}
-                <strong style={{ color: brand.text }}>{filteredRows.length}</strong>
-              </Typography>
+            {/* Footer / Pagination */}
+            <nav className="flex flex-wrap items-center justify-between p-4 border-t border-slate-200 gap-4">
+              <span className="text-sm text-slate-700">
+                Showing <span className="font-semibold">
+                  {filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}
+                </span>-<span className="font-semibold">
+                  {Math.min((page + 1) * rowsPerPage, filteredRows.length)}
+                </span> of <span className="font-semibold">{filteredRows.length}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  onMouseOver={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--slate-100)"; }}
+                  onMouseOut={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="transparent"; }}
+                >Prev</button>
+                <span className="text-sm text-slate-600">Page {page + 1}</span>
+                <button
+                  onClick={() => setPage(p => ((p + 1) * rowsPerPage < filteredRows.length) ? p + 1 : p)}
+                  disabled={(page + 1) * rowsPerPage >= filteredRows.length}
+                  className="px-3 py-1 border border-slate-300 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  onMouseOver={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--slate-100)"; }}
+                  onMouseOut={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="transparent"; }}
+                >Next</button>
+                <select
+                  value={rowsPerPage}
+                  onChange={e => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                  className="text-sm font-medium rounded-md"
+                  style={{ padding: ".25rem .5rem", border:"1px solid var(--slate-300)" }}
+                  onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 1px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                  onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </nav>
+          </main>
 
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Total Remaining</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: brand.text }}>
-                    {(() => {
-                      const groups = [];
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0) > 0) groups.push(displayTotalsByGroup.gramsGroup);
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0) > 0) groups.push(displayTotalsByGroup.mlGroup);
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0) > 0) groups.push(displayTotalsByGroup.unitsGroup);
+          {/* Side: Quick Stats + Totals */}
+          <aside className="w-full w-80 flex-shrink-0 flex flex-col gap-6">
+            <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-slate-800">Quick Stats</h3>
+              <p className="text-sm text-slate-500 mb-4">Top ingredients by remaining stock.</p>
+              <SmallBarChart data={totalsByIngredient} />
+            </div>
 
-                      if (groups.length === 0) return "—";
-                      if (groups.length === 1) return `${groups[0].amount} ${groups[0].unit}`;
-                      return `${groups.map(g => `${g.amount} ${g.unit}`).join(" · ")}`;
-                    })()}
-                  </Typography>
+            <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-2">Total Remaining</h3>
+              <div className="flex flex-col" style={{gap:".5rem"}}>
+                {Object.entries(displayTotalsByGroup).map(([key, value]) =>
+                  totalsByBaseUnitGroup[key.replace('Group', '_group')] > 0 && (
+                    <div key={key} className="flex justify-between items-baseline">
+                      <span className="text-sm text-slate-600">{key.replace('Group', ' Group')}</span>
+                      <span className="font-semibold text-slate-800">{value.amount} {value.unit}</span>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
 
-                  <Typography variant="caption" color="text.secondary">
-                    {(() => {
-                      const parts = [];
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.GRAMS] || 0) > 0) {
-                        const g = displayTotalsByGroup.gramsGroup;
-                        parts.push(`${g.amount} ${g.unit}`);
-                      }
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.ML] || 0) > 0) {
-                        const m = displayTotalsByGroup.mlGroup;
-                        parts.push(`${m.amount} ${m.unit}`);
-                      }
-                      if ((totalsByBaseUnitGroup[UNIT_GROUP.UNITS] || 0) > 0) {
-                        const u = displayTotalsByGroup.unitsGroup;
-                        parts.push(`${u.amount} ${u.unit}`);
-                      }
-                      return parts.length === 0 ? "—" : parts.join(" · ");
-                    })()}
-                  </Typography>
-                </Box>
+      {/* Edit Dialog */}
+      {editDialogOpen && editingRow && (
+        <div className="fixed inset-0" style={{background:"rgba(0,0,0,.3)"}} >
+          <div className="flex items-center justify-center" style={{height:"100%"}}>
+            <div className="bg-white rounded-lg shadow-md w-full" style={{maxWidth:"40rem"}}>
+              <h3 className="text-lg font-bold p-4 border-b">Edit Goods In Record</h3>
+              <div className="p-4" style={{display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:"1rem"}}>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Ingredient</label>
+                  <input type="text" value={editingRow.ingredient || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Date</label>
+                  <input type="date" value={editingRow.date || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Temperature (℃)</label>
+                  <input type="text" value={editingRow.temperature || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Stock Received</label>
+                  <input type="number" value={editingRow.stockReceived || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Stock Remaining</label>
+                  <input type="number" value={editingRow.stockRemaining || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Unit</label>
+                  <select value={editingRow.unit || ""}
+                          onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}
+                          className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                          onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                          onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  >
+                    {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Batch Code</label>
+                  <input type="text" value={editingRow.barCode || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Invoice Number</label>
+                  <input type="text" value={editingRow.invoiceNumber || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Expiry Date</label>
+                  <input type="date" value={editingRow.expiryDate || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}
+                    className="w-full" style={{marginTop:".25rem", border:"1px solid var(--slate-300)", borderRadius:".375rem", padding:".5rem"}}
+                    onFocus={(e)=>{ e.currentTarget.style.boxShadow="0 0 0 2px rgba(124,58,237,.35)"; e.currentTarget.style.borderColor="var(--violet-600)"; }}
+                    onBlur={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor="var(--slate-300)"; }}
+                  />
+                </div>
+              </div>
+              <div className="px-4 py-3 border-t" style={{background:"var(--slate-50)", display:"flex", justifyContent:"end", gap:".5rem"}}>
+                <button
+                  onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}
+                  disabled={updating}
+                  className="px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50"
+                  style={{ border:"1px solid var(--slate-300)", color:"var(--slate-700)" }}
+                  onMouseOver={(e)=>{ e.currentTarget.style.background="var(--slate-100)"; }}
+                  onMouseOut={(e)=>{ e.currentTarget.style.background="transparent"; }}
+                >Cancel</button>
+                <button
+                  onClick={handleConfirmEdit}
+                  disabled={updating}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg disabled:opacity-50"
+                  style={{ background:"var(--violet-600)", color:"#fff", boxShadow:"var(--shadow-sm)" }}
+                  onMouseOver={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--violet-700)"; }}
+                  onMouseOut={(e)=>{ if(!e.currentTarget.disabled) e.currentTarget.style.background="var(--violet-600)"; }}
+                >
+                  {updating ? <SpinnerIcon className="w-4 h-4" /> : null} {updating ? " Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: 2 }}>
-                  <Button variant="outlined" size="small" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}>Prev</Button>
-                  <Typography variant="caption">{page + 1}</Typography>
-                  <Button variant="outlined" size="small" onClick={() => {
-                    const maxPage = Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1);
-                    setPage(Math.min(maxPage, page + 1));
-                  }} disabled={(page + 1) * rowsPerPage >= filteredRows.length}>Next</Button>
-
-                  <FormControl size="small" sx={{ minWidth: 88 }}>
-                    <Select
-                      value={rowsPerPage}
-                      onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
-                    >
-                      <MenuItem value={5}>5</MenuItem>
-                      <MenuItem value={10}>10</MenuItem>
-                      <MenuItem value={25}>25</MenuItem>
-                      <MenuItem value={50}>50</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-              </Box>
-            </Box>
-          </Paper>
-
-          <Box sx={{ width: { xs: "100%", md: 320 } }}>
-            <Paper sx={{ p: 2, mb: 2, borderRadius: 2, boxShadow: brand.shadow }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Quick Stats</Typography>
-              <Typography variant="caption" color="text.secondary">Top ingredients by remaining stock (normalized)</Typography>
-              <Box sx={{ mt: 2 }}>
-                <SmallBarChart data={totalsByIngredient} />
-              </Box>
-            </Paper>
-
-            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: brand.shadow }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Legend</Typography>
-              <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                <Chip label="Selected" color="default" size="small" />
-                <Chip label="Low stock" size="small" sx={{ bgcolor: "#fff7ed", color: "#92400e" }} />
-              </Box>
-            </Paper>
-          </Box>
-        </Box>
-      </Box>
-
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 800 }}>Edit Goods In Record</DialogTitle>
-        <DialogContent dividers>
-          {editingRow ? (
-            <Box sx={{ display: "grid", gap: 2, mt: 1 }}>
-              <TextField label="Ingredient" fullWidth value={editingRow.ingredient || ""} onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })} />
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                <TextField label="Date" type="date" value={editingRow.date || ""} onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })} fullWidth />
-                <TextField label="Temperature (℃)" value={editingRow.temperature || ""} onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })} fullWidth />
-              </Box>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                <TextField label="Stock Received" type="number" value={editingRow.stockReceived || ""} onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })} fullWidth />
-                <TextField label="Stock Remaining" type="number" value={editingRow.stockRemaining || ""} onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })} fullWidth />
-              </Box>
-
-              <FormControl fullWidth>
-                <InputLabel>Unit</InputLabel>
-                <Select value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
-                  {unitOptions.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-                </Select>
-              </FormControl>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                <TextField label="Batch Code" value={editingRow.barCode || ""} onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })} fullWidth />
-                <TextField label="Invoice Number" value={editingRow.invoiceNumber || ""} onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })} fullWidth />
-              </Box>
-
-              <TextField label="Expiry Date" type="date" value={editingRow.expiryDate || ""} onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })} fullWidth />
-            </Box>
-          ) : (
-            <Typography color="text.secondary">No row selected.</Typography>
-          )}
-        </DialogContent>
-
-        <DialogActions sx={{ p: 2 }}>
-          <Button variant="outlined" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</Button>
-          <Button variant="contained" onClick={handleConfirmEdit} disabled={updating}>
-            {updating ? <CircularProgress size={18} /> : "Save Changes"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <Typography color="text.secondary">Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}? This action will soft-delete them.</Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button variant="outlined" onClick={() => setOpenConfirmDialog(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteSelectedRows}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {/* Confirm Delete */}
+      {openConfirmDialog && (
+        <div className="fixed inset-0" style={{background:"rgba(0,0,0,.3)"}}>
+          <div className="flex items-center justify-center" style={{height:"100%"}}>
+            <div className="bg-white rounded-lg shadow-md w-full" style={{maxWidth:"28rem"}}>
+              <h3 className="text-lg font-bold p-4">Confirm Deletion</h3>
+              <p className="px-4 text-slate-600">
+                Delete {selectedRows.length} selected record{selectedRows.length === 1 ? "" : "s"}? This is a soft-delete action.
+              </p>
+              <div className="px-4 py-3 border-t" style={{background:"var(--slate-50)", display:"flex", justifyContent:"end", gap:".5rem", marginTop:"1rem"}}>
+                <button
+                  onClick={() => setOpenConfirmDialog(false)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg"
+                  style={{ border:"1px solid var(--slate-300)", color:"var(--slate-700)" }}
+                  onMouseOver={(e)=>{ e.currentTarget.style.background="var(--slate-100)"; }}
+                  onMouseOut={(e)=>{ e.currentTarget.style.background="transparent"; }}
+                >Cancel</button>
+                <button
+                  onClick={handleDeleteSelectedRows}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg"
+                  style={{ background:"var(--red-600)", color:"#fff", boxShadow:"var(--shadow-sm)" }}
+                  onMouseOver={(e)=>{ e.currentTarget.style.background="var(--red-700)"; }}
+                  onMouseOut={(e)=>{ e.currentTarget.style.background="var(--red-600)"; }}
+                >Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
