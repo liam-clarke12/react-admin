@@ -1,12 +1,34 @@
+// src/scenes/GoodsIn/index.jsx
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+// MUI just for the ingredient dropdown + add-custom dialog in the Add Good(s) popup
+import Autocomplete from "@mui/material/Autocomplete";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tabs,
+  Tab,
+  IconButton,
+  Snackbar,
+  Alert,
+  Box,
+} from "@mui/material";
 
 /* =========================================================================================
-   Brand Styles
+   Brand Styles (unchanged look)
    ========================================================================================= */
 const BrandStyles = () => (
   <style>{`
-  .r-wrap { padding: 16px; overflow-x: hidden; }
+  .r-wrap { padding: 16px; }
   .r-card {
     background:#fff; border:1px solid #e5e7eb; border-radius:16px;
     box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
@@ -17,8 +39,6 @@ const BrandStyles = () => (
   .r-sub { margin:0; color:#64748b; font-size:12px; }
   .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
   .r-flex { display:flex; align-items:center; gap:10px; }
-  .r-btn-icon { border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626; }
-  .r-btn-icon:hover { background:#fee2e2; }
   .r-btn-ghost {
     display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
     color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
@@ -32,19 +52,27 @@ const BrandStyles = () => (
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
 
-  /* Table: only the table scrolls horizontally */
-  .r-table-wrap { overflow-x:auto; overflow-y: hidden; }
-  table.r-table { width:100%; min-width:1200px; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
+  /* Table (no horizontal scroll on page or table) */
+  .r-table-wrap { overflow-x: hidden; }
+  table.r-table { width:100%; table-layout: fixed; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
   .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
-  .r-thead th { padding:12px; text-align:left; }
+  .r-thead th { padding:12px; text-align:left; white-space:nowrap; }
   .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
   .r-row:hover { background:#f4f1ff; }
-  .r-td { padding:12px; }
-  .r-td--name { font-weight:800; color:#0f172a; white-space:nowrap; }
+  .r-td { padding:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .r-td--name { font-weight:800; color:#0f172a; }
   .r-qty-badge { display:inline-block; padding:2px 8px; border-radius:10px; background:#f1f5f9; color:#0f172a; font-weight:700; }
-  .r-badge-mono { padding:2px 8px; border-radius:8px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; background:#ede9fe; color:#7C3AED; }
+  .r-badge-mono { display:inline-block; padding:2px 8px; border-radius:8px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; background:#ede9fe; color:#7C3AED; max-width: 180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .r-actions { text-align:right; }
   .r-chk { width:16px; height:16px; }
+
+  .col-date{width:110px}
+  .col-temp{width:80px}
+  .col-num{width:120px}
+  .col-invoice{width:120px}
+  .col-expiry{width:110px}
+  .col-batch{width:200px}
+  .col-actions{width:160px}
 
   .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .r-input {
@@ -57,28 +85,6 @@ const BrandStyles = () => (
   .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
   .r-muted { color:#64748b; font-size:12px; }
 
-  /* Modal */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:860px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
-  .r-mbody { padding:16px; overflow:auto; }
-  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
-
-  /* Form inside modal (Single / Multiple) */
-  .tabs { display:flex; gap:6px; background:#f8fafc; padding:6px; border-radius:12px; border:1px solid #e5e7eb; }
-  .tab { font-weight:800; font-size:14px; padding:8px 12px; border-radius:10px; cursor:pointer; color:#334155; }
-  .tab.active { background:#7C3AED; color:#fff; }
-  .gi-grid { display:grid; gap:12px; grid-template-columns: repeat(4, minmax(0,1fr)); }
-  .gi-field { display:flex; flex-direction:column; gap:6px; }
-  .gi-field label { font-size:12px; font-weight:800; color:#64748b; }
-  .gi-field input, .gi-field select, .gi-field textarea {
-    padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
-  }
-  .gi-field input:focus, .gi-field select:focus, .gi-field textarea:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
-  .gi-row-card { border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
-  .gi-row-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-  .gi-err { color:#dc2626; font-size:12px; }
-
   /* Page layout */
   .gi-layout { display:flex; gap:24px; align-items:flex-start; }
   .gi-main { flex:1 1 0%; min-width:0; }
@@ -86,14 +92,31 @@ const BrandStyles = () => (
 
   /* Side cards */
   .gi-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); padding:16px; }
-  .gi-card h3 { margin:0 0 6px 0; font-weight:900; color:#0f172a; }
-  .gi-stat-row { display:flex; align-items:baseline; justify-content:space-between; padding:6px 0; }
-  .gi-bar { height:10px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
-  .gi-bar > span { display:block; height:100%; background:linear-gradient(180deg, #6366f1, #7C3AED); }
+
+  /* Thin modal overlay for our existing popups */
+  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+  .r-mbody { padding:16px; overflow:auto; background:#fff; }
+  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
+
+  /* Add Good form bits in modal */
+  .ag-grid { display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0, 1fr)); }
+  .ag-field { grid-column: span 2; }
+  .ag-field-1 { grid-column: span 1; }
+  .ag-field-4 { grid-column: span 4; }
+  .ag-label { font-size:12px; color:#64748b; font-weight:800; margin-bottom:6px; display:block; }
+  .ag-input, .ag-select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; }
+  .ag-input:focus, .ag-select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+
+  /* Row card in multiple */
+  .ag-row { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff; }
+  .ag-row:nth-child(odd){ background:#f8fafc; }
+
   `}</style>
 );
 
-/* Tiny icons */
+/* Icons */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -112,31 +135,9 @@ const PlusIcon = (props) => (
 );
 
 /* =========================================================================================
-   Types
+   Types & Utils
    ========================================================================================= */
-/**
- * @typedef {Object} GoodsInRow
- * @property {string} _id
- * @property {string} date
- * @property {string} ingredient
- * @property {string|number|null} temperature
- * @property {number} stockReceived
- * @property {number} stockRemaining
- * @property {string} unit
- * @property {string|null} expiryDate
- * @property {string|null} barCode
- * @property {string|null} invoiceNumber
- * @property {'Yes'|'No'} processed
- */
-
-/* =========================================================================================
-   Units utils
-   ========================================================================================= */
-const UnitGroup = Object.freeze({
-  GRAMS: "grams_group",
-  ML: "ml_group",
-  UNITS: "units_group",
-});
+const UnitGroup = Object.freeze({ GRAMS: "grams_group", ML: "ml_group", UNITS: "units_group" });
 const unitOptions = [
   { value: "grams", label: "Grams (g)" },
   { value: "ml", label: "Milliliters (ml)" },
@@ -178,12 +179,10 @@ function formatDisplayAmount(baseAmount, group) {
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /* =========================================================================================
-   Side bar small bar list
+   Small Bar List (side stats)
    ========================================================================================= */
 const SmallBarList = ({ data = [] }) => {
-  if (!data || data.length === 0) {
-    return <p className="r-muted">No data available.</p>;
-  }
+  if (!data || data.length === 0) return <p className="r-muted">No data available.</p>;
   const maxBase = Math.max(...data.map((d) => Number(d.baseAmount) || 0), 1);
   return (
     <div style={{ display: "grid", gap: 8 }}>
@@ -195,8 +194,8 @@ const SmallBarList = ({ data = [] }) => {
               <span style={{ fontSize: 12, color: "#64748b" }}>{d.ingredient}</span>
               <span style={{ fontSize: 12, fontWeight: 800 }}>{d.amount} {d.unit}</span>
             </div>
-            <div className="gi-bar" aria-label={`${d.ingredient} ${d.amount} ${d.unit}`}>
-              <span style={{ width: `${pct}%` }} />
+            <div style={{ height: 10, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+              <span style={{ display: "block", height: "100%", width: `${pct}%`, background: "linear-gradient(180deg, #6366f1, #7C3AED)" }} />
             </div>
           </div>
         );
@@ -204,296 +203,6 @@ const SmallBarList = ({ data = [] }) => {
     </div>
   );
 };
-
-/* =========================================================================================
-   Add Goods Modal (Single / Multiple)
-   ========================================================================================= */
-const defaultSingle = () => ({
-  date: new Date().toISOString().slice(0,10),
-  ingredient: "",
-  stockReceived: "",
-  unit: "grams",
-  barCode: "",
-  expiryDate: new Date().toISOString().slice(0,10),
-  temperature: "N/A",
-  invoiceNumber: ""
-});
-const defaultItem = () => ({ ...defaultSingle() });
-
-function validateItem(item) {
-  const errors = {};
-  if (!String(item.date || "").trim()) errors.date = "Required";
-  if (!String(item.ingredient || "").trim()) errors.ingredient = "Required";
-  if (item.stockReceived === "" || isNaN(Number(item.stockReceived)) || Number(item.stockReceived) <= 0) errors.stockReceived = "Positive number required";
-  if (!String(item.unit || "").trim()) errors.unit = "Required";
-  if (!String(item.barCode || "").trim()) errors.barCode = "Required";
-  if (!String(item.expiryDate || "").trim()) errors.expiryDate = "Required";
-  if (!String(item.temperature || "").trim()) errors.temperature = "Required";
-  return errors;
-}
-
-function anyErrors(errors) {
-  return Object.keys(errors).length > 0;
-}
-
-/** Add Goods modal component */
-function AddGoodsModal({ open, onClose, onSubmitted, cognitoId }) {
-  const [tab, setTab] = useState("single"); // 'single' | 'multiple'
-  const [single, setSingle] = useState(defaultSingle());
-  const [singleErrors, setSingleErrors] = useState({});
-  const [items, setItems] = useState([defaultItem()]);
-  const [itemErrors, setItemErrors] = useState([{}]);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      // reset on open
-      setTab("single");
-      setSingle(defaultSingle());
-      setSingleErrors({});
-      setItems([defaultItem()]);
-      setItemErrors([{}]);
-      setSubmitting(false);
-    }
-  }, [open]);
-
-  const handleChangeSingle = (key, val) => setSingle((s) => ({ ...s, [key]: val }));
-  const handleChangeItem = (idx, key, val) => {
-    setItems((arr) => {
-      const next = arr.slice();
-      next[idx] = { ...next[idx], [key]: val };
-      return next;
-    });
-  };
-
-  const addRow = () => {
-    setItems((arr) => {
-      const last = arr[arr.length - 1];
-      const seed = defaultItem();
-      // inherit invoice/date to speed up
-      if (last?.invoiceNumber) seed.invoiceNumber = last.invoiceNumber;
-      if (last?.date) seed.date = last.date;
-      return [...arr, seed];
-    });
-    setItemErrors((errs) => [...errs, {}]);
-  };
-
-  const removeRow = (idx) => {
-    setItems((arr) => arr.filter((_, i) => i !== idx));
-    setItemErrors((errs) => errs.filter((_, i) => i !== idx));
-  };
-
-  const postSingle = async () => {
-    const payload = { ...single, cognito_id: cognitoId, invoiceNumber: single.invoiceNumber || null };
-    const res = await fetch(`${API_BASE}/submit`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text().catch(()=> "Submit failed"));
-  };
-
-  const postBatch = async () => {
-    const entries = items.map((it) => ({ ...it, invoiceNumber: it.invoiceNumber || null }));
-    // try batch endpoint
-    try {
-      const r = await fetch(`${API_BASE}/submit/batch`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries, cognito_id: cognitoId })
-      });
-      if (r.ok) return;
-    } catch {}
-    // fallback sequential
-    for (const it of entries) {
-      const r = await fetch(`${API_BASE}/submit`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...it, cognito_id: cognitoId })
-      });
-      // continue even if one fails; log
-      if (!r.ok) console.error("Submit failed item:", await r.text().catch(()=> r.status));
-    }
-  };
-
-  const submit = async () => {
-    if (tab === "single") {
-      const errs = validateItem(single);
-      setSingleErrors(errs);
-      if (anyErrors(errs)) return;
-      setSubmitting(true);
-      try {
-        await postSingle();
-        onSubmitted?.(); // refresh table
-        onClose?.();
-      } catch (e) {
-        alert("Submission failed.");
-      } finally {
-        setSubmitting(false);
-      }
-    } else {
-      // validate each
-      const errsArr = items.map(validateItem);
-      setItemErrors(errsArr);
-      if (errsArr.some(anyErrors)) return;
-      setSubmitting(true);
-      try {
-        await postBatch();
-        onSubmitted?.();
-        onClose?.();
-      } catch (e) {
-        alert("Multiple submission failed.");
-      } finally {
-        setSubmitting(false);
-      }
-    }
-  };
-
-  if (!open) return null;
-  return (
-    <div className="r-modal-dim">
-      <div className="r-modal">
-        <div className="r-mhdr">
-          <div style={{display:"flex", flexDirection:"column", gap:2}}>
-            <h3 className="r-title" style={{ fontSize: 18 }}>Add Goods</h3>
-            <p className="r-sub">Record a single delivery or multiple lines.</p>
-          </div>
-          <button className="r-btn-ghost" onClick={onClose}>Close</button>
-        </div>
-
-        <div className="r-mbody">
-          {/* Tabs */}
-          <div className="tabs" style={{ marginBottom: 12 }}>
-            <button className={`tab ${tab === "single" ? "active" : ""}`} onClick={() => setTab("single")}>Single</button>
-            <button className={`tab ${tab === "multiple" ? "active" : ""}`} onClick={() => setTab("multiple")}>Multiple</button>
-          </div>
-
-          {/* Single */}
-          {tab === "single" && (
-            <div className="gi-grid">
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Date</label>
-                <input type="date" value={single.date} onChange={(e)=>handleChangeSingle("date", e.target.value)} />
-                {singleErrors.date && <span className="gi-err">{singleErrors.date}</span>}
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Ingredient</label>
-                <input type="text" placeholder="e.g., Açaí puree" value={single.ingredient} onChange={(e)=>handleChangeSingle("ingredient", e.target.value)} />
-                {singleErrors.ingredient && <span className="gi-err">{singleErrors.ingredient}</span>}
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Invoice Number (optional)</label>
-                <input type="text" value={single.invoiceNumber} onChange={(e)=>handleChangeSingle("invoiceNumber", e.target.value)} />
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 1" }}>
-                <label>Stock Received</label>
-                <input type="number" value={single.stockReceived} onChange={(e)=>handleChangeSingle("stockReceived", e.target.value)} />
-                {singleErrors.stockReceived && <span className="gi-err">{singleErrors.stockReceived}</span>}
-              </div>
-              <div className="gi-field" style={{ gridColumn: "span 1" }}>
-                <label>Metric</label>
-                <select value={single.unit} onChange={(e)=>handleChangeSingle("unit", e.target.value)}>
-                  {unitOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                {singleErrors.unit && <span className="gi-err">{singleErrors.unit}</span>}
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Batch Code</label>
-                <input type="text" value={single.barCode} onChange={(e)=>handleChangeSingle("barCode", e.target.value)} />
-                {singleErrors.barCode && <span className="gi-err">{singleErrors.barCode}</span>}
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Expiry Date</label>
-                <input type="date" value={single.expiryDate} onChange={(e)=>handleChangeSingle("expiryDate", e.target.value)} />
-                {singleErrors.expiryDate && <span className="gi-err">{singleErrors.expiryDate}</span>}
-              </div>
-
-              <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                <label>Temperature (℃)</label>
-                <input type="text" value={single.temperature} onChange={(e)=>handleChangeSingle("temperature", e.target.value)} />
-                {singleErrors.temperature && <span className="gi-err">{singleErrors.temperature}</span>}
-              </div>
-            </div>
-          )}
-
-          {/* Multiple */}
-          {tab === "multiple" && (
-            <div style={{ display:"grid", gap:12 }}>
-              {items.map((it, idx) => (
-                <div className="gi-row-card" key={idx}>
-                  <div className="gi-row-head">
-                    <strong>Good {idx+1}</strong>
-                    <button className="r-btn-ghost" onClick={()=>removeRow(idx)}><DeleteIcon /> Remove</button>
-                  </div>
-                  <div className="gi-grid">
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Date</label>
-                      <input type="date" value={it.date} onChange={(e)=>handleChangeItem(idx,"date", e.target.value)} />
-                      {itemErrors[idx]?.date && <span className="gi-err">{itemErrors[idx].date}</span>}
-                    </div>
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Ingredient</label>
-                      <input type="text" value={it.ingredient} onChange={(e)=>handleChangeItem(idx,"ingredient", e.target.value)} />
-                      {itemErrors[idx]?.ingredient && <span className="gi-err">{itemErrors[idx].ingredient}</span>}
-                    </div>
-
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Invoice Number (optional)</label>
-                      <input type="text" value={it.invoiceNumber} onChange={(e)=>handleChangeItem(idx,"invoiceNumber", e.target.value)} />
-                    </div>
-
-                    <div className="gi-field">
-                      <label>Stock Received</label>
-                      <input type="number" value={it.stockReceived} onChange={(e)=>handleChangeItem(idx,"stockReceived", e.target.value)} />
-                      {itemErrors[idx]?.stockReceived && <span className="gi-err">{itemErrors[idx].stockReceived}</span>}
-                    </div>
-                    <div className="gi-field">
-                      <label>Metric</label>
-                      <select value={it.unit} onChange={(e)=>handleChangeItem(idx,"unit", e.target.value)}>
-                        {unitOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                      {itemErrors[idx]?.unit && <span className="gi-err">{itemErrors[idx].unit}</span>}
-                    </div>
-
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Batch Code</label>
-                      <input type="text" value={it.barCode} onChange={(e)=>handleChangeItem(idx,"barCode", e.target.value)} />
-                      {itemErrors[idx]?.barCode && <span className="gi-err">{itemErrors[idx].barCode}</span>}
-                    </div>
-
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Expiry Date</label>
-                      <input type="date" value={it.expiryDate} onChange={(e)=>handleChangeItem(idx,"expiryDate", e.target.value)} />
-                      {itemErrors[idx]?.expiryDate && <span className="gi-err">{itemErrors[idx].expiryDate}</span>}
-                    </div>
-
-                    <div className="gi-field" style={{ gridColumn:"span 2" }}>
-                      <label>Temperature (℃)</label>
-                      <input type="text" value={it.temperature} onChange={(e)=>handleChangeItem(idx,"temperature", e.target.value)} />
-                      {itemErrors[idx]?.temperature && <span className="gi-err">{itemErrors[idx].temperature}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{ display:"flex", gap:8 }}>
-                <button className="r-btn-ghost" onClick={addRow}><PlusIcon /> Add Good</button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="r-mfooter">
-          <button className="r-btn-ghost" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button className={`r-btn-primary ${submitting ? "disabled" : ""}`} onClick={submit} disabled={submitting}>
-            {submitting ? "Saving..." : (tab === "single" ? "Record Stock" : `Submit Multiple (${items.length})`)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* =========================================================================================
    Main Component
@@ -510,24 +219,76 @@ export default function GoodsIn() {
   } catch {}
   const cognitoId = cognitoIdFromAuth || cognitoIdFromWindow || cognitoIdFromStorage || "";
 
-  /** @type {[GoodsInRow[], Function]} */
+  // Table state
   const [goodsInRows, setGoodsInRows] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [fatalMsg, setFatalMsg] = useState("");
+  const selectAllCheckboxRef = useRef(null);
+
+  // Edit / Delete
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
   const [originalBarcode, setOriginalBarcode] = useState(null);
   const [originalId, setOriginalId] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [fatalMsg, setFatalMsg] = useState("");
-  const [addOpen, setAddOpen] = useState(false); // NEW: add goods modal
-  const selectAllCheckboxRef = useRef(null);
 
+  // ADD GOODS POPUP — keep your popup, we just enhance the ingredient field
+  const [addOpen, setAddOpen] = useState(false);
+  const [addTab, setAddTab] = useState(0); // 0 = Single, 1 = Multiple
+
+  // single entry state
+  const [single, setSingle] = useState({
+    date: new Date().toISOString().slice(0,10),
+    ingredient: "", // will store selected ingredient id OR custom text
+    invoiceNumber: "",
+    stockReceived: "",
+    unit: "grams",
+    barCode: "",
+    expiryDate: new Date().toISOString().slice(0,10),
+    temperature: "N/A",
+  });
+
+  // multiple entry state
+  const blankItem = () => ({
+    date: new Date().toISOString().slice(0,10),
+    ingredient: "",
+    invoiceNumber: single.invoiceNumber || "",
+    stockReceived: "",
+    unit: "grams",
+    barCode: "",
+    expiryDate: new Date().toISOString().slice(0,10),
+    temperature: "N/A",
+  });
+  const [multi, setMulti] = useState([blankItem()]);
+
+  // Ingredient sources (from your attached form file behavior)
+  const [masterIngredients, setMasterIngredients] = useState([]);
+  const [customIngredients, setCustomIngredients] = useState([]);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [loadingCustom, setLoadingCustom] = useState(false);
+  const ingredients = useMemo(
+    () => [
+      ...masterIngredients.map((i) => ({ ...i, source: "master" })),
+      ...customIngredients.map((i) => ({ ...i, source: "custom" })),
+    ],
+    [masterIngredients, customIngredients]
+  );
+
+  // Add custom ingredient dialog
+  const [addIngOpen, setAddIngOpen] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState("");
+  const [addingIng, setAddingIng] = useState(false);
+
+  // Toast after successful submit
+  const [toastOpen, setToastOpen] = useState(false);
+
+  // Helpers
   const computeIngredientInventory = (rows) => {
     const active = (Array.isArray(rows) ? rows : []).filter((r) => r.stockRemaining > 0);
     const map = new Map();
@@ -548,9 +309,7 @@ export default function GoodsIn() {
 
   const fetchGoodsInData = useCallback(async () => {
     if (!cognitoId) {
-      setFatalMsg(
-        "Missing cognito_id. Ensure useAuth() provides cognitoId, or set window.__COGNITO_ID__ / localStorage('cognito_id')."
-      );
+      setFatalMsg("Missing cognito_id. Ensure useAuth() provides cognitoId, or set window.__COGNITO_ID__ / localStorage('cognito_id').");
       setGoodsInRows([]);
       setLoading(false);
       return;
@@ -594,6 +353,24 @@ export default function GoodsIn() {
 
   useEffect(() => { fetchGoodsInData(); }, [fetchGoodsInData]);
 
+  // Fetch ingredients when popup opens (or when cognitoId changes)
+  useEffect(() => {
+    if (!addOpen || !cognitoId) return;
+    setLoadingMaster(true);
+    fetch(`${API_BASE}/ingredients?cognito_id=${cognitoId}`)
+      .then(res => { if (!res.ok) throw new Error("Failed to fetch ingredients"); return res.json(); })
+      .then(setMasterIngredients)
+      .catch(err => console.error("Ingredients master error:", err))
+      .finally(() => setLoadingMaster(false));
+
+    setLoadingCustom(true);
+    fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
+      .then(res => { if (!res.ok) throw new Error("Failed to fetch custom ingredients"); return res.json(); })
+      .then(data => setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))))
+      .catch(err => console.error("Custom ingredients error:", err))
+      .finally(() => setLoadingCustom(false));
+  }, [addOpen, cognitoId]);
+
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let rows = [...goodsInRows];
@@ -617,6 +394,7 @@ export default function GoodsIn() {
     }
   }, [selectedRows, filteredRows]);
 
+  // Edit/update/delete
   const processRowUpdate = async (newRow, oldRow) => {
     if (!cognitoId) throw new Error("Missing cognito_id for update.");
     const payload = {
@@ -644,7 +422,6 @@ export default function GoodsIn() {
     }
     await fetchGoodsInData();
   };
-
   const handleDeleteSelectedRows = async () => {
     if (selectedRows.length === 0) return;
     if (!cognitoId) { alert("Missing cognito_id for delete."); return; }
@@ -669,14 +446,12 @@ export default function GoodsIn() {
       alert("Could not delete selected records. Check console for details.");
     }
   };
-
   const handleEditRow = (row) => {
     setEditingRow({ ...row });
     setOriginalBarcode(row.barCode);
     setOriginalId(row._id);
     setEditDialogOpen(true);
   };
-
   const handleConfirmEdit = async () => {
     if (!editingRow) return; setUpdating(true);
     try {
@@ -741,6 +516,114 @@ export default function GoodsIn() {
 
   const numSelected = selectedRows.length;
 
+  /* ===========================================================
+     Add Good(s) Submit — matches attached form endpoints
+     =========================================================== */
+  const resolveIngredientName = (value) => {
+    // value can be ingredient id or custom text
+    const opt = ingredients.find((i) => String(i.id) === String(value));
+    return opt ? opt.name : value;
+  };
+
+  const submitSingle = async () => {
+    const payload = {
+      ...single,
+      ingredient: resolveIngredientName(single.ingredient),
+      ingredientId: ingredients.find((i) => String(i.id) === String(single.ingredient))?.id ?? null,
+      invoiceNumber: single.invoiceNumber || null,
+      cognito_id: cognitoId,
+    };
+    const res = await fetch(`${API_BASE}/submit`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text().catch(()=>"Submit failed"));
+  };
+
+  const submitMultiple = async () => {
+    const entries = multi.map((it) => ({
+      ...it,
+      ingredient: resolveIngredientName(it.ingredient),
+      ingredientId: ingredients.find((i) => String(i.id) === String(it.ingredient))?.id ?? null,
+      invoiceNumber: it.invoiceNumber || null,
+    }));
+    // try batch first
+    const res = await fetch(`${API_BASE}/submit/batch`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries, cognito_id: cognitoId }),
+    });
+    if (res.ok) return;
+    // fallback sequential
+    for (const e of entries) {
+      const r = await fetch(`${API_BASE}/submit`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...e, cognito_id: cognitoId }),
+      });
+      if (!r.ok) console.warn("submit fallback failed:", await r.text().catch(()=>r.status));
+    }
+  };
+
+  const handleAddSubmit = async () => {
+    try {
+      if (!cognitoId) throw new Error("Missing cognito id");
+      if (addTab === 0) {
+        await submitSingle();
+      } else {
+        if (!multi.length) throw new Error("Please add at least one item");
+        await submitMultiple();
+      }
+      setAddOpen(false);
+      // reset forms
+      setSingle({
+        date: new Date().toISOString().slice(0,10),
+        ingredient: "",
+        invoiceNumber: "",
+        stockReceived: "",
+        unit: "grams",
+        barCode: "",
+        expiryDate: new Date().toISOString().slice(0,10),
+        temperature: "N/A",
+      });
+      setMulti([blankItem()]);
+      // refresh list and toast
+      await fetchGoodsInData();
+      setToastOpen(true);
+    } catch (e) {
+      console.error("Add Good(s) submit error:", e);
+      alert(String(e?.message || e));
+    }
+  };
+
+  const addMultiRow = () => setMulti((arr) => [...arr, blankItem()]);
+  const removeMultiRow = (idx) => setMulti((arr) => arr.filter((_, i) => i !== idx));
+
+  /* ===========================================================
+     Add custom ingredient (dialog)
+     =========================================================== */
+  const handleAddCustomIngredient = async () => {
+    if (!newIngredientName.trim() || !cognitoId) return;
+    setAddingIng(true);
+    try {
+      const res = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cognito_id: cognitoId, name: newIngredientName.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to add ingredient");
+      // refresh custom list
+      const updated = await fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`);
+      if (!updated.ok) throw new Error("Failed to refresh custom ingredients");
+      const data = await updated.json();
+      setCustomIngredients(data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })));
+      setAddIngOpen(false);
+      setNewIngredientName("");
+    } catch (err) {
+      console.error("add custom ingredient error:", err);
+      alert("Could not add ingredient");
+    } finally {
+      setAddingIng(false);
+    }
+  };
+
   return (
     <div className="r-wrap">
       <BrandStyles />
@@ -768,14 +651,9 @@ export default function GoodsIn() {
               </div>
 
               <div className="r-flex">
-                <button
-                  className="r-btn-primary"
-                  onClick={() => setAddOpen(true)}
-                  title="Add Goods"
-                >
-                  <span style={{display:"inline-flex", alignItems:"center", gap:8}}>
-                    <PlusIcon stroke="#fff" />
-                    Add Goods
+                <button className="r-btn-primary" onClick={() => setAddOpen(true)}>
+                  <span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>
+                    <PlusIcon /> Add Good(s)
                   </span>
                 </button>
 
@@ -783,12 +661,14 @@ export default function GoodsIn() {
                   <div className="r-flex" style={{ background:"#eef2ff", padding:"6px 10px", borderRadius:10 }}>
                     <span className="r-pill">{numSelected} selected</span>
                     <button
-                      className="r-btn-icon"
+                      className="r-btn-ghost"
                       onClick={() => setDeleteOpen(true)}
                       aria-label="Delete selected"
                       title="Delete selected"
+                      style={{ color:"#dc2626", borderColor:"#fecaca" }}
                     >
                       <DeleteIcon />
+                      Delete
                     </button>
                   </div>
                 )}
@@ -821,7 +701,7 @@ export default function GoodsIn() {
               </select>
             </div>
 
-            {/* TABLE (only this div scrolls horizontally) */}
+            {/* TABLE */}
             <div className="r-table-wrap r-toolbar-gap">
               <table className="r-table">
                 <thead className="r-thead">
@@ -835,15 +715,15 @@ export default function GoodsIn() {
                         checked={filteredRows.length > 0 && numSelected === filteredRows.length}
                       />
                     </th>
-                    <th className="r-td">Date</th>
+                    <th className="r-td col-date">Date</th>
                     <th className="r-td">Ingredient</th>
-                    <th className="r-td">Temp</th>
-                    <th className="r-td">Received</th>
-                    <th className="r-td">Remaining</th>
-                    <th className="r-td">Invoice #</th>
-                    <th className="r-td">Expiry</th>
-                    <th className="r-td">Batch Code</th>
-                    <th className="r-td r-actions">Actions</th>
+                    <th className="r-td col-temp">Temp</th>
+                    <th className="r-td col-num">Received</th>
+                    <th className="r-td col-num">Remaining</th>
+                    <th className="r-td col-invoice">Invoice #</th>
+                    <th className="r-td col-expiry">Expiry</th>
+                    <th className="r-td col-batch">Batch Code</th>
+                    <th className="r-td col-actions r-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -890,7 +770,7 @@ export default function GoodsIn() {
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* FOOTER / PAGINATION */}
             <div className="r-footer">
               <span className="r-muted">
                 Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
@@ -924,25 +804,25 @@ export default function GoodsIn() {
           </div>
         </div>
 
-        {/* SIDE */}
+        {/* SIDE (right) */}
         <aside className="gi-side">
           <div className="gi-card">
-            <h3>Quick Stats</h3>
+            <h3 style={{ margin:0, fontWeight:900, color:"#0f172a" }}>Quick Stats</h3>
             <p className="r-muted" style={{ marginBottom: 10 }}>Top ingredients by remaining stock</p>
             <SmallBarList data={totalsByIngredient} />
           </div>
 
           <div className="gi-card">
-            <h3>Total Remaining</h3>
-            <div className="gi-stat-row">
+            <h3 style={{ margin:0, fontWeight:900, color:"#0f172a" }}>Total Remaining</h3>
+            <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", padding:"6px 0" }}>
               <span className="r-muted">Grams Group</span>
               <strong>{displayTotalsByGroup.gramsGroup.amount} {displayTotalsByGroup.gramsGroup.unit}</strong>
             </div>
-            <div className="gi-stat-row">
+            <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", padding:"6px 0" }}>
               <span className="r-muted">ml Group</span>
               <strong>{displayTotalsByGroup.mlGroup.amount} {displayTotalsByGroup.mlGroup.unit}</strong>
             </div>
-            <div className="gi-stat-row">
+            <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", padding:"6px 0" }}>
               <span className="r-muted">Units Group</span>
               <strong>{displayTotalsByGroup.unitsGroup.amount} {displayTotalsByGroup.unitsGroup.unit}</strong>
             </div>
@@ -950,7 +830,7 @@ export default function GoodsIn() {
         </aside>
       </div>
 
-      {/* EDIT MODAL */}
+      {/* ===================== EDIT MODAL ===================== */}
       {editDialogOpen && editingRow && (
         <div className="r-modal-dim">
           <div className="r-modal">
@@ -959,72 +839,64 @@ export default function GoodsIn() {
               <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}>Close</button>
             </div>
             <div className="r-mbody">
-              <div className="gi-grid">
-                <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                  <label>Ingredient</label>
-                  <input type="text" value={editingRow.ingredient || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })} />
+              <div className="ag-grid">
+                <div className="ag-field ag-field-4">
+                  <label className="ag-label">Ingredient</label>
+                  <input className="ag-input" type="text" value={editingRow.ingredient || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}/>
                 </div>
-                <div className="gi-field">
-                  <label>Date</label>
-                  <input type="date" value={editingRow.date || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })} />
+                <div className="ag-field">
+                  <label className="ag-label">Date</label>
+                  <input className="ag-input" type="date" value={editingRow.date || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}/>
                 </div>
-                <div className="gi-field">
-                  <label>Temperature (℃)</label>
-                  <input type="text" value={editingRow.temperature || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })} />
+                <div className="ag-field">
+                  <label className="ag-label">Temperature (℃)</label>
+                  <input className="ag-input" type="text" value={editingRow.temperature || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}/>
                 </div>
-                <div className="gi-field">
-                  <label>Stock Received</label>
-                  <input type="number" value={editingRow.stockReceived || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })} />
+                <div className="ag-field-1">
+                  <label className="ag-label">Stock Received</label>
+                  <input className="ag-input" type="number" value={editingRow.stockReceived || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}/>
                 </div>
-                <div className="gi-field">
-                  <label>Stock Remaining</label>
-                  <input type="number" value={editingRow.stockRemaining || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })} />
+                <div className="ag-field-1">
+                  <label className="ag-label">Stock Remaining</label>
+                  <input className="ag-input" type="number" value={editingRow.stockRemaining || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}/>
                 </div>
-                <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                  <label>Unit</label>
-                  <select value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
+                <div className="ag-field ag-field-4">
+                  <label className="ag-label">Unit</label>
+                  <select className="ag-select" value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
                     {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
-                <div className="gi-field">
-                  <label>Batch Code</label>
-                  <input type="text" value={editingRow.barCode || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })} />
+                <div className="ag-field">
+                  <label className="ag-label">Batch Code</label>
+                  <input className="ag-input" type="text" value={editingRow.barCode || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}/>
                 </div>
-                <div className="gi-field">
-                  <label>Invoice Number</label>
-                  <input type="text" value={editingRow.invoiceNumber || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })} />
+                <div className="ag-field">
+                  <label className="ag-label">Invoice Number</label>
+                  <input className="ag-input" type="text" value={editingRow.invoiceNumber || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}/>
                 </div>
-                <div className="gi-field" style={{ gridColumn: "span 2" }}>
-                  <label>Expiry Date</label>
-                  <input type="date" value={editingRow.expiryDate || ""}
-                    onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })} />
+                <div className="ag-field ag-field-4">
+                  <label className="ag-label">Expiry Date</label>
+                  <input className="ag-input" type="date" value={editingRow.expiryDate || ""}
+                    onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}/>
                 </div>
               </div>
             </div>
             <div className="r-mfooter">
-              <button
-                className="r-btn-ghost"
-                onClick={() => { setEditDialogOpen(false); setEditingRow(null); }}
-                disabled={updating}
-              >Cancel</button>
-              <button
-                className="r-btn-primary"
-                onClick={handleConfirmEdit}
-                disabled={updating}
-              >{updating ? "Saving..." : "Save Changes"}</button>
+              <button className="r-btn-ghost" onClick={() => { setEditDialogOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</button>
+              <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>{updating ? "Saving..." : "Save Changes"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* DELETE CONFIRMATION MODAL */}
+      {/* ===================== DELETE CONFIRM MODAL ===================== */}
       {deleteOpen && numSelected > 0 && (
         <div className="r-modal-dim">
           <div className="r-modal" style={{ maxWidth: 420 }}>
@@ -1049,13 +921,245 @@ export default function GoodsIn() {
         </div>
       )}
 
-      {/* ADD GOODS MODAL */}
-      <AddGoodsModal
-        open={addOpen}
-        onClose={()=>setAddOpen(false)}
-        onSubmitted={fetchGoodsInData}
-        cognitoId={cognitoId}
-      />
+      {/* ===================== ADD GOOD(S) POPUP (kept) ===================== */}
+      {addOpen && (
+        <div className="r-modal-dim">
+          <div className="r-modal">
+            <div className="r-mhdr">
+              <h3 className="r-title" style={{ fontSize: 18 }}>Add Good(s)</h3>
+              <div>
+                <Tabs value={addTab} onChange={(_,v)=>setAddTab(v)} sx={{ minHeight: 40, "& .MuiTab-root": { textTransform:"none", fontWeight:800, minHeight:40 } }}>
+                  <Tab label="Single" />
+                  <Tab label={`Multiple (${multi.length})`} />
+                </Tabs>
+              </div>
+            </div>
+
+            <div className="r-mbody">
+              {addTab === 0 ? (
+                <div className="ag-grid">
+                  {/* Date */}
+                  <div className="ag-field">
+                    <label className="ag-label">Date</label>
+                    <input className="ag-input" type="date" value={single.date} onChange={(e)=>setSingle(s=>({...s, date: e.target.value}))}/>
+                  </div>
+
+                  {/* Ingredient — MUI Autocomplete with master + custom + Add Ingredient + */}
+                  <div className="ag-field">
+                    <label className="ag-label">Ingredient</label>
+                    <Autocomplete
+                      options={ingredients}
+                      value={ingredients.find(i=>String(i.id)===String(single.ingredient)) || null}
+                      onChange={(_, val)=>setSingle(s=>({...s, ingredient: val ? val.id : ""}))}
+                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                      loading={loadingMaster || loadingCustom}
+                      renderInput={(params)=>(
+                        <TextField
+                          {...params}
+                          placeholder="Search ingredients…"
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                    <div style={{ textAlign:"right", marginTop:8 }}>
+                      <button className="r-btn-ghost" onClick={()=>setAddIngOpen(true)}>Add Ingredient +</button>
+                    </div>
+                  </div>
+
+                  {/* Invoice Number */}
+                  <div className="ag-field">
+                    <label className="ag-label">Invoice Number</label>
+                    <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e)=>setSingle(s=>({...s, invoiceNumber: e.target.value}))}/>
+                  </div>
+
+                  {/* Stock Received */}
+                  <div className="ag-field-1">
+                    <label className="ag-label">Stock Received</label>
+                    <input className="ag-input" type="number" value={single.stockReceived} onChange={(e)=>setSingle(s=>({...s, stockReceived: e.target.value}))}/>
+                  </div>
+
+                  {/* Unit */}
+                  <div className="ag-field-1">
+                    <label className="ag-label">Unit</label>
+                    <select className="ag-select" value={single.unit} onChange={(e)=>setSingle(s=>({...s, unit: e.target.value}))}>
+                      {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Batch Code */}
+                  <div className="ag-field">
+                    <label className="ag-label">Batch Code</label>
+                    <input className="ag-input" type="text" value={single.barCode} onChange={(e)=>setSingle(s=>({...s, barCode: e.target.value}))}/>
+                  </div>
+
+                  {/* Expiry Date */}
+                  <div className="ag-field">
+                    <label className="ag-label">Expiry Date</label>
+                    <input className="ag-input" type="date" value={single.expiryDate} onChange={(e)=>setSingle(s=>({...s, expiryDate: e.target.value}))}/>
+                  </div>
+
+                  {/* Temperature */}
+                  <div className="ag-field">
+                    <label className="ag-label">Temperature (℃)</label>
+                    <input className="ag-input" type="text" value={single.temperature} onChange={(e)=>setSingle(s=>({...s, temperature: e.target.value}))}/>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display:"grid", gap:12 }}>
+                  {multi.map((it, idx)=>(
+                    <div key={idx} className="ag-row">
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                        <strong>Good {idx+1}</strong>
+                        <IconButton size="small" onClick={()=>removeMultiRow(idx)}><DeleteIcon /></IconButton>
+                      </div>
+                      <div className="ag-grid">
+                        <div className="ag-field">
+                          <label className="ag-label">Date</label>
+                          <input className="ag-input" type="date" value={it.date} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, date:e.target.value} : v))}/>
+                        </div>
+                        <div className="ag-field">
+                          <label className="ag-label">Ingredient</label>
+                          <Autocomplete
+                            options={ingredients}
+                            value={ingredients.find(i=>String(i.id)===String(it.ingredient)) || null}
+                            onChange={(_, val)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, ingredient: val ? val.id : ""} : v))}
+                            getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                            isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                            loading={loadingMaster || loadingCustom}
+                            renderInput={(params)=>(
+                              <TextField
+                                {...params}
+                                placeholder="Search ingredients…"
+                                InputProps={{
+                                  ...params.InputProps,
+                                  endAdornment: (
+                                    <>
+                                      {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
+                                      {params.InputProps.endAdornment}
+                                    </>
+                                  ),
+                                }}
+                              />
+                            )}
+                          />
+                          <div style={{ textAlign:"right", marginTop:8 }}>
+                            <button className="r-btn-ghost" onClick={()=>setAddIngOpen(true)}>Add Ingredient +</button>
+                          </div>
+                        </div>
+
+                        <div className="ag-field">
+                          <label className="ag-label">Invoice Number</label>
+                          <input className="ag-input" type="text" value={it.invoiceNumber} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, invoiceNumber: e.target.value} : v))}/>
+                        </div>
+
+                        <div className="ag-field-1">
+                          <label className="ag-label">Stock Received</label>
+                          <input className="ag-input" type="number" value={it.stockReceived} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, stockReceived: e.target.value} : v))}/>
+                        </div>
+
+                        <div className="ag-field-1">
+                          <label className="ag-label">Unit</label>
+                          <select className="ag-select" value={it.unit} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, unit: e.target.value} : v))}>
+                            {unitOptions.map(u=><option key={u.value} value={u.value}>{u.label}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="ag-field">
+                          <label className="ag-label">Batch Code</label>
+                          <input className="ag-input" type="text" value={it.barCode} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, barCode: e.target.value} : v))}/>
+                        </div>
+
+                        <div className="ag-field">
+                          <label className="ag-label">Expiry Date</label>
+                          <input className="ag-input" type="date" value={it.expiryDate} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, expiryDate: e.target.value} : v))}/>
+                        </div>
+
+                        <div className="ag-field">
+                          <label className="ag-label">Temperature (℃)</label>
+                          <input className="ag-input" type="text" value={it.temperature} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, temperature: e.target.value} : v))}/>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div>
+                    <button className="r-btn-ghost" onClick={addMultiRow}><PlusIcon /> Add another</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="r-mfooter">
+              <button className="r-btn-ghost" onClick={()=>setAddOpen(false)}>Cancel</button>
+              <button className="r-btn-primary" onClick={handleAddSubmit}>
+                {addTab===0 ? "Add Good" : `Add ${multi.length} Good(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Ingredient dialog (MUI) */}
+      <Dialog
+        open={addIngOpen}
+        onClose={()=>setAddIngOpen(false)}
+        fullWidth
+        PaperProps={{ sx:{ borderRadius: 14, border: "1px solid #e5e7eb" } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>Add New Ingredient</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Ingredient Name"
+            fullWidth
+            value={newIngredientName}
+            onChange={(e)=>setNewIngredientName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={()=>setAddIngOpen(false)} disabled={addingIng} sx={{ textTransform:"none", fontWeight:700 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddCustomIngredient}
+            disabled={addingIng}
+            variant="contained"
+            sx={{
+              textTransform:"none", fontWeight:800, borderRadius:999, px:3,
+              background:"linear-gradient(180deg, #7C3AED, #5B21B6)",
+              "&:hover":{ background:"#5B21B6" }
+            }}
+            startIcon={addingIng ? <CircularProgress size={18} sx={{ color:"#fff" }} /> : null}
+          >
+            {addingIng ? "Adding…" : "Add"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Toast */}
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={2500}
+        onClose={()=>setToastOpen(false)}
+        anchorOrigin={{ vertical:"top", horizontal:"right" }}
+      >
+        <Alert
+          onClose={()=>setToastOpen(false)}
+          severity="success"
+          sx={{ fontWeight:700, borderRadius:2, "& .MuiAlert-icon": { color:"#7C3AED" } }}
+        >
+          Added successfully!
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
