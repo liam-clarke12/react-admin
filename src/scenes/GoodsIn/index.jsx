@@ -25,7 +25,8 @@ const BrandStyles = () => (
   .r-card {
     background:#fff; border:1px solid #e5e7eb; border-radius:16px;
     box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
-    overflow:hidden;
+    /* allow children to show scrollbars if needed */
+    overflow: visible;
   }
   .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
   .r-title { margin:0; font-weight:900; color:#0f172a; font-size:20px; }
@@ -46,9 +47,9 @@ const BrandStyles = () => (
   .r-btn-danger:hover { background:#b91c1c; }
 
   /* Table */
-  /* Allow horizontal scroll instead of clipping */
   .r-table-wrap { overflow-x: auto; }
-  table.r-table { width:100%; table-layout: fixed; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
+  /* switch to auto so the Ingredient column can size naturally */
+  table.r-table { width:100%; table-layout: auto; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
   .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
   .r-thead th { padding:12px; text-align:left; white-space:nowrap; }
   .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
@@ -60,16 +61,15 @@ const BrandStyles = () => (
   .r-actions { text-align:right; }
   .r-chk { width:16px; height:16px; }
 
-  .col-date{width:110px}
-  .col-temp{width:80px}
-  .col-num{width:120px}
-  .col-invoice{width:120px}
-  .col-expiry{width:110px}
-  /* Give Ingredient column breathing room */
-  .col-ingredient{min-width:220px}
-  /* Slightly narrower batch col to help fit */
-  .col-batch{width:170px}
-  .col-actions{width:160px}
+  .col-date{width:100px}
+  .col-temp{width:70px}
+  .col-num{width:110px}
+  .col-invoice{width:110px}
+  .col-expiry{width:100px}
+  /* Give Ingredient column a hard width so it can't collapse */
+  .col-ingredient{width:260px}
+  .col-batch{width:150px}
+  .col-actions{width:140px}
 
   .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .r-input {
@@ -88,7 +88,7 @@ const BrandStyles = () => (
   .gi-side { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
   .gi-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); padding:16px; }
 
-  /* Modal shell */
+  /* Modal shell (boosted z-index to beat any top bar) */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -107,7 +107,7 @@ const BrandStyles = () => (
   .ag-row { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff; }
   .ag-row:nth-child(odd){ background:#f8fafc; }
 
-  /* Segmented toggle */
+  /* Segmented toggle for Single / Multiple */
   .seg {
     display:inline-flex; gap:6px; padding:4px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:12px;
     position:relative; z-index:10001;
@@ -395,7 +395,7 @@ export default function GoodsIn() {
     setLoadingCustom(true);
     fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
       .then(res => { if (!res.ok) throw new Error("Failed to fetch custom ingredients"); return res.json(); })
-      .then(data => setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))))
+      .then(data => setCustomIngredients(data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name }))))
       .catch(err => console.error("Custom ingredients error:", err))
       .finally(() => setLoadingCustom(false));
   }, [cognitoId]);
@@ -413,7 +413,7 @@ export default function GoodsIn() {
     setLoadingCustom(true);
     fetch(`${API_BASE}/custom-ingredients?cognito_id=${cognitoId}`)
       .then(res => { if (!res.ok) throw new Error("Failed to fetch custom ingredients"); return res.json(); })
-      .then(data => setCustomIngredients(data.map(ci => ({ id: `c-${ci.id}`, name: ci.name }))))
+      .then(data => setCustomIngredients(data.map((ci) => ({ id: `c-${ci.id}`, name: ci.name }))))
       .catch(err => console.error("Custom ingredients error:", err))
       .finally(() => setLoadingCustom(false));
   }, [addOpen, cognitoId]);
@@ -571,6 +571,7 @@ export default function GoodsIn() {
   const resolveIngredientName = (value) => {
     const opt = ingredients.find((i) => String(i.id) === String(value));
     return opt ? opt.name : value;
+    // NOTE: when reading rows back, we display using ingredientNameById OR the stored string
   };
 
   const submitSingle = async () => {
@@ -784,8 +785,9 @@ export default function GoodsIn() {
                         checked={filteredRows.length > 0 && numSelected === filteredRows.length}
                       />
                     </th>
-                    <th className="r-td col-date">Date</th>
+                    {/* Ingredient FIRST so it's always visible */}
                     <th className="r-td col-ingredient">Ingredient</th>
+                    <th className="r-td col-date">Date</th>
                     <th className="r-td col-temp">Temp</th>
                     <th className="r-td col-num">Received</th>
                     <th className="r-td col-num">Remaining</th>
@@ -821,8 +823,9 @@ export default function GoodsIn() {
                               onChange={() => toggleRowSelection(row._id)}
                             />
                           </td>
-                          <td className="r-td">{row.date || "-"}</td>
+                          {/* Ingredient FIRST */}
                           <td className="r-td r-td--name">{ingredientDisplay}</td>
+                          <td className="r-td">{row.date || "-"}</td>
                           <td className="r-td">{row.temperature ? `${row.temperature}℃` : "-"}</td>
                           <td className="r-td"><span className="r-qty-badge">{row.stockReceived} {row.unit}</span></td>
                           <td className="r-td"><span className="r-qty-badge">{row.stockRemaining} {row.unit}</span></td>
@@ -1038,6 +1041,7 @@ export default function GoodsIn() {
                         getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                         isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                         loading={loadingMaster || loadingCustom}
+                        /* ensure popper appears above modal overlay */
                         slotProps={{ popper: { sx: { zIndex: 10020 } } }}
                         componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                         renderInput={(params)=>(
@@ -1116,6 +1120,7 @@ export default function GoodsIn() {
                               getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
                               isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
                               loading={loadingMaster || loadingCustom}
+                              /* ensure popper appears above modal overlay */
                               slotProps={{ popper: { sx: { zIndex: 10020 } } }}
                               componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
                               renderInput={(params)=>(
