@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useAuth } from "../auth"; // ⬅️ Adjust this path to wherever your hook lives
+import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
    Tailwind-Style CSS Shim (no Tailwind required)
