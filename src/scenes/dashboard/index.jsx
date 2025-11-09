@@ -73,6 +73,42 @@ const DashboardStyles = () => (
 );
 
 /* ==========================================
+   Unit helpers (normalize amounts)
+   ========================================== */
+
+const UnitGroup = Object.freeze({ GRAMS: "grams_group", ML: "ml_group", UNITS: "units_group" });
+
+function detectUnitGroup(unit) {
+  const u = String(unit || "").toLowerCase();
+  if (u === "kg" || u === "g" || u === "grams") return UnitGroup.GRAMS;
+  if (u === "l" || u === "litre" || u === "litres" || u === "liter" || u === "liters" || u === "ml") return UnitGroup.ML;
+  return UnitGroup.UNITS;
+}
+
+function toBaseAmount(amount, unit) {
+  const val = Number(amount || 0);
+  const u = String(unit || "").toLowerCase();
+  if (u === "kg") return val * 1000;            // grams base
+  if (u === "g" || u === "grams") return val;   // grams base
+  if (u === "l" || u === "litre" || u === "litres" || u === "liter" || u === "liters") return val * 1000; // ml base
+  if (u === "ml") return val;                   // ml base
+  return val;                                   // units base (no change)
+}
+
+function formatDisplayAmount(baseAmount, group) {
+  const n = Number(baseAmount || 0);
+  if (group === UnitGroup.GRAMS) {
+    if (Math.abs(n) >= 1000) return { amount: Number((n / 1000).toFixed(2)), unit: "kg" };
+    return { amount: Math.round(n), unit: "g" };
+  }
+  if (group === UnitGroup.ML) {
+    if (Math.abs(n) >= 1000) return { amount: Number((n / 1000).toFixed(2)), unit: "L" };
+    return { amount: Math.round(n), unit: "ml" };
+  }
+  return { amount: Math.round(n), unit: "units" };
+}
+
+/* ==========================================
    Inline components (no Tailwind classes)
    ========================================== */
 
@@ -110,7 +146,9 @@ const ExpiringIngredients = ({ ingredients }) => {
           <div key={ing.id} className="list-item">
             <div>
               <p className="list-item-title">{ing.name}</p>
-              <p className="list-item-sub">{ing.stock}{ing.unit}</p>
+              <p className="list-item-sub">
+                {ing.display.amount} {ing.display.unit}
+              </p>
             </div>
             <span className="badge" style={urgencyStyle}>
               {daysRemaining <= 0 ? "Today" : `${daysRemaining}d`}
@@ -122,23 +160,23 @@ const ExpiringIngredients = ({ ingredients }) => {
   );
 };
 
-// Ingredient stock bars (show ONLY current qty in label)
+// Ingredient stock bars (normalized; label shows nice display)
 const IngredientStock = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (list.length === 0) return <p className="list-item-sub">No ingredients in stock.</p>;
 
-  const sorted = [...list].sort((a, b) => a.stock / a.maxStock - b.stock / b.maxStock);
+  const sorted = [...list].sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
 
   return (
     <div className="list" style={{height: 320}}>
       {sorted.map((ing) => {
-        const pct = Math.max(0, Math.min(100, (ing.stock / ing.maxStock) * 100));
+        const pct = Math.max(0, Math.min(100, (ing.stockBase / ing.maxBase) * 100));
         const color = pct < 25 ? "red" : pct < 50 ? "yellow" : "green";
         return (
           <div key={ing.id}>
             <div className="progress-row">
               <span className="name">{ing.name}</span>
-              <span className="qty">{ing.stock} {ing.unit}</span>
+              <span className="qty">{ing.display.amount} {ing.display.unit}</span>
             </div>
             <div className="progress">
               <div className={`bar ${color}`} style={{ width: `${pct}%` }} />
@@ -264,44 +302,62 @@ const Dashboard = () => {
   const {
     kpiStockoutsCount,
     kpiLowStockCount,
-    kpiRecentProduction,
     ingredientStockList,
     expiringSoonList,
     weeklyBatchesData,       // ISO week: batches per day
     weeklyRecipeUnits,       // ISO week: units per recipe (from production-log/active)
   } = useMemo(() => {
-    // --- Active inventory mapping (for stock bars + expiries) ---
-    const invMapped = (inventoryRaw || []).map((r, i) => ({
-      id: `${r.ingredient || "item"}-${i}`,
-      name: r.ingredient || "Unknown",
-      unit: r.unit || "",
-      stock: Number(r.totalRemaining) || 0,
-      expiryDate: (() => {
-        const raw = r.expiryDate || r.expiry || r.bestBefore || r.best_before || r.activeExpiry || r.batchExpiry;
-        const d = raw ? new Date(raw) : null;
-        return d && !Number.isNaN(d.getTime()) ? d : undefined;
-      })(),
-      maxStock: 0,
-    }));
+    // --- Active inventory mapping (normalize amounts) ---
+    const mapped = (inventoryRaw || []).map((r, i) => {
+      const name = r.ingredient || "Unknown";
+      const unit = r.unit || "";
+      const group = detectUnitGroup(unit);
+      const stockBase = toBaseAmount(r.totalRemaining, unit); // g or ml (or units)
+      // Display in a nice unit (kg/L if big)
+      const display = formatDisplayAmount(stockBase, group);
 
-    // simple max heuristic for bar visuals
-    const mean = invMapped.reduce((s, it) => s + (it.stock || 0), 0) / Math.max(invMapped.length, 1);
-    const ingredientStockList = invMapped
-      .map((it) => ({ ...it, maxStock: Math.max(it.stock, Math.round(mean * 1.25), 1) }))
-      .sort((a, b) => a.stock / a.maxStock - b.stock / b.maxStock);
+      // Expiry normalization
+      const rawExpiry =
+        r.expiryDate || r.expiry || r.bestBefore || r.best_before || r.activeExpiry || r.batchExpiry;
+      const d = rawExpiry ? new Date(rawExpiry) : null;
+      const expiryDate = d && !Number.isNaN(d.getTime()) ? d : undefined;
+
+      return {
+        id: `${name}-${i}`,
+        name,
+        group,
+        stockBase,        // normalized numeric for math
+        display,          // {amount, unit} for labels
+        expiryDate,
+      };
+    });
+
+    // Heuristic max per item (in base units) for bar visuals
+    const meanBase = mapped.reduce((s, it) => s + (it.stockBase || 0), 0) / Math.max(mapped.length, 1);
+    const ingredientStockList = mapped
+      .map((it) => {
+        const maxBase = Math.max(it.stockBase, Math.round(meanBase * 1.25), 1);
+        return { ...it, maxBase };
+      })
+      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
 
     // Expiring soon (next 7 days) — FROM ACTIVE INVENTORY ONLY
     const now = new Date();
     const soonCut = new Date(startOfISOWeek(now)); // start of week baseline
     soonCut.setDate(soonCut.getDate() + 7);
-    const expiringSoonList = invMapped
+    const expiringSoonList = ingredientStockList
       .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
       .sort((a, b) => (a.expiryDate?.getTime() || 0) - (b.expiryDate?.getTime() || 0))
       .slice(0, 30);
 
     // KPIs
-    const kpiLowStockCount = ingredientStockList.filter((it) => (it.stock || 0) <= 10).length;
-    const kpiStockoutsCount = ingredientStockList.filter((it) => (it.stock || 0) <= 0).length;
+    const kpiStockoutsCount = ingredientStockList.filter((it) => (it.stockBase || 0) <= 0).length;
+
+    // Low stock: percentage-based to be unit-agnostic (<= 25% of max)
+    const kpiLowStockCount = ingredientStockList.filter((it) => {
+      const pct = (it.stockBase / it.maxBase) * 100;
+      return pct <= 25 && it.stockBase > 0; // exclude stockouts from low-stock
+    }).length;
 
     // --- Weekly batches per day (ISO week) from production-log ---
     const weekStart = startOfISOWeek(new Date());
@@ -337,7 +393,6 @@ const Dashboard = () => {
     return {
       kpiStockoutsCount,
       kpiLowStockCount,
-      kpiRecentProduction,
       ingredientStockList,
       expiringSoonList,
       weeklyBatchesData,
@@ -358,11 +413,11 @@ const Dashboard = () => {
         <DashboardCard title="Stockouts (0 qty)">
           <div className="kpi">{kpiStockoutsCount}</div>
         </DashboardCard>
-        <DashboardCard title="Low Stock (≤ 10)">
+        <DashboardCard title="Low Stock (≤ 25% of max)">
           <div className="kpi">{kpiLowStockCount}</div>
         </DashboardCard>
         <DashboardCard title="Batches Produced (This Week)">
-          <div className="kpi">{kpiRecentProduction}</div>
+          <div className="kpi">{weeklyBatchesData.reduce((s, d) => s + (d.batches || 0), 0)}</div>
         </DashboardCard>
       </div>
 
