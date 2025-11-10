@@ -3,6 +3,18 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
+/* MUI bits to mirror Goods In behaviour */
+import Autocomplete from "@mui/material/Autocomplete";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  CircularProgress,
+} from "@mui/material";
+
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /* ---------------- Unit options (local) ---------------- */
@@ -41,18 +53,13 @@ const CheckIcon = (props) => (
     <polyline points="20 6 9 17 4 12" />
   </Svg>
 );
-const DownloadIcon = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-  </Svg>
-);
 const PlusIcon = (props) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
   </Svg>
 );
 
-/* ---------------- Scoped styles (no Tailwind needed) ---------------- */
+/* ---------------- Scoped styles (kept identical) ---------------- */
 const BrandStyles = () => (
   <style>{`
   .r-wrap { padding: 20px; }
@@ -346,7 +353,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
 
         <div className="r-footer">
           <button className="r-btn-ghost" onClick={exportCsv} disabled={!recipe}>
-            <DownloadIcon /> Export CSV
+            Export CSV
           </button>
           <button className="r-btn-primary" onClick={onClose}>Done</button>
         </div>
@@ -355,10 +362,98 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   );
 };
 
+/* ---------------- Shared ingredient source (same as Goods In) ---------------- */
+const useIngredientOptions = (cognitoId, refreshKey = 0) => {
+  const [masterIngredients, setMasterIngredients] = useState([]);
+  const [customIngredients, setCustomIngredients] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!cognitoId) return;
+    setLoading(true);
+    try {
+      const [mRes, cRes] = await Promise.all([
+        fetch(`${API_BASE}/ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
+        fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
+      ]);
+
+      const m = mRes.ok ? await mRes.json() : [];
+      const c = cRes.ok ? await cRes.json() : [];
+      setMasterIngredients(Array.isArray(m) ? m : []);
+      setCustomIngredients(Array.isArray(c) ? c.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })) : []);
+    } catch (e) {
+      console.error("Ingredient load error:", e);
+      setMasterIngredients([]);
+      setCustomIngredients([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [cognitoId]);
+
+  useEffect(() => { load(); }, [load, refreshKey]);
+
+  const ingredients = useMemo(
+    () => [
+      ...masterIngredients.map((i) => ({ ...i, source: "master" })),
+      ...customIngredients.map((i) => ({ ...i, source: "custom" })),
+    ],
+    [masterIngredients, customIngredients]
+  );
+
+  return { ingredients, reload: load, loading };
+};
+
+/* ---------------- Add custom ingredient dialog (shared) ---------------- */
+const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
+  const [name, setName] = useState("");
+  useEffect(() => { if (!open) setName(""); }, [open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth PaperProps={{ sx:{ borderRadius: 14, border: "1px solid #e5e7eb" } }}>
+      <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>Add New Ingredient</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          margin="dense"
+          label="Ingredient Name"
+          fullWidth
+          value={name}
+          onChange={(e)=>setName(e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} disabled={adding} sx={{ textTransform:"none", fontWeight:700 }}>
+          Cancel
+        </Button>
+        <Button
+          onClick={()=>onAdd(name)}
+          disabled={adding || !name.trim()}
+          variant="contained"
+          sx={{
+            textTransform:"none", fontWeight:800, borderRadius:999, px:3,
+            background:"linear-gradient(180deg, #7C3AED, #5B21B6)",
+            "&:hover":{ background:"#5B21B6" }
+          }}
+          startIcon={adding ? <CircularProgress size={18} sx={{ color:"#fff" }} /> : null}
+        >
+          {adding ? "Adding…" : "Add"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 /* ---------------- Edit Modal ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
+  const { cognitoId } = useAuth();
+  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
+
   const [edited, setEdited] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addTargetIndex, setAddTargetIndex] = useState(null); // which ingredient row to auto-select into
 
   useEffect(() => {
     if (recipe) setEdited(JSON.parse(JSON.stringify(recipe)));
@@ -373,7 +468,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
     arr[idx] = { ...(arr[idx] || {}), [k]: v };
     setEdited((p) => ({ ...p, ingredients: arr }));
   };
-  const addIngredient = () => {
+  const addIngredientRow = () => {
     setEdited((p) => ({
       ...p,
       ingredients: [
@@ -390,6 +485,36 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
     setSaving(true);
     await onSave(edited);
     setSaving(false);
+  };
+
+  const openAddCustom = (index) => {
+    setAddTargetIndex(index);
+    setAddOpen(true);
+  };
+  const doAddCustom = async (name) => {
+    if (!cognitoId || !name?.trim()) return;
+    setAdding(true);
+    try {
+      const resp = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
+      });
+      if (!resp.ok) throw new Error("Failed to add ingredient");
+      await reload();
+      // auto-select newly added (name match)
+      const just = (ingredients || []).find(i => i.name?.toLowerCase() === name.trim().toLowerCase());
+      if (just && addTargetIndex != null) {
+        handleIngredient(addTargetIndex, "name", just.name);
+      }
+      setAddOpen(false);
+      setAddTargetIndex(null);
+    } catch (e) {
+      console.error("add ingredient failed:", e);
+      alert("Could not add ingredient");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -425,12 +550,24 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
             <div style={{ display: "grid", gap: 8 }}>
               {(edited?.ingredients || []).map((ing, idx) => (
                 <div key={ing.id || idx} className="r-ing">
-                  <input
-                    type="text"
-                    placeholder="Ingredient Name"
-                    value={ing.name}
-                    onChange={(e) => handleIngredient(idx, "name", e.target.value)}
-                  />
+                  {/* Ingredient dropdown (same UX as Goods In) */}
+                  <div>
+                    <Autocomplete
+                      options={ingredients}
+                      value={ingredients.find(i => i.name === ing.name) || null}
+                      onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
+                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                      renderInput={(params) => (
+                        <TextField {...params} placeholder="Select an ingredient" />
+                      )}
+                      disableClearable={false}
+                    />
+                    <div style={{ marginTop:8 }}>
+                      <button className="r-btn-ghost" onClick={()=>openAddCustom(idx)}>Add Ingredient +</button>
+                    </div>
+                  </div>
+
                   <input
                     type="number"
                     placeholder="Quantity"
@@ -452,7 +589,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
               ))}
             </div>
 
-            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredient}>
+            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredientRow}>
               <PlusIcon /> Add Ingredient
             </button>
           </div>
@@ -465,18 +602,32 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
           </button>
         </div>
       </div>
+
+      <AddIngredientDialog
+        open={addOpen}
+        onClose={()=>{ setAddOpen(false); setAddTargetIndex(null); }}
+        onAdd={doAddCustom}
+        adding={adding}
+      />
     </div>
   );
 };
 
 /* ---------------- Add Recipe Modal (popup form) ---------------- */
 const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
+  const { cognitoId } = useAuth();
+  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
+
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     unitsPerBatch: 1,
     ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
   });
   const [saving, setSaving] = useState(false);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addTargetIndex, setAddTargetIndex] = useState(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -497,7 +648,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
     arr[idx] = { ...arr[idx], [k]: v };
     setNewRecipe((p) => ({ ...p, ingredients: arr }));
   };
-  const addIngredient = () => {
+  const addIngredientRow = () => {
     setNewRecipe((p) => ({
       ...p,
       ingredients: [...p.ingredients, { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
@@ -510,6 +661,35 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
     setSaving(true);
     await onSave(newRecipe);
     setSaving(false);
+  };
+
+  const openAddCustom = (index) => {
+    setAddTargetIndex(index);
+    setAddOpen(true);
+  };
+  const doAddCustom = async (name) => {
+    if (!cognitoId || !name?.trim()) return;
+    setAdding(true);
+    try {
+      const resp = await fetch(`${API_BASE}/custom-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
+      });
+      if (!resp.ok) throw new Error("Failed to add ingredient");
+      await reload();
+      const just = (ingredients || []).find(i => i.name?.toLowerCase() === name.trim().toLowerCase());
+      if (just && addTargetIndex != null) {
+        handleIngredient(addTargetIndex, "name", just.name);
+      }
+      setAddOpen(false);
+      setAddTargetIndex(null);
+    } catch (e) {
+      console.error("add ingredient failed:", e);
+      alert("Could not add ingredient");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -546,12 +726,24 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
             <div style={{ display: "grid", gap: 8 }}>
               {newRecipe.ingredients.map((ing, idx) => (
                 <div key={ing.id} className="r-ing">
-                  <input
-                    type="text"
-                    placeholder="Ingredient Name"
-                    value={ing.name}
-                    onChange={(e) => handleIngredient(idx, "name", e.target.value)}
-                  />
+                  {/* Ingredient dropdown (same UX as Goods In) */}
+                  <div>
+                    <Autocomplete
+                      options={ingredients}
+                      value={ingredients.find(i => i.name === ing.name) || null}
+                      onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
+                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
+                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
+                      renderInput={(params) => (
+                        <TextField {...params} placeholder="Select an ingredient" />
+                      )}
+                      disableClearable={false}
+                    />
+                    <div style={{ marginTop:8 }}>
+                      <button className="r-btn-ghost" onClick={()=>openAddCustom(idx)}>Add Ingredient +</button>
+                    </div>
+                  </div>
+
                   <input
                     type="number"
                     placeholder="Qty"
@@ -573,7 +765,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
               ))}
             </div>
 
-            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredient}>
+            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredientRow}>
               <PlusIcon /> Add Ingredient
             </button>
           </div>
@@ -586,6 +778,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
           </button>
         </div>
       </div>
+
+      <AddIngredientDialog
+        open={addOpen}
+        onClose={()=>{ setAddOpen(false); setAddTargetIndex(null); }}
+        onAdd={doAddCustom}
+        adding={adding}
+      />
     </div>
   );
 };

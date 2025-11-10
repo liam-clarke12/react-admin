@@ -229,10 +229,44 @@ export default function GoodsOut() {
       const arr = Array.isArray(data) ? data : [];
       const normalized = arr.map((row, idx) => {
         const sourceDate = row.date ?? row.production_log_date ?? row.created_at ?? row.createdAt ?? "";
+
+        // normalize core fields coming from snake_case / alternate names
+        const stockAmount =
+          Number(
+            row.stockAmount ??
+            row.stock_amount ??
+            row.unitsOut ??
+            row.units_out ??
+            row.units ??
+            row.quantity ??
+            row.qty ??
+            row.amount ??
+            0
+          ) || 0;
+
+        const recipe =
+          row.recipe ??
+          row.recipe_name ??
+          row.product ??
+          row.product_name ??
+          row.sku ??
+          "Unknown";
+
+        const recipients =
+          row.recipients ??
+          row.customer ??
+          row.client ??
+          row.destination ??
+          row.to ??
+          "";
+
         return {
           ...row,
-          id: row.id ?? `${row.recipe ?? "row"}-${idx}`,
+          id: row.id ?? `${recipe}-` + idx,
           date: formatToYYYYMMDD(sourceDate),
+          stockAmount,
+          recipe,
+          recipients,
         };
       });
       setGoodsOut(normalized);
@@ -303,7 +337,6 @@ export default function GoodsOut() {
       flex: 1,
       headerAlign: "left",
       align: "left",
-      valueGetter: (p) => Number(p.row?.stockAmount ?? 0),
     },
     {
       field: "batchcodes",
@@ -624,7 +657,7 @@ export default function GoodsOut() {
                     ["Batch code", "Units"],
                     ...drawerItems.map((i) => [i.code, i.units || 0]),
                   ]
-                    .map((r) => r.map((c) => `"${String(c).replace(/\"/g, '""')}"`).join(","))
+                    .map((r) => r.map((c) => `"${String(c).replace(/\\"/g, '""')}"`).join(","))
                     .join("\n");
                   const blob = new Blob([csv], { type: "text/csv" });
                   const url = URL.createObjectURL(blob);
