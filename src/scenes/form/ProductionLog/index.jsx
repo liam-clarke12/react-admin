@@ -1,5 +1,5 @@
 // src/scenes/form/RecipeProduction/index.jsx
-// MUI-styled Production Log with Single / Multiple tabs (mirrors Goods In UX)
+// MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
@@ -75,8 +75,16 @@ const selectSx = {
 const singleSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
-  batchesProduced: yup.number().typeError("Must be a number").required("Batches produced is required").positive("Must be positive"),
-  unitsOfWaste: yup.number().typeError("Must be a number").required("Units of waste is required").min(0, "Cannot be negative"),
+  batchesProduced: yup
+    .number()
+    .typeError("Must be a number")
+    .required("Batches produced is required")
+    .positive("Must be positive"),
+  unitsOfWaste: yup
+    .number()
+    .typeError("Must be a number")
+    .required("Units of waste is required")
+    .min(0, "Cannot be negative"),
   batchCode: yup.string().required("Batch Code is required"),
   producerName: yup.string().nullable(),
 });
@@ -84,8 +92,16 @@ const singleSchema = yup.object().shape({
 const itemSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
-  batchesProduced: yup.number().typeError("Must be a number").required("Batches produced is required").positive("Must be positive"),
-  unitsOfWaste: yup.number().typeError("Must be a number").required("Units of waste is required").min(0, "Cannot be negative"),
+  batchesProduced: yup
+    .number()
+    .typeError("Must be a number")
+    .required("Batches produced is required")
+    .positive("Must be positive"),
+  unitsOfWaste: yup
+    .number()
+    .typeError("Must be a number")
+    .required("Units of waste is required")
+    .min(0, "Cannot be negative"),
   batchCode: yup.string().required("Batch Code is required"),
   producerName: yup.string().nullable(),
 });
@@ -115,6 +131,51 @@ const initialBatchItem = {
 
 const initialBatch = { items: [initialBatchItem] };
 
+/** ===== helpers for availability check ===== */
+const normalizeName = (s) =>
+  (s || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const normalizeUnit = (u) => {
+  const raw = (u || "").toString().trim().toLowerCase();
+  if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+  if (["g", "gram", "grams"].includes(raw)) return "g";
+  if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+  if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
+  if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+  if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
+  return raw;
+};
+
+const unitFactorToBase = (canonUnit) => {
+  const u = (canonUnit || "").toString().toLowerCase();
+  if (!u) return 1;
+  if (u === "kg") return 1000; // kg -> g
+  if (u === "g") return 1;
+  if (u === "l") return 1000; // L -> ml
+  if (u === "ml") return 1;
+  if (u === "unit") return 1;
+  return 1;
+};
+
+const roundDisp = (n) => {
+  if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
+  return Math.round(n * 1000) / 1000;
+};
+
+// Pick a nice display unit for an ingredient across lines (prefer g > ml > unit > "")
+const pickDisplayUnit = (unitsSet) => {
+  const u = new Set(Array.from(unitsSet || []).map(normalizeUnit));
+  if (u.has("g") || u.has("kg")) return "g";
+  if (u.has("ml") || u.has("l")) return "ml";
+  if (u.has("unit")) return "unit";
+  return "";
+};
+
 const ProductionLogForm = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
@@ -122,24 +183,30 @@ const ProductionLogForm = () => {
   // tabs: 0 single, 1 multiple
   const [tabIndex, setTabIndex] = useState(0);
 
-  // recipes for dropdown
+  // recipes for dropdown + index for availability check
   const [recipes, setRecipes] = useState([]);
+  const [recipesIndex, setRecipesIndex] = useState({}); // recipe -> [{ingredient, quantity, unit}]
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [fetchErr, setFetchErr] = useState("");
 
   // snackbar
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // multiple confirm dialog
+  // multiple confirm dialog (preview list)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewItems, setPreviewItems] = useState([]);
   const [submittingBatch, setSubmittingBatch] = useState(false);
   const [batchResetForm, setBatchResetForm] = useState(null);
 
+  // deficit warning dialog (used by single & multiple)
+  const [deficitOpen, setDeficitOpen] = useState(false);
+  const [deficits, setDeficits] = useState([]); // [{ingredient, unit, need, have}]
+  const deficitNextRef = useRef(null); // callback to run after "Proceed anyway"
+
   // FAB hook to add another row
   const addItemRef = useRef(null);
 
-  // fetch recipe names (same endpoint your single form uses)
+  /** Fetch recipes (full rows) so we can build an index for precheck */
   useEffect(() => {
     if (!cognitoId) return;
     (async () => {
@@ -149,15 +216,28 @@ const ProductionLogForm = () => {
         const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const rows = await res.json();
-        const names = Array.from(
-          new Set((Array.isArray(rows) ? rows : [])
-            .map(r => r.recipe_name ?? r.recipe)
-            .filter(Boolean))
-        ).sort();
+
+        // Build index: recipe name => [{ ingredient, quantity, unit }]
+        const index = {};
+        const namesTemp = new Set();
+        for (const r of Array.isArray(rows) ? rows : []) {
+          const recipeName = r.recipe_name ?? r.recipe ?? "";
+          if (!recipeName) continue;
+          namesTemp.add(recipeName);
+          if (!index[recipeName]) index[recipeName] = [];
+          index[recipeName].push({
+            ingredient: r.ingredient ?? r.ingredient_name ?? "",
+            quantity: Number(r.quantity) || 0,
+            unit: r.unit ?? "",
+          });
+        }
+        const names = Array.from(namesTemp).sort();
+        setRecipesIndex(index);
         setRecipes(names);
       } catch (e) {
         console.error(e);
         setRecipes([]);
+        setRecipesIndex({});
         setFetchErr("Error fetching recipes");
       } finally {
         setLoadingRecipes(false);
@@ -189,7 +269,139 @@ const ProductionLogForm = () => {
     }
   };
 
-  // submit single (existing route)
+  /** Build menu items for Recipe select */
+  const recipeMenu = useMemo(() => {
+    if (loadingRecipes) return [<MenuItem key="loading" value="" disabled>Loading recipes…</MenuItem>];
+    if (fetchErr) return [<MenuItem key="err" value="" disabled>{fetchErr}</MenuItem>];
+    if (!recipes.length) return [<MenuItem key="none" value="" disabled>No recipes</MenuItem>];
+    return [
+      <MenuItem key="placeholder" value="" disabled>Select a recipe…</MenuItem>,
+      ...recipes.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)
+    ];
+  }, [recipes, loadingRecipes, fetchErr]);
+
+  /** ===== Availability checks ===== */
+
+  // Load ACTIVE inventory snapshot (base-unit aware)
+  const fetchActiveInventory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+      return res.ok ? await res.json() : [];
+    } catch (e) {
+      console.error("Active inventory fetch failed:", e);
+      return [];
+    }
+  };
+
+  // Single: compute deficits for (recipe, batchesProduced)
+  const computeDeficitsSingle = async (recipeName, batchesProduced) => {
+    const lines = recipesIndex[recipeName] || [];
+    if (!lines.length) return [];
+
+    // requirements per ingredient (base units)
+    const needByIng = new Map(); // name -> { needBase, unitsSeen:Set }
+    for (const line of lines) {
+      const name = (line.ingredient || "").toString();
+      const uCanon = normalizeUnit(line.unit);
+      const qty = Number(line.quantity) || 0;
+      const need = qty * (Number(batchesProduced) || 0);
+      const needBase = need * unitFactorToBase(uCanon);
+
+      const k = normalizeName(name);
+      const cur = needByIng.get(k) || { name, needBase: 0, unitsSeen: new Set() };
+      cur.needBase += needBase;
+      cur.unitsSeen.add(uCanon);
+      needByIng.set(k, cur);
+    }
+
+    // available per ingredient (base units)
+    const invRows = await fetchActiveInventory();
+    const haveByIng = new Map(); // name -> haveBase
+    for (const r of Array.isArray(invRows) ? invRows : []) {
+      const k = normalizeName(r?.ingredient ?? "");
+      const unitCanon = normalizeUnit(r?.unit ?? "");
+      const amt = Number(r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0) || 0;
+      const base = amt * unitFactorToBase(unitCanon);
+      haveByIng.set(k, (haveByIng.get(k) || 0) + base);
+    }
+
+    // compare
+    const problems = [];
+    for (const { name, needBase, unitsSeen } of needByIng.values()) {
+      const haveBase = haveByIng.get(normalizeName(name)) || 0;
+      if (needBase > haveBase + 1e-9) {
+        const dispUnit = pickDisplayUnit(unitsSeen);
+        const factor = unitFactorToBase(dispUnit || ""); // 0 → base
+        const needDisp = factor ? needBase / factor : needBase;
+        const haveDisp = factor ? haveBase / factor : haveBase;
+        problems.push({
+          ingredient: name,
+          unit: dispUnit,
+          need: roundDisp(needDisp),
+          have: roundDisp(haveDisp),
+        });
+      }
+    }
+    return problems;
+  };
+
+  // Multiple: aggregate across items
+  const computeDeficitsBatch = async (items) => {
+    // aggregate need per ingredient in base units; track units seen
+    const needByIng = new Map(); // name -> { needBase, unitsSeen:Set }
+    for (const it of items || []) {
+      const recipeName = it?.recipe;
+      const batches = Number(it?.batchesProduced) || 0;
+      if (!recipeName || !batches) continue;
+      const lines = recipesIndex[recipeName] || [];
+      for (const line of lines) {
+        const name = (line.ingredient || "").toString();
+        const uCanon = normalizeUnit(line.unit);
+        const qty = Number(line.quantity) || 0;
+        const need = qty * batches;
+        const needBase = need * unitFactorToBase(uCanon);
+
+        const k = normalizeName(name);
+        const cur = needByIng.get(k) || { name, needBase: 0, unitsSeen: new Set() };
+        cur.needBase += needBase;
+        cur.unitsSeen.add(uCanon);
+        needByIng.set(k, cur);
+      }
+    }
+
+    // available per ingredient (base units)
+    const invRows = await fetchActiveInventory();
+    const haveByIng = new Map(); // name -> haveBase
+    for (const r of Array.isArray(invRows) ? invRows : []) {
+      const k = normalizeName(r?.ingredient ?? "");
+      const unitCanon = normalizeUnit(r?.unit ?? "");
+      const amt = Number(r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0) || 0;
+      const base = amt * unitFactorToBase(unitCanon);
+      haveByIng.set(k, (haveByIng.get(k) || 0) + base);
+    }
+
+    const problems = [];
+    for (const { name, needBase, unitsSeen } of needByIng.values()) {
+      const haveBase = haveByIng.get(normalizeName(name)) || 0;
+      if (needBase > haveBase + 1e-9) {
+        const dispUnit = pickDisplayUnit(unitsSeen);
+        const factor = unitFactorToBase(dispUnit || "");
+        const needDisp = factor ? needBase / factor : needBase;
+        const haveDisp = factor ? haveBase / factor : haveBase;
+        problems.push({
+          ingredient: name,
+          unit: dispUnit,
+          need: roundDisp(needDisp),
+          have: roundDisp(haveDisp),
+        });
+      }
+    }
+    return problems;
+  };
+
+  /** ===== Submitters (unchanged endpoints) ===== */
+
+  // submit single
   const submitSingle = async (values, { resetForm }) => {
     const payload = { ...values, cognito_id: cognitoId, producerName: values.producerName ?? "" };
     try {
@@ -210,7 +422,7 @@ const ProductionLogForm = () => {
     }
   };
 
-  // submit multiple (new batch route, mirrors Goods In flow)
+  // submit multiple (batch)
   const submitBatch = async (items, { resetForm }) => {
     try {
       const res = await fetch(`${API_BASE}/add-production-log/batch`, {
@@ -226,7 +438,7 @@ const ProductionLogForm = () => {
       setOpenSnackbar(true);
     } catch (err) {
       console.error("Batch submit error:", err);
-      // soft fallback: try sequentially to the single route (don’t block operator)
+      // fallback: try sequential singles so ops are not blocked
       try {
         for (const it of items) {
           const payload = { ...it, cognito_id: cognitoId, producerName: it.producerName ?? "" };
@@ -235,9 +447,7 @@ const ProductionLogForm = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          if (!r.ok) {
-            console.error("Fallback single failed for item:", it, await r.text().catch(() => r.status));
-          }
+          if (!r.ok) console.error("Fallback single failed for item:", it, await r.text().catch(() => r.status));
         }
         resetForm();
         setOpenSnackbar(true);
@@ -248,6 +458,42 @@ const ProductionLogForm = () => {
     }
   };
 
+  /** ===== UI handlers ===== */
+
+  // SINGLE: validate + precheck before submit
+  const handleSingleClick = async (validateForm, values, setTouched, submitForm) => {
+    const errs = await validateForm();
+    if (errs && Object.keys(errs).length) {
+      setTouched(
+        { date: true, recipe: true, batchesProduced: true, unitsOfWaste: true, batchCode: true, producerName: true },
+        false
+      );
+      scrollToFirstError(errs);
+      return;
+    }
+
+    // run availability precheck
+    try {
+      const problems = await computeDeficitsSingle(values.recipe, values.batchesProduced);
+      if (problems.length) {
+        setDeficits(problems);
+        deficitNextRef.current = async () => {
+          // after user accepts risk, proceed with submit
+          await submitForm();
+        };
+        setDeficitOpen(true);
+        return;
+      }
+    } catch (e) {
+      console.error("Single availability check failed:", e);
+      alert("Could not verify inventory availability. Please try again.");
+      return;
+    }
+
+    await submitForm();
+  };
+
+  // MULTIPLE: validate + precheck; if OK => open preview; if not => show deficit then preview
   const openConfirm = async ({ validateForm, values, setTouched, resetForm }) => {
     const errs = await validateForm();
     if (errs && Object.keys(errs).length) {
@@ -258,6 +504,27 @@ const ProductionLogForm = () => {
       scrollToFirstError(errs);
       return;
     }
+
+    try {
+      const problems = await computeDeficitsBatch(values.items || []);
+      if (problems.length) {
+        // after user accepts risk, continue to preview confirm
+        setDeficits(problems);
+        deficitNextRef.current = () => {
+          setPreviewItems(values.items || []);
+          setBatchResetForm(() => resetForm);
+          setConfirmOpen(true);
+        };
+        setDeficitOpen(true);
+        return;
+      }
+    } catch (e) {
+      console.error("Batch availability check failed:", e);
+      alert("Could not verify inventory availability. Please try again.");
+      return;
+    }
+
+    // no problems -> open preview
     setPreviewItems(values.items || []);
     setBatchResetForm(() => resetForm);
     setConfirmOpen(true);
@@ -274,17 +541,6 @@ const ProductionLogForm = () => {
       setSubmittingBatch(false);
     }
   };
-
-  // shared selects
-  const recipeMenu = useMemo(() => {
-    if (loadingRecipes) return [<MenuItem key="loading" value="" disabled>Loading recipes…</MenuItem>];
-    if (fetchErr) return [<MenuItem key="err" value="" disabled>{fetchErr}</MenuItem>];
-    if (!recipes.length) return [<MenuItem key="none" value="" disabled>No recipes</MenuItem>];
-    return [
-      <MenuItem key="placeholder" value="" disabled>Select a recipe…</MenuItem>,
-      ...recipes.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)
-    ];
-  }, [recipes, loadingRecipes, fetchErr]);
 
   return (
     <Box m="20px">
@@ -385,17 +641,7 @@ const ProductionLogForm = () => {
                   <Box display="flex" justifyContent="flex-end" mt={3}>
                     <Fab
                       variant="extended"
-                      onClick={async () => {
-                        const errs = await validateForm();
-                        if (errs && Object.keys(errs).length) {
-                          setTouched({
-                            date: true, recipe: true, batchesProduced: true, unitsOfWaste: true, batchCode: true, producerName: true,
-                          }, false);
-                          scrollToFirstError(errs);
-                          return;
-                        }
-                        await submitForm();
-                      }}
+                      onClick={() => handleSingleClick(validateForm, values, setTouched, submitForm)}
                       sx={{
                         px: 4, py: 1.25, gap: 1, borderRadius: 999, fontWeight: 800, textTransform: "none",
                         boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
@@ -539,7 +785,7 @@ const ProductionLogForm = () => {
                             })}
                           </Box>
 
-                          {/* Submit multiple (opens confirm) */}
+                          {/* Submit multiple (opens confirm, but only after precheck) */}
                           <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
                             <Fab
                               variant="extended"
@@ -604,7 +850,7 @@ const ProductionLogForm = () => {
         )}
       </Box>
 
-      {/* Confirm dialog for batch submit */}
+      {/* Confirm dialog for batch preview */}
       <Dialog
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -664,6 +910,74 @@ const ProductionLogForm = () => {
             disabled={submittingBatch}
           >
             {submittingBatch ? "Submitting…" : "Confirm & Submit"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Deficit warning dialog (Single & Multiple) */}
+      <Dialog
+        open={deficitOpen}
+        onClose={() => setDeficitOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}` } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Insufficient / Missing Ingredients
+        </DialogTitle>
+        <DialogContent dividers>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            You're about to record production that uses ingredients you do not currently have enough of in <strong>active stock</strong>.
+            This can lead to negative or inconsistent inventory.
+          </Alert>
+
+          <Table size="small" aria-label="deficits">
+            <TableHead>
+              <TableRow sx={{ background: brand.surfaceMuted }}>
+                <TableCell sx={{ fontWeight: 800 }}>Ingredient</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Need</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Have</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Unit</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {deficits.map((d, i) => (
+                <TableRow key={i}>
+                  <TableCell>{d.ingredient}</TableCell>
+                  <TableCell>{d.need}</TableCell>
+                  <TableCell>{d.have}</TableCell>
+                  <TableCell>{d.unit || "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Proceeding will deduct current stock down to 0 where possible and excuse any remaining shortfall in this log.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeficitOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              setDeficitOpen(false);
+              const next = deficitNextRef.current;
+              deficitNextRef.current = null;
+              if (typeof next === "function") next();
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+          >
+            Proceed anyway
           </Button>
         </DialogActions>
       </Dialog>
