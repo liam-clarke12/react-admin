@@ -1,10 +1,39 @@
 // src/scenes/form/RecipeProduction/index.jsx
-// Nory-styled, MUI-free version with ACTIVE-inventory precheck + serious confirm modal.
-import React, { useState, useEffect } from "react";
-import { Formik } from "formik";
+// MUI-styled Production Log with Single / Multiple tabs (mirrors Goods In UX)
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Box,
+  TextField,
+  Snackbar,
+  Alert,
+  Fab,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Paper,
+  Typography,
+  Tabs,
+  Tab,
+  IconButton,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAuth } from "../../../contexts/AuthContext";
-import { useData } from "../../../contexts/DataContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
@@ -14,33 +43,59 @@ const brand = {
   border: "#e5e7eb",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
   primary: "#7C3AED",
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-/* ===== Validation schema ===== */
-const productionLogSchema = yup.object().shape({
+// ---- shared MUI sx (same look/feel as Goods In)
+const inputSx = {
+  "& .MuiInputLabel-root": { color: brand.subtext, fontWeight: 600, letterSpacing: 0.2 },
+  "& .MuiInputLabel-root.Mui-focused": { color: brand.primary },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 12,
+    "& fieldset": { borderColor: brand.border },
+    "&:hover fieldset": { borderColor: brand.primary },
+    "&.Mui-focused fieldset": { borderColor: brand.primary, boxShadow: `0 0 0 4px ${brand.focusRing}` },
+    "& input, & textarea": { paddingTop: "14px", paddingBottom: "14px" },
+  },
+};
+
+const selectSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 12,
+    "& fieldset": { borderColor: brand.border },
+    "&:hover fieldset": { borderColor: brand.primary },
+    "&.Mui-focused fieldset": { borderColor: brand.primary, boxShadow: `0 0 0 4px ${brand.focusRing}` },
+  },
+  "& .MuiInputLabel-root.Mui-focused": { color: brand.primary },
+};
+
+// ===== validation
+const singleSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
-  recipe: yup.string().required("Recipe Name is required"),
-  batchesProduced: yup
-    .number()
-    .typeError("Must be a number")
-    .required("Batches produced is required")
-    .positive("Must be positive"),
-  unitsOfWaste: yup
-    .number()
-    .typeError("Must be a number")
-    .required("Units of waste is required")
-    .min(0, "Cannot be negative"),
+  recipe: yup.string().required("Recipe is required"),
+  batchesProduced: yup.number().typeError("Must be a number").required("Batches produced is required").positive("Must be positive"),
+  unitsOfWaste: yup.number().typeError("Must be a number").required("Units of waste is required").min(0, "Cannot be negative"),
   batchCode: yup.string().required("Batch Code is required"),
-  producerName: yup.string().nullable(), // optional field
+  producerName: yup.string().nullable(),
 });
 
-/* ===== Initial values ===== */
-const initialValues = {
+const itemSchema = yup.object().shape({
+  date: yup.string().required("Date is required"),
+  recipe: yup.string().required("Recipe is required"),
+  batchesProduced: yup.number().typeError("Must be a number").required("Batches produced is required").positive("Must be positive"),
+  unitsOfWaste: yup.number().typeError("Must be a number").required("Units of waste is required").min(0, "Cannot be negative"),
+  batchCode: yup.string().required("Batch Code is required"),
+  producerName: yup.string().nullable(),
+});
+
+const batchSchema = yup.object().shape({
+  items: yup.array().of(itemSchema).min(1, "At least one item is required"),
+});
+
+// ===== initial values
+const initialSingle = {
   date: new Date().toISOString().split("T")[0],
   recipe: "",
   batchesProduced: "",
@@ -49,629 +104,582 @@ const initialValues = {
   producerName: "",
 };
 
-/* ===== Tiny toast ===== */
-function Toast({ open, onClose, children }) {
-  React.useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [open, onClose]);
-  return (
-    <div aria-live="polite" className={`plf-toast ${open ? "show" : ""}`} role="status">
-      <div className="plf-toast-inner">{children}</div>
-    </div>
-  );
-}
-
-/* ===== Serious confirm modal ===== */
-function ConfirmModal({ open, onCancel, onProceed, deficits }) {
-  if (!open) return null;
-  return (
-    <div className="plf-modal-backdrop" onClick={onCancel}>
-      <div
-        className="plf-modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="plf-modal-header">
-          <h3>Insufficient / Missing Ingredients</h3>
-        </div>
-        <div className="plf-modal-body">
-          <p className="plf-warning">
-            You are about to record production that uses ingredients you do not currently have
-            enough of in <strong>active stock</strong>. This can lead to negative or inconsistent
-            inventory.
-          </p>
-          <div className="plf-deficits">
-            {deficits.map((d, i) => (
-              <div key={i} className="plf-deficit-row">
-                <div className="left">
-                  <div className="name">{d.ingredient}</div>
-                  {d.unit ? <div className="unit">Unit: {d.unit}</div> : null}
-                </div>
-                <div className="right">
-                  <div className="need">
-                    Need: <strong>{d.need}</strong>
-                  </div>
-                  <div className="have">
-                    Have: <strong>{d.have}</strong>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="plf-callout">
-            Do you want to continue anyway? This will deduct current stock down to 0, and any
-            remaining shortfall will be excused in this log.
-          </p>
-        </div>
-        <div className="plf-modal-footer">
-          <button type="button" className="btn ghost" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="button" className="btn danger" onClick={onProceed}>
-            Proceed anyway
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ===== Utils ===== */
-const normalizeName = (s) =>
-  (s || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "") // collapse whitespace
-    .replace(/[^a-z0-9]/g, ""); // drop punctuation
-
-// Canonicalize units + treat N/A/blank as empty (wildcard for recipe-only)
-const normalizeUnit = (u) => {
-  const raw = (u || "").toString().trim().toLowerCase();
-  if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
-  if (["g", "gram", "grams"].includes(raw)) return "g";
-  if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
-  if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
-  if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
-  if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
-  return raw; // fallback to provided string
+const initialBatchItem = {
+  date: new Date().toISOString().split("T")[0],
+  recipe: "",
+  batchesProduced: "",
+  unitsOfWaste: 0,
+  batchCode: "",
+  producerName: "",
 };
 
-const keyNameUnit = (name, unit) => `${normalizeName(name)}|${normalizeUnit(unit)}`;
-
-/* ===== New: unit conversion helper ===== */
-// Convert canonical unit to the factor that converts that unit into the chosen "base unit"
-// - mass base unit: grams (g) => kg -> *1000
-// - volume base unit: milliliters (ml) => l -> *1000
-// - count base unit: units => factor 1
-const unitFactorToBase = (canonUnit) => {
-  const u = (canonUnit || "").toString().toLowerCase();
-  if (!u) return 1;
-  if (u === "kg") return 1000;
-  if (u === "g") return 1;
-  if (u === "l") return 1000;
-  if (u === "ml") return 1;
-  if (u === "unit") return 1;
-  return 1;
-};
+const initialBatch = { items: [initialBatchItem] };
 
 const ProductionLogForm = () => {
+  const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
-  const { setGoodsInRows, setIngredientInventory } = useData();
 
-  /* Recipes */
-  const [recipeNames, setRecipeNames] = useState([]); // select options
-  const [recipesIndex, setRecipesIndex] = useState({}); // recipeName -> [{ingredient, quantity, unit}]
+  // tabs: 0 single, 1 multiple
+  const [tabIndex, setTabIndex] = useState(0);
+
+  // recipes for dropdown
+  const [recipes, setRecipes] = useState([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
+  const [fetchErr, setFetchErr] = useState("");
 
-  /* Confirm modal state */
+  // snackbar
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  // multiple confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deficits, setDeficits] = useState([]);
-  const [pendingPayload, setPendingPayload] = useState(null);
+  const [previewItems, setPreviewItems] = useState([]);
+  const [submittingBatch, setSubmittingBatch] = useState(false);
+  const [batchResetForm, setBatchResetForm] = useState(null);
 
-  /* Toast */
-  const [openToast, setOpenToast] = useState(false);
+  // FAB hook to add another row
+  const addItemRef = useRef(null);
 
-  // --- Fetch recipes (FULL rows) and build index ---
+  // fetch recipe names (same endpoint your single form uses)
   useEffect(() => {
-    const fetchRecipes = async () => {
-      if (!cognitoId) return;
-
+    if (!cognitoId) return;
+    (async () => {
       setLoadingRecipes(true);
-      setFetchError(null);
-
+      setFetchErr("");
       try {
-        const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const rows = await res.json();
-
-        // Build: recipe -> array of { ingredient, quantity, unit? }
-        const index = {};
-        for (const r of Array.isArray(rows) ? rows : []) {
-          const recipeName = r.recipe_name ?? r.recipe ?? "";
-          if (!recipeName) continue;
-          if (!index[recipeName]) index[recipeName] = [];
-          index[recipeName].push({
-            ingredient: r.ingredient ?? r.ingredient_name ?? "",
-            quantity: Number(r.quantity) || 0,
-            unit: r.unit ?? "", // if recipe_ingredients has a unit; may be empty or "N/A"
-          });
-        }
-        setRecipesIndex(index);
-        setRecipeNames(Object.keys(index).sort());
-      } catch (err) {
-        console.error("Error fetching recipes:", err);
-        setFetchError("Error fetching recipes");
-        setRecipeNames([]);
-        setRecipesIndex({});
+        const names = Array.from(
+          new Set((Array.isArray(rows) ? rows : [])
+            .map(r => r.recipe_name ?? r.recipe)
+            .filter(Boolean))
+        ).sort();
+        setRecipes(names);
+      } catch (e) {
+        console.error(e);
+        setRecipes([]);
+        setFetchErr("Error fetching recipes");
       } finally {
         setLoadingRecipes(false);
       }
-    };
-
-    fetchRecipes();
+    })();
   }, [cognitoId]);
 
-  // --- Availability check against ACTIVE inventory ---
-  const checkAvailability = async (recipeName, batchesProduced) => {
-    const lines = recipesIndex[recipeName] || [];
-    if (!lines.length) return [];
-
-    // 1) Compute required per (ingredient, unit) and convert to base units
-    const required = []; // keep array to preserve each line
-    for (const line of lines) {
-      const ing = (line.ingredient || "").toString();
-      const uCanon = normalizeUnit(line.unit);
-      const qty = Number(line.quantity) || 0;
-      const need = qty * (Number(batchesProduced) || 0);
-      const needBase = need * unitFactorToBase(uCanon);
-      required.push({ ingredient: ing, unit: uCanon, need, needBase });
-    }
-
-    // 2) Fetch ACTIVE inventory snapshot
-    const invRes = await fetch(
-      `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`
-    );
-    const invRows = invRes.ok ? await invRes.json() : [];
-
-    // Build two maps in BASE UNITS:
-    //  - availableByIU: name+unit (canonical) -> amount (in base units)
-    //  - availableByI:  name only -> sum of all units (in base units)
-    const availableByIU = new Map();
-    const availableByI = new Map();
-
-    for (const r of Array.isArray(invRows) ? invRows : []) {
-      const nameCanon = normalizeName(r?.ingredient ?? "");
-      const unitCanon = normalizeUnit(r?.unit ?? "");
-      const rawHave = Number(r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0) || 0;
-      const haveBase = rawHave * unitFactorToBase(unitCanon);
-
-      const kIU = `${nameCanon}|${unitCanon}`;
-      availableByIU.set(kIU, (availableByIU.get(kIU) || 0) + haveBase);
-
-      availableByI.set(nameCanon, (availableByI.get(nameCanon) || 0) + haveBase);
-    }
-
-    // 3) Compare (all in base units)
-    const problems = [];
-    for (const { ingredient, unit, need, needBase } of required) {
-      const nameCanon = normalizeName(ingredient);
-
-      // ✅ Key change:
-      // Instead of requiring an exact unit match, use the SUM across ALL units for that ingredient,
-      // since both recipe need and inventory are converted to base units.
-      // This fixes cases like need=500g while inventory is 3kg.
-      const haveBaseAllUnits = availableByI.get(nameCanon) ?? 0;
-
-      if (needBase > haveBaseAllUnits) {
-        // For display: convert have back into the recipe unit if it exists; otherwise show base units.
-        const displayFactor = unit ? unitFactorToBase(unit) : 1;
-        const reportedHave = displayFactor > 0 ? haveBaseAllUnits / displayFactor : haveBaseAllUnits;
-        const reportedNeed = need;
-
-        const round = (n) => {
-          if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
-          return Math.round(n * 1000) / 1000;
-        };
-
-        problems.push({
-          ingredient,
-          unit,
-          need: round(reportedNeed),
-          have: round(reportedHave),
-        });
+  // helpers to find/scroll to first error (same as Goods In pattern)
+  const findFirstErrorPath = (errObj) => {
+    if (!errObj || typeof errObj !== "object") return null;
+    for (const k of Object.keys(errObj)) {
+      if (!errObj[k]) continue;
+      if (typeof errObj[k] === "string") return k;
+      if (typeof errObj[k] === "object") {
+        const child = findFirstErrorPath(errObj[k]);
+        if (child) return `${k}.${child}`;
       }
     }
-
-    return problems;
+    return null;
   };
-
-  // --- helper: refresh goods-in active & recompute ingredient inventory client-side ---
-  const refreshGoodsInAndInventory = async () => {
-    if (!cognitoId) return;
-    try {
-      // goods-in active rows
-      const res = await fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`);
-      const goodsRows = res.ok ? await res.json() : [];
-
-      // normalize goods rows similar to other components
-      const normalized = (Array.isArray(goodsRows) ? goodsRows : []).map((row, idx) => {
-        const date = row.date ? String(row.date).slice(0, 10) : row.date;
-        const expiryDate = row.expiryDate ? String(row.expiryDate).slice(0, 10) : row.expiryDate;
-        const stockReceived = Number(row.stockReceived || 0);
-        const stockRemaining = Number(row.stockRemaining || 0);
-        const serverBar = row.barCode ? String(row.barCode) : null;
-        const _id = serverBar ? `${serverBar}-${idx}` : `gen-${idx}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-
-        return {
-          ...row,
-          date,
-          expiryDate,
-          stockReceived,
-          stockRemaining,
-          processed: Number(stockRemaining) === 0 ? "Yes" : "No",
-          barCode: serverBar || null,
-          _id,
-        };
-      });
-
-      setGoodsInRows(normalized);
-
-      // compute ingredient inventory from normalized goods (sum stockRemaining per ingredient; pick earliest date's barcode)
-      const active = normalized.filter((r) => Number(r.stockRemaining) > 0);
-      const map = new Map();
-      for (const r of active) {
-        const key = r.ingredient;
-        const prev = map.get(key) || { ingredient: key, amount: 0, barcode: r.barCode, _date: r.date };
-        const amount = prev.amount + Number(r.stockRemaining || 0);
-
-        let nextBarcode = prev.barcode;
-        let nextDate = prev._date;
-        try {
-          const prevTime = new Date(prev._date).getTime() || Infinity;
-          const curTime = new Date(r.date).getTime() || Infinity;
-          if (curTime < prevTime) {
-            nextBarcode = r.barCode;
-            nextDate = r.date;
-          }
-        } catch {
-          // ignore
-        }
-
-        map.set(key, { ingredient: key, amount, barcode: nextBarcode, _date: nextDate });
-      }
-      const inventory = Array.from(map.values()).map(({ _date, ...rest }) => rest);
-      setIngredientInventory(inventory);
-    } catch (err) {
-      console.warn("refreshGoodsInAndInventory failed:", err);
+  const scrollToFirstError = (errors) => {
+    const firstPath = findFirstErrorPath(errors);
+    if (!firstPath) return;
+    const selector = `[data-field="${firstPath}"]`;
+    const el = document.querySelector(selector);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      try { el.focus({ preventScroll: true }); } catch {}
     }
   };
 
-  // --- Final submit to API ---
-  const submitToServer = async (payload, resetForm) => {
+  // submit single (existing route)
+  const submitSingle = async (values, { resetForm }) => {
+    const payload = { ...values, cognito_id: cognitoId, producerName: values.producerName ?? "" };
     try {
       const res = await fetch(`${API_BASE}/add-production-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to submit data");
-      await res.json().catch(() => null);
-
-      // refresh client-side goods-in snapshot so UI shows server deductions immediately
-      try {
-        await refreshGoodsInAndInventory();
-      } catch (refreshErr) {
-        console.warn("Could not refresh goods-in after production submit:", refreshErr);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "Failed");
       }
-
       resetForm();
-      setOpenToast(true);
+      setOpenSnackbar(true);
     } catch (err) {
-      console.error("Error submitting data:", err);
-      alert("Submission failed. Check console.");
+      console.error("Single submit failed:", err);
+      alert("Submission failed. See console for details.");
     }
   };
 
-  // --- Form submit with precheck ---
-  const handleFormSubmit = async (values, { resetForm }) => {
-    // include producerName in payload (even if empty)
-    const payload = { ...values, cognito_id: cognitoId, producerName: values.producerName ?? "" };
-
+  // submit multiple (new batch route, mirrors Goods In flow)
+  const submitBatch = async (items, { resetForm }) => {
     try {
-      const problems = await checkAvailability(values.recipe, values.batchesProduced);
-
-      if (problems.length > 0) {
-        setDeficits(problems);
-        setPendingPayload({ payload, resetForm });
-        setConfirmOpen(true);
-        return;
+      const res = await fetch(`${API_BASE}/add-production-log/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: items, cognito_id: cognitoId }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "Batch submit failed");
       }
-
-      // All good → submit
-      await submitToServer(payload, resetForm);
+      resetForm();
+      setOpenSnackbar(true);
     } catch (err) {
-      console.error("Availability check failed:", err);
-      alert("Could not verify inventory availability. Please try again.");
+      console.error("Batch submit error:", err);
+      // soft fallback: try sequentially to the single route (don’t block operator)
+      try {
+        for (const it of items) {
+          const payload = { ...it, cognito_id: cognitoId, producerName: it.producerName ?? "" };
+          const r = await fetch(`${API_BASE}/add-production-log`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!r.ok) {
+            console.error("Fallback single failed for item:", it, await r.text().catch(() => r.status));
+          }
+        }
+        resetForm();
+        setOpenSnackbar(true);
+      } catch (fallbackErr) {
+        console.error("Batch fallback failed:", fallbackErr);
+        alert("Multiple submission failed. See console.");
+      }
     }
   };
 
-  // --- Confirm handlers ---
-  const handleCancel = () => {
-    setConfirmOpen(false);
-    setDeficits([]);
-    setPendingPayload(null);
+  const openConfirm = async ({ validateForm, values, setTouched, resetForm }) => {
+    const errs = await validateForm();
+    if (errs && Object.keys(errs).length) {
+      const touchedItems = (values.items || []).map(() => ({
+        date: true, recipe: true, batchesProduced: true, unitsOfWaste: true, batchCode: true, producerName: true,
+      }));
+      setTouched({ items: touchedItems }, false);
+      scrollToFirstError(errs);
+      return;
+    }
+    setPreviewItems(values.items || []);
+    setBatchResetForm(() => resetForm);
+    setConfirmOpen(true);
   };
 
-  const handleProceedAnyway = async () => {
-    const pp = pendingPayload;
-    setConfirmOpen(false);
-    setDeficits([]);
-    setPendingPayload(null);
-    if (pp) {
-      await submitToServer(pp.payload, pp.resetForm);
+  const handleConfirmSubmit = async () => {
+    if (!previewItems.length) return setConfirmOpen(false);
+    setSubmittingBatch(true);
+    try {
+      await submitBatch(previewItems, { resetForm: batchResetForm || (() => {}) });
+      setConfirmOpen(false);
+      setPreviewItems([]);
+    } finally {
+      setSubmittingBatch(false);
     }
   };
+
+  // shared selects
+  const recipeMenu = useMemo(() => {
+    if (loadingRecipes) return [<MenuItem key="loading" value="" disabled>Loading recipes…</MenuItem>];
+    if (fetchErr) return [<MenuItem key="err" value="" disabled>{fetchErr}</MenuItem>];
+    if (!recipes.length) return [<MenuItem key="none" value="" disabled>No recipes</MenuItem>];
+    return [
+      <MenuItem key="placeholder" value="" disabled>Select a recipe…</MenuItem>,
+      ...recipes.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)
+    ];
+  }, [recipes, loadingRecipes, fetchErr]);
 
   return (
-    <div className="plf-wrap">
-      {/* Scoped CSS */}
-      <style>{`
-        .plf-wrap { padding: 20px; color: ${brand.text}; background: ${brand.surfaceMuted}; min-height: 100%; }
-        .plf-card {
-          margin-top: 12px; padding: 16px;
-          border: 1px solid ${brand.border}; background: ${brand.surface};
-          border-radius: 16px; box-shadow: ${brand.shadow};
-        }
-        .plf-title { font-weight: 800; margin: 0 0 4px; }
-        .plf-sub { color: ${brand.subtext}; margin: 0 0 18px; }
-
-        .plf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-        .span-1 { grid-column: span 1; } .span-2 { grid-column: span 2; } .span-4 { grid-column: span 4; }
-        @media (max-width: 600px) { .span-1,.span-2,.span-4 { grid-column: span 4; } }
-
-        .plf-field { display: flex; flex-direction: column; }
-        .plf-label { font-size: 13px; font-weight: 600; color: ${brand.subtext}; margin-bottom: 6px; }
-        .plf-input, .plf-select {
-          background: ${brand.inputBg}; border: 1px solid ${brand.border}; border-radius: 12px;
-          padding: 12px 14px; font-size: 14px; outline: none;
-          transition: border-color .15s ease, box-shadow .15s ease;
-        }
-        .plf-input:focus, .plf-select:focus { border-color: ${brand.primary}; box-shadow: 0 0 0 4px ${brand.focusRing}; }
-        .plf-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
-
-        .plf-fab {
-          position: relative;
-          margin-top: 20px;
-          float: right;
-          display: inline-flex; 
-          align-items: center; 
-          gap: 8px;
-          border-radius: 999px; 
-          padding: 12px 18px; 
-          border: 0; 
-          cursor: pointer; 
-          font-weight: 800; 
-          color: #fff;
-          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
-          transition: transform .2s ease;
-        }
-        .plf-fab:hover { transform: scale(1.06); background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
-
-        /* Toast */
-        .plf-toast {
-          position: fixed; top: 16px; right: 16px; transform: translateY(-20px); opacity: 0;
-          transition: all .2s ease; z-index: 60; pointer-events: none;
-        }
-        .plf-toast.show { transform: translateY(0); opacity: 1; }
-        .plf-toast-inner {
-          background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
-          padding: 10px 12px; border-radius: 10px; font-weight: 700; box-shadow: ${brand.shadow};
-        }
-
-        /* Modal */
-        .plf-modal-backdrop {
-          position: fixed; inset: 0; background: rgba(15,23,42,.55);
-          display: flex; align-items: center; justify-content: center; z-index: 70;
-        }
-        .plf-modal {
-          width: min(640px, 94vw); background: ${brand.surface};
-          border: 1px solid ${brand.border}; border-radius: 14px; box-shadow: ${brand.shadow}; overflow: hidden;
-        }
-        .plf-modal-header {
-          padding: 14px 16px;
-          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          color: #fff; font-weight: 800;
-        }
-        .plf-modal-body { padding: 16px; }
-        .plf-modal-footer {
-          padding: 12px 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid ${brand.border};
-        }
-        .plf-warning {
-          color: ${brand.danger}; font-weight: 800; margin-bottom: 12px;
-        }
-        .plf-deficits { display: grid; gap: 10px; margin-bottom: 12px; }
-        .plf-deficit-row {
-          display: flex; align-items: center; justify-content: space-between;
-          border: 1px solid ${brand.border}; border-radius: 10px; padding: 10px 12px; background: ${brand.surfaceMuted};
-        }
-        .plf-deficit-row .name { font-weight: 800; color: ${brand.text}; }
-        .plf-deficit-row .unit { font-size: 12px; color: ${brand.subtext}; }
-        .plf-deficit-row .right { display: flex; gap: 14px; font-size: 14px; color: ${brand.text}; }
-        .plf-callout {
-          background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
-          padding: 10px 12px; border-radius: 8px; font-weight: 700;
-        }
-        .btn { border: 0; cursor: pointer; font-weight: 800; padding: 10px 14px; border-radius: 10px; }
-        .btn.ghost { background: transparent; color: ${brand.text}; border: 1px solid ${brand.border}; }
-        .btn.danger { color: #fff; background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); }
-        .btn.danger:hover { background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
-      `}</style>
-
-      <div className="plf-card">
-        <h2 className="plf-title">Production Log</h2>
-        <p className="plf-sub">Fill out the details and click Record.</p>
-
-        <Formik
-          onSubmit={handleFormSubmit}
-          initialValues={initialValues}
-          validationSchema={productionLogSchema}
+    <Box m="20px">
+      <Box sx={{ position: "relative" }}>
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 2,
+            p: { xs: 2, sm: 3 },
+            pb: tabIndex === 1 ? "120px" : undefined,
+            borderRadius: 16,
+            border: `1px solid ${brand.border}`,
+            background: brand.surface,
+            boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+          }}
         >
-          {({ values, errors, touched, handleBlur, handleChange, handleSubmit }) => (
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="plf-grid">
-                {/* Date */}
-                <div className="plf-field span-2">
-                  <label className="plf-label" htmlFor="date">Date</label>
-                  <input
-                    id="date"
-                    name="date"
-                    type="date"
-                    className="plf-input"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.date}
-                  />
-                  {touched.date && errors.date && <div className="plf-error">{errors.date}</div>}
-                </div>
-
-                {/* Recipe */}
-                <div className="plf-field span-2">
-                  <label className="plf-label" htmlFor="recipe">Recipe</label>
-                  <select
-                    id="recipe"
-                    name="recipe"
-                    className="plf-select"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.recipe}
-                  >
-                    {loadingRecipes ? (
-                      <option value="" disabled>Loading recipes...</option>
-                    ) : fetchError ? (
-                      <option value="" disabled>{fetchError}</option>
-                    ) : recipeNames.length > 0 ? (
-                      <>
-                        <option value="" disabled>Select a recipe…</option>
-                        {recipeNames.map((r, idx) => (
-                          <option key={idx} value={r}>{r}</option>
-                        ))}
-                      </>
-                    ) : (
-                      <option value="" disabled>No recipes available</option>
-                    )}
-                  </select>
-                  {touched.recipe && errors.recipe && <div className="plf-error">{errors.recipe}</div>}
-                </div>
-
-                {/* Batches Produced */}
-                <div className="plf-field span-2">
-                  <label className="plf-label" htmlFor="batchesProduced">Batches Produced</label>
-                  <input
-                    id="batchesProduced"
-                    name="batchesProduced"
-                    type="number"
-                    className="plf-input"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.batchesProduced}
-                    step="any"
-                    placeholder="0"
-                  />
-                  {touched.batchesProduced && errors.batchesProduced && (
-                    <div className="plf-error">{errors.batchesProduced}</div>
-                  )}
-                </div>
-
-                {/* Units of Waste */}
-                <div className="plf-field span-2">
-                  <label className="plf-label" htmlFor="unitsOfWaste">Units of Waste</label>
-                  <input
-                    id="unitsOfWaste"
-                    name="unitsOfWaste"
-                    type="number"
-                    className="plf-input"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.unitsOfWaste}
-                    step="1"
-                    min="0"
-                    placeholder="0"
-                  />
-                  {touched.unitsOfWaste && errors.unitsOfWaste && (
-                    <div className="plf-error">{errors.unitsOfWaste}</div>
-                  )}
-                </div>
-
-                {/* Batch Code */}
-                <div className="plf-field span-4">
-                  <label className="plf-label" htmlFor="batchCode">Batch Code</label>
-                  <input
-                    id="batchCode"
-                    name="batchCode"
-                    type="text"
-                    className="plf-input"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.batchCode}
-                    placeholder="e.g., BATCH-2025-08-10-A"
-                  />
-                  {touched.batchCode && errors.batchCode && (
-                    <div className="plf-error">{errors.batchCode}</div>
-                  )}
-                </div>
-
-                {/* Producer Name (NEW) */}
-                <div className="plf-field span-4">
-                  <label className="plf-label" htmlFor="producerName">Produced by (Name)</label>
-                  <input
-                    id="producerName"
-                    name="producerName"
-                    type="text"
-                    className="plf-input"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.producerName}
-                    placeholder="Name of person who produced this batch"
-                  />
-                  {touched.producerName && errors.producerName && (
-                    <div className="plf-error">{errors.producerName}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Fixed gradient pill action */}
-              <button type="submit" className="plf-fab" aria-label="Record production">
-                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: brand.text }}>
                 Record Production
-              </button>
-            </form>
+              </Typography>
+              <Typography variant="body2" sx={{ color: brand.subtext }}>
+                Use Single for one run or switch to Multiple to log several runs at once.
+              </Typography>
+            </Box>
+            <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 700 } }}>
+              <Tab label="Single" />
+              <Tab label="Multiple" />
+            </Tabs>
+          </Box>
+
+          {/* SINGLE */}
+          {tabIndex === 0 && (
+            <Formik initialValues={initialSingle} validationSchema={singleSchema} onSubmit={submitSingle}>
+              {({ values, errors, touched, handleBlur, handleChange, handleSubmit, validateForm, setTouched, submitForm }) => (
+                <form onSubmit={handleSubmit}>
+                  <Box
+                    display="grid"
+                    gap="20px"
+                    gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                    sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                  >
+                    <TextField
+                      fullWidth variant="outlined" type="date" label="Date" name="date"
+                      onBlur={handleBlur} onChange={handleChange} value={values.date}
+                      error={!!touched.date && !!errors.date} helperText={touched.date && errors.date}
+                      sx={{ gridColumn: "span 2", ...inputSx }}
+                      InputProps={{ inputProps: { "data-field": "date" } }}
+                    />
+                    <FormControl fullWidth sx={{ gridColumn: "span 2", ...selectSx }}>
+                      <InputLabel id="recipe-label">Recipe</InputLabel>
+                      <Select
+                        labelId="recipe-label" name="recipe" value={values.recipe} label="Recipe"
+                        onChange={handleChange} inputProps={{ "data-field": "recipe" }}
+                        error={!!touched.recipe && !!errors.recipe}
+                      >
+                        {recipeMenu}
+                      </Select>
+                      {!!touched.recipe && !!errors.recipe && (
+                        <Typography variant="caption" sx={{ color: "error.main", mt: 0.5 }}>
+                          {errors.recipe}
+                        </Typography>
+                      )}
+                    </FormControl>
+
+                    <TextField
+                      fullWidth variant="outlined" type="number" label="Batches Produced" name="batchesProduced"
+                      onBlur={handleBlur} onChange={handleChange} value={values.batchesProduced}
+                      error={!!touched.batchesProduced && !!errors.batchesProduced} helperText={touched.batchesProduced && errors.batchesProduced}
+                      sx={{ gridColumn: "span 2", ...inputSx }}
+                      InputProps={{ inputProps: { "data-field": "batchesProduced" } }}
+                    />
+                    <TextField
+                      fullWidth variant="outlined" type="number" label="Units of Waste" name="unitsOfWaste"
+                      onBlur={handleBlur} onChange={handleChange} value={values.unitsOfWaste}
+                      error={!!touched.unitsOfWaste && !!errors.unitsOfWaste} helperText={touched.unitsOfWaste && errors.unitsOfWaste}
+                      sx={{ gridColumn: "span 2", ...inputSx }}
+                      InputProps={{ inputProps: { "data-field": "unitsOfWaste", min: 0 } }}
+                    />
+
+                    <TextField
+                      fullWidth variant="outlined" type="text" label="Batch Code" name="batchCode"
+                      onBlur={handleBlur} onChange={handleChange} value={values.batchCode}
+                      error={!!touched.batchCode && !!errors.batchCode} helperText={touched.batchCode && errors.batchCode}
+                      sx={{ gridColumn: "span 4", ...inputSx }}
+                      InputProps={{ inputProps: { "data-field": "batchCode" } }}
+                    />
+
+                    <TextField
+                      fullWidth variant="outlined" type="text" label="Produced by (Name) – optional" name="producerName"
+                      onBlur={handleBlur} onChange={handleChange} value={values.producerName}
+                      error={!!touched.producerName && !!errors.producerName} helperText={touched.producerName && errors.producerName}
+                      sx={{ gridColumn: "span 4", ...inputSx }}
+                      InputProps={{ inputProps: { "data-field": "producerName" } }}
+                    />
+                  </Box>
+
+                  <Box display="flex" justifyContent="flex-end" mt={3}>
+                    <Fab
+                      variant="extended"
+                      onClick={async () => {
+                        const errs = await validateForm();
+                        if (errs && Object.keys(errs).length) {
+                          setTouched({
+                            date: true, recipe: true, batchesProduced: true, unitsOfWaste: true, batchCode: true, producerName: true,
+                          }, false);
+                          scrollToFirstError(errs);
+                          return;
+                        }
+                        await submitForm();
+                      }}
+                      sx={{
+                        px: 4, py: 1.25, gap: 1, borderRadius: 999, fontWeight: 800, textTransform: "none",
+                        boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                        background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                        color: "#fff",
+                        "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                      }}
+                    >
+                      <AddIcon />
+                      Record Production
+                    </Fab>
+                  </Box>
+                </form>
+              )}
+            </Formik>
           )}
-        </Formik>
-      </div>
 
-      {/* Serious confirm modal */}
-      <ConfirmModal
+          {/* MULTIPLE */}
+          {tabIndex === 1 && (
+            <Formik initialValues={initialBatch} validationSchema={batchSchema} onSubmit={() => {}}>
+              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
+                <form>
+                  <FieldArray name="items">
+                    {({ push, remove }) => {
+                      // enable FAB to add item
+                      addItemRef.current = () => {
+                        const last = (values.items || [])[values.items.length - 1] || null;
+                        const next = { ...initialBatchItem };
+                        if (last?.date) next.date = last.date;
+                        if (last?.producerName) next.producerName = last.producerName;
+                        push(next);
+                      };
+
+                      return (
+                        <Box>
+                          <Box display="grid" gap={2}>
+                            {(values.items || []).map((it, idx) => {
+                              const base = `items.${idx}`;
+                              const dErr = getIn(errors, `${base}.date`), dTouch = getIn(touched, `${base}.date`);
+                              const rErr = getIn(errors, `${base}.recipe`), rTouch = getIn(touched, `${base}.recipe`);
+                              const bErr = getIn(errors, `${base}.batchesProduced`), bTouch = getIn(touched, `${base}.batchesProduced`);
+                              const wErr = getIn(errors, `${base}.unitsOfWaste`), wTouch = getIn(touched, `${base}.unitsOfWaste`);
+                              const cErr = getIn(errors, `${base}.batchCode`), cTouch = getIn(touched, `${base}.batchCode`);
+                              const pErr = getIn(errors, `${base}.producerName`), pTouch = getIn(touched, `${base}.producerName`);
+
+                              return (
+                                <Paper
+                                  key={idx}
+                                  elevation={0}
+                                  sx={{
+                                    p: 2,
+                                    borderRadius: 2,
+                                    border: `1px solid ${brand.border}`,
+                                    background: idx % 2 ? brand.surfaceMuted : brand.surface,
+                                  }}
+                                >
+                                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                    <Typography sx={{ fontWeight: 800 }}>Item {idx + 1}</Typography>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => remove(idx)}
+                                      sx={{ color: brand.primary }}
+                                      aria-label={`Remove item ${idx + 1}`}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Box>
+
+                                  <Box
+                                    display="grid"
+                                    gap="12px"
+                                    gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                                    sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                                  >
+                                    <TextField
+                                      fullWidth type="date" label="Date"
+                                      name={`${base}.date`} value={it.date}
+                                      onChange={(e) => setFieldValue(`${base}.date`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!dTouch && !!dErr} helperText={dTouch && dErr ? dErr : ""}
+                                      InputProps={{ inputProps: { "data-field": `${base}.date` } }}
+                                    />
+
+                                    <FormControl fullWidth sx={{ gridColumn: "span 2", ...selectSx }} error={!!rTouch && !!rErr}>
+                                      <InputLabel id={`recipe-label-${idx}`}>Recipe</InputLabel>
+                                      <Select
+                                        labelId={`recipe-label-${idx}`}
+                                        name={`${base}.recipe`}
+                                        value={it.recipe}
+                                        label="Recipe"
+                                        onChange={(e) => setFieldValue(`${base}.recipe`, e.target.value)}
+                                        inputProps={{ "data-field": `${base}.recipe` }}
+                                      >
+                                        {recipeMenu}
+                                      </Select>
+                                      {!!rTouch && !!rErr && (
+                                        <Typography variant="caption" sx={{ color: "error.main", mt: 0.5 }}>
+                                          {rErr}
+                                        </Typography>
+                                      )}
+                                    </FormControl>
+
+                                    <TextField
+                                      fullWidth type="number" label="Batches Produced"
+                                      name={`${base}.batchesProduced`} value={it.batchesProduced}
+                                      onChange={(e) => setFieldValue(`${base}.batchesProduced`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!bTouch && !!bErr} helperText={!!bTouch && bErr ? bErr : ""}
+                                      InputProps={{ inputProps: { "data-field": `${base}.batchesProduced` } }}
+                                    />
+
+                                    <TextField
+                                      fullWidth type="number" label="Units of Waste"
+                                      name={`${base}.unitsOfWaste`} value={it.unitsOfWaste}
+                                      onChange={(e) => setFieldValue(`${base}.unitsOfWaste`, e.target.value)}
+                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      error={!!wTouch && !!wErr} helperText={!!wTouch && wErr ? wErr : ""}
+                                      InputProps={{ inputProps: { "data-field": `${base}.unitsOfWaste`, min: 0 } }}
+                                    />
+
+                                    <TextField
+                                      fullWidth type="text" label="Batch Code"
+                                      name={`${base}.batchCode`} value={it.batchCode}
+                                      onChange={(e) => setFieldValue(`${base}.batchCode`, e.target.value)}
+                                      sx={{ gridColumn: "span 4", ...inputSx }}
+                                      error={!!cTouch && !!cErr} helperText={!!cTouch && cErr ? cErr : ""}
+                                      InputProps={{ inputProps: { "data-field": `${base}.batchCode` } }}
+                                    />
+
+                                    <TextField
+                                      fullWidth type="text" label="Produced by (Name) – optional"
+                                      name={`${base}.producerName`} value={it.producerName}
+                                      onChange={(e) => setFieldValue(`${base}.producerName`, e.target.value)}
+                                      sx={{ gridColumn: "span 4", ...inputSx }}
+                                      error={!!pTouch && !!pErr} helperText={!!pTouch && pErr ? pErr : ""}
+                                      InputProps={{ inputProps: { "data-field": `${base}.producerName` } }}
+                                    />
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Box>
+
+                          {/* Submit multiple (opens confirm) */}
+                          <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
+                            <Fab
+                              variant="extended"
+                              onClick={() => openConfirm({ validateForm, values, setTouched, resetForm })}
+                              sx={{
+                                px: 4, py: 1.25, gap: 1, borderRadius: 999, fontWeight: 800, textTransform: "none",
+                                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                                color: "#fff",
+                                "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                              }}
+                            >
+                              <AddIcon />
+                              Submit Multiple ({(values.items || []).length})
+                            </Fab>
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                  </FieldArray>
+                </form>
+              )}
+            </Formik>
+          )}
+        </Paper>
+
+        {/* FAB to add an item (Multiple tab only) */}
+        {tabIndex === 1 && (
+          <Box
+            sx={{
+              position: "absolute",
+              left: 20,
+              bottom: 20,
+              zIndex: 1200,
+              pointerEvents: "auto",
+            }}
+          >
+            <Fab
+              onClick={() => addItemRef.current && addItemRef.current()}
+              sx={{
+                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                color: "#fff",
+                "&:hover": { background: brand.primaryDark },
+                boxShadow: "0 14px 36px rgba(16,24,40,0.20)",
+                width: 170,
+                height: 56,
+                borderRadius: 3,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                fontWeight: 800,
+                textTransform: "none",
+              }}
+              aria-label="Add production item"
+              size="medium"
+              variant="extended"
+            >
+              <AddIcon sx={{ mr: 1 }} />
+              Add Item
+            </Fab>
+          </Box>
+        )}
+      </Box>
+
+      {/* Confirm dialog for batch submit */}
+      <Dialog
         open={confirmOpen}
-        deficits={deficits}
-        onCancel={handleCancel}
-        onProceed={handleProceedAnyway}
-      />
+        onClose={() => setConfirmOpen(false)}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}` } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Multiple Submission</DialogTitle>
+        <DialogContent dividers>
+          <Typography sx={{ color: brand.subtext, mb: 2 }}>
+            You're about to submit <strong>{previewItems.length}</strong> production log item(s). Review and confirm.
+          </Typography>
 
-      {/* Success Toast */}
-      <Toast open={openToast} onClose={() => setOpenToast(false)}>
-        Production log has been recorded!
-      </Toast>
-    </div>
+          <Table size="small" aria-label="batch-summary">
+            <TableHead>
+              <TableRow sx={{ background: brand.surfaceMuted }}>
+                <TableCell sx={{ fontWeight: 800 }}>#</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Recipe</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Batches</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Waste (units)</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Batch Code</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Producer</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {previewItems.map((it, i) => (
+                <TableRow key={i}>
+                  <TableCell>{i + 1}</TableCell>
+                  <TableCell>{String(it.recipe || "—")}</TableCell>
+                  <TableCell>{String(it.batchesProduced ?? "—")}</TableCell>
+                  <TableCell>{String(it.unitsOfWaste ?? "—")}</TableCell>
+                  <TableCell>{String(it.batchCode ?? "—")}</TableCell>
+                  <TableCell>{String(it.producerName ?? "—")}</TableCell>
+                  <TableCell>{String(it.date ?? "—")}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }} disabled={submittingBatch}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmSubmit}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
+            startIcon={submittingBatch ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
+            disabled={submittingBatch}
+          >
+            {submittingBatch ? "Submitting…" : "Confirm & Submit"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Toast */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setOpenSnackbar(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert onClose={() => setOpenSnackbar(false)} severity="success" sx={{ fontWeight: 700, borderRadius: 2 }}>
+          Production log recorded successfully!
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

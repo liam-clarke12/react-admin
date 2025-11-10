@@ -1385,6 +1385,196 @@ app.post("/api/add-production-log", async (req, res) => {
   }
 });
 
+// NEW: Batch Production Log submit (multiple items)
+app.post("/api/add-production-log/batch", async (req, res) => {
+  const { entries, cognito_id } = req.body;
+
+  // (Optional) Allow your frontend origin, mirroring your goods-in batch route
+  res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return res.status(400).json({ success: false, error: "entries must be a non-empty array" });
+  }
+  if (!cognito_id) {
+    return res.status(400).json({ success: false, error: "cognito_id is required" });
+  }
+
+  // quick validation of each entry
+  const invalid = entries
+    .map((e, i) => {
+      const missing = [];
+      if (e.date == null) missing.push("date");
+      if (e.recipe == null) missing.push("recipe");
+      if (e.batchesProduced == null) missing.push("batchesProduced");
+      if (e.batchCode == null) missing.push("batchCode");
+      if (e.unitsOfWaste == null) missing.push("unitsOfWaste");
+      return missing.length ? { index: i, missing } : null;
+    })
+    .filter(Boolean);
+
+  if (invalid.length) {
+    return res.status(400).json({ success: false, error: "Validation failed for some entries", details: invalid });
+  }
+
+  const connection = await db.promise().getConnection();
+
+  // ---- helpers (mirror single route)
+  const normalizeUnit = (u) => {
+    const raw = (u || "").toString().trim().toLowerCase();
+    if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+    if (["g", "gram", "grams"].includes(raw)) return "g";
+    if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+    if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
+    if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+    if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
+    return raw;
+  };
+  const unitFactorToBase = (canonUnit) => {
+    const u = (canonUnit || "").toString().toLowerCase();
+    if (!u) return 1;
+    if (u === "kg") return 1000; // kg -> g
+    if (u === "g") return 1;
+    if (u === "l") return 1000; // L -> ml
+    if (u === "ml") return 1;
+    if (u === "unit") return 1;
+    return 1;
+  };
+  const toFixedSafe = (num, decimals = 6) => Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+
+  try {
+    await connection.beginTransaction();
+
+    const insertedIds = [];
+
+    // Process each entry in order (FIFO deductions are per-item)
+    for (const entry of entries) {
+      const {
+        date,
+        recipe,
+        batchesProduced,
+        batchCode,
+        unitsOfWaste,
+        producerName: producerNameFromBody,
+        producer_name: producerNameSnake,
+      } = entry;
+
+      const producerName = producerNameFromBody ?? producerNameSnake ?? null;
+
+      // fetch recipe + units_per_batch
+      const [recipeRows] = await connection.execute(
+        `SELECT id, units_per_batch FROM recipes WHERE recipe_name = ? AND user_id = ?`,
+        [recipe, cognito_id]
+      );
+      if (recipeRows.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, error: `Recipe not found: ${recipe}` });
+      }
+
+      const recipeId = recipeRows[0].id;
+      const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
+      const batchRemaining = Number(batchesProduced) * unitsPerBatch;
+      const finalUnitsOfWaste = Number(unitsOfWaste) || 0;
+
+      // insert production_log (returns id)
+      const [productionLogResult] = await connection.execute(
+        `
+          INSERT INTO production_log
+            (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          date,
+          recipe,
+          batchesProduced,
+          batchRemaining,
+          batchCode,
+          cognito_id,
+          finalUnitsOfWaste,
+          producerName,
+        ]
+      );
+      const productionLogId = productionLogResult.insertId;
+      insertedIds.push(productionLogId);
+
+      // fetch recipe ingredients for this recipe
+      const [ingredients] = await connection.execute(
+        `
+          SELECT
+            i.id AS ingredient_id,
+            i.ingredient_name,
+            ri.unit AS unit,
+            (ri.quantity * ?) AS total_needed
+          FROM recipe_ingredients ri
+          JOIN ingredients i ON ri.ingredient_id = i.id
+          WHERE ri.recipe_id = ?
+        `,
+        [Number(batchesProduced), recipeId]
+      );
+
+      // Deduct from goods_in FIFO (active, any unit; convert to base)
+      for (const ing of ingredients) {
+        let amountNeeded = Number(ing.total_needed) || 0;
+        const ingName = ing.ingredient_name;
+        const ingUnitCanon = normalizeUnit(ing.unit);
+        const needBasePerUnit = unitFactorToBase(ingUnitCanon);
+        let amountNeededBase = amountNeeded * needBasePerUnit;
+
+        while (amountNeededBase > 0) {
+          const [stockRows] = await connection.execute(
+            `
+              SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit
+              FROM goods_in gi
+              WHERE gi.user_id = ?
+                AND gi.ingredient = ?
+                AND gi.deleted_at IS NULL
+                AND gi.stockRemaining > 0
+              ORDER BY gi.date ASC, gi.id ASC
+              LIMIT 1
+            `,
+            [cognito_id, ingName]
+          );
+
+          if (stockRows.length === 0) {
+            // not enough stock — allow shortfall (same behavior as single route)
+            break;
+          }
+
+          const { id: goodsInId, stockRemaining: lotStockRaw, unit: lotUnitRaw } = stockRows[0];
+          const lotUnitCanon = normalizeUnit(lotUnitRaw);
+          const lotFactor = unitFactorToBase(lotUnitCanon);
+          const lotBase = (Number(lotStockRaw) || 0) * lotFactor;
+
+          const deductionBase = Math.min(amountNeededBase, lotBase);
+          const newLotBase = lotBase - deductionBase;
+          const newLotRemaining = toFixedSafe(newLotBase / (lotFactor || 1), 6);
+
+          await connection.execute(`UPDATE goods_in SET stockRemaining = ? WHERE id = ?`, [newLotRemaining, goodsInId]);
+
+          await connection.execute(
+            `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id) VALUES (?, ?, ?)`,
+            [productionLogId, goodsInId, cognito_id]
+          );
+
+          amountNeededBase -= deductionBase;
+        }
+      }
+    }
+
+    await connection.commit();
+    return res.status(200).json({
+      success: true,
+      message: `Inserted ${insertedIds.length} production log entries`,
+      insertedIds,
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Batch production DB error:", { message: err.message, stack: err.stack });
+    return res.status(500).json({ success: false, error: "Database error", details: err.message });
+  } finally {
+    connection.release();
+  }
+});
 
 app.get("/api/production-log", async (req, res) => {
   const { cognito_id } = req.query; // Get cognito_id from query parameters
