@@ -37,7 +37,6 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -114,8 +113,9 @@ const itemSchema = yup.object().shape({
   barCode: yup.string().required("Bar Code is required"),
   expiryDate: yup.string().required("Expiry Date is required"),
   temperature: yup.string().required("Temperature is required"),
-  // invoiceNumber is optional
+  // invoiceNumber & supplier are optional
   invoiceNumber: yup.string().notRequired(),
+  supplier: yup.string().notRequired(),
 });
 
 const GoodsInForm = () => {
@@ -266,6 +266,7 @@ const GoodsInForm = () => {
     expiryDate: new Date().toISOString().split("T")[0],
     temperature: "N/A",
     invoiceNumber: "",
+    supplier: "",
   };
 
   const initialBatchItem = {
@@ -277,19 +278,22 @@ const GoodsInForm = () => {
     expiryDate: new Date().toISOString().split("T")[0],
     temperature: "N/A",
     invoiceNumber: "",
+    supplier: "",
   };
 
   const initialValuesBatch = { items: [initialBatchItem] };
 
   // submit helpers
   const submitSingle = async (values, { resetForm }) => {
-    const selectedOpt = ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
+    const selectedOpt =
+      ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
     const payload = {
       ...values,
       ingredient: selectedOpt ? selectedOpt.name : values.ingredient,
       ingredientId: selectedOpt ? String(selectedOpt.id) : null,
       cognito_id: cognitoId,
       invoiceNumber: values.invoiceNumber ? values.invoiceNumber : null,
+      supplier: values.supplier ? values.supplier : null,
     };
 
     try {
@@ -310,12 +314,14 @@ const GoodsInForm = () => {
   const submitBatch = async (values, { resetForm }) => {
     // Build canonical entries (expand ingredient id -> name if possible)
     const items = (values.items || []).map((it) => {
-      const selectedOpt = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
+      const selectedOpt =
+        ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
       return {
         ...it,
         ingredient: selectedOpt ? selectedOpt.name : it.ingredient,
         ingredientId: selectedOpt ? String(selectedOpt.id) : null,
         invoiceNumber: it.invoiceNumber ? it.invoiceNumber : null,
+        supplier: it.supplier ? it.supplier : null,
       };
     });
 
@@ -334,7 +340,10 @@ const GoodsInForm = () => {
       }
 
       // If the batch endpoint isn't available, fallback to posting each item sequentially to /submit
-      console.warn("Batch endpoint returned non-OK, falling back to sequential submits:", res.status);
+      console.warn(
+        "Batch endpoint returned non-OK, falling back to sequential submits:",
+        res.status
+      );
     } catch (err) {
       console.warn("Batch endpoint failed, falling back to sequential submits:", err);
     }
@@ -349,7 +358,10 @@ const GoodsInForm = () => {
           body: JSON.stringify(payload),
         });
         if (!r.ok) {
-          console.error("Failed to submit good in fallback:", await r.text().catch(() => r.status));
+          console.error(
+            "Failed to submit good in fallback:",
+            await r.text().catch(() => r.status)
+          );
           // continue attempting others, but report in console
         }
       }
@@ -362,10 +374,15 @@ const GoodsInForm = () => {
   };
 
   // Helper to open confirmation dialog for multiple after validating form
-  const openBatchConfirmDialog = async ({ validateForm, values, setTouched, resetForm }) => {
+  const openBatchConfirmDialog = async ({
+    validateForm,
+    values,
+    setTouched,
+    resetForm,
+  }) => {
     const errors = await validateForm();
     if (errors && Object.keys(errors).length) {
-      // mark all fields as touched to show errors, included invoiceNumber now
+      // mark all fields as touched to show errors, including invoiceNumber & supplier now
       const touchedItems = (values.items || []).map(() => ({
         date: true,
         ingredient: true,
@@ -375,6 +392,7 @@ const GoodsInForm = () => {
         expiryDate: true,
         temperature: true,
         invoiceNumber: true,
+        supplier: true,
       }));
       setTouched({ items: touchedItems }, false);
       // scroll/focus
@@ -396,7 +414,10 @@ const GoodsInForm = () => {
     setBatchSubmitting(true);
 
     try {
-      await submitBatch({ items: batchPreviewItems }, { resetForm: batchResetFormFn || (() => {}) });
+      await submitBatch(
+        { items: batchPreviewItems },
+        { resetForm: batchResetFormFn || (() => {}) }
+      );
       setBatchConfirmOpen(false);
       setBatchPreviewItems([]);
     } catch (err) {
@@ -420,16 +441,26 @@ const GoodsInForm = () => {
             borderRadius: 16,
             border: `1px solid ${brand.border}`,
             background: brand.surface,
-            boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+            boxShadow:
+              "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
           }}
         >
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+          <Box
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+            mb={2}
+          >
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: brand.text }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 800, color: brand.text }}
+              >
                 Record Goods In
               </Typography>
               <Typography variant="body2" sx={{ color: brand.subtext }}>
-                Fill out the details below and hit Record (single) or add multiple goods in Multiple.
+                Fill out the details below and hit Record (single) or add multiple
+                goods in Multiple.
               </Typography>
             </Box>
 
@@ -446,7 +477,11 @@ const GoodsInForm = () => {
 
           {/* Single item form (original) */}
           {tabIndex === 0 && (
-            <Formik onSubmit={submitSingle} initialValues={initialValuesSingle} validationSchema={goodsInSchema}>
+            <Formik
+              onSubmit={submitSingle}
+              initialValues={initialValuesSingle}
+              validationSchema={goodsInSchema}
+            >
               {({
                 values,
                 errors,
@@ -458,32 +493,11 @@ const GoodsInForm = () => {
                 validateForm,
                 setTouched,
                 submitForm,
-                isValid,
-                isSubmitting,
               }) => {
-                const selected = ingredients.find((i) => String(i.id) === String(values.ingredient)) || null;
-
-                // when user clicks Record Stock, validate and scroll-to-first-error if invalid
-                const onPrimaryClick = async () => {
-                  const errs = await validateForm();
-                  if (errs && Object.keys(errs).length) {
-                    // mark touched
-                    setTouched({
-                      date: true,
-                      ingredient: true,
-                      stockReceived: true,
-                      unit: true,
-                      barCode: true,
-                      expiryDate: true,
-                      temperature: true,
-                      invoiceNumber: true,
-                    }, false);
-                    scrollToFirstError(errs);
-                    return;
-                  }
-                  // otherwise submit
-                  await submitForm();
-                };
+                const selected =
+                  ingredients.find(
+                    (i) => String(i.id) === String(values.ingredient)
+                  ) || null;
 
                 return (
                   <form onSubmit={handleSubmit}>
@@ -491,7 +505,11 @@ const GoodsInForm = () => {
                       display="grid"
                       gap="20px"
                       gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                      sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                      sx={{
+                        "& > div": {
+                          gridColumn: isNonMobile ? undefined : "span 4",
+                        },
+                      }}
                     >
                       {/* Date */}
                       <TextField
@@ -515,11 +533,20 @@ const GoodsInForm = () => {
                       <Box sx={{ gridColumn: "span 2" }}>
                         <Autocomplete
                           options={ingredients}
-                          getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                          getOptionLabel={(opt) =>
+                            typeof opt === "string" ? opt : opt?.name ?? ""
+                          }
                           loading={loadingMaster || loadingCustom}
                           value={selected}
-                          onChange={(_, newVal) => setFieldValue("ingredient", newVal ? newVal.id : "")}
-                          isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                          onChange={(_, newVal) =>
+                            setFieldValue(
+                              "ingredient",
+                              newVal ? newVal.id : ""
+                            )
+                          }
+                          isOptionEqualToValue={(opt, val) =>
+                            (opt?.id ?? opt) === (val?.id ?? val)
+                          }
                           filterSelectedOptions
                           renderInput={(params) => (
                             <TextField
@@ -527,15 +554,26 @@ const GoodsInForm = () => {
                               label="Ingredient"
                               name="ingredient"
                               onBlur={handleBlur}
-                              error={!!getIn(touched, "ingredient") && !!getIn(errors, "ingredient")}
-                              helperText={getIn(touched, "ingredient") && getIn(errors, "ingredient")}
+                              error={
+                                !!getIn(touched, "ingredient") &&
+                                !!getIn(errors, "ingredient")
+                              }
+                              helperText={
+                                getIn(touched, "ingredient") &&
+                                getIn(errors, "ingredient")
+                              }
                               sx={inputSx}
                               // IMPORTANT: preserve params.InputProps and params.inputProps (ref lives in params.inputProps)
                               InputProps={{
                                 ...params.InputProps,
                                 endAdornment: (
                                   <>
-                                    {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
+                                    {(loadingMaster || loadingCustom) && (
+                                      <CircularProgress
+                                        color="inherit"
+                                        size={20}
+                                      />
+                                    )}
                                     {params.InputProps.endAdornment}
                                   </>
                                 ),
@@ -555,7 +593,10 @@ const GoodsInForm = () => {
                               textTransform: "none",
                               fontWeight: 700,
                               color: brand.primary,
-                              "&:hover": { color: brand.primaryDark, bgColor: "transparent" },
+                              "&:hover": {
+                                color: brand.primaryDark,
+                                bgColor: "transparent",
+                              },
                             }}
                           >
                             Add Ingredient +
@@ -579,6 +620,22 @@ const GoodsInForm = () => {
                         }}
                       />
 
+                      {/* Supplier - optional */}
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="text"
+                        label="Supplier"
+                        name="supplier"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.supplier}
+                        sx={{ gridColumn: "span 2", ...inputSx }}
+                        InputProps={{
+                          inputProps: { "data-field": "supplier" },
+                        }}
+                      />
+
                       {/* Stock Received */}
                       <TextField
                         fullWidth
@@ -589,8 +646,12 @@ const GoodsInForm = () => {
                         onBlur={handleBlur}
                         onChange={handleChange}
                         value={values.stockReceived}
-                        error={!!touched.stockReceived && !!errors.stockReceived}
-                        helperText={touched.stockReceived && errors.stockReceived}
+                        error={
+                          !!touched.stockReceived && !!errors.stockReceived
+                        }
+                        helperText={
+                          touched.stockReceived && errors.stockReceived
+                        }
                         sx={{ gridColumn: "span 1", ...inputSx }}
                         InputProps={{
                           inputProps: { "data-field": "stockReceived" },
@@ -598,7 +659,10 @@ const GoodsInForm = () => {
                       />
 
                       {/* Unit */}
-                      <FormControl fullWidth sx={{ gridColumn: "span 1", ...selectSx }}>
+                      <FormControl
+                        fullWidth
+                        sx={{ gridColumn: "span 1", ...selectSx }}
+                      >
                         <InputLabel id="unit-label">Metric</InputLabel>
                         <Select
                           labelId="unit-label"
@@ -662,7 +726,9 @@ const GoodsInForm = () => {
                         onBlur={handleBlur}
                         onChange={handleChange}
                         value={values.temperature}
-                        error={!!touched.temperature && !!errors.temperature}
+                        error={
+                          !!touched.temperature && !!errors.temperature
+                        }
                         helperText={touched.temperature && errors.temperature}
                         sx={{ gridColumn: "span 2", ...inputSx }}
                         InputProps={{
@@ -678,16 +744,20 @@ const GoodsInForm = () => {
                         onClick={async () => {
                           const errs = await validateForm();
                           if (errs && Object.keys(errs).length) {
-                            setTouched({
-                              date: true,
-                              ingredient: true,
-                              stockReceived: true,
-                              unit: true,
-                              barCode: true,
-                              expiryDate: true,
-                              temperature: true,
-                              invoiceNumber: true,
-                            }, false);
+                            setTouched(
+                              {
+                                date: true,
+                                ingredient: true,
+                                stockReceived: true,
+                                unit: true,
+                                barCode: true,
+                                expiryDate: true,
+                                temperature: true,
+                                invoiceNumber: true,
+                                supplier: true,
+                              },
+                              false
+                            );
                             scrollToFirstError(errs);
                             return;
                           }
@@ -700,10 +770,13 @@ const GoodsInForm = () => {
                           borderRadius: 999,
                           fontWeight: 800,
                           textTransform: "none",
-                          boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                          boxShadow:
+                            "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
                           background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
                           color: "#fff",
-                          "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                          "&:hover": {
+                            background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
+                          },
                         }}
                       >
                         <AddIcon />
@@ -723,18 +796,30 @@ const GoodsInForm = () => {
               validationSchema={batchSchema}
               onSubmit={submitBatch}
             >
-              {({ values, errors, touched, validateForm, setTouched, resetForm, setFieldValue }) => (
+              {({
+                values,
+                errors,
+                touched,
+                validateForm,
+                setTouched,
+                resetForm,
+                setFieldValue,
+              }) => (
                 <form>
                   <FieldArray name="items">
                     {({ push, remove }) => {
                       // expose add-good function so FAB inside wrapper can call it regardless of scroll
                       addGoodRef.current = () => {
-                        // default new item; if previous item exists and had invoiceNumber/date, inherit them
-                        const last = (values.items || [])[values.items.length - 1] || null;
+                        // default new item; if previous item exists and had invoiceNumber/date/supplier, inherit them
+                        const last =
+                          (values.items || [])[values.items.length - 1] ||
+                          null;
                         const next = { ...initialBatchItem };
                         if (last) {
-                          if (last.invoiceNumber) next.invoiceNumber = last.invoiceNumber;
+                          if (last.invoiceNumber)
+                            next.invoiceNumber = last.invoiceNumber;
                           if (last.date) next.date = last.date;
+                          if (last.supplier) next.supplier = last.supplier;
                         }
                         push(next);
                       };
@@ -744,25 +829,79 @@ const GoodsInForm = () => {
                           {/* Goods */}
                           <Box display="grid" gap={2}>
                             {(values.items || []).map((it, idx) => {
-                              const selectedOption = ingredients.find((i) => String(i.id) === String(it.ingredient)) || null;
+                              const selectedOption =
+                                ingredients.find(
+                                  (i) =>
+                                    String(i.id) === String(it.ingredient)
+                                ) || null;
 
                               const base = `items.${idx}`;
                               const dateError = getIn(errors, `${base}.date`);
-                              const dateTouched = getIn(touched, `${base}.date`);
-                              const ingError = getIn(errors, `${base}.ingredient`);
-                              const ingTouched = getIn(touched, `${base}.ingredient`);
-                              const qtyError = getIn(errors, `${base}.stockReceived`);
-                              const qtyTouched = getIn(touched, `${base}.stockReceived`);
+                              const dateTouched = getIn(
+                                touched,
+                                `${base}.date`
+                              );
+                              const ingError = getIn(
+                                errors,
+                                `${base}.ingredient`
+                              );
+                              const ingTouched = getIn(
+                                touched,
+                                `${base}.ingredient`
+                              );
+                              const qtyError = getIn(
+                                errors,
+                                `${base}.stockReceived`
+                              );
+                              const qtyTouched = getIn(
+                                touched,
+                                `${base}.stockReceived`
+                              );
                               const unitError = getIn(errors, `${base}.unit`);
-                              const unitTouched = getIn(touched, `${base}.unit`);
-                              const codeError = getIn(errors, `${base}.barCode`);
-                              const codeTouched = getIn(touched, `${base}.barCode`);
-                              const expError = getIn(errors, `${base}.expiryDate`);
-                              const expTouched = getIn(touched, `${base}.expiryDate`);
-                              const tempError = getIn(errors, `${base}.temperature`);
-                              const tempTouched = getIn(touched, `${base}.temperature`);
-                              const invError = getIn(errors, `${base}.invoiceNumber`);
-                              const invTouched = getIn(touched, `${base}.invoiceNumber`);
+                              const unitTouched = getIn(
+                                touched,
+                                `${base}.unit`
+                              );
+                              const codeError = getIn(
+                                errors,
+                                `${base}.barCode`
+                              );
+                              const codeTouched = getIn(
+                                touched,
+                                `${base}.barCode`
+                              );
+                              const expError = getIn(
+                                errors,
+                                `${base}.expiryDate`
+                              );
+                              const expTouched = getIn(
+                                touched,
+                                `${base}.expiryDate`
+                              );
+                              const tempError = getIn(
+                                errors,
+                                `${base}.temperature`
+                              );
+                              const tempTouched = getIn(
+                                touched,
+                                `${base}.temperature`
+                              );
+                              const invError = getIn(
+                                errors,
+                                `${base}.invoiceNumber`
+                              );
+                              const invTouched = getIn(
+                                touched,
+                                `${base}.invoiceNumber`
+                              );
+                              const supplierError = getIn(
+                                errors,
+                                `${base}.supplier`
+                              );
+                              const supplierTouched = getIn(
+                                touched,
+                                `${base}.supplier`
+                              );
 
                               return (
                                 <Paper
@@ -772,11 +911,21 @@ const GoodsInForm = () => {
                                     p: 2,
                                     borderRadius: 2,
                                     border: `1px solid ${brand.border}`,
-                                    background: idx % 2 ? brand.surfaceMuted : brand.surface,
+                                    background:
+                                      idx % 2
+                                        ? brand.surfaceMuted
+                                        : brand.surface,
                                   }}
                                 >
-                                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                    <Typography sx={{ fontWeight: 800 }}>Good {idx + 1}</Typography>
+                                  <Box
+                                    display="flex"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                    mb={1}
+                                  >
+                                    <Typography sx={{ fontWeight: 800 }}>
+                                      Good {idx + 1}
+                                    </Typography>
                                     <Box>
                                       <IconButton
                                         size="small"
@@ -793,7 +942,13 @@ const GoodsInForm = () => {
                                     display="grid"
                                     gap="12px"
                                     gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                                    sx={{ "& > div": { gridColumn: isNonMobile ? undefined : "span 4" } }}
+                                    sx={{
+                                      "& > div": {
+                                        gridColumn: isNonMobile
+                                          ? undefined
+                                          : "span 4",
+                                      },
+                                    }}
                                   >
                                     <TextField
                                       fullWidth
@@ -802,23 +957,45 @@ const GoodsInForm = () => {
                                       label="Date"
                                       name={`items.${idx}.date`}
                                       value={it.date}
-                                      onChange={(e) => setFieldValue(`items.${idx}.date`, e.target.value)}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.date`,
+                                          e.target.value
+                                        )
+                                      }
                                       sx={{ gridColumn: "span 2", ...inputSx }}
                                       error={!!dateTouched && !!dateError}
-                                      helperText={dateTouched && dateError ? dateError : ""}
+                                      helperText={
+                                        dateTouched && dateError ? dateError : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.date` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.date`,
+                                        },
                                       }}
                                     />
 
                                     <Box sx={{ gridColumn: "span 2" }}>
                                       <Autocomplete
                                         options={ingredients}
-                                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
-                                        loading={loadingMaster || loadingCustom}
+                                        getOptionLabel={(opt) =>
+                                          typeof opt === "string"
+                                            ? opt
+                                            : opt?.name ?? ""
+                                        }
+                                        loading={
+                                          loadingMaster || loadingCustom
+                                        }
                                         value={selectedOption}
-                                        onChange={(_, newVal) => setFieldValue(`items.${idx}.ingredient`, newVal ? newVal.id : "")}
-                                        isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                                        onChange={(_, newVal) =>
+                                          setFieldValue(
+                                            `items.${idx}.ingredient`,
+                                            newVal ? newVal.id : ""
+                                          )
+                                        }
+                                        isOptionEqualToValue={(opt, val) =>
+                                          (opt?.id ?? opt) === (val?.id ?? val)
+                                        }
                                         filterSelectedOptions
                                         renderInput={(params) => (
                                           <TextField
@@ -826,15 +1003,30 @@ const GoodsInForm = () => {
                                             label="Ingredient"
                                             name={`items.${idx}.ingredient`}
                                             sx={inputSx}
-                                            error={!!ingTouched && !!ingError}
-                                            helperText={ingTouched && ingError ? ingError : ""}
+                                            error={
+                                              !!ingTouched && !!ingError
+                                            }
+                                            helperText={
+                                              ingTouched && ingError
+                                                ? ingError
+                                                : ""
+                                            }
                                             // Preserve params.InputProps and params.inputProps (ref lives in params.inputProps)
                                             InputProps={{
                                               ...params.InputProps,
                                               endAdornment: (
                                                 <>
-                                                  {(loadingMaster || loadingCustom) && <CircularProgress color="inherit" size={20} />}
-                                                  {params.InputProps.endAdornment}
+                                                  {(loadingMaster ||
+                                                    loadingCustom) && (
+                                                    <CircularProgress
+                                                      color="inherit"
+                                                      size={20}
+                                                    />
+                                                  )}
+                                                  {
+                                                    params.InputProps
+                                                      .endAdornment
+                                                  }
                                                 </>
                                               ),
                                             }}
@@ -855,12 +1047,57 @@ const GoodsInForm = () => {
                                       label="Invoice Number"
                                       name={`items.${idx}.invoiceNumber`}
                                       value={it.invoiceNumber}
-                                      onChange={(e) => setFieldValue(`items.${idx}.invoiceNumber`, e.target.value)}
-                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.invoiceNumber`,
+                                          e.target.value
+                                        )
+                                      }
+                                      sx={{
+                                        gridColumn: "span 2",
+                                        ...inputSx,
+                                      }}
                                       error={!!invTouched && !!invError}
-                                      helperText={invTouched && invError ? invError : ""}
+                                      helperText={
+                                        invTouched && invError ? invError : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.invoiceNumber` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.invoiceNumber`,
+                                        },
+                                      }}
+                                    />
+
+                                    {/* Supplier - optional, next to invoice */}
+                                    <TextField
+                                      fullWidth
+                                      variant="outlined"
+                                      type="text"
+                                      label="Supplier"
+                                      name={`items.${idx}.supplier`}
+                                      value={it.supplier}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.supplier`,
+                                          e.target.value
+                                        )
+                                      }
+                                      sx={{
+                                        gridColumn: "span 2",
+                                        ...inputSx,
+                                      }}
+                                      error={
+                                        !!supplierTouched && !!supplierError
+                                      }
+                                      helperText={
+                                        supplierTouched && supplierError
+                                          ? supplierError
+                                          : ""
+                                      }
+                                      InputProps={{
+                                        inputProps: {
+                                          "data-field": `items.${idx}.supplier`,
+                                        },
                                       }}
                                     />
 
@@ -871,12 +1108,21 @@ const GoodsInForm = () => {
                                       label="Stock Received"
                                       name={`items.${idx}.stockReceived`}
                                       value={it.stockReceived}
-                                      onChange={(e) => setFieldValue(`items.${idx}.stockReceived`, e.target.value)}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.stockReceived`,
+                                          e.target.value
+                                        )
+                                      }
                                       sx={{ gridColumn: "span 1", ...inputSx }}
                                       error={!!qtyTouched && !!qtyError}
-                                      helperText={qtyTouched && qtyError ? qtyError : ""}
+                                      helperText={
+                                        qtyTouched && qtyError ? qtyError : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.stockReceived` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.stockReceived`,
+                                        },
                                       }}
                                     />
 
@@ -885,23 +1131,38 @@ const GoodsInForm = () => {
                                       sx={{ gridColumn: "span 1", ...selectSx }}
                                       error={!!unitTouched && !!unitError}
                                     >
-                                      <InputLabel id={`unit-label-${idx}`}>Metric</InputLabel>
+                                      <InputLabel id={`unit-label-${idx}`}>
+                                        Metric
+                                      </InputLabel>
                                       <Select
                                         labelId={`unit-label-${idx}`}
                                         name={`items.${idx}.unit`}
                                         value={it.unit}
                                         label="Metric"
-                                        onChange={(e) => setFieldValue(`items.${idx}.unit`, e.target.value)}
-                                        inputProps={{ "data-field": `items.${idx}.unit` }}
+                                        onChange={(e) =>
+                                          setFieldValue(
+                                            `items.${idx}.unit`,
+                                            e.target.value
+                                          )
+                                        }
+                                        inputProps={{
+                                          "data-field": `items.${idx}.unit`,
+                                        }}
                                       >
                                         {unitOptions.map((opt) => (
-                                          <MenuItem key={opt.value} value={opt.value}>
+                                          <MenuItem
+                                            key={opt.value}
+                                            value={opt.value}
+                                          >
                                             {opt.label}
                                           </MenuItem>
                                         ))}
                                       </Select>
                                       {!!unitTouched && !!unitError && (
-                                        <Typography variant="caption" sx={{ color: "error.main", mt: 0.5 }}>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{ color: "error.main", mt: 0.5 }}
+                                        >
                                           {unitError}
                                         </Typography>
                                       )}
@@ -914,12 +1175,23 @@ const GoodsInForm = () => {
                                       label="Batch Code"
                                       name={`items.${idx}.barCode`}
                                       value={it.barCode}
-                                      onChange={(e) => setFieldValue(`items.${idx}.barCode`, e.target.value)}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.barCode`,
+                                          e.target.value
+                                        )
+                                      }
                                       sx={{ gridColumn: "span 2", ...inputSx }}
                                       error={!!codeTouched && !!codeError}
-                                      helperText={codeTouched && codeError ? codeError : ""}
+                                      helperText={
+                                        codeTouched && codeError
+                                          ? codeError
+                                          : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.barCode` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.barCode`,
+                                        },
                                       }}
                                     />
 
@@ -930,12 +1202,21 @@ const GoodsInForm = () => {
                                       label="Expiry Date"
                                       name={`items.${idx}.expiryDate`}
                                       value={it.expiryDate}
-                                      onChange={(e) => setFieldValue(`items.${idx}.expiryDate`, e.target.value)}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.expiryDate`,
+                                          e.target.value
+                                        )
+                                      }
                                       sx={{ gridColumn: "span 2", ...inputSx }}
                                       error={!!expTouched && !!expError}
-                                      helperText={expTouched && expError ? expError : ""}
+                                      helperText={
+                                        expTouched && expError ? expError : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.expiryDate` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.expiryDate`,
+                                        },
                                       }}
                                     />
 
@@ -946,12 +1227,23 @@ const GoodsInForm = () => {
                                       label="Temperature (℃)"
                                       name={`items.${idx}.temperature`}
                                       value={it.temperature}
-                                      onChange={(e) => setFieldValue(`items.${idx}.temperature`, e.target.value)}
+                                      onChange={(e) =>
+                                        setFieldValue(
+                                          `items.${idx}.temperature`,
+                                          e.target.value
+                                        )
+                                      }
                                       sx={{ gridColumn: "span 2", ...inputSx }}
                                       error={!!tempTouched && !!tempError}
-                                      helperText={tempTouched && tempError ? tempError : ""}
+                                      helperText={
+                                        tempTouched && tempError
+                                          ? tempError
+                                          : ""
+                                      }
                                       InputProps={{
-                                        inputProps: { "data-field": `items.${idx}.temperature` },
+                                        inputProps: {
+                                          "data-field": `items.${idx}.temperature`,
+                                        },
                                       }}
                                     />
                                   </Box>
@@ -961,11 +1253,21 @@ const GoodsInForm = () => {
                           </Box>
 
                           {/* Multiple submit (opens confirmation dialog after validate) */}
-                          <Box display="flex" justifyContent="flex-end" mt={3} sx={{ mb: 2 }}>
+                          <Box
+                            display="flex"
+                            justifyContent="flex-end"
+                            mt={3}
+                            sx={{ mb: 2 }}
+                          >
                             <Fab
                               variant="extended"
                               onClick={() =>
-                                openBatchConfirmDialog({ validateForm, values, setTouched, resetForm })
+                                openBatchConfirmDialog({
+                                  validateForm,
+                                  values,
+                                  setTouched,
+                                  resetForm,
+                                })
                               }
                               sx={{
                                 px: 4,
@@ -974,10 +1276,13 @@ const GoodsInForm = () => {
                                 borderRadius: 999,
                                 fontWeight: 800,
                                 textTransform: "none",
-                                boxShadow: "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                                boxShadow:
+                                  "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
                                 background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
                                 color: "#fff",
-                                "&:hover": { background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})` },
+                                "&:hover": {
+                                  background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
+                                },
                               }}
                             >
                               <AddIcon />
@@ -1046,10 +1351,13 @@ const GoodsInForm = () => {
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Multiple Submission</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Confirm Multiple Submission
+        </DialogTitle>
         <DialogContent dividers>
           <Typography sx={{ color: brand.subtext, mb: 2 }}>
-            You're about to submit <strong>{batchPreviewItems.length}</strong> good(s). Review them below and confirm to proceed.
+            You're about to submit <strong>{batchPreviewItems.length}</strong>{" "}
+            good(s). Review them below and confirm to proceed.
           </Typography>
 
           <Table size="small" aria-label="batch-summary">
@@ -1064,6 +1372,7 @@ const GoodsInForm = () => {
                 <TableCell sx={{ fontWeight: 800 }}>Temp</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Invoice</TableCell>
+                <TableCell sx={{ fontWeight: 800 }}>Supplier</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1078,6 +1387,7 @@ const GoodsInForm = () => {
                   <TableCell>{String(it.temperature ?? "—")}</TableCell>
                   <TableCell>{String(it.date ?? "—")}</TableCell>
                   <TableCell>{String(it.invoiceNumber ?? "—")}</TableCell>
+                  <TableCell>{String(it.supplier ?? "—")}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -1102,7 +1412,11 @@ const GoodsInForm = () => {
               background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
               "&:hover": { background: brand.primaryDark },
             }}
-            startIcon={batchSubmitting ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null}
+            startIcon={
+              batchSubmitting ? (
+                <CircularProgress size={16} sx={{ color: "#fff" }} />
+              ) : null
+            }
             disabled={batchSubmitting}
           >
             {batchSubmitting ? "Submitting…" : "Confirm & Submit"}
@@ -1141,7 +1455,9 @@ const GoodsInForm = () => {
           },
         }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Add New Ingredient</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Add New Ingredient
+        </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -1154,7 +1470,11 @@ const GoodsInForm = () => {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeAddDialog} disabled={adding} sx={{ textTransform: "none", fontWeight: 700 }}>
+          <Button
+            onClick={closeAddDialog}
+            disabled={adding}
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
             Cancel
           </Button>
           <Button
@@ -1170,13 +1490,16 @@ const GoodsInForm = () => {
               "&:hover": { background: brand.primaryDark },
             }}
           >
-            {adding ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Add"}
+            {adding ? (
+              <CircularProgress size={20} sx={{ color: "#fff" }} />
+            ) : (
+              "Add"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
-
 
 export default GoodsInForm;

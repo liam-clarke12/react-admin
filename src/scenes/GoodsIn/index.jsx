@@ -70,6 +70,7 @@ const BrandStyles = () => (
   .col-ingredient{width:260px}
   .col-batch{width:150px}
   .col-actions{width:140px}
+  .col-supplier{width:150px}
 
   .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .r-input {
@@ -264,6 +265,7 @@ export default function GoodsIn() {
     date: new Date().toISOString().slice(0,10),
     ingredient: "", // id of ingredient or custom name
     invoiceNumber: "",
+    supplier: "",
     stockReceived: "",
     unit: "grams",
     barCode: "",
@@ -276,6 +278,7 @@ export default function GoodsIn() {
     date: new Date().toISOString().slice(0,10),
     ingredient: "",
     invoiceNumber: single.invoiceNumber || "",
+    supplier: single.supplier || "",
     stockReceived: "",
     unit: "grams",
     barCode: "",
@@ -364,6 +367,7 @@ export default function GoodsIn() {
           processed: stockRemaining === 0 ? "Yes" : "No",
           barCode: serverBar || row.barCode || null,
           invoiceNumber: row.invoice_number ?? row.invoiceNumber ?? null,
+          supplier: row.supplier ?? row.supplier_name ?? row.supplierName ?? null,
           unit: row.unit ?? row.unitName ?? row.unit_label ?? "",
           ingredient: rawIngredient,          // may be id or name; resolve at render
           temperature: row.temperature
@@ -454,6 +458,7 @@ export default function GoodsIn() {
       expiryDate: newRow.expiryDate,
       barCode: newRow.barCode,
       invoice_number: newRow.invoiceNumber ?? null,
+      supplier: newRow.supplier ?? null,
       cognito_id: cognitoId,
     };
     const identifierForPath = oldRow.barCode || newRow.barCode;
@@ -580,6 +585,7 @@ export default function GoodsIn() {
       ingredient: resolveIngredientName(single.ingredient),
       ingredientId: ingredients.find((i) => String(i.id) === String(single.ingredient))?.id ?? null,
       invoiceNumber: single.invoiceNumber || null,
+      supplier: single.supplier || null,
       cognito_id: cognitoId,
     };
     const res = await fetch(`${API_BASE}/submit`, {
@@ -594,6 +600,7 @@ export default function GoodsIn() {
       ingredient: resolveIngredientName(it.ingredient),
       ingredientId: ingredients.find((i) => String(i.id) === String(it.ingredient))?.id ?? null,
       invoiceNumber: it.invoiceNumber || null,
+      supplier: it.supplier || null,
     }));
     const res = await fetch(`${API_BASE}/submit/batch`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -625,6 +632,7 @@ export default function GoodsIn() {
         date: new Date().toISOString().slice(0,10),
         ingredient: "",
         invoiceNumber: "",
+        supplier: "",
         stockReceived: "",
         unit: "grams",
         barCode: "",
@@ -750,7 +758,7 @@ export default function GoodsIn() {
               <input
                 className="r-input"
                 type="text"
-                placeholder="Search by ingredient, batch code, invoice..."
+                placeholder="Search by ingredient, batch code, invoice, supplier..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               />
@@ -791,6 +799,7 @@ export default function GoodsIn() {
                     <th className="r-td col-temp">Temp</th>
                     <th className="r-td col-num">Received</th>
                     <th className="r-td col-num">Remaining</th>
+                    <th className="r-td col-supplier">Supplier</th>
                     <th className="r-td col-invoice">Invoice #</th>
                     <th className="r-td col-expiry">Expiry</th>
                     <th className="r-td col-batch">Batch Code</th>
@@ -800,13 +809,13 @@ export default function GoodsIn() {
                 <tbody>
                   {loading ? (
                     <tr className="r-row">
-                      <td className="r-td" colSpan={10} style={{ textAlign: "center" }}>
+                      <td className="r-td" colSpan={11} style={{ textAlign: "center" }}>
                         <span className="r-muted">Loading goods in…</span>
                       </td>
                     </tr>
                   ) : visibleRows.length === 0 ? (
                     <tr className="r-row">
-                      <td className="r-td" colSpan={10} style={{ textAlign: "center" }}>
+                      <td className="r-td" colSpan={11} style={{ textAlign: "center" }}>
                         <span className="r-muted">No records found.</span>
                       </td>
                     </tr>
@@ -829,6 +838,7 @@ export default function GoodsIn() {
                           <td className="r-td">{row.temperature ? `${row.temperature}℃` : "-"}</td>
                           <td className="r-td"><span className="r-qty-badge">{row.stockReceived} {row.unit}</span></td>
                           <td className="r-td"><span className="r-qty-badge">{row.stockRemaining} {row.unit}</span></td>
+                          <td className="r-td" style={{ color:"#64748b" }}>{row.supplier || "-"}</td>
                           <td className="r-td" style={{ color:"#64748b" }}>{row.invoiceNumber || "-"}</td>
                           <td className="r-td" style={{ color:"#64748b" }}>{row.expiryDate || "-"}</td>
                           <td className="r-td"><span className="r-badge-mono">{row.barCode || "-"}</span></td>
@@ -957,6 +967,11 @@ export default function GoodsIn() {
                     <input className="ag-input" type="text" value={editingRow.invoiceNumber || ""}
                       onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}/>
                   </div>
+                  <div className="ag-field">
+                    <label className="ag-label">Supplier</label>
+                    <input className="ag-input" type="text" value={editingRow.supplier || ""}
+                      onChange={(e) => setEditingRow({ ...editingRow, supplier: e.target.value })}/>
+                  </div>
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Expiry Date</label>
                     <input className="ag-input" type="date" value={editingRow.expiryDate || ""}
@@ -1070,6 +1085,11 @@ export default function GoodsIn() {
                       <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e)=>setSingle(s=>({...s, invoiceNumber: e.target.value}))}/>
                     </div>
 
+                    <div className="ag-field">
+                      <label className="ag-label">Supplier</label>
+                      <input className="ag-input" type="text" value={single.supplier} onChange={(e)=>setSingle(s=>({...s, supplier: e.target.value}))}/>
+                    </div>
+
                     <div className="ag-field-1">
                       <label className="ag-label">Stock Received</label>
                       <input className="ag-input" type="number" value={single.stockReceived} onChange={(e)=>setSingle(s=>({...s, stockReceived: e.target.value}))}/>
@@ -1147,6 +1167,11 @@ export default function GoodsIn() {
                           <div className="ag-field">
                             <label className="ag-label">Invoice Number</label>
                             <input className="ag-input" type="text" value={it.invoiceNumber} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, invoiceNumber: e.target.value} : v))}/>
+                          </div>
+
+                          <div className="ag-field">
+                            <label className="ag-label">Supplier</label>
+                            <input className="ag-input" type="text" value={it.supplier} onChange={(e)=>setMulti(arr=> arr.map((v,i)=> i===idx ? {...v, supplier: e.target.value} : v))}/>
                           </div>
 
                           <div className="ag-field-1">

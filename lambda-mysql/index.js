@@ -224,20 +224,34 @@ app.post("/api/submit", async (req, res) => {
     cognito_id,
     invoiceNumber, // optional: camelCase
     invoice_number, // optional: snake_case fallback
+    supplier, // optional supplier from frontend
   } = req.body;
 
   // Set CORS headers explicitly
-  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://master.d2fdrxobxyr2je.amplifyapp.com"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   try {
     console.log("Raw request body:", req.body);
 
     // Normalize invoice value: treat empty string as null
-    const invoiceVal = (invoiceNumber ?? invoice_number ?? null);
-    const invoice_sql_value = (typeof invoiceVal === "string" && invoiceVal.trim() === "") ? null : invoiceVal;
+    const invoiceVal = invoiceNumber ?? invoice_number ?? null;
+    const invoice_sql_value =
+      typeof invoiceVal === "string" && invoiceVal.trim() === ""
+        ? null
+        : invoiceVal;
 
-    // Validate required fields (invoice is optional)
+    // Normalize supplier value: treat empty string as null (optional)
+    const supplierVal = supplier ?? null;
+    const supplier_sql_value =
+      typeof supplierVal === "string" && supplierVal.trim() === ""
+        ? null
+        : supplierVal;
+
+    // Validate required fields (invoice & supplier are optional)
     if (
       !date ||
       !ingredient ||
@@ -245,15 +259,26 @@ app.post("/api/submit", async (req, res) => {
       !unit ||
       !barCode ||
       !expiryDate ||
-      temperature === undefined || temperature === null ||
+      temperature === undefined ||
+      temperature === null ||
       !cognito_id
     ) {
       console.error("❌ Missing fields in request body:", {
-        date, ingredient, stockReceived, unit, barCode, expiryDate, temperature, cognito_id, invoiceVal
+        date,
+        ingredient,
+        stockReceived,
+        unit,
+        barCode,
+        expiryDate,
+        temperature,
+        cognito_id,
+        invoiceVal,
+        supplierVal,
       });
       return res.status(400).json({
-        error: "All required fields are missing or invalid (invoiceNumber is optional)",
-        received: req.body
+        error:
+          "All required fields are missing or invalid (invoiceNumber and supplier are optional)",
+        received: req.body,
       });
     }
 
@@ -261,11 +286,11 @@ app.post("/api/submit", async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      // Insert into goods_in (including invoice_number)
+      // Insert into goods_in (including invoice_number & supplier)
       const goodsInQuery = `
         INSERT INTO goods_in
-          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number, supplier)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsInResult] = await connection.execute(goodsInQuery, [
         date,
@@ -275,12 +300,13 @@ app.post("/api/submit", async (req, res) => {
         barCode,
         expiryDate,
         temperature,
-        unit,               // pass unit
+        unit, // pass unit
         cognito_id,
-        invoice_sql_value,  // invoice_number (NULL if not provided)
+        invoice_sql_value, // invoice_number (NULL if not provided)
+        supplier_sql_value, // supplier (NULL if not provided)
       ]);
 
-      // Update ingredient_inventory (unchanged structure; invoice is not part of inventory)
+      // Update ingredient_inventory (unchanged structure; invoice/supplier are not part of inventory)
       const ingredientInventoryQuery = `
         INSERT INTO ingredient_inventory (ingredient, amount, barcode, unit)
         VALUES (?, ?, ?, ?)
@@ -290,26 +316,39 @@ app.post("/api/submit", async (req, res) => {
         ingredient,
         Number(stockReceived) || 0,
         barCode,
-        unit,           // pass unit
-        Number(stockReceived) || 0
+        unit, // pass unit
+        Number(stockReceived) || 0,
       ]);
 
       await connection.commit();
       res.status(200).json({
         success: true,
         message: "Data saved successfully",
-        id: goodsInResult.insertId
+        id: goodsInResult.insertId,
       });
     } catch (err) {
       await connection.rollback();
-      console.error("Database error:", { message: err.message, stack: err.stack, sql: err.sql, parameters: err.parameters });
-      res.status(500).json({ success: false, error: "Database operation failed", details: err.message });
+      console.error("Database error:", {
+        message: err.message,
+        stack: err.stack,
+        sql: err.sql,
+        parameters: err.parameters,
+      });
+      res
+        .status(500)
+        .json({ success: false, error: "Database operation failed", details: err.message });
     } finally {
       connection.release();
     }
   } catch (err) {
-    console.error("Server error:", { message: err.message, stack: err.stack, request: { headers: req.headers, body: req.body } });
-    res.status(500).json({ success: false, error: "Server error", details: err.message });
+    console.error("Server error:", {
+      message: err.message,
+      stack: err.stack,
+      request: { headers: req.headers, body: req.body },
+    });
+    res
+      .status(500)
+      .json({ success: false, error: "Server error", details: err.message });
   }
 });
 
@@ -317,14 +356,21 @@ app.post("/api/submit/batch", async (req, res) => {
   const { entries, cognito_id } = req.body;
 
   // Allow your frontend origin (same as single route)
-  res.setHeader('Access-Control-Allow-Origin', 'https://master.d2fdrxobxyr2je.amplifyapp.com');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://master.d2fdrxobxyr2je.amplifyapp.com"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (!Array.isArray(entries) || entries.length === 0) {
-    return res.status(400).json({ success: false, error: "entries must be a non-empty array" });
+    return res
+      .status(400)
+      .json({ success: false, error: "entries must be a non-empty array" });
   }
   if (!cognito_id) {
-    return res.status(400).json({ success: false, error: "cognito_id is required" });
+    return res
+      .status(400)
+      .json({ success: false, error: "cognito_id is required" });
   }
 
   // Validate entries quickly before DB work (collect errors)
@@ -333,18 +379,24 @@ app.post("/api/submit/batch", async (req, res) => {
       const missing = [];
       if (!e.date) missing.push("date");
       if (!e.ingredient) missing.push("ingredient");
-      if (e.stockReceived === undefined || e.stockReceived === null) missing.push("stockReceived");
+      if (e.stockReceived === undefined || e.stockReceived === null)
+        missing.push("stockReceived");
       if (!e.unit) missing.push("unit");
       if (!e.barCode) missing.push("barCode");
       if (!e.expiryDate) missing.push("expiryDate");
-      if (e.temperature === undefined || e.temperature === null) missing.push("temperature");
-      // invoiceNumber is optional — do not validate it
+      if (e.temperature === undefined || e.temperature === null)
+        missing.push("temperature");
+      // invoiceNumber & supplier are optional — do not validate them
       return missing.length ? { index: i, missing } : null;
     })
     .filter(Boolean);
 
   if (invalid.length) {
-    return res.status(400).json({ success: false, error: "Validation failed for some entries", details: invalid });
+    return res.status(400).json({
+      success: false,
+      error: "Validation failed for some entries",
+      details: invalid,
+    });
   }
 
   const connection = await db.promise().getConnection();
@@ -357,13 +409,21 @@ app.post("/api/submit/batch", async (req, res) => {
       const stock = Number(entry.stockReceived) || 0;
 
       // Normalize invoice value: treat empty string as null
-      const invVal = (entry.invoiceNumber ?? entry.invoice_number ?? null);
-      const invSql = (typeof invVal === "string" && invVal.trim() === "") ? null : invVal;
+      const invVal = entry.invoiceNumber ?? entry.invoice_number ?? null;
+      const invSql =
+        typeof invVal === "string" && invVal.trim() === "" ? null : invVal;
+
+      // Normalize supplier value: treat empty string as null (optional)
+      const supplierVal = entry.supplier ?? null;
+      const supplierSql =
+        typeof supplierVal === "string" && supplierVal.trim() === ""
+          ? null
+          : supplierVal;
 
       const goodsInQuery = `
         INSERT INTO goods_in
-          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (date, ingredient, stockReceived, stockRemaining, barCode, expiryDate, temperature, unit, user_id, invoice_number, supplier)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [goodsRes] = await connection.execute(goodsInQuery, [
         entry.date,
@@ -376,6 +436,7 @@ app.post("/api/submit/batch", async (req, res) => {
         entry.unit,
         cognito_id,
         invSql, // invoice_number (NULL if not provided)
+        supplierSql, // supplier (NULL if not provided)
       ]);
       insertedIds.push(goodsRes.insertId);
 
@@ -401,8 +462,15 @@ app.post("/api/submit/batch", async (req, res) => {
     });
   } catch (err) {
     await connection.rollback();
-    console.error("Batch submit DB error:", { message: err.message, stack: err.stack });
-    return res.status(500).json({ success: false, error: "Database error", details: err.message });
+    console.error("Batch submit DB error:", {
+      message: err.message,
+      stack: err.stack,
+    });
+    return res.status(500).json({
+      success: false,
+      error: "Database error",
+      details: err.message,
+    });
   } finally {
     connection.release();
   }
