@@ -2338,6 +2338,206 @@ app.post("/api/add-goods-out", async (req, res) => {
   }
 });
 
+app.post("/api/add-goods-out-batch", async (req, res) => {
+  const { entries, cognito_id } = req.body;
+
+  // Allow your frontend origin (same as goods in batch)
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://master.d2fdrxobxyr2je.amplifyapp.com"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, error: "entries must be a non-empty array" });
+  }
+
+  if (!cognito_id) {
+    return res
+      .status(400)
+      .json({ success: false, error: "cognito_id is required" });
+  }
+
+  // Quick validation for each entry
+  const invalid = entries
+    .map((e, i) => {
+      const missing = [];
+      if (!e.date) missing.push("date");
+      if (!e.recipe) missing.push("recipe");
+      if (e.stockAmount === undefined || e.stockAmount === null)
+        missing.push("stockAmount");
+      if (!e.recipients) missing.push("recipients");
+      return missing.length ? { index: i, missing } : null;
+    })
+    .filter(Boolean);
+
+  if (invalid.length) {
+    return res.status(400).json({
+      success: false,
+      error: "Validation failed for some entries",
+      details: invalid,
+    });
+  }
+
+  const connection = await db.promise().getConnection();
+
+  try {
+    console.log("Starting /add-goods-out-batch transaction...");
+    await connection.beginTransaction();
+
+    // 0) Preload recipe info (units_per_batch) for all recipes in this batch
+    const uniqueRecipes = [
+      ...new Set(entries.map((e) => e.recipe).filter(Boolean)),
+    ];
+
+    if (uniqueRecipes.length === 0) {
+      throw new Error("No recipe values provided in entries");
+    }
+
+    const placeholders = uniqueRecipes.map(() => "?").join(",");
+    const [recipeRows] = await connection.execute(
+      `
+      SELECT recipe_name, units_per_batch
+        FROM recipes
+       WHERE user_id = ?
+         AND recipe_name IN (${placeholders})
+    `,
+      [cognito_id, ...uniqueRecipes]
+    );
+
+    const recipeMap = new Map();
+    recipeRows.forEach((r) => {
+      recipeMap.set(r.recipe_name, r);
+    });
+
+    const missingRecipes = uniqueRecipes.filter((r) => !recipeMap.has(r));
+    if (missingRecipes.length > 0) {
+      throw new Error(
+        `Recipe(s) not found for user ${cognito_id}: ${missingRecipes.join(
+          ", "
+        )}`
+      );
+    }
+
+    const insertedIds = [];
+
+    // 1) For each entry, do what /api/add-goods-out does, but all inside this single transaction
+    for (const entry of entries) {
+      const { date, recipe, stockAmount, recipients } = entry;
+
+      const recipeRow = recipeMap.get(recipe);
+      const unitsPerBatch = Number(recipeRow.units_per_batch) || 1;
+      console.log(
+        `Units per batch for '${recipe}' in batch route:`,
+        unitsPerBatch
+      );
+
+      // If stockAmount is actually UNITS, you could do:
+      // const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
+      // For now, mirror your single route (treat stockAmount as "batches"):
+      const batchesToDeduct = Math.ceil(Number(stockAmount));
+      console.log(
+        `[BATCH] Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`
+      );
+
+      // 1a) Insert goods_out record
+      const goodsOutQuery = `
+        INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      const [goodsOutResult] = await connection.execute(goodsOutQuery, [
+        date,
+        recipe,
+        stockAmount,
+        recipients,
+        cognito_id,
+      ]);
+
+      const goodsOutId = goodsOutResult.insertId;
+      insertedIds.push(goodsOutId);
+      console.log("[BATCH] Inserted into goods_out. ID:", goodsOutId);
+
+      // 1b) Deduct from ACTIVE production_log rows for this user & recipe (FIFO by id)
+      let remainingToDeduct = batchesToDeduct;
+
+      const [productionRows] = await connection.execute(
+        `
+        SELECT id, batchRemaining, batchCode
+          FROM production_log
+         WHERE recipe = ?
+           AND user_id = ?
+           AND batchRemaining > 0
+           AND deleted_at IS NULL
+         ORDER BY id ASC
+      `,
+        [recipe, cognito_id]
+      );
+
+      for (const row of productionRows) {
+        if (remainingToDeduct <= 0) break;
+
+        const deductAmount = Math.min(row.batchRemaining, remainingToDeduct);
+
+        // Update production_log
+        await connection.execute(
+          `
+          UPDATE production_log
+             SET batchRemaining = batchRemaining - ?
+           WHERE id = ?
+        `,
+          [deductAmount, row.id]
+        );
+
+        // Track deduction against this batch
+        await connection.execute(
+          `
+          INSERT INTO goods_out_batches
+            (goods_out_id, production_log_id, quantity_used)
+          VALUES (?, ?, ?)
+        `,
+          [goodsOutId, row.id, deductAmount]
+        );
+
+        console.log(
+          `[BATCH] Deducted ${deductAmount} batch(es) from production_log ID ${row.id} (batchCode: ${row.batchCode})`
+        );
+
+        remainingToDeduct -= deductAmount;
+      }
+
+      if (remainingToDeduct > 0) {
+        console.warn(
+          `[BATCH] Not enough active batches to cover stockAmount for recipe '${recipe}'; ${remainingToDeduct} batch(es) short.`
+        );
+        // Same behaviour as your single route: we log and still commit whatever was possible.
+        // If you prefer, you could throw here instead to rollback the whole batch.
+      }
+    }
+
+    await connection.commit();
+    console.log(
+      `/add-goods-out-batch committed. Inserted ${insertedIds.length} goods_out rows.`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Goods out batch added; deducted from ACTIVE production_log rows (deleted_at IS NULL).`,
+      insertedIds,
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error processing /add-goods-out-batch:", err);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  } finally {
+    connection.release();
+  }
+});
+
 app.get("/api/goods-out-with-batches", async (req, res) => {
   const { cognito_id } = req.query;
 
