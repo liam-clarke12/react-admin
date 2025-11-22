@@ -1,18 +1,36 @@
 // src/scenes/goodsout/GoodsOut.jsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Box, Drawer, Typography, IconButton, TextField, Divider, Stack, Card, CardContent, Button, List, ListItem, ListItemIcon, ListItemText } from "@mui/material";
+import {
+  Box,
+  Drawer,
+  Typography,
+  IconButton,
+  TextField,
+  Divider,
+  Stack,
+  Card,
+  CardContent,
+  Button,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import AddIcon from "@mui/icons-material/Add";
 import { useAuth } from "../../contexts/AuthContext";
+import * as yup from "yup";
+import { Formik, FieldArray } from "formik";
 
-/* =========================================================================================
-   Brand Styles (ported from ProductionLog for unified look)
-   ========================================================================================= */
+/* =====================================================================
+   Brand Styles (includes FORM + MODAL styles)
+   ===================================================================== */
 const BrandStyles = () => (
   <style>{`
   .r-wrap { padding: 16px; }
@@ -26,283 +44,988 @@ const BrandStyles = () => (
   .r-sub { margin:0; color:#64748b; font-size:12px; }
   .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
   .r-flex { display:flex; align-items:center; gap:10px; }
+
+  /* Buttons */
   .r-btn-ghost {
     display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
     color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
   }
   .r-btn-ghost:hover { background:#f4f1ff; }
+
   .r-btn-primary {
-    padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px; font-weight:800; color:#fff;
+    background: linear-gradient(180deg, #7C3AED, #5B21B6);
+    border:0; border-radius:10px; cursor:pointer;
+    box-shadow:0 4px 12px rgba(124,58,237,0.25);
   }
-  .r-btn-primary:hover { background:#5B21B6; }
+  .r-btn-primary:hover {
+    background: linear-gradient(180deg, #5B21B6, #5B21B6);
+  }
+
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
 
-  /* Toolbar */
-  .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-  .r-input {
-    min-width:260px; flex:1; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
-  }
+  /* Search toolbar */
+  .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .r-input { min-width:260px; flex:1; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; }
   .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
   .r-select { padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
   .r-toolbar-gap { margin-top:12px; }
 
-  /* Footer */
-  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
-  .r-muted { color:#64748b; font-size:12px; }
-
-  /* Page layout */
-  .gi-layout { display:flex; gap:24px; align-items:flex-start; }
-  .gi-main { flex:1 1 0%; min-width:0; }
-  .gi-side {
-    width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:16px;
+  /* Modal shell */
+  .go-modal-dim {
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:9999;
+    padding:20px;
+  }
+  .go-modal {
+    background:#fff; width:100%; max-width:560px;
+    max-height:92vh; overflow:hidden;
+    border-radius:18px;
+    display:flex; flex-direction:column;
+    box-shadow:0 18px 40px rgba(15,23,42,0.35);
+  }
+  .go-mhdr {
+    padding:20px 24px;
+    border-bottom:1px solid #e5e7eb;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .go-mbody {
+    padding:20px 24px;
+    overflow:auto;
+  }
+  .go-mfooter {
+    border-top:1px solid #e5e7eb;
+    padding:14px 20px;
+    display:flex; justify-content:flex-end; gap:12px;
+    background:#f8fafc;
   }
 
-  /* Modal shell (delete confirm) */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:420px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow:auto; background:#fff; text-align:center; }
-  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
+  /* Tabs */
+  .go-tabs { display:inline-flex; background:#e2e8f0; padding:4px; border-radius:999px; gap:4px; margin-bottom:18px; }
+  .go-tab {
+    border:none; background:transparent;
+    padding:6px 14px; border-radius:999px;
+    cursor:pointer;
+    font-weight:700; font-size:13px;
+    color:#64748b;
+  }
+  .go-tab.active {
+    background:#fff; color:#7C3AED;
+    box-shadow:0 1px 3px rgba(16,24,40,.12);
+  }
 
-  /* DataGrid look */
+  /* Fields */
+  .go-grid { display:grid; grid-template-columns:repeat(12, 1fr); gap:20px; }
+  .col-6 { grid-column:span 6; }
+  .col-12 { grid-column:span 12; }
+  @media(max-width:900px){
+    .col-6 { grid-column:span 12; }
+  }
+  .go-field { display:flex; flex-direction:column; }
+  .go-label { font-size:13px; font-weight:600; margin-bottom:6px; color:#475569; }
+  .go-input, .go-select {
+    padding:12px 14px; border-radius:12px;
+    border:1px solid #e5e7eb; background:#f8fafc;
+    font-size:14px; outline:none;
+  }
+  .go-input:focus, .go-select:focus {
+    border-color:#7C3AED;
+    box-shadow:0 0 0 4px rgba(124,58,237,.18);
+  }
+  .go-error { color:#dc2626; font-size:12px; margin-top:6px; }
+
+  /* Multi rows */
+  .go-row {
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:14px;
+  }
+  .go-row-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .go-row-remove { border:none; background:none; color:#dc2626; cursor:pointer; font-size:12px; }
+
+  /* Toast */
+  .go-toast {
+    position:fixed; top:16px; right:16px;
+    background:#0f172a; color:#e5e7eb;
+    padding:10px 14px; border-radius:999px;
+    animation:toastIn .2s forwards;
+    z-index:10000; font-size:13px;
+  }
+  @keyframes toastIn {
+    from { opacity:0; transform:translateY(-12px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  /* DataGrid */
   .dg-wrap { height: 70vh; min-width: 750px; }
-  .dg-wrap .MuiDataGrid-root { border:0; font-size:14px; color:#334155; }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(odd) { background:#fff; }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(even) { background:#f8fafc; }
-  .dg-wrap .MuiDataGrid-row:hover { background:#f4f1ff !important; }
+  .dg-wrap .MuiDataGrid-root { border:0; }
 
-  /* Sidebar stat cards */
-  .stat-card { padding:14px 16px; }
-  .stat-title { font-size:12px; color:#64748b; font-weight:800; margin:0 0 6px; }
-  .stat-value { font-weight:900; color:#0f172a; font-size:28px; line-height:1; margin:0; }
-  .stat-row { display:flex; align-items:center; justify-content:space-between; }
-  .stat-kpi { font-size:14px; font-weight:800; color:#0f172a; }
-  .stat-sub { font-size:12px; color:#64748b; }
-  .stat-accent { border:1px dashed #7C3AED66; background: #f9f7ff; }
+  /* Layout */
+  .gi-layout { display:flex; gap:24px; align-items:flex-start; }
+  .gi-main { flex:1 1 0%; min-width:0; }
+  .gi-side { width:320px; flex:0 0 320px; position:sticky; top:16px; display:flex; flex-direction:column; gap:12px; }
   `}</style>
 );
 
-/* Simple SVG for delete badge in modal */
-const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
-const TrashLg = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </Svg>
-);
+/* =====================================================================
+   HARD BLOCK MODAL (NO PROCEED)
+   ===================================================================== */
+const HardBlockModal = ({ open, recipe, need, have, onClose }) => {
+  if (!open) return null;
+  return createPortal(
+    <div className="go-modal-dim" onClick={onClose}>
+      <div className="go-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="go-mhdr">
+          <h3 style={{ margin:0, fontWeight:800, color:"#0f172a" }}>
+            Insufficient Finished Units
+          </h3>
+          <button className="r-btn-ghost" onClick={onClose}>Close</button>
+        </div>
 
-/* =========================================================================================
-   Config & helpers (from your current GoodsOut, with minor tweaks)
-   ========================================================================================= */
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+        <div className="go-mbody">
+          <p style={{
+            background:"#fef2f2",
+            border:"1px solid #fecaca",
+            padding:"12px",
+            borderRadius:"12px",
+            color:"#b91c1c",
+            fontWeight:600,
+            marginBottom:"16px"
+          }}>
+            You’re trying to send out more <strong>{recipe}</strong> units than are currently available.
+          </p>
 
-const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  danger: "#dc2626",
-  primary: "#7C3AED",
-  primaryDark: "#5B21B6",
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"14px" }}>
+            <div style={{ border:"1px solid #e5e7eb", borderRadius:"12px", padding:"10px 12px" }}>
+              <div style={{ fontSize:11, color:"#64748b" }}>Requested</div>
+              <div style={{ fontSize:20, fontWeight:900 }}>{need}</div>
+            </div>
+            <div style={{ border:"1px solid #e5e7eb", borderRadius:"12px", padding:"10px 12px" }}>
+              <div style={{ fontSize:11, color:"#64748b" }}>Available</div>
+              <div style={{ fontSize:20, fontWeight:900 }}>{have}</div>
+            </div>
+          </div>
+
+          <p style={{ fontSize:13, color:"#475569" }}>
+            Please produce more <strong>{recipe}</strong> before recording these goods out.
+          </p>
+        </div>
+
+        <div className="go-mfooter">
+          <button className="r-btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 };
+
+/* =====================================================================
+   TOAST
+   ===================================================================== */
+const Toast = ({ open, children, onClose }) => {
+  if (!open) return null;
+  return createPortal(
+    <div className="go-toast" onClick={onClose}>
+      {children}
+    </div>,
+    document.body
+  );
+};
+
+/* =====================================================================
+   GOODS OUT FORM (Single + Multiple) — Integrated Modal
+   ===================================================================== */
+
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+const goodsOutSchema = yup.object().shape({
+  date: yup.string().required("Date is required"),
+  recipe: yup.string().required("Recipe is required"),
+  stockAmount: yup
+    .number()
+    .typeError("Must be a number")
+    .positive("Must be positive")
+    .required("Amount is required"),
+  recipients: yup.string().required("Recipient is required"),
+});
+
+const multiGoodsOutSchema = yup.object().shape({
+  items: yup
+    .array()
+    .of(goodsOutSchema)
+    .min(1, "You must add at least one row"),
+});
+
+/* Fetch available units from Production Log */
+const useAvailableUnitsFetcher = (cognitoId) => {
+  return useCallback(
+    async (recipeName) => {
+      if (!cognitoId || !recipeName) return 0;
+      try {
+        const res = await fetch(
+          `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch production log");
+
+        const rows = await res.json();
+        let total = 0;
+
+        (Array.isArray(rows) ? rows : []).forEach((r) => {
+          const rName =
+            r.recipe ?? r.recipe_name ?? r.name ?? "";
+          if ((rName || "").trim() !== recipeName.trim()) return;
+
+          const br = Number(
+            r.batchRemaining ??
+              r.batch_remaining ??
+              r.units_per_batch_total ??
+              0
+          );
+          const waste = Number(
+            r.units_of_waste ?? r.unitsOfWaste ?? 0
+          );
+          const out = Number(
+            r.units_out ?? r.unitsOut ?? 0
+          );
+          const apiUnits = Number(
+            r.units_remaining ??
+              r.unitsRemaining ??
+              NaN
+          );
+
+          let remain = Number.isFinite(apiUnits)
+            ? apiUnits
+            : Math.max(0, br - waste - out);
+
+          if (Number.isFinite(remain)) total += remain;
+        });
+
+        return total;
+      } catch (err) {
+        console.error("[AvailCheck] failed:", err);
+        return 0;
+      }
+    },
+    [cognitoId]
+  );
+};
+
+/* =====================================================================
+   MAIN COMPONENT
+   ===================================================================== */
+export default function GoodsOut() {
+  const { cognitoId } = useAuth();
+
+  /* ===========================
+     NEW: Form Modal State
+  ============================= */
+  const [formOpen, setFormOpen] = useState(false);
+  const [formView, setFormView] = useState("single"); // single | multiple
+
+  const [recipes, setRecipes] = useState([]);
+  const [recipesLoading, setRecipesLoading] = useState(false);
+  const [recipesError, setRecipesError] = useState("");
+
+  const [toastOpen, setToastOpen] = useState(false);
+
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockInfo, setBlockInfo] = useState({
+    recipe: "",
+    need: 0,
+    have: 0,
+  });
+
+  const fetchAvailableUnits = useAvailableUnitsFetcher(cognitoId);
+
+  /* Fetch recipes for select dropdown */
+  useEffect(() => {
+    if (!cognitoId) return;
+    const loadRecipes = async () => {
+      setRecipesLoading(true);
+      setRecipesError("");
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
+        );
+        if (!res.ok) throw new Error("Failed to load recipes");
+        const data = await res.json();
+
+        const names = Array.isArray(data)
+          ? data
+              .map(
+                (r) =>
+                  r.recipe_name ??
+                  r.recipe ??
+                  r.name
+              )
+              .filter(Boolean)
+          : [];
+
+        setRecipes([...new Set(names)]);
+      } catch (err) {
+        console.error("Recipe load error:", err);
+        setRecipesError("Error loading recipes");
+      } finally {
+        setRecipesLoading(false);
+      }
+    };
+
+    loadRecipes();
+  }, [cognitoId]);
+
+  /* ===============================
+     Submit — SINGLE
+  =============================== */
+  const handleSubmitSingle = async (values, helpers) => {
+    const need = Number(values.stockAmount) || 0;
+    const have = await fetchAvailableUnits(values.recipe);
+
+    if (need > have) {
+      setBlockInfo({ recipe: values.recipe, need, have });
+      setBlockOpen(true);
+      return;
+    }
+
+    try {
+      const payload = {
+        ...values,
+        cognito_id: cognitoId,
+      };
+
+      const res = await fetch(`${API_BASE}/add-goods-out`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Submit failed");
+
+      helpers.resetForm();
+      setFormOpen(false);
+      setToastOpen(true);
+      await fetchGoodsOut(); // auto refresh
+    } catch (err) {
+      alert("Submission failed. Check console.");
+      console.error(err);
+    }
+  };
+
+  /* ===============================
+     Submit — MULTIPLE
+  =============================== */
+  const handleSubmitBatch = async (values, helpers) => {
+    const items = values.items || [];
+
+    // aggregate needs
+    const needMap = {};
+    items.forEach((item) => {
+      const r = item.recipe?.trim();
+      if (!r) return;
+      needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0);
+    });
+
+    // HARD precheck
+    for (const [recipe, need] of Object.entries(needMap)) {
+      const have = await fetchAvailableUnits(recipe);
+      if (need > have) {
+        setBlockInfo({ recipe, need, have });
+        setBlockOpen(true);
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        entries: items.map((i) => ({
+          date: i.date,
+          recipe: i.recipe,
+          stockAmount: i.stockAmount,
+          recipients: i.recipients,
+        })),
+        cognito_id: cognitoId,
+      };
+
+      const res = await fetch(
+        `${API_BASE}/add-goods-out-batch`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) throw new Error("Batch submit failed");
+
+      helpers.resetForm();
+      setFormOpen(false);
+      setToastOpen(true);
+      await fetchGoodsOut(); // refresh table
+    } catch (err) {
+      console.error(err);
+      alert("Batch submission failed.");
+    }
+  };
+
+  /* =====================================================================
+     FORM MODAL CONTENT
+     ===================================================================== */
+  const renderFormModal = () => {
+    if (!formOpen) return null;
+
+    return createPortal(
+      <div className="go-modal-dim" onClick={() => setFormOpen(false)}>
+        <div className="go-modal" onClick={(e) => e.stopPropagation()}>
+          {/* HEADER */}
+          <div className="go-mhdr">
+            <h3 style={{ margin: 0, fontWeight: 900 }}>
+              Add Goods Out
+            </h3>
+            <button className="r-btn-ghost" onClick={() => setFormOpen(false)}>
+              Close
+            </button>
+          </div>
+
+          {/* BODY */}
+          <div className="go-mbody">
+            {/* Tabs */}
+            <div className="go-tabs">
+              <button
+                type="button"
+                className={`go-tab ${formView === "single" ? "active" : ""}`}
+                onClick={() => setFormView("single")}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                className={`go-tab ${formView === "multiple" ? "active" : ""}`}
+                onClick={() => setFormView("multiple")}
+              >
+                Multiple
+              </button>
+            </div>
+
+            {/* ===================== SINGLE FORM ===================== */}
+            {formView === "single" && (
+              <Formik
+                initialValues={{
+                  date: new Date().toISOString().split("T")[0],
+                  recipe: "",
+                  stockAmount: "",
+                  recipients: "",
+                }}
+                validationSchema={goodsOutSchema}
+                onSubmit={handleSubmitSingle}
+              >
+                {({
+                  handleSubmit,
+                  values,
+                  errors,
+                  touched,
+                  handleChange,
+                  handleBlur,
+                }) => (
+                  <form onSubmit={handleSubmit}>
+
+                    <div className="go-grid">
+                      {/* Date */}
+                      <div className="go-field col-6">
+                        <label className="go-label">Date</label>
+                        <input
+                          type="date"
+                          name="date"
+                          className="go-input"
+                          value={values.date}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                        />
+                        {touched.date && errors.date && (
+                          <div className="go-error">{errors.date}</div>
+                        )}
+                      </div>
+
+                      {/* Recipe */}
+                      <div className="go-field col-6">
+                        <label className="go-label">Recipe</label>
+                        <select
+                          name="recipe"
+                          className="go-select"
+                          value={values.recipe}
+                          onChange={handleChange}
+                        >
+                          <option value="" disabled>
+                            {recipesLoading
+                              ? "Loading..."
+                              : recipesError
+                              ? recipesError
+                              : "Select recipe…"}
+                          </option>
+                          {recipes.map((r, idx) => (
+                            <option key={idx} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                        {touched.recipe && errors.recipe && (
+                          <div className="go-error">{errors.recipe}</div>
+                        )}
+                      </div>
+
+                      {/* Units */}
+                      <div className="go-field col-12">
+                        <label className="go-label">
+                          Amount of Units
+                        </label>
+                        <input
+                          type="number"
+                          className="go-input"
+                          name="stockAmount"
+                          placeholder="0"
+                          value={values.stockAmount}
+                          onChange={handleChange}
+                        />
+                        {touched.stockAmount && errors.stockAmount && (
+                          <div className="go-error">{errors.stockAmount}</div>
+                        )}
+                      </div>
+
+                      {/* Recipients */}
+                      <div className="go-field col-12">
+                        <label className="go-label">Recipient</label>
+                        <input
+                          type="text"
+                          className="go-input"
+                          name="recipients"
+                          placeholder="Store / Customer"
+                          value={values.recipients}
+                          onChange={handleChange}
+                        />
+                        {touched.recipients && errors.recipients && (
+                          <div className="go-error">{errors.recipients}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="go-mfooter">
+                      <button
+                        type="button"
+                        className="r-btn-ghost"
+                        onClick={() => setFormOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="r-btn-primary"
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </Formik>
+            )}
+
+            {/* ===================== MULTIPLE FORM ===================== */}
+            {formView === "multiple" && (
+              <Formik
+                initialValues={{
+                  items: [
+                    {
+                      date: new Date().toISOString().split("T")[0],
+                      recipe: "",
+                      stockAmount: "",
+                      recipients: "",
+                    },
+                  ],
+                }}
+                validationSchema={multiGoodsOutSchema}
+                onSubmit={handleSubmitBatch}
+              >
+                {({
+                  values,
+                  errors,
+                  touched,
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                }) => (
+                  <form onSubmit={handleSubmit}>
+                    <FieldArray
+                      name="items"
+                      render={({ push, remove }) => (
+                        <>
+                          {values.items.map((item, idx) => {
+                            const itemErrors = errors.items?.[idx] || {};
+                            const itemTouched = touched.items?.[idx] || {};
+
+                            return (
+                              <div key={idx} className="go-row">
+                                <div className="go-row-head">
+                                  <strong>Goods Out {idx + 1}</strong>
+                                  {values.items.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="go-row-remove"
+                                      onClick={() => remove(idx)}
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="go-grid">
+                                  {/* Date */}
+                                  <div className="go-field col-6">
+                                    <label className="go-label">
+                                      Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      className="go-input"
+                                      name={`items[${idx}].date`}
+                                      value={item.date}
+                                      onChange={handleChange}
+                                    />
+                                    {itemTouched.date && itemErrors.date && (
+                                      <div className="go-error">
+                                        {itemErrors.date}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Recipe */}
+                                  <div className="go-field col-6">
+                                    <label className="go-label">
+                                      Recipe
+                                    </label>
+                                    <select
+                                      className="go-select"
+                                      name={`items[${idx}].recipe`}
+                                      value={item.recipe}
+                                      onChange={handleChange}
+                                    >
+                                      <option value="" disabled>
+                                        {recipesLoading
+                                          ? "Loading..."
+                                          : recipesError
+                                          ? recipesError
+                                          : "Select recipe…"}
+                                      </option>
+                                      {recipes.map((r, i) => (
+                                        <option key={i} value={r}>
+                                          {r}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {itemTouched.recipe &&
+                                      itemErrors.recipe && (
+                                        <div className="go-error">
+                                          {itemErrors.recipe}
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {/* Units */}
+                                  <div className="go-field col-12">
+                                    <label className="go-label">
+                                      Amount of Units
+                                    </label>
+                                    <input
+                                      type="number"
+                                      className="go-input"
+                                      name={`items[${idx}].stockAmount`}
+                                      value={item.stockAmount}
+                                      onChange={handleChange}
+                                      placeholder="0"
+                                    />
+                                    {itemTouched.stockAmount &&
+                                      itemErrors.stockAmount && (
+                                        <div className="go-error">
+                                          {itemErrors.stockAmount}
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {/* Recipients */}
+                                  <div className="go-field col-12">
+                                    <label className="go-label">
+                                      Recipient
+                                    </label>
+                                    <input
+                                      type="text"
+                                      className="go-input"
+                                      name={`items[${idx}].recipients`}
+                                      value={item.recipients}
+                                      placeholder="Store / Customer"
+                                      onChange={handleChange}
+                                    />
+                                    {itemTouched.recipients &&
+                                      itemErrors.recipients && (
+                                        <div className="go-error">
+                                          {itemErrors.recipients}
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <button
+                            type="button"
+                            className="r-btn-ghost"
+                            onClick={() =>
+                              push({
+                                date: new Date()
+                                  .toISOString()
+                                  .split("T")[0],
+                                recipe: "",
+                                stockAmount: "",
+                                recipients: "",
+                              })
+                            }
+                          >
+                            + Add another row
+                          </button>
+
+                          {/* FOOTER */}
+                          <div className="go-mfooter">
+                            <button
+                              type="button"
+                              className="r-btn-ghost"
+                              onClick={() => setFormOpen(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="r-btn-primary"
+                            >
+                              Submit Multiple
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    />
+                  </form>
+                )}
+              </Formik>
+            )}
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
 
 const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const safeParse = (val, fallback) => {
   if (val == null) return fallback;
-  if (Array.isArray(val) || typeof val === "object") return val;
   try {
-    const parsed = JSON.parse(val);
-    return parsed == null ? fallback : parsed;
+    const p = JSON.parse(val);
+    return p ?? fallback;
   } catch {
     return fallback;
   }
 };
 
-// format date to YYYY-MM-DD (robust)
 const formatToYYYYMMDD = (val) => {
-  if (val === undefined || val === null || val === "") return "";
+  if (!val) return "";
   try {
     const d = new Date(val);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().slice(0, 10);
-    }
-  } catch (_) {}
-  const s = String(val);
-  const m = s.match(/\d{4}-\d{2}-\d{2}/);
-  if (m) return m[0];
-  return s.slice(0, 10);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  } catch {}
+  const m = String(val).match(/\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : String(val).slice(0, 10);
 };
 
-// Normalize drawer pairs from row data -> [{ code, units }]
 const normalizeRowPairs = (row) => {
-  const rawCodes = row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes ?? null;
-  const rawQuantities = row.quantitiesUsed ?? row.quantities ?? row.batchesUsed ?? row.quantities_used ?? null;
+  const rawCodes =
+    row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes;
+  const rawQty =
+    row.quantitiesUsed ??
+    row.quantities ??
+    row.batchesUsed ??
+    row.quantities_used;
 
-  const codesParsed = safeParse(rawCodes, []);
-  const qtyParsed = safeParse(rawQuantities, []);
+  const codes = safeParse(rawCodes, []);
+  const qty = safeParse(rawQty, []);
 
-  const pairs = [];
+  const out = [];
 
-  if (Array.isArray(codesParsed) && codesParsed.length) {
-    codesParsed.forEach((c, i) => {
-      if (typeof c === "string") {
-        const units = (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[c]) ?? 0;
-        pairs.push({ code: c, units: Number(units) || 0 });
-      } else if (c && typeof c === "object") {
-        const code = c.code ?? c.batchCode ?? c.id ?? String(i);
-        const unitsFromObj = c.units ?? c.qty ?? c.quantity ?? c.count ?? 0;
-        const unitsFallback = (Array.isArray(qtyParsed) ? qtyParsed[i] : qtyParsed?.[code]) ?? 0;
-        pairs.push({ code, units: Number(unitsFromObj || unitsFallback) || 0 });
-      }
+  if (Array.isArray(codes) && codes.length) {
+    codes.forEach((c, i) => {
+      const code =
+        typeof c === "string"
+          ? c
+          : c?.code || c?.batchCode || `Batch ${i + 1}`;
+      const units = Number(
+        (Array.isArray(qty) ? qty[i] : qty?.[code]) ??
+          c?.units ??
+          c?.qty ??
+          0
+      );
+      out.push({ code, units });
     });
-    return pairs;
+    return out;
   }
 
-  if (codesParsed && typeof codesParsed === "object") {
-    Object.entries(codesParsed).forEach(([code, maybeUnits]) => {
-      const override = (Array.isArray(qtyParsed) ? undefined : qtyParsed?.[code]) ?? undefined;
-      pairs.push({ code, units: Number(override ?? maybeUnits) || 0 });
+  if (codes && typeof codes === "object") {
+    Object.entries(codes).forEach(([code, units]) => {
+      out.push({ code, units: Number(units) || 0 });
     });
-    return pairs;
+    return out;
   }
 
-  if (Array.isArray(qtyParsed)) {
-    return qtyParsed.map((q, i) => ({ code: `Batch ${i + 1}`, units: Number(q) || 0 }));
+  if (Array.isArray(qty)) {
+    return qty.map((u, i) => ({
+      code: `Batch ${i + 1}`,
+      units: Number(u) || 0,
+    }));
   }
 
   return [];
 };
 
-const buildDrawerItems = (row) => {
-  const pairs = normalizeRowPairs(row);
-  return pairs.map(({ code, units }) => ({
-    code,
-    units,
-    unitsLabel: `${Number(units || 0).toLocaleString()} units`,
+const buildDrawerItems = (row) =>
+  normalizeRowPairs(row).map((it) => ({
+    ...it,
+    unitsLabel: `${nf(it.units)} units`,
   }));
-};
 
-const Portal = ({ children }) => {
-  if (typeof window === "undefined") return null;
-  return createPortal(children, document.body);
-};
+/* Drawer Portal */
+const Portal = ({ children }) =>
+  typeof window === "undefined"
+    ? null
+    : createPortal(children, document.body);
 
-/* =========================================================================================
-   Component
-   ========================================================================================= */
-export default function GoodsOut() {
-  const { cognitoId } = useAuth();
-
-  // Core data
   const [goodsOut, setGoodsOut] = useState([]);
+  const [fatalMsg, setFatalMsg] = useState("");
 
-  // Selection + delete
   const [selectedRows, setSelectedRows] = useState([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerHeader, setDrawerHeader] = useState("Batchcodes");
   const [drawerItems, setDrawerItems] = useState([]);
+  const [drawerHeader, setDrawerHeader] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Search + sort + pagination (match ProductionLog UX)
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Error
-  const [fatalMsg, setFatalMsg] = useState("");
-
-  // ===== Fetch goods-out =====
+  /* Fetch goods-out list */
   const fetchGoodsOut = useCallback(async () => {
-    if (!cognitoId) { setFatalMsg("Missing cognito_id."); return; }
-    try {
-      const response = await fetch(`${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`);
-      if (!response.ok) throw new Error("Failed to fetch goods out");
-      const data = await response.json();
-      const arr = Array.isArray(data) ? data : [];
-      const normalized = arr.map((row, idx) => {
-        const sourceDate = row.date ?? row.production_log_date ?? row.created_at ?? row.createdAt ?? "";
+    if (!cognitoId) return setFatalMsg("Missing cognito_id.");
 
-        // normalize core fields coming from snake_case / alternate names
-        const stockAmount =
-          Number(
-            row.stockAmount ??
-            row.stock_amount ??
-            row.unitsOut ??
-            row.units_out ??
-            row.units ??
-            row.quantity ??
-            row.qty ??
-            row.amount ??
+    try {
+      const res = await fetch(
+        `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch goods out");
+
+      const raw = await res.json();
+      const arr = Array.isArray(raw) ? raw : [];
+
+      const norm = arr.map((r, idx) => {
+        const stockAmount = Number(
+          r.stockAmount ??
+            r.stock_amount ??
+            r.unitsOut ??
+            r.units_out ??
+            r.units ??
+            r.qty ??
             0
-          ) || 0;
+        );
 
         const recipe =
-          row.recipe ??
-          row.recipe_name ??
-          row.product ??
-          row.product_name ??
-          row.sku ??
+          r.recipe ??
+          r.recipe_name ??
+          r.product ??
+          r.product_name ??
           "Unknown";
 
         const recipients =
-          row.recipients ??
-          row.customer ??
-          row.client ??
-          row.destination ??
-          row.to ??
-          "";
+          r.recipients ?? r.customer ?? r.client ?? r.destination ?? "";
+
+        const date =
+          formatToYYYYMMDD(
+            r.date ??
+              r.production_log_date ??
+              r.created_at ??
+              r.createdAt
+          ) || "";
 
         return {
-          ...row,
-          id: row.id ?? `${recipe}-` + idx,
-          date: formatToYYYYMMDD(sourceDate),
+          ...r,
+          id: r.id ?? `${recipe}-${idx}`,
           stockAmount,
           recipe,
           recipients,
+          date,
         };
       });
-      setGoodsOut(normalized);
+
+      setGoodsOut(norm);
       setFatalMsg("");
-    } catch (e) {
-      console.error("[GoodsOut] fetch error:", e);
-      setFatalMsg(String(e?.message || e));
+    } catch (err) {
+      console.error("[GoodsOut] fetch failed:", err);
+      setFatalMsg(String(err.message || err));
     }
   }, [cognitoId]);
 
-  useEffect(() => { fetchGoodsOut(); }, [fetchGoodsOut]);
+  useEffect(() => {
+    fetchGoodsOut();
+  }, [fetchGoodsOut]);
 
-  // ===== Open Drawer =====
-  const handleDrawerOpenForRow = (row) => {
-    const rowWithDate = { ...row, date: formatToYYYYMMDD(row.date ?? row.production_log_date ?? row.created_at ?? "") };
+  /* Drawer open */
+  const openDrawerForRow = (row) => {
+    const rr = { ...row, date: formatToYYYYMMDD(row?.date) };
+    setSelectedRow(rr);
     setDrawerHeader("Batchcodes");
-    setDrawerItems(buildDrawerItems(rowWithDate));
-    setSelectedRow(rowWithDate);
+    setDrawerItems(buildDrawerItems(rr));
     setSearchTerm("");
     setDrawerOpen(true);
   };
-  const handleDrawerClose = () => { setDrawerOpen(false); setSelectedRow(null); setDrawerItems([]); };
 
-  // ===== Delete selected (soft) =====
-  const handleDeleteSelectedRows = async () => {
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setSelectedRow(null);
+    setDrawerItems([]);
+  };
+
+  /* Delete selected rows */
+  const handleDelete = async () => {
     try {
-      // Map selected grid IDs back to DB numeric IDs
-      const map = new Map((Array.isArray(goodsOut) ? goodsOut : []).map((r) => [String(r.id ?? ""), r]));
-      const dbIds = selectedRows
+      const map = new Map(
+        goodsOut.map((r) => [String(r.id), r])
+      );
+      const ids = selectedRows
         .map((rid) => map.get(String(rid)))
         .filter(Boolean)
         .map((r) => r.id)
-        .filter((id) => typeof id === "number" || /^\d+$/.test(String(id)))
-        .map((id) => Number(id));
+        .map(Number)
+        .filter((n) => !isNaN(n));
 
-      if (!cognitoId || dbIds.length === 0) {
+      if (!ids.length) {
         setDeleteOpen(false);
         return;
       }
@@ -310,71 +1033,77 @@ export default function GoodsOut() {
       const res = await fetch(`${API_BASE}/goods-out/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: dbIds, cognito_id: cognitoId }),
+        body: JSON.stringify({ ids, cognito_id: cognitoId }),
       });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(`Delete failed: ${res.status} ${t}`);
-      }
+
+      if (!res.ok) throw new Error("Delete failed");
 
       await fetchGoodsOut();
       setSelectedRows([]);
       setDeleteOpen(false);
     } catch (err) {
-      console.error("[GoodsOut] Delete failed:", err);
+      console.error("Delete failed:", err);
       setDeleteOpen(false);
     }
   };
 
-  // ===== Columns (keep your Batchcodes Drawer behavior) =====
-  const columns = useMemo(() => ([
-    { field: "date", headerName: "Date", flex: 1 },
-    { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    {
-      field: "stockAmount",
-      headerName: "Units Going Out",
-      type: "number",
-      flex: 1,
-      headerAlign: "left",
-      align: "left",
-    },
-    {
-      field: "batchcodes",
-      headerName: "Batchcodes",
-      flex: 1,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <Typography
-          sx={{
-            cursor: "pointer",
-            color: brand.primary,
-            fontWeight: 600,
-            "&:hover": { color: brand.primaryDark },
-          }}
-          onClick={() => handleDrawerOpenForRow(params.row)}
-        >
-          Show Batchcodes
-        </Typography>
-      ),
-    },
-    { field: "recipients", headerName: "Recipients", flex: 1, headerAlign: "left", align: "left" },
-  ]), []);
+  /* DataGrid columns */
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1 },
+      { field: "recipe", headerName: "Recipe Name", flex: 1 },
+      {
+        field: "stockAmount",
+        headerName: "Units Out",
+        type: "number",
+        flex: 1,
+      },
+      {
+        field: "batchcodes",
+        headerName: "Batchcodes",
+        flex: 1,
+        renderCell: (params) => (
+          <Typography
+            sx={{
+              cursor: "pointer",
+              color: "#7C3AED",
+              fontWeight: 700,
+              "&:hover": { color: "#5B21B6" },
+            }}
+            onClick={() => openDrawerForRow(params.row)}
+          >
+            Show Batchcodes
+          </Typography>
+        ),
+      },
+      { field: "recipients", headerName: "Recipients", flex: 1 },
+    ],
+    []
+  );
 
-  // ===== Search + sort + pagination (client-side, like ProductionLog) =====
+  /* Filter + sort */
   const filteredRows = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let rows = [...(goodsOut || [])];
+    const q = searchQuery.toLowerCase().trim();
+    let rows = [...goodsOut];
+
     if (q) {
-      rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+      rows = rows.filter((r) =>
+        Object.values(r).some((v) =>
+          String(v).toLowerCase().includes(q)
+        )
+      );
     }
+
     const dir = sortBy.dir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       const fa = a[sortBy.field] ?? "";
       const fb = b[sortBy.field] ?? "";
-      if (typeof fa === "number" || typeof fb === "number") return ((Number(fa) || 0) - (Number(fb) || 0)) * dir;
+      if (typeof fa === "number" || typeof fb === "number") {
+        return (Number(fa) - Number(fb)) * dir;
+      }
       return String(fa).localeCompare(String(fb)) * dir;
     });
+
     return rows;
   }, [goodsOut, searchQuery, sortBy]);
 
@@ -383,44 +1112,68 @@ export default function GoodsOut() {
     return filteredRows.slice(start, start + rowsPerPage);
   }, [filteredRows, page, rowsPerPage]);
 
-  // ===== Sidebar Stats (based on filtered rows) =====
+  /* Stats */
   const stats = useMemo(() => {
-    const totalUnitsOut = filteredRows.reduce((s, r) => s + (Number(r.stockAmount ?? 0) || 0), 0);
+    const totalUnits = filteredRows.reduce(
+      (s, r) => s + (r.stockAmount || 0),
+      0
+    );
     const shipments = filteredRows.length;
-    const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
-    const uniqueRecipes = uniq(filteredRows.map((r) => r.recipe)).length;
-    const uniqueRecipients = uniq(filteredRows.map((r) => r.recipients)).length;
+    const uniq = (arr) =>
+      Array.from(new Set(arr.filter(Boolean))).length;
 
-    // Top recipes by units
-    const byRecipe = filteredRows.reduce((acc, r) => {
-      const key = r.recipe || "Unknown";
-      acc[key] = (acc[key] || 0) + (Number(r.stockAmount ?? 0) || 0);
-      return acc;
-    }, {});
-    const topRecipes = Object.entries(byRecipe)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([recipe, units]) => ({ recipe, units }));
+    const uniqueRecipes = uniq(filteredRows.map((r) => r.recipe));
+    const uniqueRecipients = uniq(
+      filteredRows.map((r) => r.recipients)
+    );
 
-    return { totalUnitsOut, shipments, uniqueRecipes, uniqueRecipients, topRecipes };
+    return {
+      totalUnits,
+      shipments,
+      uniqueRecipes,
+      uniqueRecipients,
+    };
   }, [filteredRows]);
+
+  /* ===================================================================== */
 
   return (
     <div className="r-wrap">
       <BrandStyles />
 
-      {/* Errors / Missing Cognito */}
-      {!cognitoId && (
-        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
-          <strong>Can’t load data:</strong> No cognito_id detected.
-        </div>
-      )}
+      {/* Form modal */}
+      {renderFormModal()}
+
+      {/* Hard block modal */}
+      <HardBlockModal
+        open={blockOpen}
+        recipe={blockInfo.recipe}
+        need={blockInfo.need}
+        have={blockInfo.have}
+        onClose={() => setBlockOpen(false)}
+      />
+
+      {/* Toast */}
+      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
+        Goods Out recorded successfully!
+      </Toast>
+
+      {/* Errors */}
       {fatalMsg && (
-        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
-          <strong>API error:</strong> {fatalMsg}
+        <div
+          className="r-card"
+          style={{
+            borderColor: "#fecaca",
+            background: "#fff1f2",
+            color: "#b91c1c",
+            marginBottom: 12,
+          }}
+        >
+          <strong>Error:</strong> {fatalMsg}
         </div>
       )}
 
+      {/* Layout */}
       <div className="gi-layout">
         {/* MAIN TABLE */}
         <div className="gi-main">
@@ -429,22 +1182,29 @@ export default function GoodsOut() {
             <div className="r-head">
               <div>
                 <h2 className="r-title">Goods Out</h2>
-                <p className="r-sub">Log of units dispatched with quick batchcode drill-down</p>
+                <p className="r-sub">
+                  Log of dispatched units with batchcode details
+                </p>
               </div>
 
               <div className="r-flex">
+                {/* Add Goods Out button (Option 1) */}
+                <button
+                  className="r-btn-primary"
+                  onClick={() => setFormOpen(true)}
+                >
+                  <AddIcon fontSize="small" /> Add Goods Out
+                </button>
+
+                {/* Delete selected */}
                 {selectedRows.length > 0 && (
-                  <div className="r-flex">
-                    <span className="r-pill">{selectedRows.length} selected</span>
-                    <button
-                      className="r-btn-ghost"
-                      onClick={() => setDeleteOpen(true)}
-                      title="Delete selected"
-                      style={{ color:"#dc2626", borderColor:"#fecaca" }}
-                    >
-                      <DeleteIcon fontSize="small" /> Delete
-                    </button>
-                  </div>
+                  <button
+                    className="r-btn-ghost"
+                    onClick={() => setDeleteOpen(true)}
+                    style={{ color: "#dc2626", borderColor: "#fecaca" }}
+                  >
+                    <DeleteIcon fontSize="small" /> Delete
+                  </button>
                 )}
               </div>
             </div>
@@ -453,11 +1213,14 @@ export default function GoodsOut() {
             <div className="r-toolbar">
               <input
                 className="r-input"
-                type="text"
-                placeholder="Search by recipe, recipients, batch code..."
+                placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(0);
+                }}
               />
+
               <select
                 className="r-select"
                 value={`${sortBy.field}:${sortBy.dir}`}
@@ -471,10 +1234,18 @@ export default function GoodsOut() {
                 <option value="date:asc">Date (old → new)</option>
                 <option value="recipe:asc">Recipe A→Z</option>
                 <option value="recipe:desc">Recipe Z→A</option>
-                <option value="stockAmount:desc">Units out (high → low)</option>
-                <option value="stockAmount:asc">Units out (low → high)</option>
-                <option value="recipients:asc">Recipients A→Z</option>
-                <option value="recipients:desc">Recipients Z→A</option>
+                <option value="stockAmount:desc">
+                  Units Out (high → low)
+                </option>
+                <option value="stockAmount:asc">
+                  Units Out (low → high)
+                </option>
+                <option value="recipients:asc">
+                  Recipients A→Z
+                </option>
+                <option value="recipients:desc">
+                  Recipients Z→A
+                </option>
               </select>
             </div>
 
@@ -485,35 +1256,63 @@ export default function GoodsOut() {
                 columns={columns}
                 getRowId={(row) => row.id}
                 checkboxSelection
-                rowSelectionModel={selectedRows}
-                onRowSelectionModelChange={(model) => setSelectedRows(Array.isArray(model) ? model.map(String) : [])}
                 disableRowSelectionOnClick
+                rowSelectionModel={selectedRows}
+                onRowSelectionModelChange={(m) =>
+                  setSelectedRows(m.map(String))
+                }
               />
             </div>
 
-            {/* Footer / pagination */}
+            {/* Footer */}
             <div className="r-footer">
               <span className="r-muted">
-                Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
-                <strong>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
-                <strong>{filteredRows.length}</strong>
+                Showing{" "}
+                {filteredRows.length === 0
+                  ? 0
+                  : page * rowsPerPage + 1}
+                –
+                {Math.min(
+                  (page + 1) * rowsPerPage,
+                  filteredRows.length
+                )}{" "}
+                of {filteredRows.length}
               </span>
+
               <div className="r-flex">
                 <button
                   className="r-btn-ghost"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                >Prev</button>
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Prev
+                </button>
+
                 <span className="r-muted">Page {page + 1}</span>
+
                 <button
                   className="r-btn-ghost"
-                  onClick={() => setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length) ? p + 1 : p)}
-                  disabled={(page + 1) * rowsPerPage >= filteredRows.length}
-                >Next</button>
+                  disabled={
+                    (page + 1) * rowsPerPage >= filteredRows.length
+                  }
+                  onClick={() =>
+                    setPage((p) =>
+                      (p + 1) * rowsPerPage < filteredRows.length
+                        ? p + 1
+                        : p
+                    )
+                  }
+                >
+                  Next
+                </button>
+
                 <select
                   className="r-select"
                   value={rowsPerPage}
-                  onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setPage(0);
+                  }}
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -525,327 +1324,214 @@ export default function GoodsOut() {
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR: QUICK STATS */}
+        {/* RIGHT SIDEBAR */}
         <aside className="gi-side">
-          {/* Total Units Out highlight */}
           <div className="r-card stat-card stat-accent">
             <p className="stat-title">Total Units Out</p>
-            <p className="stat-value">{nf(stats.totalUnitsOut)}</p>
-            <p className="stat-sub">Based on current filters</p>
+            <p className="stat-value">{nf(stats.totalUnits)}</p>
+            <p className="stat-sub">Based on filtered data</p>
           </div>
 
-          {/* Core KPIs */}
           <div className="r-card stat-card">
-            <div className="stat-row" style={{ marginBottom:10 }}>
+            <div className="stat-row">
               <span className="stat-kpi">Shipments</span>
               <span className="stat-kpi">{nf(stats.shipments)}</span>
             </div>
-            <div className="stat-row" style={{ marginBottom:10 }}>
+            <div className="stat-row">
               <span className="stat-kpi">Unique Recipes</span>
               <span className="stat-kpi">{nf(stats.uniqueRecipes)}</span>
             </div>
             <div className="stat-row">
               <span className="stat-kpi">Unique Recipients</span>
-              <span className="stat-kpi">{nf(stats.uniqueRecipients)}</span>
+              <span className="stat-kpi">
+                {nf(stats.uniqueRecipients)}
+              </span>
             </div>
-          </div>
-
-          {/* Top recipes by units */}
-          <div className="r-card stat-card">
-            <p className="stat-title">Top Recipes by Units</p>
-            {stats.topRecipes.length === 0 ? (
-              <p className="stat-sub">No data</p>
-            ) : (
-              <div style={{ display:"grid", gap:8 }}>
-                {stats.topRecipes.map((t) => (
-                  <div key={t.recipe} className="stat-row">
-                    <span className="stat-sub" style={{ fontWeight:800, color:"#0f172a" }}>{t.recipe}</span>
-                    <span className="stat-kpi">{nf(t.units)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </aside>
       </div>
 
-      {/* ===================== DELETE CONFIRM MODAL ===================== */}
+      {/* DELETE CONFIRM MODAL */}
       {deleteOpen && selectedRows.length > 0 && (
         <Portal>
-          <div className="r-modal-dim">
-            <div className="r-modal">
-              <div className="r-mhdr">
-                <h3 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h3>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
-              </div>
-              <div className="r-mbody">
-                <div className="r-flex" style={{ width: 60, height: 60, margin:"0 auto", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", borderRadius:999 }}>
-                  <TrashLg />
-                </div>
-                <h3 style={{ fontWeight: 900, color:"#0f172a", marginTop: 10, fontSize:18 }}>
-                  Delete {selectedRows.length} record{selectedRows.length>1 ? "s" : ""}?
+          <div className="go-modal-dim">
+            <div className="go-modal">
+              <div className="go-mhdr">
+                <h3 style={{ margin: 0, fontWeight: 900 }}>
+                  Confirm Deletion
                 </h3>
-                <p className="r-muted" style={{ marginTop: 6 }}>This is a soft-delete action.</p>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Close
+                </button>
               </div>
-              <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
-                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+
+              <div className="go-mbody" style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    width: 60,
+                    height: 60,
+                    margin: "0 auto",
+                    borderRadius: 999,
+                    background: "#fee2e2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#dc2626",
+                  }}
+                >
+                  <DeleteIcon />
+                </div>
+
+                <h3 style={{ marginTop: 16, fontWeight: 800 }}>
+                  Delete {selectedRows.length} record
+                  {selectedRows.length > 1 ? "s" : ""}?
+                </h3>
+
+                <p style={{ color: "#64748b", fontSize: 13 }}>
+                  This is a soft delete.
+                </p>
+              </div>
+
+              <div className="go-mfooter">
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="r-btn-primary r-btn-danger"
+                  onClick={handleDelete}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           </div>
         </Portal>
       )}
 
-      {/* ===================== DRAWER (kept from your GoodsOut) ===================== */}
+      {/* BATCHCODE DRAWER */}
       <Drawer
         anchor="right"
         open={drawerOpen}
-        onClose={handleDrawerClose}
+        onClose={closeDrawer}
         PaperProps={{
           sx: {
             width: 420,
             borderRadius: "20px 0 0 20px",
-            border: `1px solid ${brand.border}`,
+            border: "1px solid #e5e7eb",
             boxShadow: "0 24px 48px rgba(15,23,42,0.12)",
-            overflow: "hidden",
           },
         }}
       >
-        {/* Header with gradient */}
+        {/* HEADER */}
         <Box
           sx={{
+            background: "linear-gradient(180deg,#7C3AED,#5B21B6)",
+            color: "#fff",
+            p: 2,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 1,
-            px: 2,
-            py: 1.25,
-            color: "#fff",
-            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 2,
-                background: "rgba(255,255,255,0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MenuOutlinedIcon sx={{ color: "#fff" }} />
-            </Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <MenuOutlinedIcon />
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#fff" }}>
+              <Typography variant="h6" fontWeight={800}>
                 {drawerHeader}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
-                {selectedRow?.recipe ? `${selectedRow.recipe} · ${selectedRow?.date ?? ""}` : ""}
+              <Typography variant="caption">
+                {selectedRow?.recipe} · {selectedRow?.date}
               </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <IconButton
-              size="small"
-              onClick={() => {
-                try {
-                  const csv = [
-                    ["Batch code", "Units"],
-                    ...drawerItems.map((i) => [i.code, i.units || 0]),
-                  ]
-                    .map((r) => r.map((c) => `"${String(c).replace(/\\"/g, '""')}"`).join(","))
-                    .join("\n");
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `${selectedRow?.recipe ?? "batchcodes"}-batchcodes.csv`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                } catch (e) {
-                  console.error("Export failed", e);
-                }
-              }}
-              sx={{
-                color: "#fff",
-                borderRadius: 1,
-                border: "1px solid rgba(255,255,255,0.12)",
-              }}
-            >
-              <FileDownloadOutlinedIcon fontSize="small" />
-            </IconButton>
-
-            <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
+          <IconButton onClick={closeDrawer} sx={{ color: "#fff" }}>
+            <CloseIcon />
+          </IconButton>
         </Box>
 
-        {/* Content */}
-        <Box sx={{ background: brand.surface, p: 2, height: "calc(100% - 88px)" }}>
-          {/* Meta card */}
+        {/* CONTENT */}
+        <Box sx={{ p: 2 }}>
           <Card
             variant="outlined"
             sx={{
-              borderColor: brand.border,
-              background: brand.surface,
+              borderColor: "#e5e7eb",
               borderRadius: 2,
               mb: 2,
             }}
           >
-            <CardContent sx={{ p: 1.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box>
-                  <Typography sx={{ color: brand.subtext, fontSize: 12, fontWeight: 700 }}>
-                    Recipients
-                  </Typography>
-                  <Typography sx={{ color: brand.text, fontWeight: 800 }}>
-                    {selectedRow?.recipients ?? "—"}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: "right" }}>
-                  <Typography sx={{ color: "text.secondary", fontSize: 12 }}>Total units</Typography>
-                  <Typography sx={{ color: brand.primary, fontWeight: 900, fontSize: 22 }}>
-                    {drawerItems.reduce((s, it) => s + (it.units || 0), 0).toLocaleString()}
-                  </Typography>
-                </Box>
-              </Box>
+            <CardContent sx={{ p: 2 }}>
+              <Typography fontSize={12} color="#64748b" fontWeight={700}>
+                Recipient
+              </Typography>
+              <Typography fontWeight={800}>
+                {selectedRow?.recipients}
+              </Typography>
             </CardContent>
           </Card>
 
-          {/* Search + Reset */}
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <TextField
-              size="small"
-              placeholder="Search batch code or filter"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              fullWidth
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 1.5,
-                  background: "#fff",
-                  borderColor: brand.border,
-                },
-              }}
-            />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                setSearchTerm("");
-                if (selectedRow) setDrawerItems(buildDrawerItems(selectedRow));
-              }}
-              sx={{ textTransform: "none", borderRadius: 1.5 }}
-            >
-              Reset
-            </Button>
-          </Stack>
+          <TextField
+            size="small"
+            placeholder="Search batch code..."
+            fullWidth
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ mb: 2 }}
+          />
 
           <Divider sx={{ mb: 2 }} />
 
-          {/* Items list */}
-          {drawerItems.filter((it) => it.code.toLowerCase().includes(searchTerm.trim().toLowerCase())).length === 0 ? (
-            <Typography sx={{ color: brand.subtext }}>No batchcodes available.</Typography>
-          ) : (
-            <List disablePadding>
-              {drawerItems
-                .filter((it) => it.code.toLowerCase().includes(searchTerm.trim().toLowerCase()))
-                .map(({ code, unitsLabel }, idx) => (
-                <Box
-                  key={`${code}-${idx}`}
-                  sx={{
-                    borderRadius: 2,
-                    border: `1px solid ${brand.border}`,
-                    backgroundColor: idx % 2 ? brand.surfaceMuted : brand.surface,
-                    mb: 1,
-                    overflow: "hidden",
-                  }}
-                >
-                  <ListItem
-                    secondaryAction={
-                      <Box
-                        component="span"
-                        sx={{
-                          borderRadius: 999,
-                          border: `1px solid ${brand.border}`,
-                          background: "#f1f5f9",
-                          px: 1.25,
-                          py: 0.25,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: brand.text,
-                          maxWidth: 180,
-                          textAlign: "right",
-                        }}
-                      >
-                        {unitsLabel}
-                      </Box>
-                    }
-                    sx={{ py: 1 }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <CheckRoundedIcon sx={{ color: brand.primary }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={code}
-                      primaryTypographyProps={{
-                        sx: { color: brand.text, fontWeight: 600 },
+          {drawerItems
+            .filter((i) =>
+              i.code.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .map((it, idx) => (
+              <Box
+                key={`${it.code}-${idx}`}
+                sx={{
+                  border:
+                    "1px solid #e5e7eb",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1,
+                }}
+              >
+                <ListItem
+                  secondaryAction={
+                    <Box
+                      sx={{
+                        borderRadius: 999,
+                        px: 1.5,
+                        py: 0.5,
+                        background: "#f1f5f9",
+                        border: "1px solid #e5e7eb",
+                        fontSize: 12,
+                        fontWeight: 800,
                       }}
-                    />
-                  </ListItem>
-                </Box>
-              ))}
-            </List>
-          )}
-        </Box>
-
-        {/* Drawer Footer */}
-        <Box
-          sx={{
-            p: 2,
-            borderTop: `1px solid ${brand.border}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: brand.surface,
-          }}
-        >
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              onClick={handleDrawerClose}
-              sx={{
-                textTransform: "none",
-                borderRadius: 999,
-                px: 2,
-                border: `1px solid ${brand.border}`,
-              }}
-            >
-              Close
-            </Button>
-            <Button
-              onClick={handleDrawerClose}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-                borderRadius: 999,
-                px: 2,
-                color: "#fff",
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                "&:hover": { background: brand.primaryDark },
-              }}
-            >
-              Confirm & Close
-            </Button>
-          </Box>
-
-          <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-            {drawerItems.length} items
-          </Typography>
+                    >
+                      {it.unitsLabel}
+                    </Box>
+                  }
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <CheckRoundedIcon sx={{ color: "#7C3AED" }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={it.code}
+                    primaryTypographyProps={{
+                      fontWeight: 700,
+                      color: "#0f172a",
+                    }}
+                  />
+                </ListItem>
+              </Box>
+            ))}
         </Box>
       </Drawer>
     </div>
