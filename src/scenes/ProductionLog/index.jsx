@@ -655,8 +655,8 @@ export default function ProductionLog() {
                 }}
               />
 
-              <select
-                className="r-select" disabled={openProductionForm}
+              {!openProductionForm && (<select
+                className="r-select"
                 value={`${sortBy.field}:${sortBy.dir}`}
                 onChange={(e) => {
                   const [field, dir] = e.target.value.split(":");
@@ -670,7 +670,7 @@ export default function ProductionLog() {
                 <option value="recipe:desc">Recipe Z→A</option>
                 <option value="unitsRemaining:desc">Units remaining (high → low)</option>
                 <option value="unitsRemaining:asc">Units remaining (low → high)</option>
-              </select>
+              </select>)}
             </div>
 
             {/* DataGrid */}
@@ -747,8 +747,8 @@ export default function ProductionLog() {
                   Next
                 </button>
 
-                <select
-                  className="r-select" disabled={openProductionForm}
+                {!openProductionForm && (<select
+                  className="r-select"
                   value={rowsPerPage}
                   onChange={(e) => {
                     setRowsPerPage(Number(e.target.value));
@@ -759,7 +759,7 @@ export default function ProductionLog() {
                   <option value={10}>10</option>
                   <option value={25}>25</option>
                   <option value={50}>50</option>
-                </select>
+                </select>)}
               </div>
             </div>
           </div>
