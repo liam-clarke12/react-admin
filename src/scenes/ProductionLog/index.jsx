@@ -56,9 +56,9 @@ const BrandStyles = () => (
 
   /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow: visible !important; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow:auto; background:#fff; }
+  .r-mbody { padding:16px; overflow: visible !important; background:#fff; flex:1; }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Grid form bits in modal */
@@ -94,11 +94,21 @@ const BrandStyles = () => (
 
   /* === FIX: modal dropdown stacking === */
   .r-modal-dim { z-index:200000 !important; }
-  .r-modal { z-index:200001 !important; overflow:visible !important; position:relative; }
+  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow: visible !important; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative; }
   .ag-grid { overflow:visible !important; }
   .ag-select, .ag-input, select { z-index:200002 !important; position:relative; }
 
-  `}</style>
+  
+/* Force MUI dropdowns above modal */
+.MuiPopover-root,
+.MuiPopover-root .MuiPaper-root,
+.MuiMenu-root,
+.MuiMenu-paper,
+.MuiPopper-root {
+  z-index: 300000 !important;
+  position: absolute !important;
+}
+`}</style>
 );
 
 /* Icons (match Goods In) */
