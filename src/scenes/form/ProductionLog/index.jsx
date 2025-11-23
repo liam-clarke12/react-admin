@@ -235,7 +235,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                   toNumber(values.unitsOfWaste),
               },
             ]
-          : values.logs.map((log) => ({
+          : (values.logs ?? []).map((log) => ({
               ...log,
               recipe: values.recipe,
               date: values.date,
@@ -642,7 +642,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {values.logs.map((log, index) => {
+                          {(values.logs ?? []).map((log, index) => {
                             const batchesProducedPath = `logs[${index}].batchesProduced`;
                             const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
                             const batchCodePath = `logs[${index}].batchCode`;
