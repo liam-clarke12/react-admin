@@ -277,7 +277,7 @@ const handleDeficitCheck = useCallback(
       submitFunc();
 
 // =====================================================================
-// FIXED handleSingleClick
+// FIXED handleSingleClick (final corrected version)
 // =====================================================================
 const handleSingleClick = (
   validateForm,
@@ -294,7 +294,7 @@ const handleSingleClick = (
 
   validateForm().then((errors) => {
     if (Object.keys(errors).length === 0) {
-      handleDeficitCheck(values, submitForm);
+      handleDeficitCheck(values, submitForm); 
     } else {
       const firstError = Object.keys(errors)[0];
       const el = document.getElementById(firstError);
@@ -302,7 +302,6 @@ const handleSingleClick = (
     }
   });
 };
-
       return;
     }
 
