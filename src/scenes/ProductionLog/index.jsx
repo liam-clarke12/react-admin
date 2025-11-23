@@ -656,7 +656,7 @@ export default function ProductionLog() {
               />
 
               <select
-                className="r-select"
+                className="r-select" disabled={openProductionForm}
                 value={`${sortBy.field}:${sortBy.dir}`}
                 onChange={(e) => {
                   const [field, dir] = e.target.value.split(":");
@@ -748,7 +748,7 @@ export default function ProductionLog() {
                 </button>
 
                 <select
-                  className="r-select"
+                  className="r-select" disabled={openProductionForm}
                   value={rowsPerPage}
                   onChange={(e) => {
                     setRowsPerPage(Number(e.target.value));
