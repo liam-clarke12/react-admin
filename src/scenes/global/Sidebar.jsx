@@ -282,41 +282,8 @@ const Sidebar = () => {
                 selected={selected}
                 setSelected={setSelected}
               />
-
-              {/* Section: Forms */}
-              <SectionSeparator label="Forms" />
-
-              <Item
-                title="Goods In Form"
-                to="/GoodsInForm"
-                icon={<DeliveryDiningOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Recipe Production"
-                to="/recipe_production"
-                icon={<OutdoorGrillOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Goods Out Form"
-                to="/goods_out_form"
-                icon={<Inventory2OutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Recipe Form"
-                to="/recipeform"
-                icon={<ReceiptLongOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-
               {/* Section: Data */}
-              <SectionSeparator label="Data" />
+              <SectionSeparator label="MRP" />
 
               <Item
                 title="Goods In"
