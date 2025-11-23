@@ -91,6 +91,13 @@ const BrandStyles = () => (
   .stat-kpi { font-size:14px; font-weight:800; color:#0f172a; }
   .stat-sub { font-size:12px; color:#64748b; }
   .stat-accent { border:1px dashed #7C3AED66; background: #f9f7ff; }
+
+  /* === FIX: modal dropdown stacking === */
+  .r-modal-dim { z-index:200000 !important; }
+  .r-modal { z-index:200001 !important; overflow:visible !important; position:relative; }
+  .ag-grid { overflow:visible !important; }
+  .ag-select, .ag-input, select { z-index:200002 !important; position:relative; }
+
   `}</style>
 );
 
@@ -103,7 +110,8 @@ const EditIcon = (props) => (
 );
 const DeleteIcon = (props) => (
   <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
 );
 
@@ -124,17 +132,21 @@ const formatDateYMD = (val) => {
 };
 
 // Prefer batchCode as the key everywhere
-const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
+const getRowKey = (row) =>
+  String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
 
 const makeStableId = (row) => {
   if (!row) return null;
   const key = getRowKey(row);
   if (key) return key;
-  const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`;
+  const slug = `${row.recipe || "r"}|${row.date || "d"}|${
+    row.producer_name || row.producerName || "p"
+  }`;
   return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
 };
 
-const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
+const toNumber = (v) =>
+  v === "" || v === null || v === undefined ? 0 : Number(v) || 0;
 const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const Portal = ({ children }) => {
@@ -166,13 +178,14 @@ export default function ProductionLog() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [openProductionForm, setOpenProductionForm] = useState(false);
 
-
   // ===== Recipes map =====
   useEffect(() => {
     if (!cognitoId) return;
     const run = async () => {
       try {
-        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+        const res = await fetch(
+          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
+        );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
         const map = {};
@@ -190,24 +203,50 @@ export default function ProductionLog() {
 
   // ===== Fetch production logs =====
   const fetchLogs = useCallback(async () => {
-    if (!cognitoId) { setFatalMsg("Missing cognito_id."); return; }
+    if (!cognitoId) {
+      setFatalMsg("Missing cognito_id.");
+      return;
+    }
     try {
-      const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+      const res = await fetch(
+        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
+          cognitoId
+        )}`
+      );
       if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
       const data = await res.json();
-      if (!Array.isArray(data)) { setProductionLogs([]); return; }
+      if (!Array.isArray(data)) {
+        setProductionLogs([]);
+        return;
+      }
       const sanitized = data.map((row) => {
         const dbId = row.id ?? row.ID ?? null;
-        const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced);
-        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining);
-        const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste);
-        const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
-        const unitsRemaining = toNumber(row.unitsRemaining ?? (batchRemaining - unitsOfWaste));
-        const batchesRemaining = upb > 0 ? unitsRemaining / upb : null;
-        const producerName = row.producer_name ?? row.producerName ?? "";
+        const batchesProduced = toNumber(
+          row.batchesProduced ?? row.batches_produced
+        );
+        const batchRemaining = toNumber(
+          row.batchRemaining ?? row.batch_remaining
+        );
+        const unitsOfWaste = toNumber(
+          row.units_of_waste ?? row.unitsOfWaste
+        );
+        const upb =
+          recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
+        const unitsRemaining = toNumber(
+          row.unitsRemaining ?? batchRemaining - unitsOfWaste
+        );
+        const batchesRemaining =
+          upb > 0 ? unitsRemaining / upb : null;
+        const producerName =
+          row.producer_name ?? row.producerName ?? "";
 
         const normalized = {
-          id: String(dbId ?? row.batchCode ?? row.batch_code ?? makeStableId(row)),
+          id: String(
+            dbId ??
+              row.batchCode ??
+              row.batch_code ??
+              makeStableId(row)
+          ),
           batchCode: row.batchCode ?? row.batch_code ?? null,
           recipe: row.recipe ?? "",
           date: formatDateYMD(row.date ?? null),
@@ -219,7 +258,9 @@ export default function ProductionLog() {
           producerName,
           __raw: row,
         };
-        normalized.id = String(normalized.batchCode ?? normalized.id);
+        normalized.id = String(
+          normalized.batchCode ?? normalized.id
+        );
         return normalized;
       });
       setProductionLogs(sanitized);
@@ -230,67 +271,117 @@ export default function ProductionLog() {
     }
   }, [cognitoId, recipesMap]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
 
   // ===== Grid columns =====
-  const columns = useMemo(() => ([
-    { field: "date", headerName: "Date", flex: 1 },
-    { field: "recipe", headerName: "Recipe Name", flex: 1 },
-    { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, align: "left", headerAlign: "left" },
-    { field: "unitsOfWaste", headerName: "Units of Waste", type: "number", flex: 1, align: "left", headerAlign: "left" },
-    { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, align: "left", headerAlign: "left" },
-    { field: "producerName", headerName: "Produced by", flex: 1, align: "left", headerAlign: "left" },
-    { field: "batchCode", headerName: "Batch Code", flex: 1 },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 120,
-      sortable: false,
-      filterable: false,
-      align: "right",
-      renderCell: (params) => (
-        <button
-          className="r-btn-ghost"
-          aria-label="Edit row"
-          onClick={() => { setEditingRow(params.row); setEditOpen(true); }}
-        >
-          <EditIcon /> Edit
-        </button>
-      ),
-    },
-  ]), []);
+  const columns = useMemo(
+    () => [
+      { field: "date", headerName: "Date", flex: 1 },
+      { field: "recipe", headerName: "Recipe Name", flex: 1 },
+      {
+        field: "batchesProduced",
+        headerName: "Batches Produced",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      {
+        field: "unitsOfWaste",
+        headerName: "Units of Waste",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      {
+        field: "unitsRemaining",
+        headerName: "Units Remaining",
+        type: "number",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      {
+        field: "producerName",
+        headerName: "Produced by",
+        flex: 1,
+        align: "left",
+        headerAlign: "left",
+      },
+      { field: "batchCode", headerName: "Batch Code", flex: 1 },
+      {
+        field: "actions",
+        headerName: "Actions",
+        width: 120,
+        sortable: false,
+        filterable: false,
+        align: "right",
+        renderCell: (params) => (
+          <button
+            className="r-btn-ghost"
+            aria-label="Edit row"
+            onClick={() => {
+              setEditingRow(params.row);
+              setEditOpen(true);
+            }}
+          >
+            <EditIcon /> Edit
+          </button>
+        ),
+      },
+    ],
+    []
+  );
 
-  // ===== Search + sort on client (like Goods In) =====
+  // ===== Search + sort (client-side) =====
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let rows = [...productionLogs];
     if (q) {
       rows = rows.filter((r) =>
-        Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))
+        Object.values(r).some((v) =>
+          String(v ?? "").toLowerCase().includes(q)
+        )
       );
     }
     const dir = sortBy.dir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       const fa = a[sortBy.field] ?? "";
       const fb = b[sortBy.field] ?? "";
-      if (typeof fa === "number" && typeof fb === "number") return (fa - fb) * dir;
+      if (
+        typeof fa === "number" &&
+        typeof fb === "number"
+      )
+        return (fa - fb) * dir;
       return String(fa).localeCompare(String(fb)) * dir;
     });
     return rows;
   }, [productionLogs, searchQuery, sortBy]);
 
-  // ===== Sidebar Quick Stats (computed from filteredRows) =====
+  // ===== Sidebar Stats =====
   const stats = useMemo(() => {
-    const totalUnitsRemaining = filteredRows.reduce((s, r) => s + toNumber(r.unitsRemaining), 0);
-    const totalWaste = filteredRows.reduce((s, r) => s + toNumber(r.unitsOfWaste), 0);
-    const totalBatchesProduced = filteredRows.reduce((s, r) => s + toNumber(r.batchesProduced), 0);
+    const totalUnitsRemaining = filteredRows.reduce(
+      (s, r) => s + toNumber(r.unitsRemaining),
+      0
+    );
+    const totalWaste = filteredRows.reduce(
+      (s, r) => s + toNumber(r.unitsOfWaste),
+      0
+    );
+    const totalBatchesProduced = filteredRows.reduce(
+      (s, r) => s + toNumber(r.batchesProduced),
+      0
+    );
     const activeBatches = filteredRows.length;
     const byRecipe = filteredRows.reduce((acc, r) => {
       const k = r.recipe || "Unknown";
-      acc[k] = (acc[k] || 0) + toNumber(r.unitsRemaining);
+      acc[k] =
+        (acc[k] || 0) + toNumber(r.unitsRemaining);
       return acc;
     }, {});
-    // Top 3 recipes by remaining
     const topRecipes = Object.entries(byRecipe)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
@@ -309,15 +400,29 @@ export default function ProductionLog() {
   const processRowUpdate = async (updatedRow) => {
     if (!cognitoId) throw new Error("Missing cognitoId");
 
-    const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code;
-    if (!batchCodeForPath) throw new Error("batchCode is required to update production_log");
+    const batchCodeForPath =
+      updatedRow.batchCode || updatedRow.batch_code;
+    if (!batchCodeForPath)
+      throw new Error(
+        "batchCode is required to update production_log"
+      );
 
-    // Coercions
     const dateYmd = formatDateYMD(updatedRow.date);
-    const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
-    const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
-    const unitsRemaining = toNumber(updatedRow.unitsRemaining);
-    const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? (unitsRemaining + unitsOfWaste));
+    const batchesProduced = toNumber(
+      updatedRow.batchesProduced ?? updatedRow.batches_produced
+    );
+    const unitsOfWaste = toNumber(
+      updatedRow.unitsOfWaste ??
+        updatedRow.units_of_waste
+    );
+    const unitsRemaining = toNumber(
+      updatedRow.unitsRemaining
+    );
+    const batchRemaining = toNumber(
+      updatedRow.batchRemaining ??
+        updatedRow.batch_remaining ??
+        unitsRemaining + unitsOfWaste
+    );
 
     const payload = {
       date: dateYmd,
@@ -326,11 +431,16 @@ export default function ProductionLog() {
       units_of_waste: unitsOfWaste,
       batchRemaining,
       unitsRemaining,
-      producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
+      producer_name:
+        updatedRow.producerName ??
+        updatedRow.producer_name ??
+        "",
       cognito_id: cognitoId,
     };
 
-    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`;
+    const url = `${API_BASE}/production-log/${encodeURIComponent(
+      batchCodeForPath
+    )}`;
     const res = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -341,32 +451,47 @@ export default function ProductionLog() {
       throw new Error(txt || `Server returned ${res.status}`);
     }
 
-    // Reload from server to prevent drift/dupes
     await fetchLogs();
   };
 
   const handleConfirmEdit = async () => {
-    if (!editingRow) { setEditOpen(false); return; }
+    if (!editingRow) {
+      setEditOpen(false);
+      return;
+    }
     setUpdating(true);
     try {
       const patched = {
         ...editingRow,
         id: getRowKey(editingRow),
-        batchCode: editingRow.batchCode ?? editingRow.batch_code,
+        batchCode:
+          editingRow.batchCode ??
+          editingRow.batch_code,
         date: formatDateYMD(editingRow.date),
         recipe: editingRow.recipe ?? "",
-        batchesProduced: toNumber(editingRow.batchesProduced),
-        unitsOfWaste: toNumber(editingRow.unitsOfWaste),
-        unitsRemaining: toNumber(editingRow.unitsRemaining),
-        batchRemaining: toNumber(editingRow.batchRemaining ?? editingRow.unitsRemaining + editingRow.unitsOfWaste),
+        batchesProduced: toNumber(
+          editingRow.batchesProduced
+        ),
+        unitsOfWaste: toNumber(
+          editingRow.unitsOfWaste
+        ),
+        unitsRemaining: toNumber(
+          editingRow.unitsRemaining
+        ),
+        batchRemaining: toNumber(
+          editingRow.batchRemaining ??
+            editingRow.unitsRemaining +
+              editingRow.unitsOfWaste
+        ),
         producerName: editingRow.producerName ?? "",
       };
 
-      // Optimistic local patch
       setProductionLogs((prev) => {
         const next = [...prev];
         const key = getRowKey(patched);
-        const idx = next.findIndex((r) => getRowKey(r) === key);
+        const idx = next.findIndex(
+          (r) => getRowKey(r) === key
+        );
         if (idx >= 0) next[idx] = { ...next[idx], ...patched };
         return next;
       });
@@ -377,29 +502,47 @@ export default function ProductionLog() {
     } catch (e) {
       console.error("Edit failed:", e);
       alert(`Update failed: ${e?.message || e}`);
-    } finally { setUpdating(false); }
+    } finally {
+      setUpdating(false);
+    }
   };
 
   // ===== Delete (soft) =====
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
-    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(getRowKey(r)));
+    const rowsToDelete = productionLogs.filter((r) =>
+      selectedRows.includes(getRowKey(r))
+    );
     try {
       await Promise.all(
         rowsToDelete.map((row) =>
           fetch(`${API_BASE}/delete-production-log`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              batchCode: row.batchCode,
+              cognito_id: cognitoId,
+            }),
           }).then(async (res) => {
             if (!res.ok) {
-              const t = await res.text().catch(() => "");
-              throw new Error(t || `Delete failed for ${row.batchCode}`);
+              const t =
+                await res.text().catch(() => "");
+              throw new Error(
+                t ||
+                  `Delete failed for ${row.batchCode}`
+              );
             }
           })
         )
       );
-      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(getRowKey(r))));
+      setProductionLogs((prev) =>
+        prev.filter(
+          (r) =>
+            !selectedRows.includes(getRowKey(r))
+        )
+      );
       setSelectedRows([]);
       setDeleteOpen(false);
     } catch (err) {
@@ -408,26 +551,45 @@ export default function ProductionLog() {
     }
   };
 
-  // ===== Pagination helper for footer =====
+  // ===== Pagination =====
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const visibleRows = useMemo(() => {
     const start = page * rowsPerPage;
-    return filteredRows.slice(start, start + rowsPerPage);
+    return filteredRows.slice(
+      start,
+      start + rowsPerPage
+    );
   }, [filteredRows, page, rowsPerPage]);
 
   return (
     <div className="r-wrap">
       <BrandStyles />
 
-      {/* Errors / Missing Cognito */}
       {!cognitoId && (
-        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
-          <strong>Can’t load data:</strong> No cognito_id detected.
+        <div
+          className="r-card"
+          style={{
+            borderColor: "#fecaca",
+            background: "#fff1f2",
+            color: "#b91c1c",
+            marginBottom: 12,
+          }}
+        >
+          <strong>Can’t load data:</strong> No cognito_id
+          detected.
         </div>
       )}
       {fatalMsg && (
-        <div className="r-card" style={{ borderColor:"#fecaca", background:"#fff1f2", color:"#b91c1c", marginBottom:12 }}>
+        <div
+          className="r-card"
+          style={{
+            borderColor: "#fecaca",
+            background: "#fff1f2",
+            color: "#b91c1c",
+            marginBottom: 12,
+          }}
+        >
           <strong>API error:</strong> {fatalMsg}
         </div>
       )}
@@ -440,21 +602,38 @@ export default function ProductionLog() {
             <div className="r-head">
               <div>
                 <h2 className="r-title">Production Log</h2>
-                <p className="r-sub">Track batches, waste and remaining units</p>
+                <p className="r-sub">
+                  Track batches, waste and remaining units
+                </p>
               </div>
 
-                              <div style={{ marginLeft: "auto" }}>
-<button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>+ Record Production</button>
-</div>
-<div className="r-flex">
+              <div style={{ marginLeft: "auto" }}>
+                <button
+                  className="r-btn-primary"
+                  onClick={() =>
+                    setOpenProductionForm(true)
+                  }
+                >
+                  + Record Production
+                </button>
+              </div>
+
+              <div className="r-flex">
                 {selectedRows.length > 0 && (
                   <div className="r-chip">
-                    <span className="r-pill">{selectedRows.length} selected</span>
+                    <span className="r-pill">
+                      {selectedRows.length} selected
+                    </span>
                     <button
                       className="r-btn-ghost"
-                      onClick={() => setDeleteOpen(true)}
+                      onClick={() =>
+                        setDeleteOpen(true)
+                      }
                       title="Delete selected"
-                      style={{ color:"#dc2626", borderColor:"#fecaca" }}
+                      style={{
+                        color: "#dc2626",
+                        borderColor: "#fecaca",
+                      }}
                     >
                       <DeleteIcon /> Delete
                     </button>
@@ -470,8 +649,12 @@ export default function ProductionLog() {
                 type="text"
                 placeholder="Search by recipe, batch code, producer..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(0);
+                }}
               />
+
               <select
                 className="r-select"
                 value={`${sortBy.field}:${sortBy.dir}`}
@@ -499,7 +682,10 @@ export default function ProductionLog() {
                 checkboxSelection
                 rowSelectionModel={selectedRows}
                 onRowSelectionModelChange={(model) => {
-                  const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
+                  const arr =
+                    Array.isArray(model)
+                      ? model.map((m) => String(m))
+                      : [];
                   setSelectedRows(arr);
                 }}
                 disableSelectionOnClick
@@ -514,26 +700,60 @@ export default function ProductionLog() {
             {/* Footer / pagination */}
             <div className="r-footer">
               <span className="r-muted">
-                Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
-                <strong>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
-                <strong>{filteredRows.length}</strong>
+                Showing{" "}
+                <strong>
+                  {filteredRows.length === 0
+                    ? 0
+                    : page * rowsPerPage + 1}
+                </strong>
+                –
+                <strong>
+                  {Math.min(
+                    (page + 1) * rowsPerPage,
+                    filteredRows.length
+                  )}
+                </strong>{" "}
+                of <strong>{filteredRows.length}</strong>
               </span>
+
               <div className="r-flex">
                 <button
                   className="r-btn-ghost"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  onClick={() =>
+                    setPage((p) => Math.max(0, p - 1))
+                  }
                   disabled={page === 0}
-                >Prev</button>
+                >
+                  Prev
+                </button>
+
                 <span className="r-muted">Page {page + 1}</span>
+
                 <button
                   className="r-btn-ghost"
-                  onClick={() => setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length) ? p + 1 : p)}
-                  disabled={(page + 1) * rowsPerPage >= filteredRows.length}
-                >Next</button>
+                  onClick={() =>
+                    setPage((p) =>
+                      (p + 1) * rowsPerPage <
+                      filteredRows.length
+                        ? p + 1
+                        : p
+                    )
+                  }
+                  disabled={
+                    (page + 1) * rowsPerPage >=
+                    filteredRows.length
+                  }
+                >
+                  Next
+                </button>
+
                 <select
                   className="r-select"
                   value={rowsPerPage}
-                  onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setPage(0);
+                  }}
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -556,30 +776,47 @@ export default function ProductionLog() {
 
           {/* Core KPIs */}
           <div className="r-card stat-card">
-            <div className="stat-row" style={{ marginBottom:10 }}>
+            <div className="stat-row" style={{ marginBottom: 10 }}>
               <span className="stat-kpi">Batches Produced</span>
-              <span className="stat-kpi">{nf(stats.totalBatchesProduced)}</span>
+              <span className="stat-kpi">
+                {nf(stats.totalBatchesProduced)}
+              </span>
             </div>
-            <div className="stat-row" style={{ marginBottom:10 }}>
+
+            <div className="stat-row" style={{ marginBottom: 10 }}>
               <span className="stat-kpi">Units of Waste</span>
-              <span className="stat-kpi">{nf(stats.totalWaste)}</span>
+              <span className="stat-kpi">
+                {nf(stats.totalWaste)}
+              </span>
             </div>
+
             <div className="stat-row">
               <span className="stat-kpi">Active Batches</span>
-              <span className="stat-kpi">{nf(stats.activeBatches)}</span>
+              <span className="stat-kpi">
+                {nf(stats.activeBatches)}
+              </span>
             </div>
           </div>
 
           {/* Top recipes by remaining */}
           <div className="r-card stat-card">
             <p className="stat-title">Top Recipes by Remaining</p>
+
             {stats.topRecipes.length === 0 ? (
               <p className="stat-sub">No data</p>
             ) : (
-              <div style={{ display:"grid", gap:8 }}>
+              <div style={{ display: "grid", gap: 8 }}>
                 {stats.topRecipes.map((t) => (
                   <div key={t.recipe} className="stat-row">
-                    <span className="stat-sub" style={{ fontWeight:800, color:"#0f172a" }}>{t.recipe}</span>
+                    <span
+                      className="stat-sub"
+                      style={{
+                        fontWeight: 800,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {t.recipe}
+                    </span>
                     <span className="stat-kpi">{nf(t.units)}</span>
                   </div>
                 ))}
@@ -588,48 +825,77 @@ export default function ProductionLog() {
           </div>
         </aside>
       </div>
-
       {/* ===================== EDIT MODAL ===================== */}
       {editOpen && editingRow && (
         <Portal>
           <div className="r-modal-dim">
             <div className="r-modal">
               <div className="r-mhdr">
-                <h3 className="r-title" style={{ fontSize: 18 }}>Edit Production Log</h3>
-                <button className="r-btn-ghost" onClick={() => { setEditOpen(false); setEditingRow(null); }}>Close</button>
+                <h3 className="r-title" style={{ fontSize: 18 }}>
+                  Edit Production Log
+                </h3>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => {
+                    setEditOpen(false);
+                    setEditingRow(null);
+                  }}
+                >
+                  Close
+                </button>
               </div>
+
               <div className="r-mbody">
                 <div className="ag-grid">
+                  {/* Recipe */}
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Recipe</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.recipe ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), recipe: e.target.value }))}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          recipe: e.target.value,
+                        }))
+                      }
                     />
                   </div>
 
+                  {/* Date */}
                   <div className="ag-field">
                     <label className="ag-label">Date</label>
                     <input
                       className="ag-input"
                       type="date"
                       value={formatDateYMD(editingRow.date ?? "")}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), date: formatDateYMD(e.target.value) }))}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          date: formatDateYMD(e.target.value),
+                        }))
+                      }
                     />
                   </div>
 
+                  {/* Batches Produced */}
                   <div className="ag-field ag-field-1">
                     <label className="ag-label">Batches Produced</label>
                     <input
                       className="ag-input"
                       type="number"
                       value={editingRow.batchesProduced ?? 0}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchesProduced: toNumber(e.target.value) }))}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          batchesProduced: toNumber(e.target.value),
+                        }))
+                      }
                     />
                   </div>
 
+                  {/* Units of Waste */}
                   <div className="ag-field ag-field-1">
                     <label className="ag-label">Units of Waste</label>
                     <input
@@ -638,16 +904,19 @@ export default function ProductionLog() {
                       value={editingRow.unitsOfWaste ?? 0}
                       onChange={(e) => {
                         const unitsOfWaste = toNumber(e.target.value);
-                        const unitsRemaining = toNumber(editingRow.unitsRemaining);
+                        const unitsRemaining = toNumber(
+                          editingRow.unitsRemaining
+                        );
                         setEditingRow((prev) => ({
                           ...(prev || {}),
                           unitsOfWaste,
-                          batchRemaining: unitsRemaining + unitsOfWaste
+                          batchRemaining: unitsRemaining + unitsOfWaste,
                         }));
                       }}
                     />
                   </div>
 
+                  {/* Units Remaining */}
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Units Remaining</label>
                     <input
@@ -656,40 +925,69 @@ export default function ProductionLog() {
                       value={editingRow.unitsRemaining ?? 0}
                       onChange={(e) => {
                         const unitsRemaining = toNumber(e.target.value);
-                        const unitsOfWaste = toNumber(editingRow.unitsOfWaste);
+                        const unitsOfWaste = toNumber(
+                          editingRow.unitsOfWaste
+                        );
                         setEditingRow((prev) => ({
                           ...(prev || {}),
                           unitsRemaining,
-                          batchRemaining: unitsRemaining + unitsOfWaste
+                          batchRemaining: unitsRemaining + unitsOfWaste,
                         }));
                       }}
                     />
                   </div>
 
+                  {/* Produced by */}
                   <div className="ag-field ag-field-2">
                     <label className="ag-label">Produced by (Name)</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.producerName ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), producerName: e.target.value }))}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          producerName: e.target.value,
+                        }))
+                      }
                     />
                   </div>
 
+                  {/* Batch Code */}
                   <div className="ag-field ag-field-2">
                     <label className="ag-label">Batch Code</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.batchCode ?? ""}
-                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchCode: e.target.value }))}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          batchCode: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                 </div>
               </div>
+
               <div className="r-mfooter">
-                <button className="r-btn-ghost" onClick={() => { setEditOpen(false); setEditingRow(null); }} disabled={updating}>Cancel</button>
-                <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => {
+                    setEditOpen(false);
+                    setEditingRow(null);
+                  }}
+                  disabled={updating}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="r-btn-primary"
+                  onClick={handleConfirmEdit}
+                  disabled={updating}
+                >
                   {updating ? "Saving..." : "Save Changes"}
                 </button>
               </div>
@@ -697,7 +995,6 @@ export default function ProductionLog() {
           </div>
         </Portal>
       )}
-
       {/* ===================== DELETE CONFIRM MODAL ===================== */}
       {deleteOpen && selectedRows.length > 0 && (
         <Portal>
@@ -707,24 +1004,53 @@ export default function ProductionLog() {
                 <h3 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h3>
                 <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
               </div>
+
               <div className="r-mbody" style={{ textAlign: "center" }}>
-                <div className="r-flex" style={{ width: 60, height: 60, margin:"0 auto", alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", borderRadius:999 }}>
+                <div
+                  className="r-flex"
+                  style={{
+                    width: 60,
+                    height: 60,
+                    margin: "0 auto",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#fee2e2",
+                    color: "#dc2626",
+                    borderRadius: 999,
+                  }}
+                >
                   <DeleteIcon />
                 </div>
-                <h3 style={{ fontWeight: 900, color:"#0f172a", marginTop: 10, fontSize:18 }}>
-                  Delete {selectedRows.length} record{selectedRows.length>1 ? "s" : ""}?
+
+                <h3
+                  style={{
+                    fontWeight: 900,
+                    color: "#0f172a",
+                    marginTop: 10,
+                    fontSize: 18,
+                  }}
+                >
+                  Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
                 </h3>
-                <p className="r-muted" style={{ marginTop: 6 }}>This is a soft-delete action.</p>
+
+                <p className="r-muted" style={{ marginTop: 6 }}>
+                  This is a soft-delete action.
+                </p>
               </div>
-              <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
-                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+
+              <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
+                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>
+                  Cancel
+                </button>
+                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>
+                  Delete
+                </button>
               </div>
             </div>
           </div>
         </Portal>
       )}
-    
+
       {/* ===================== RECORD PRODUCTION MODAL ===================== */}
       {openProductionForm && (
         <Portal>
@@ -732,18 +1058,25 @@ export default function ProductionLog() {
             <div className="r-modal">
               <div className="r-mhdr">
                 <h3 className="r-title" style={{ fontSize: 18 }}>Record Production</h3>
-                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
+                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>
+                  Close
+                </button>
               </div>
+
               <div className="r-mbody">
                 <ProductionLogForm cognitoId={cognitoId} />
               </div>
+
               <div className="r-mfooter">
-                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
+                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>
+                  Close
+                </button>
               </div>
             </div>
           </div>
         </Portal>
       )}
-</div>
+
+    </div>
   );
 }
