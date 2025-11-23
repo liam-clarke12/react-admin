@@ -163,15 +163,15 @@ const getIngredientStock = async (cognitoId) => {
 // MAIN COMPONENT
 // =====================================================================
 
-// Renamed from ProductionLogForm to RecipeProductionForm to match the file structure convention 
+// Renamed from ProductionLogForm to RecipeProductionForm to match the file structure convention
 // (or ensure you import ProductionLogForm from this file in index.jsx)
 export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  
+
   // FIX: recipes state now stores objects { name, units_per_batch } instead of just strings
-  const [recipes, setRecipes] = useState([]); 
+  const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Deficit State
@@ -196,7 +196,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        
+
         // FIX: Store recipe objects with units_per_batch
         setRecipes(
           (Array.isArray(data) ? data : []).map((r) => ({
@@ -270,76 +270,103 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     [cognitoId, tabValue, onSubmitted, loading, getUnitsPerBatch]
   );
 
-  const handleDeficitCheck = useCallback(
-    async (values, submitFunc) => {
-      if (!values.recipe) {
-        submitFunc();
+
+const handleDeficitCheck = useCallback(
+  async (values, submitFunc) => {
+    if (!values.recipe) {
+      submitFunc();
+
+// =====================================================================
+// FIXED handleSingleClick
+// =====================================================================
+const handleSingleClick = (
+  validateForm,
+  values,
+  setTouched,
+  submitForm
+) => {
+  setTouched(
+    Object.keys(values).reduce(
+      (acc, key) => ({ ...acc, [key]: true }),
+      {}
+    )
+  );
+
+  validateForm().then((errors) => {
+    if (Object.keys(errors).length === 0) {
+      handleDeficitCheck(values, submitForm);
+    } else {
+      const firstError = Object.keys(errors)[0];
+      const el = document.getElementById(firstError);
+      if (el) el.focus();
+    }
+  });
+};
+
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const recipeIngredients = await getRecipeIngredients(cognitoId);
+      const recipeRows = recipeIngredients.filter(
+        (r) => (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
+      );
+
+      const grouped = recipeRows.map((r) => ({
+        ingredient: r.ingredient,
+        quantity: toNumber(r.quantity),
+        unit: r.unit,
+      }));
+
+      const stock = await getIngredientStock(cognitoId);
+
+      const totalBatches =
+        tabValue === 0
+          ? toNumber(values.batchesProduced)
+          : values.logs.reduce(
+              (sum, log) => sum + toNumber(log.batchesProduced),
+              0
+            );
+
+      const deficits = [];
+      grouped.forEach((req) => {
+        const required = req.quantity * totalBatches;
+        const match = stock.find(
+          (s) => s.ingredient === req.ingredient && s.unit === req.unit
+        );
+        const available = toNumber(match?.totalRemaining ?? 0);
+        if (required > available) {
+          deficits.push({
+            ingredient: req.ingredient,
+            unit: req.unit,
+            required,
+            available,
+            missing: required - available,
+          });
+        }
+      });
+
+      if (deficits.length > 0) {
+        deficitInfoRef.current = {
+          recipe: values.recipe,
+          deficits,
+        };
+        deficitNextRef.current = submitFunc;
+        setDeficitOpen(true);
         return;
       }
 
-      setLoading(true);
-      try {
-        // Fetch current inventory for the recipe
-        const availableUnits = await getInventory(
-          cognitoId,
-          values.recipe
-        );
-
-        // Calculate total units needed (unitsOfWaste)
-        const totalUnitsOfWaste =
-          tabValue === 0
-            ? toNumber(values.unitsOfWaste)
-            : values.logs.reduce(
-                (sum, log) => sum + toNumber(log.unitsOfWaste),
-                0
-              );
-
-        if (totalUnitsOfWaste > availableUnits) {
-          // Deficit detected: open warning modal
-          deficitInfoRef.current = {
-            recipe: values.recipe,
-            required: totalUnitsOfWaste,
-            available: availableUnits,
-          };
-          deficitNextRef.current = submitFunc;
-          setDeficitOpen(true);
-        } else {
-          // No deficit: proceed to submission
-          submitFunc();
-        }
-      } catch (error) {
-        console.error("Deficit Check Error:", error);
-        alert(`Pre-check failed: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [cognitoId, tabValue]
-  );
-
-  // Custom click handler for single submission FAB
-  const handleSingleClick = (validateForm, values, setTouched, submitForm) => {
-    // 1. Manually mark all fields as touched for validation feedback
-    setTouched(
-      Object.keys(values).reduce((acc, key) => ({ ...acc, [key]: true }), {})
-    );
-
-    // 2. Run form validation
-    validateForm().then((errors) => {
-      if (Object.keys(errors).length === 0) {
-        // 3. If valid, run deficit check which then calls submitForm
-        handleDeficitCheck(values, submitForm);
-      } else {
-        // Find and focus the first invalid field
-        const firstError = Object.keys(errors)[0];
-        document.getElementById(firstError)?.focus();
-      }
-    });
-  };
-
-  // =====================================================================
-  // JSX
-  // =====================================================================
+      submitFunc();
+    } catch (error) {
+      console.error("Ingredient Deficit Error:", error);
+      alert(`Ingredient check failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  },
+  [cognitoId, tabValue]
+);
 
   return (
     <Paper elevation={0} sx={{ p: isMobile ? 1 : 2, mb: 3 }}>
@@ -395,7 +422,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-                    
+
   MenuProps={{
     disablePortal: false,
     anchorOrigin: { vertical: "bottom", horizontal: "left" },
@@ -497,7 +524,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                   <Fab
                     variant="extended"
                     // FIX: Add type="button" to prevent redundant browser form submission
-                    type="button" 
+                    type="button"
                     onClick={() =>
                       handleSingleClick(
                         validateForm,
@@ -557,7 +584,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-                    
+
   MenuProps={{
     disablePortal: false,
     anchorOrigin: { vertical: "bottom", horizontal: "left" },
@@ -761,7 +788,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    type="submit" 
+                    type="submit"
                     disabled={loading || !cognitoId}
                     sx={{
                       px: 4,
