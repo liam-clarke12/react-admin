@@ -367,6 +367,33 @@ const handleSingleClick = (
   },
   [cognitoId, tabValue]
 );
+// =====================================================================
+// FIXED handleSingleClick
+// =====================================================================
+const handleSingleClick = (
+  validateForm,
+  values,
+  setTouched,
+  submitForm
+) => {
+  setTouched(
+    Object.keys(values).reduce(
+      (acc, key) => ({ ...acc, [key]: true }),
+      {}
+    )
+  );
+
+  validateForm().then((errors) => {
+    if (Object.keys(errors).length === 0) {
+      handleDeficitCheck(values, submitFunc);
+    } else {
+      const firstError = Object.keys(errors)[0];
+      const el = document.getElementById(firstError);
+      if (el) el.focus();
+    }
+  });
+};
+
 
   return (
     <Paper elevation={0} sx={{ p: isMobile ? 1 : 2, mb: 3 }}>
