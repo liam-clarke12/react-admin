@@ -735,7 +735,7 @@ export default function ProductionLog() {
                 <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
               </div>
               <div className="r-mbody">
-                <ProductionLogForm />
+                <ProductionLogForm cognitoId={cognitoId} />
               </div>
               <div className="r-mfooter">
                 <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
