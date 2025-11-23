@@ -1,124 +1,61 @@
-// src/scenes/production/ProductionLog.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { DataGrid } from "@mui/x-data-grid";
-import ProductionLogForm from "../form/ProductionLog";
-import { useAuth } from "../../contexts/AuthContext";
+// src/scenes/form/ProductionLog/index.jsx
+// MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import {
+  Box,
+  TextField,
+  Snackbar,
+  Alert,
+  Fab,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Paper,
+  Typography,
+  Tabs,
+  Tab,
+  IconButton,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { Formik, FieldArray, getIn } from "formik";
+import * as yup from "yup";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useAuth } from "../../../contexts/AuthContext";
 
-/* =========================================================================================
-   Brand Styles (identical to Goods In) + sidebar cards
-   ========================================================================================= */
-const BrandStyles = () => (
-  <style>{`
-  .r-wrap { padding: 16px; }
-  .r-card {
-    background:#fff; border:1px solid #e5e7eb; border-radius:16px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
-    overflow:hidden;
-  }
-  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
-  .r-title { margin:0; font-weight:900; color:#0f172a; font-size:20px; }
-  .r-sub { margin:0; color:#64748b; font-size:12px; }
-  .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
-  .r-flex { display:flex; align-items:center; gap:10px; }
-  .r-btn-ghost {
-    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
-    color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
-  }
-  .r-btn-ghost:hover { background:#f4f1ff; }
-  .r-btn-primary {
-    padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
-  }
-  .r-btn-primary:hover { background:#5B21B6; }
-  .r-btn-danger { background:#dc2626; }
-  .r-btn-danger:hover { background:#b91c1c; }
-
-  /* Toolbar */
-  .r-toolbar { background:#fff; padding:12px 16px; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-  .r-input {
-    min-width:260px; flex:1; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
-  }
-  .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
-  .r-select { padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
-  .r-toolbar-gap { margin-top:12px; }
-
-  /* Footer */
-  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
-  .r-muted { color:#64748b; font-size:12px; }
-
-  /* Page layout */
-  .gi-layout { display:flex; gap:24px; align-items:flex-start; }
-  .gi-main { flex:1 1 0%; min-width:0; }
-  .gi-side {
-    width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:16px;
-  }
-
-  /* Modal shell */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow:auto; background:#fff; }
-  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
-
-  /* Grid form bits in modal */
-  .ag-grid { display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0, 1fr)); }
-  .ag-field { grid-column: span 2; }
-  .ag-field-1 { grid-column: span 1; }
-  .ag-field-4 { grid-column: span 4; }
-  .ag-label { font-size:12px; color:#64748b; font-weight:800; margin-bottom:6px; display:block; }
-  .ag-input, .ag-select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; }
-  .ag-input:focus, .ag-select:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
-
-  /* DataGrid look-alike row striping + hover */
-  .dg-wrap { height: 70vh; min-width: 750px; }
-  .dg-wrap .MuiDataGrid-root { border:0; font-size:14px; color:#334155; }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(odd) { background:#fff; }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(even) { background:#f8fafc; }
-  .dg-wrap .MuiDataGrid-row:hover { background:#f4f1ff !important; }
-
-  /* Badges like Goods In */
-  .r-qty-badge { display:inline-block; padding:2px 8px; border-radius:10px; background:#f1f5f9; color:#0f172a; font-weight:700; }
-
-  /* Selection chip area */
-  .r-chip { background:#eef2ff; padding:6px 10px; border-radius:10px; display:flex; align-items:center; gap:10px; }
-
-  /* Sidebar stat cards */
-  .stat-card { padding:14px 16px; }
-  .stat-title { font-size:12px; color:#64748b; font-weight:800; margin:0 0 6px; }
-  .stat-value { font-weight:900; color:#0f172a; font-size:28px; line-height:1; margin:0; }
-  .stat-row { display:flex; align-items:center; justify-content:space-between; }
-  .stat-kpi { font-size:14px; font-weight:800; color:#0f172a; }
-  .stat-sub { font-size:12px; color:#64748b; }
-  .stat-accent { border:1px dashed #7C3AED66; background: #f9f7ff; }
-
-  /* === FIX: modal dropdown stacking === */
-  .r-modal-dim { z-index:200000 !important; }
-  .r-modal { z-index:200001 !important; overflow:visible !important; position:relative; }
-  .ag-grid { overflow:visible !important; }
-  .ag-select, .ag-input, select { z-index:200002 !important; position:relative; }
-
-  `}</style>
-);
-
-/* Icons (match Goods In) */
-const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
-const EditIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-  </Svg>
-);
-const DeleteIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 6h18" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-  </Svg>
-);
-
-/* =========================================================================================
-   Config & utils
-   ========================================================================================= */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+
+const brand = {
+  text: "#0f172a",
+  subtext: "#334155",
+  border: "#e5e7eb",
+  surface: "#ffffff",
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
+  danger: "#dc2626",
+  dangerSoft: "#fecaca",
+  info: "#3b82f6",
+  infoSoft: "#bfdbfe",
+};
+
+// =====================================================================
+// UTILS & SCHEMAS
+// =====================================================================
+
+const toNumber = (v) =>
+  v === "" || v === null || v === undefined ? 0 : Number(v) || 0;
 
 const formatDateYMD = (val) => {
   if (!val) return "";
@@ -131,963 +68,793 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
-// Prefer batchCode as the key everywhere
-const getRowKey = (row) =>
-  String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
-
-const makeStableId = (row) => {
-  if (!row) return null;
-  const key = getRowKey(row);
-  if (key) return key;
-  const slug = `${row.recipe || "r"}|${row.date || "d"}|${
-    row.producer_name || row.producerName || "p"
-  }`;
-  return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
+const defaultSingleLog = {
+  recipe: "",
+  date: formatDateYMD(new Date()),
+  batchesProduced: 1,
+  unitsOfWaste: 0,
+  producerName: "",
+  batchCode: "",
 };
 
-const toNumber = (v) =>
-  v === "" || v === null || v === undefined ? 0 : Number(v) || 0;
-const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
-
-const Portal = ({ children }) => {
-  if (typeof window === "undefined") return null;
-  return createPortal(children, document.body);
+const defaultMultipleLog = {
+  recipe: "",
+  date: formatDateYMD(new Date()),
+  producerName: "",
+  logs: [
+    { batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+    { batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+  ],
 };
 
-/* =========================================================================================
-   Component
-   ========================================================================================= */
-export default function ProductionLog() {
-  const { cognitoId } = useAuth() || {};
+const singleSchema = yup.object().shape({
+  recipe: yup.string().required("Recipe is required"),
+  batchesProduced: yup
+    .number()
+    .min(1, "Must be at least 1")
+    .required("Required"),
+  unitsOfWaste: yup.number().min(0, "Cannot be negative").required("Required"),
+  producerName: yup.string().required("Producer is required"),
+  date: yup.date().required("Date is required"),
+});
 
-  const [productionLogs, setProductionLogs] = useState([]);
-  const [recipesMap, setRecipesMap] = useState({});
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [fatalMsg, setFatalMsg] = useState("");
+const multipleSchema = yup.object().shape({
+  recipe: yup.string().required("Recipe is required"),
+  producerName: yup.string().required("Producer is required"),
+  date: yup.date().required("Date is required"),
+  logs: yup
+    .array()
+    .of(
+      yup.object().shape({
+        batchesProduced: yup
+          .number()
+          .min(1, "Must be at least 1")
+          .required("Required"),
+        unitsOfWaste: yup
+          .number()
+          .min(0, "Cannot be negative")
+          .required("Required"),
+      })
+    )
+    .min(1, "Must have at least one batch"),
+});
 
-  // Search + sort (to match Goods In toolbar)
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
+// =====================================================================
+// API FUNCTIONS
+// =====================================================================
 
-  // Edit dialog state
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingRow, setEditingRow] = useState(null);
-  const [updating, setUpdating] = useState(false);
+const postProductionLog = async (data, cognitoId, isBatch = false) => {
+  const endpoint = isBatch
+    ? `${API_BASE}/production-log/batch`
+    : `${API_BASE}/production-log`;
 
-  // Delete dialog state
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [openProductionForm, setOpenProductionForm] = useState(false);
+  const body = isBatch
+    ? data.map((d) => ({ ...d, cognito_id: cognitoId }))
+    : { ...data, cognito_id: cognitoId };
 
-  // ===== Recipes map =====
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Server returned ${res.status}`);
+  }
+
+  return res.json();
+};
+
+const getInventory = async (cognitoId, recipe) => {
+  const res = await fetch(
+    `${API_BASE}/inventory/active?cognito_id=${encodeURIComponent(
+      cognitoId
+    )}&recipe=${encodeURIComponent(recipe)}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch inventory");
+  const data = await res.json();
+  // We only care about the total number of units available for the given recipe
+  return toNumber(data[0]?.totalUnits ?? 0); 
+};
+
+// =====================================================================
+// MAIN COMPONENT
+// =====================================================================
+
+// Renamed from ProductionLogForm to RecipeProductionForm to match the file structure convention 
+// (or ensure you import ProductionLogForm from this file in index.jsx)
+export default function ProductionLogForm({ cognitoId, onSubmitted }) {
+  const isMobile = useMediaQuery("(max-width:600px)");
+  const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  
+  // FIX: recipes state now stores objects { name, units_per_batch } instead of just strings
+  const [recipes, setRecipes] = useState([]); 
+  const [loading, setLoading] = useState(false);
+
+  // Deficit State
+  const [deficitOpen, setDeficitOpen] = useState(false);
+  const deficitNextRef = useRef(null);
+  const deficitInfoRef = useRef({
+    recipe: "",
+    required: 0,
+    available: 0,
+    next: null,
+  });
+
+  // ===== Fetch Recipes =====
   useEffect(() => {
     if (!cognitoId) return;
-    const run = async () => {
+    const fetchRecipes = async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
+          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        const map = {};
-        (Array.isArray(data) ? data : []).forEach((r) => {
-          const key = r.recipe_name ?? r.recipe ?? r.name ?? "unknown";
-          map[key] = Number(r.units_per_batch) || 0;
-        });
-        setRecipesMap(map);
+        
+        // FIX: Store recipe objects with units_per_batch
+        setRecipes(
+          (Array.isArray(data) ? data : []).map((r) => ({
+            name: r.recipe_name ?? r.recipe ?? r.name,
+            units_per_batch: toNumber(r.units_per_batch) || 0,
+          }))
+        );
       } catch (e) {
         console.error("Recipes fetch error:", e);
       }
     };
-    run();
+    fetchRecipes();
   }, [cognitoId]);
 
-  // ===== Fetch production logs =====
-  const fetchLogs = useCallback(async () => {
-    if (!cognitoId) {
-      setFatalMsg("Missing cognito_id.");
-      return;
-    }
-    try {
-      const res = await fetch(
-        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
-          cognitoId
-        )}`
-      );
-      if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
-      const data = await res.json();
-      if (!Array.isArray(data)) {
-        setProductionLogs([]);
-        return;
+  // Utility to find the units per batch for a selected recipe name
+  const getUnitsPerBatch = useCallback((recipeName) => {
+    return recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0;
+  }, [recipes]);
+
+  // ===== Submission Handlers =====
+
+  const handleSubmit = useCallback(
+    async (values, { resetForm }) => {
+      if (loading) return;
+      setLoading(true);
+
+      const logsToPost =
+        tabValue === 0
+          ? [
+              {
+                ...values,
+                batchesProduced: toNumber(values.batchesProduced),
+                unitsOfWaste: toNumber(values.unitsOfWaste),
+                // Calculate units remaining based on recipe data
+                unitsRemaining:
+                  toNumber(values.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                  toNumber(values.unitsOfWaste),
+              },
+            ]
+          : values.logs.map((log) => ({
+              ...log,
+              recipe: values.recipe,
+              date: values.date,
+              producerName: values.producerName,
+              batchesProduced: toNumber(log.batchesProduced),
+              unitsOfWaste: toNumber(log.unitsOfWaste),
+              // Calculate units remaining for each log entry
+              unitsRemaining:
+                toNumber(log.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                toNumber(log.unitsOfWaste),
+            }));
+
+      try {
+        await postProductionLog(
+          tabValue === 0 ? logsToPost[0] : logsToPost,
+          cognitoId,
+          tabValue === 1
+        );
+        setOpenSnackbar(true);
+        resetForm({
+          values: tabValue === 0 ? defaultSingleLog : defaultMultipleLog,
+        });
+        if (onSubmitted) onSubmitted();
+      } catch (e) {
+        console.error("Submission error:", e);
+        alert(`Submission failed: ${e.message}`);
+      } finally {
+        setLoading(false);
       }
-      const sanitized = data.map((row) => {
-        const dbId = row.id ?? row.ID ?? null;
-        const batchesProduced = toNumber(
-          row.batchesProduced ?? row.batches_produced
-        );
-        const batchRemaining = toNumber(
-          row.batchRemaining ?? row.batch_remaining
-        );
-        const unitsOfWaste = toNumber(
-          row.units_of_waste ?? row.unitsOfWaste
-        );
-        const upb =
-          recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
-        const unitsRemaining = toNumber(
-          row.unitsRemaining ?? batchRemaining - unitsOfWaste
-        );
-        const batchesRemaining =
-          upb > 0 ? unitsRemaining / upb : null;
-        const producerName =
-          row.producer_name ?? row.producerName ?? "";
-
-        const normalized = {
-          id: String(
-            dbId ??
-              row.batchCode ??
-              row.batch_code ??
-              makeStableId(row)
-          ),
-          batchCode: row.batchCode ?? row.batch_code ?? null,
-          recipe: row.recipe ?? "",
-          date: formatDateYMD(row.date ?? null),
-          batchesProduced,
-          batchRemaining,
-          unitsOfWaste,
-          unitsRemaining,
-          batchesRemaining,
-          producerName,
-          __raw: row,
-        };
-        normalized.id = String(
-          normalized.batchCode ?? normalized.id
-        );
-        return normalized;
-      });
-      setProductionLogs(sanitized);
-      setFatalMsg("");
-    } catch (e) {
-      console.error("Production log fetch error:", e);
-      setFatalMsg(String(e?.message || e));
-    }
-  }, [cognitoId, recipesMap]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-
-  // ===== Grid columns =====
-  const columns = useMemo(
-    () => [
-      { field: "date", headerName: "Date", flex: 1 },
-      { field: "recipe", headerName: "Recipe Name", flex: 1 },
-      {
-        field: "batchesProduced",
-        headerName: "Batches Produced",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsOfWaste",
-        headerName: "Units of Waste",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsRemaining",
-        headerName: "Units Remaining",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "producerName",
-        headerName: "Produced by",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      { field: "batchCode", headerName: "Batch Code", flex: 1 },
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 120,
-        sortable: false,
-        filterable: false,
-        align: "right",
-        renderCell: (params) => (
-          <button
-            className="r-btn-ghost"
-            aria-label="Edit row"
-            onClick={() => {
-              setEditingRow(params.row);
-              setEditOpen(true);
-            }}
-          >
-            <EditIcon /> Edit
-          </button>
-        ),
-      },
-    ],
-    []
+    },
+    [cognitoId, tabValue, onSubmitted, loading, getUnitsPerBatch]
   );
 
-  // ===== Search + sort (client-side) =====
-  const filteredRows = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let rows = [...productionLogs];
-    if (q) {
-      rows = rows.filter((r) =>
-        Object.values(r).some((v) =>
-          String(v ?? "").toLowerCase().includes(q)
-        )
-      );
-    }
-    const dir = sortBy.dir === "asc" ? 1 : -1;
-    rows.sort((a, b) => {
-      const fa = a[sortBy.field] ?? "";
-      const fb = b[sortBy.field] ?? "";
-      if (
-        typeof fa === "number" &&
-        typeof fb === "number"
-      )
-        return (fa - fb) * dir;
-      return String(fa).localeCompare(String(fb)) * dir;
-    });
-    return rows;
-  }, [productionLogs, searchQuery, sortBy]);
+  const handleDeficitCheck = useCallback(
+    async (values, submitFunc) => {
+      if (!values.recipe) {
+        submitFunc();
+        return;
+      }
 
-  // ===== Sidebar Stats =====
-  const stats = useMemo(() => {
-    const totalUnitsRemaining = filteredRows.reduce(
-      (s, r) => s + toNumber(r.unitsRemaining),
-      0
-    );
-    const totalWaste = filteredRows.reduce(
-      (s, r) => s + toNumber(r.unitsOfWaste),
-      0
-    );
-    const totalBatchesProduced = filteredRows.reduce(
-      (s, r) => s + toNumber(r.batchesProduced),
-      0
-    );
-    const activeBatches = filteredRows.length;
-    const byRecipe = filteredRows.reduce((acc, r) => {
-      const k = r.recipe || "Unknown";
-      acc[k] =
-        (acc[k] || 0) + toNumber(r.unitsRemaining);
-      return acc;
-    }, {});
-    const topRecipes = Object.entries(byRecipe)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([recipe, units]) => ({ recipe, units }));
-
-    return {
-      totalUnitsRemaining,
-      totalWaste,
-      totalBatchesProduced,
-      activeBatches,
-      topRecipes,
-    };
-  }, [filteredRows]);
-
-  // ===== Update row (PUT) =====
-  const processRowUpdate = async (updatedRow) => {
-    if (!cognitoId) throw new Error("Missing cognitoId");
-
-    const batchCodeForPath =
-      updatedRow.batchCode || updatedRow.batch_code;
-    if (!batchCodeForPath)
-      throw new Error(
-        "batchCode is required to update production_log"
-      );
-
-    const dateYmd = formatDateYMD(updatedRow.date);
-    const batchesProduced = toNumber(
-      updatedRow.batchesProduced ?? updatedRow.batches_produced
-    );
-    const unitsOfWaste = toNumber(
-      updatedRow.unitsOfWaste ??
-        updatedRow.units_of_waste
-    );
-    const unitsRemaining = toNumber(
-      updatedRow.unitsRemaining
-    );
-    const batchRemaining = toNumber(
-      updatedRow.batchRemaining ??
-        updatedRow.batch_remaining ??
-        unitsRemaining + unitsOfWaste
-    );
-
-    const payload = {
-      date: dateYmd,
-      recipe: updatedRow.recipe,
-      batchesProduced,
-      units_of_waste: unitsOfWaste,
-      batchRemaining,
-      unitsRemaining,
-      producer_name:
-        updatedRow.producerName ??
-        updatedRow.producer_name ??
-        "",
-      cognito_id: cognitoId,
-    };
-
-    const url = `${API_BASE}/production-log/${encodeURIComponent(
-      batchCodeForPath
-    )}`;
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server returned ${res.status}`);
-    }
-
-    await fetchLogs();
-  };
-
-  const handleConfirmEdit = async () => {
-    if (!editingRow) {
-      setEditOpen(false);
-      return;
-    }
-    setUpdating(true);
-    try {
-      const patched = {
-        ...editingRow,
-        id: getRowKey(editingRow),
-        batchCode:
-          editingRow.batchCode ??
-          editingRow.batch_code,
-        date: formatDateYMD(editingRow.date),
-        recipe: editingRow.recipe ?? "",
-        batchesProduced: toNumber(
-          editingRow.batchesProduced
-        ),
-        unitsOfWaste: toNumber(
-          editingRow.unitsOfWaste
-        ),
-        unitsRemaining: toNumber(
-          editingRow.unitsRemaining
-        ),
-        batchRemaining: toNumber(
-          editingRow.batchRemaining ??
-            editingRow.unitsRemaining +
-              editingRow.unitsOfWaste
-        ),
-        producerName: editingRow.producerName ?? "",
-      };
-
-      setProductionLogs((prev) => {
-        const next = [...prev];
-        const key = getRowKey(patched);
-        const idx = next.findIndex(
-          (r) => getRowKey(r) === key
+      setLoading(true);
+      try {
+        // Fetch current inventory for the recipe
+        const availableUnits = await getInventory(
+          cognitoId,
+          values.recipe
         );
-        if (idx >= 0) next[idx] = { ...next[idx], ...patched };
-        return next;
-      });
 
-      await processRowUpdate(patched);
-      setEditOpen(false);
-      setEditingRow(null);
-    } catch (e) {
-      console.error("Edit failed:", e);
-      alert(`Update failed: ${e?.message || e}`);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  // ===== Delete (soft) =====
-  const handleDeleteSelectedRows = async () => {
-    if (!cognitoId || selectedRows.length === 0) return;
-    const rowsToDelete = productionLogs.filter((r) =>
-      selectedRows.includes(getRowKey(r))
-    );
-    try {
-      await Promise.all(
-        rowsToDelete.map((row) =>
-          fetch(`${API_BASE}/delete-production-log`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              batchCode: row.batchCode,
-              cognito_id: cognitoId,
-            }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const t =
-                await res.text().catch(() => "");
-              throw new Error(
-                t ||
-                  `Delete failed for ${row.batchCode}`
+        // Calculate total units needed (unitsOfWaste)
+        const totalUnitsOfWaste =
+          tabValue === 0
+            ? toNumber(values.unitsOfWaste)
+            : values.logs.reduce(
+                (sum, log) => sum + toNumber(log.unitsOfWaste),
+                0
               );
-            }
-          })
-        )
-      );
-      setProductionLogs((prev) =>
-        prev.filter(
-          (r) =>
-            !selectedRows.includes(getRowKey(r))
-        )
-      );
-      setSelectedRows([]);
-      setDeleteOpen(false);
-    } catch (err) {
-      console.error("Delete failed:", err);
-      alert(`Delete failed: ${err?.message || err}`);
-    }
+
+        if (totalUnitsOfWaste > availableUnits) {
+          // Deficit detected: open warning modal
+          deficitInfoRef.current = {
+            recipe: values.recipe,
+            required: totalUnitsOfWaste,
+            available: availableUnits,
+          };
+          deficitNextRef.current = submitFunc;
+          setDeficitOpen(true);
+        } else {
+          // No deficit: proceed to submission
+          submitFunc();
+        }
+      } catch (error) {
+        console.error("Deficit Check Error:", error);
+        alert(`Pre-check failed: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cognitoId, tabValue]
+  );
+
+  // Custom click handler for single submission FAB
+  const handleSingleClick = (validateForm, values, setTouched, submitForm) => {
+    // 1. Manually mark all fields as touched for validation feedback
+    setTouched(
+      Object.keys(values).reduce((acc, key) => ({ ...acc, [key]: true }), {})
+    );
+
+    // 2. Run form validation
+    validateForm().then((errors) => {
+      if (Object.keys(errors).length === 0) {
+        // 3. If valid, run deficit check which then calls submitForm
+        handleDeficitCheck(values, submitForm);
+      } else {
+        // Find and focus the first invalid field
+        const firstError = Object.keys(errors)[0];
+        document.getElementById(firstError)?.focus();
+      }
+    });
   };
 
-  // ===== Pagination =====
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const visibleRows = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredRows.slice(
-      start,
-      start + rowsPerPage
-    );
-  }, [filteredRows, page, rowsPerPage]);
+  // =====================================================================
+  // JSX
+  // =====================================================================
 
   return (
-    <div className="r-wrap">
-      <BrandStyles />
+    <Paper elevation={0} sx={{ p: isMobile ? 1 : 2, mb: 3 }}>
+      <Tabs
+        value={tabValue}
+        onChange={(e, newValue) => setTabValue(newValue)}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="Record Single Batch" />
+        <Tab label="Record Multiple Batches" />
+      </Tabs>
 
-      {!cognitoId && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: "#fecaca",
-            background: "#fff1f2",
-            color: "#b91c1c",
-            marginBottom: 12,
-          }}
-        >
-          <strong>Can’t load data:</strong> No cognito_id
-          detected.
-        </div>
-      )}
-      {fatalMsg && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: "#fecaca",
-            background: "#fff1f2",
-            color: "#b91c1c",
-            marginBottom: 12,
-          }}
-        >
-          <strong>API error:</strong> {fatalMsg}
-        </div>
-      )}
-
-      <div className="gi-layout">
-        {/* MAIN TABLE */}
-        <div className="gi-main">
-          <div className="r-card">
-            {/* Header */}
-            <div className="r-head">
-              <div>
-                <h2 className="r-title">Production Log</h2>
-                <p className="r-sub">
-                  Track batches, waste and remaining units
-                </p>
-              </div>
-
-              <div style={{ marginLeft: "auto" }}>
-                <button
-                  className="r-btn-primary"
-                  onClick={() =>
-                    setOpenProductionForm(true)
-                  }
+      <Formik
+        initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
+        validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
+        onSubmit={handleSubmit}
+        enableReinitialize
+      >
+        {({
+          values,
+          errors,
+          touched,
+          handleBlur,
+          handleChange,
+          handleSubmit: formikHandleSubmit,
+          setTouched,
+          validateForm,
+        }) => (
+          <>
+            {tabValue === 0 ? (
+              // =====================================================================
+              // TAB 0: SINGLE BATCH FORM
+              // =====================================================================
+              <form onSubmit={(e) => { e.preventDefault(); /* Submission is handled by FAB onClick */ }}>
+                <Box
+                  display="grid"
+                  gap="16px"
+                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
                 >
-                  + Record Production
-                </button>
-              </div>
-
-              <div className="r-flex">
-                {selectedRows.length > 0 && (
-                  <div className="r-chip">
-                    <span className="r-pill">
-                      {selectedRows.length} selected
-                    </span>
-                    <button
-                      className="r-btn-ghost"
-                      onClick={() =>
-                        setDeleteOpen(true)
-                      }
-                      title="Delete selected"
-                      style={{
-                        color: "#dc2626",
-                        borderColor: "#fecaca",
-                      }}
+                  {/* RECIPE */}
+                  <FormControl
+                    fullWidth
+                    variant="outlined"
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  >
+                    <InputLabel id="recipe-label">Recipe *</InputLabel>
+                    <Select
+                      labelId="recipe-label"
+                      id="recipe"
+                      name="recipe"
+                      value={values.recipe}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      label="Recipe *"
+                      error={!!touched.recipe && !!errors.recipe}
                     >
-                      <DeleteIcon /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+                      {/* FIX: Map over recipe objects to display the name */}
+                      {recipes.map((recipe) => (
+                        <MenuItem key={recipe.name} value={recipe.name}>
+                          {recipe.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {!!touched.recipe && !!errors.recipe && (
+                      <Typography variant="caption" color="error">
+                        {errors.recipe}
+                      </Typography>
+                    )}
+                  </FormControl>
 
-            {/* Toolbar */}
-            <div className="r-toolbar">
-              <input
-                className="r-input"
-                type="text"
-                placeholder="Search by recipe, batch code, producer..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(0);
-                }}
-              />
+                  {/* DATE */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="date"
+                    label="Date *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.date}
+                    name="date"
+                    error={!!touched.date && !!errors.date}
+                    helperText={touched.date && errors.date}
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  />
 
-              {!openProductionForm && (<select
-                className="r-select"
-                value={`${sortBy.field}:${sortBy.dir}`}
-                onChange={(e) => {
-                  const [field, dir] = e.target.value.split(":");
-                  setSortBy({ field, dir });
-                  setPage(0);
-                }}
-              >
-                <option value="date:desc">Date (new → old)</option>
-                <option value="date:asc">Date (old → new)</option>
-                <option value="recipe:asc">Recipe A→Z</option>
-                <option value="recipe:desc">Recipe Z→A</option>
-                <option value="unitsRemaining:desc">Units remaining (high → low)</option>
-                <option value="unitsRemaining:asc">Units remaining (low → high)</option>
-              </select>)}
-            </div>
+                  {/* BATCHES PRODUCED */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="number"
+                    label="Batches Produced *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.batchesProduced}
+                    name="batchesProduced"
+                    error={
+                      !!touched.batchesProduced && !!errors.batchesProduced
+                    }
+                    helperText={
+                      touched.batchesProduced && errors.batchesProduced
+                    }
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 1" }}
+                  />
 
-            {/* DataGrid */}
-            <div className="r-toolbar-gap dg-wrap">
-              <DataGrid
-                rows={visibleRows}
-                columns={columns}
-                getRowId={(row) => getRowKey(row)}
-                checkboxSelection
-                rowSelectionModel={selectedRows}
-                onRowSelectionModelChange={(model) => {
-                  const arr =
-                    Array.isArray(model)
-                      ? model.map((m) => String(m))
-                      : [];
-                  setSelectedRows(arr);
-                }}
-                disableSelectionOnClick
-                hideFooter
-                onCellDoubleClick={(params) => {
-                  setEditingRow(params.row);
-                  setEditOpen(true);
-                }}
-              />
-            </div>
+                  {/* UNITS OF WASTE */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="number"
+                    label="Units of Waste *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.unitsOfWaste}
+                    name="unitsOfWaste"
+                    error={!!touched.unitsOfWaste && !!errors.unitsOfWaste}
+                    helperText={touched.unitsOfWaste && errors.unitsOfWaste}
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 1" }}
+                  />
 
-            {/* Footer / pagination */}
-            <div className="r-footer">
-              <span className="r-muted">
-                Showing{" "}
-                <strong>
-                  {filteredRows.length === 0
-                    ? 0
-                    : page * rowsPerPage + 1}
-                </strong>
-                –
-                <strong>
-                  {Math.min(
-                    (page + 1) * rowsPerPage,
-                    filteredRows.length
-                  )}
-                </strong>{" "}
-                of <strong>{filteredRows.length}</strong>
-              </span>
+                  {/* PRODUCER NAME */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Produced By (Name) *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.producerName}
+                    name="producerName"
+                    error={!!touched.producerName && !!errors.producerName}
+                    helperText={touched.producerName && errors.producerName}
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  />
 
-              <div className="r-flex">
-                <button
-                  className="r-btn-ghost"
-                  onClick={() =>
-                    setPage((p) => Math.max(0, p - 1))
-                  }
-                  disabled={page === 0}
-                >
-                  Prev
-                </button>
+                  {/* BATCH CODE */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Batch Code (Optional)"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.batchCode}
+                    name="batchCode"
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  />
+                </Box>
 
-                <span className="r-muted">Page {page + 1}</span>
-
-                <button
-                  className="r-btn-ghost"
-                  onClick={() =>
-                    setPage((p) =>
-                      (p + 1) * rowsPerPage <
-                      filteredRows.length
-                        ? p + 1
-                        : p
-                    )
-                  }
-                  disabled={
-                    (page + 1) * rowsPerPage >=
-                    filteredRows.length
-                  }
-                >
-                  Next
-                </button>
-
-                {!openProductionForm && (<select
-                  className="r-select"
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setPage(0);
-                  }}
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT SIDEBAR: QUICK STATS */}
-        <aside className="gi-side">
-          {/* Total Remaining highlight */}
-          <div className="r-card stat-card stat-accent">
-            <p className="stat-title">Total Remaining (Units)</p>
-            <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
-            <p className="stat-sub">Based on current filters</p>
-          </div>
-
-          {/* Core KPIs */}
-          <div className="r-card stat-card">
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Batches Produced</span>
-              <span className="stat-kpi">
-                {nf(stats.totalBatchesProduced)}
-              </span>
-            </div>
-
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Units of Waste</span>
-              <span className="stat-kpi">
-                {nf(stats.totalWaste)}
-              </span>
-            </div>
-
-            <div className="stat-row">
-              <span className="stat-kpi">Active Batches</span>
-              <span className="stat-kpi">
-                {nf(stats.activeBatches)}
-              </span>
-            </div>
-          </div>
-
-          {/* Top recipes by remaining */}
-          <div className="r-card stat-card">
-            <p className="stat-title">Top Recipes by Remaining</p>
-
-            {stats.topRecipes.length === 0 ? (
-              <p className="stat-sub">No data</p>
+                {/* SINGLE SUBMIT BUTTON */}
+                <Box display="flex" justifyContent="flex-end" mt={3}>
+                  <Fab
+                    variant="extended"
+                    // FIX: Add type="button" to prevent redundant browser form submission
+                    type="button" 
+                    onClick={() =>
+                      handleSingleClick(
+                        validateForm,
+                        values,
+                        setTouched,
+                        formikHandleSubmit // Use formik's own handleSubmit
+                      )
+                    }
+                    disabled={loading || !cognitoId}
+                    sx={{
+                      px: 4,
+                      py: 1.25,
+                      gap: 1,
+                      borderRadius: 999,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      boxShadow:
+                        "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                      background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                      color: "#fff",
+                      "&:hover": { background: brand.primaryDark },
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      <AddIcon />
+                    )}
+                    {loading ? "Processing..." : "Record Production"}
+                  </Fab>
+                </Box>
+              </form>
             ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {stats.topRecipes.map((t) => (
-                  <div key={t.recipe} className="stat-row">
-                    <span
-                      className="stat-sub"
-                      style={{
-                        fontWeight: 800,
-                        color: "#0f172a",
-                      }}
+              // =====================================================================
+              // TAB 1: MULTIPLE BATCHES FORM
+              // =====================================================================
+              <form onSubmit={(e) => { e.preventDefault(); handleDeficitCheck(values, formikHandleSubmit); }}>
+                <Box
+                  display="grid"
+                  gap="16px"
+                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+                  mb={3}
+                >
+                  {/* RECIPE */}
+                  <FormControl
+                    fullWidth
+                    variant="outlined"
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  >
+                    <InputLabel id="recipe-label">Recipe *</InputLabel>
+                    <Select
+                      labelId="recipe-label"
+                      id="recipe"
+                      name="recipe"
+                      value={values.recipe}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      label="Recipe *"
+                      error={!!touched.recipe && !!errors.recipe}
                     >
-                      {t.recipe}
-                    </span>
-                    <span className="stat-kpi">{nf(t.units)}</span>
-                  </div>
-                ))}
-              </div>
+                      {/* FIX: Map over recipe objects to display the name */}
+                      {recipes.map((recipe) => (
+                        <MenuItem key={recipe.name} value={recipe.name}>
+                          {recipe.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {!!touched.recipe && !!errors.recipe && (
+                      <Typography variant="caption" color="error">
+                        {errors.recipe}
+                      </Typography>
+                    )}
+                  </FormControl>
+
+                  {/* DATE */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    type="date"
+                    label="Date *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.date}
+                    name="date"
+                    error={!!touched.date && !!errors.date}
+                    helperText={touched.date && errors.date}
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
+                  />
+
+                  {/* PRODUCER NAME */}
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    label="Produced By (Name) *"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    value={values.producerName}
+                    name="producerName"
+                    error={!!touched.producerName && !!errors.producerName}
+                    helperText={touched.producerName && errors.producerName}
+                    sx={{ gridColumn: "span 4" }}
+                  />
+                </Box>
+
+                <Typography
+                  variant="h6"
+                  sx={{
+                    mb: 1,
+                    fontWeight: 800,
+                    color: brand.text,
+                    fontSize: 14,
+                  }}
+                >
+                  Batch Logs:
+                </Typography>
+
+                <FieldArray name="logs">
+                  {({ push, remove }) => (
+                    <>
+                      {/* FIX: Check for array errors and display them */}
+                      {!!(touched.logs && errors.logs) &&
+                        typeof errors.logs === 'string' && (
+                          <Alert severity="error" sx={{ mb: 2, fontWeight: 700, borderRadius: 2 }}>
+                            {errors.logs}
+                          </Alert>
+                      )}
+
+                      <Table
+                        size="small"
+                        sx={{
+                          mb: 2,
+                          "& .MuiTableCell-root": {
+                            p: 1,
+                            borderColor: brand.border,
+                          },
+                        }}
+                      >
+                        <TableHead>
+                          <TableRow
+                            sx={{
+                              bgcolor: "#f8fafc",
+                              "& .MuiTableCell-head": { fontWeight: 800 },
+                            }}
+                          >
+                            <TableCell>Batches Produced *</TableCell>
+                            <TableCell>Units of Waste *</TableCell>
+                            <TableCell>Batch Code (Optional)</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {values.logs.map((log, index) => {
+                            const batchesProducedPath = `logs[${index}].batchesProduced`;
+                            const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
+                            const batchCodePath = `logs[${index}].batchCode`;
+
+                            return (
+                              <TableRow
+                                key={index}
+                                sx={{
+                                  "&:nth-of-type(odd)": { bgcolor: "#fff" },
+                                  "&:nth-of-type(even)": { bgcolor: "#f8fafc" },
+                                }}
+                              >
+                                <TableCell>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    name={batchesProducedPath}
+                                    value={log.batchesProduced}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={
+                                      !!getIn(touched, batchesProducedPath) &&
+                                      !!getIn(errors, batchesProducedPath)
+                                    }
+                                    helperText={
+                                      getIn(touched, batchesProducedPath) &&
+                                      getIn(errors, batchesProducedPath)
+                                    }
+                                    sx={{ minWidth: 120 }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    name={unitsOfWastePath}
+                                    value={log.unitsOfWaste}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={
+                                      !!getIn(touched, unitsOfWastePath) &&
+                                      !!getIn(errors, unitsOfWastePath)
+                                    }
+                                    helperText={
+                                      getIn(touched, unitsOfWastePath) &&
+                                      getIn(errors, unitsOfWastePath)
+                                    }
+                                    sx={{ minWidth: 120 }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <TextField
+                                    size="small"
+                                    name={batchCodePath}
+                                    value={log.batchCode}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    sx={{ minWidth: 150 }}
+                                  />
+                                </TableCell>
+                                <TableCell align="right">
+                                  <IconButton
+                                    onClick={() => remove(index)}
+                                    color="error"
+                                    disabled={values.logs.length === 1}
+                                    aria-label="Delete batch log"
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+
+                      <Button
+                        onClick={() =>
+                          push({
+                            batchesProduced: 1,
+                            unitsOfWaste: 0,
+                            batchCode: "",
+                          })
+                        }
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        sx={{
+                          fontWeight: 700,
+                          textTransform: "none",
+                          borderRadius: 999,
+                          borderColor: brand.border,
+                          color: brand.text,
+                          "&:hover": { borderColor: brand.primary },
+                        }}
+                      >
+                        Add Another Batch
+                      </Button>
+                    </>
+                  )}
+                </FieldArray>
+
+                {/* MULTIPLE SUBMIT BUTTON */}
+                <Box display="flex" justifyContent="flex-end" mt={3}>
+                  <Fab
+                    variant="extended"
+                    type="submit" 
+                    disabled={loading || !cognitoId}
+                    sx={{
+                      px: 4,
+                      py: 1.25,
+                      gap: 1,
+                      borderRadius: 999,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      boxShadow:
+                        "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
+                      background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+                      color: "#fff",
+                      "&:hover": { background: brand.primaryDark },
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      <AddIcon />
+                    )}
+                    {loading ? "Processing..." : "Record Production"}
+                  </Fab>
+                </Box>
+              </form>
             )}
-          </div>
-        </aside>
-      </div>
-      {/* ===================== EDIT MODAL ===================== */}
-      {editOpen && editingRow && (
-        <Portal>
-          <div className="r-modal-dim">
-            <div className="r-modal">
-              <div className="r-mhdr">
-                <h3 className="r-title" style={{ fontSize: 18 }}>
-                  Edit Production Log
-                </h3>
-                <button
-                  className="r-btn-ghost"
-                  onClick={() => {
-                    setEditOpen(false);
-                    setEditingRow(null);
-                  }}
-                >
-                  Close
-                </button>
-              </div>
 
-              <div className="r-mbody">
-                <div className="ag-grid">
-                  {/* Recipe */}
-                  <div className="ag-field ag-field-4">
-                    <label className="ag-label">Recipe</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.recipe ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          recipe: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+            {/* ERROR ALERT (Moved up for better visibility in Multiple tab) */}
+            {/* Removed the original logic as the FieldArray section now handles array errors */}
+          </>
+        )}
+      </Formik>
 
-                  {/* Date */}
-                  <div className="ag-field">
-                    <label className="ag-label">Date</label>
-                    <input
-                      className="ag-input"
-                      type="date"
-                      value={formatDateYMD(editingRow.date ?? "")}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          date: formatDateYMD(e.target.value),
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {/* Batches Produced */}
-                  <div className="ag-field ag-field-1">
-                    <label className="ag-label">Batches Produced</label>
-                    <input
-                      className="ag-input"
-                      type="number"
-                      value={editingRow.batchesProduced ?? 0}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          batchesProduced: toNumber(e.target.value),
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {/* Units of Waste */}
-                  <div className="ag-field ag-field-1">
-                    <label className="ag-label">Units of Waste</label>
-                    <input
-                      className="ag-input"
-                      type="number"
-                      value={editingRow.unitsOfWaste ?? 0}
-                      onChange={(e) => {
-                        const unitsOfWaste = toNumber(e.target.value);
-                        const unitsRemaining = toNumber(
-                          editingRow.unitsRemaining
-                        );
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          unitsOfWaste,
-                          batchRemaining: unitsRemaining + unitsOfWaste,
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  {/* Units Remaining */}
-                  <div className="ag-field ag-field-4">
-                    <label className="ag-label">Units Remaining</label>
-                    <input
-                      className="ag-input"
-                      type="number"
-                      value={editingRow.unitsRemaining ?? 0}
-                      onChange={(e) => {
-                        const unitsRemaining = toNumber(e.target.value);
-                        const unitsOfWaste = toNumber(
-                          editingRow.unitsOfWaste
-                        );
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          unitsRemaining,
-                          batchRemaining: unitsRemaining + unitsOfWaste,
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  {/* Produced by */}
-                  <div className="ag-field ag-field-2">
-                    <label className="ag-label">Produced by (Name)</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.producerName ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          producerName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {/* Batch Code */}
-                  <div className="ag-field ag-field-2">
-                    <label className="ag-label">Batch Code</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.batchCode ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          batchCode: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="r-mfooter">
-                <button
-                  className="r-btn-ghost"
-                  onClick={() => {
-                    setEditOpen(false);
-                    setEditingRow(null);
-                  }}
-                  disabled={updating}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  className="r-btn-primary"
-                  onClick={handleConfirmEdit}
-                  disabled={updating}
-                >
-                  {updating ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-      {/* ===================== DELETE CONFIRM MODAL ===================== */}
-      {deleteOpen && selectedRows.length > 0 && (
-        <Portal>
-          <div className="r-modal-dim">
-            <div className="r-modal" style={{ maxWidth: 420 }}>
-              <div className="r-mhdr">
-                <h3 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h3>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
-              </div>
-
-              <div className="r-mbody" style={{ textAlign: "center" }}>
-                <div
-                  className="r-flex"
-                  style={{
-                    width: 60,
-                    height: 60,
-                    margin: "0 auto",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "#fee2e2",
-                    color: "#dc2626",
-                    borderRadius: 999,
-                  }}
-                >
-                  <DeleteIcon />
-                </div>
-
-                <h3
-                  style={{
-                    fontWeight: 900,
-                    color: "#0f172a",
-                    marginTop: 10,
-                    fontSize: 18,
-                  }}
-                >
-                  Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
-                </h3>
-
-                <p className="r-muted" style={{ marginTop: 6 }}>
-                  This is a soft-delete action.
-                </p>
-              </div>
-
-              <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>
-                  Cancel
-                </button>
-                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-     {/* ===================== RECORD PRODUCTION MODAL ===================== */}
-{openProductionForm && (
-  <Portal>
-    <div className="r-modal-dim">
-      <div className="r-modal">
-        <div className="r-mhdr">
-          <h3 className="r-title" style={{ fontSize: 18 }}>Record Production</h3>
-          <button
-            className="r-btn-ghost"
-            onClick={() => setOpenProductionForm(false)}
+      {/* DEFICIT WARNING MODAL */}
+      <Dialog
+        open={deficitOpen}
+        onClose={() => setDeficitOpen(false)}
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
+          Inventory Warning
+        </DialogTitle>
+        <DialogContent dividers>
+          <Alert severity="warning" sx={{ fontWeight: 700, borderRadius: 2 }}>
+            The production log records a total of{" "}
+            <strong style={{ color: brand.danger }}>
+              {deficitInfoRef.current.required} units of waste
+            </strong>{" "}
+            for recipe "{deficitInfoRef.current.recipe}".
+          </Alert>
+          <Alert
+            severity="info"
+            sx={{ fontWeight: 700, borderRadius: 2, mt: 2 }}
           >
-            Close
-          </button>
-        </div>
+            Only{" "}
+            <strong style={{ color: brand.info }}>
+              {deficitInfoRef.current.available} units
+            </strong>{" "}
+            of this recipe are currently in stock. Proceeding will allow stock
+            to go negative.
+          </Alert>
+        </DialogContent>
 
-        <div className="r-mbody">
-          <ProductionLogForm
-            cognitoId={cognitoId}
-            onSubmitted={() => {
-              fetchLogs();
-              setOpenProductionForm(false);
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDeficitOpen(false)}
+            sx={{ fontWeight: 700 }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={() => {
+              setDeficitOpen(false);
+              const next = deficitNextRef.current;
+              deficitNextRef.current = null;
+              if (typeof next === "function") next();
             }}
-          />
-        </div>
-
-        <div className="r-mfooter">
-          <button
-            className="r-btn-ghost"
-            onClick={() => setOpenProductionForm(false)}
+            sx={{
+              fontWeight: 800,
+              borderRadius: 999,
+              px: 2,
+              color: "#fff",
+              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
+              "&:hover": { background: brand.primaryDark },
+            }}
           >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  </Portal>
-)}
-    </div>
+            Proceed Anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SUCCESS TOAST */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={3000}
+        onClose={() => setOpenSnackbar(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setOpenSnackbar(false)}
+          severity="success"
+          sx={{ fontWeight: 700, borderRadius: 2 }}
+        >
+          Production recorded successfully!
+        </Alert>
+      </Snackbar>
+    </Paper>
   );
 }
