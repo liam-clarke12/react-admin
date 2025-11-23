@@ -221,7 +221,7 @@ const ProductionLogForm = () => {
         const index = {};
         const namesTemp = new Set();
         for (const r of Array.isArray(rows) ? rows : []) {
-          const recipeName = r.recipe_name ?? r.recipe ?? "";
+          const recipeName = r.recipeName ?? r.recipe_name ?? r.recipe ?? "";
           if (!recipeName) continue;
           namesTemp.add(recipeName);
           if (!index[recipeName]) index[recipeName] = [];

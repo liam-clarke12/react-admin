@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
-import ProductionLogForm from "../form/ProductionLog";
+import ProductionLogForm from "../../form/ProductionLog";
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
@@ -443,7 +443,9 @@ export default function ProductionLog() {
                 <p className="r-sub">Track batches, waste and remaining units</p>
               </div>
 
-                              <button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>+ Record Production</button>
+                              <div style={{ marginLeft: "auto" }}>
+<button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>+ Record Production</button>
+</div>
 <div className="r-flex">
                 {selectedRows.length > 0 && (
                   <div className="r-chip">
@@ -742,6 +744,6 @@ export default function ProductionLog() {
           </div>
         </Portal>
       )}
-    </div>
+</div>
   );
 }
