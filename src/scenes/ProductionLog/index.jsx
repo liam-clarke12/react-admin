@@ -563,268 +563,272 @@ export default function ProductionLog() {
   }, [filteredRows, page, rowsPerPage]);
 
   return (
-    <div className="r-wrap">
-      <BrandStyles />
+    <> {/* START: Fragment wrapper for all top-level JSX elements */}
+      <div className="r-wrap">
+        <BrandStyles />
 
-      {!cognitoId && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: "#fecaca",
-            background: "#fff1f2",
-            color: "#b91c1c",
-            marginBottom: 12,
-          }}
-        >
-          <strong>Can’t load data:</strong> No cognito_id
-          detected.
-        </div>
-      )}
-      {fatalMsg && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: "#fecaca",
-            background: "#fff1f2",
-            color: "#b91c1c",
-            marginBottom: 12,
-          }}
-        >
-          <strong>API error:</strong> {fatalMsg}
-        </div>
-      )}
+        {!cognitoId && (
+          <div
+            className="r-card"
+            style={{
+              borderColor: "#fecaca",
+              background: "#fff1f2",
+              color: "#b91c1c",
+              marginBottom: 12,
+            }}
+          >
+            <strong>Can’t load data:</strong> No cognito_id
+            detected.
+          </div>
+        )}
+        {fatalMsg && (
+          <div
+            className="r-card"
+            style={{
+              borderColor: "#fecaca",
+              background: "#fff1f2",
+              color: "#b91c1c",
+              marginBottom: 12,
+            }}
+          >
+            <strong>API error:</strong> {fatalMsg}
+          </div>
+        )}
 
-      <div className="gi-layout">
-        {/* MAIN TABLE */}
-        <div className="gi-main">
-          <div className="r-card">
-            {/* Header */}
-            <div className="r-head">
-              <div>
-                <h2 className="r-title">Production Log</h2>
-                <p className="r-sub">
-                  Track batches, waste and remaining units
-                </p>
-              </div>
+        <div className="gi-layout">
+          {/* MAIN TABLE */}
+          <div className="gi-main">
+            <div className="r-card">
+              {/* Header */}
+              <div className="r-head">
+                <div>
+                  <h2 className="r-title">Production Log</h2>
+                  <p className="r-sub">
+                    Track batches, waste and remaining units
+                  </p>
+                </div>
 
-              <div style={{ marginLeft: "auto" }}>
-                <button
-                  className="r-btn-primary"
-                  onClick={() =>
-                    setOpenProductionForm(true)
-                  }
-                >
-                  + Record Production
-                </button>
-              </div>
+                <div style={{ marginLeft: "auto" }}>
+                  <button
+                    className="r-btn-primary"
+                    onClick={() =>
+                      setOpenProductionForm(true)
+                    }
+                  >
+                    + Record Production
+                  </button>
+                </div>
 
-              <div className="r-flex">
-                {selectedRows.length > 0 && (
-                  <div className="r-chip">
-                    <span className="r-pill">
-                      {selectedRows.length} selected
-                    </span>
-                    <button
-                      className="r-btn-ghost"
-                      onClick={() =>
-                        setDeleteOpen(true)
-                      }
-                      title="Delete selected"
-                      style={{
-                        color: "#dc2626",
-                        borderColor: "#fecaca",
-                      }}
-                    >
-                      <DeleteIcon /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Toolbar */}
-            <div className="r-toolbar">
-              <input
-                className="r-input"
-                type="text"
-                placeholder="Search by recipe, batch code, producer..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(0);
-                }}
-              />
-
-              {!openProductionForm && (<select
-                className="r-select"
-                value={`${sortBy.field}:${sortBy.dir}`}
-                onChange={(e) => {
-                  const [field, dir] = e.target.value.split(":");
-                  setSortBy({ field, dir });
-                  setPage(0);
-                }}
-              >
-                <option value="date:desc">Date (new → old)</option>
-                <option value="date:asc">Date (old → new)</option>
-                <option value="recipe:asc">Recipe A→Z</option>
-                <option value="recipe:desc">Recipe Z→A</option>
-                <option value="unitsRemaining:desc">Units remaining (high → low)</option>
-                <option value="unitsRemaining:asc">Units remaining (low → high)</option>
-              </select>)}
-            </div>
-
-            {/* DataGrid */}
-            <div className="r-toolbar-gap dg-wrap">
-              <DataGrid
-                rows={visibleRows}
-                columns={columns}
-                getRowId={(row) => getRowKey(row)}
-                checkboxSelection
-                rowSelectionModel={selectedRows}
-                onRowSelectionModelChange={(model) => {
-                  const arr =
-                    Array.isArray(model)
-                      ? model.map((m) => String(m))
-                      : [];
-                  setSelectedRows(arr);
-                }}
-                disableSelectionOnClick
-                hideFooter
-                onCellDoubleClick={(params) => {
-                  setEditingRow(params.row);
-                  setEditOpen(true);
-                }}
-              />
-            </div>
-
-            {/* Footer / pagination */}
-            <div className="r-footer">
-              <span className="r-muted">
-                Showing{" "}
-                <strong>
-                  {filteredRows.length === 0
-                    ? 0
-                    : page * rowsPerPage + 1}
-                </strong>
-                –
-                <strong>
-                  {Math.min(
-                    (page + 1) * rowsPerPage,
-                    filteredRows.length
+                <div className="r-flex">
+                  {selectedRows.length > 0 && (
+                    <div className="r-chip">
+                      <span className="r-pill">
+                        {selectedRows.length} selected
+                      </span>
+                      <button
+                        className="r-btn-ghost"
+                        onClick={() =>
+                          setDeleteOpen(true)
+                        }
+                        title="Delete selected"
+                        style={{
+                          color: "#dc2626",
+                          borderColor: "#fecaca",
+                        }}
+                      >
+                        <DeleteIcon /> Delete
+                      </button>
+                    </div>
                   )}
-                </strong>{" "}
-                of <strong>{filteredRows.length}</strong>
-              </span>
+                </div>
+              </div>
 
-              <div className="r-flex">
-                <button
-                  className="r-btn-ghost"
-                  onClick={() =>
-                    setPage((p) => Math.max(0, p - 1))
-                  }
-                  disabled={page === 0}
-                >
-                  Prev
-                </button>
-
-                <span className="r-muted">Page {page + 1}</span>
-
-                <button
-                  className="r-btn-ghost"
-                  onClick={() =>
-                    setPage((p) =>
-                      (p + 1) * rowsPerPage <
-                      filteredRows.length
-                        ? p + 1
-                        : p
-                    )
-                  }
-                  disabled={
-                    (page + 1) * rowsPerPage >=
-                    filteredRows.length
-                  }
-                >
-                  Next
-                </button>
+              {/* Toolbar */}
+              <div className="r-toolbar">
+                <input
+                  className="r-input"
+                  type="text"
+                  placeholder="Search by recipe, batch code, producer..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPage(0);
+                  }}
+                />
 
                 {!openProductionForm && (<select
                   className="r-select"
-                  value={rowsPerPage}
+                  value={`${sortBy.field}:${sortBy.dir}`}
                   onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
+                    const [field, dir] = e.target.value.split(":");
+                    setSortBy({ field, dir });
                     setPage(0);
                   }}
                 >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
+                  <option value="date:desc">Date (new → old)</option>
+                  <option value="date:asc">Date (old → new)</option>
+                  <option value="recipe:asc">Recipe A→Z</option>
+                  <option value="recipe:desc">Recipe Z→A</option>
+                  <option value="unitsRemaining:desc">Units remaining (high → low)</option>
+                  <option value="unitsRemaining:asc">Units remaining (low → high)</option>
                 </select>)}
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* RIGHT SIDEBAR: QUICK STATS */}
-        <aside className="gi-side">
-          {/* Total Remaining highlight */}
-          <div className="r-card stat-card stat-accent">
-            <p className="stat-title">Total Remaining (Units)</p>
-            <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
-            <p className="stat-sub">Based on current filters</p>
-          </div>
-
-          {/* Core KPIs */}
-          <div className="r-card stat-card">
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Batches Produced</span>
-              <span className="stat-kpi">
-                {nf(stats.totalBatchesProduced)}
-              </span>
-            </div>
-
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Units of Waste</span>
-              <span className="stat-kpi">
-                {nf(stats.totalWaste)}
-              </span>
-            </div>
-
-            <div className="stat-row">
-              <span className="stat-kpi">Active Batches</span>
-              <span className="stat-kpi">
-                {nf(stats.activeBatches)}
-              </span>
-            </div>
-          </div>
-
-          {/* Top recipes by remaining */}
-          <div className="r-card stat-card">
-            <p className="stat-title">Top Recipes by Remaining</p>
-
-            {stats.topRecipes.length === 0 ? (
-              <p className="stat-sub">No data</p>
-            ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {stats.topRecipes.map((t) => (
-                  <div key={t.recipe} className="stat-row">
-                    <span
-                      className="stat-sub"
-                      style={{
-                        fontWeight: 800,
-                        color: "#0f172a",
-                      }}
-                    >
-                      {t.recipe}
-                    </span>
-                    <span className="stat-kpi">{nf(t.units)}</span>
-                  </div>
-                ))}
+              {/* DataGrid */}
+              <div className="r-toolbar-gap dg-wrap">
+                <DataGrid
+                  rows={visibleRows}
+                  columns={columns}
+                  getRowId={(row) => getRowKey(row)}
+                  checkboxSelection
+                  rowSelectionModel={selectedRows}
+                  onRowSelectionModelChange={(model) => {
+                    const arr =
+                      Array.isArray(model)
+                        ? model.map((m) => String(m))
+                        : [];
+                    setSelectedRows(arr);
+                  }}
+                  disableSelectionOnClick
+                  hideFooter
+                  onCellDoubleClick={(params) => {
+                    setEditingRow(params.row);
+                    setEditOpen(true);
+                  }}
+                />
               </div>
-            )}
+
+              {/* Footer / pagination */}
+              <div className="r-footer">
+                <span className="r-muted">
+                  Showing{" "}
+                  <strong>
+                    {filteredRows.length === 0
+                      ? 0
+                      : page * rowsPerPage + 1}
+                  </strong>
+                  –
+                  <strong>
+                    {Math.min(
+                      (page + 1) * rowsPerPage,
+                      filteredRows.length
+                    )}
+                  </strong>{" "}
+                  of <strong>{filteredRows.length}</strong>
+                </span>
+
+                <div className="r-flex">
+                  <button
+                    className="r-btn-ghost"
+                    onClick={() =>
+                      setPage((p) => Math.max(0, p - 1))
+                    }
+                    disabled={page === 0}
+                  >
+                    Prev
+                  </button>
+
+                  <span className="r-muted">Page {page + 1}</span>
+
+                  <button
+                    className="r-btn-ghost"
+                    onClick={() =>
+                      setPage((p) =>
+                        (p + 1) * rowsPerPage <
+                        filteredRows.length
+                          ? p + 1
+                          : p
+                      )
+                    }
+                    disabled={
+                      (page + 1) * rowsPerPage >=
+                      filteredRows.length
+                    }
+                  >
+                    Next
+                  </button>
+
+                  {!openProductionForm && (<select
+                    className="r-select"
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(0);
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>)}
+                </div>
+              </div>
+            </div>
           </div>
-        </aside>
+
+          {/* RIGHT SIDEBAR: QUICK STATS */}
+          <aside className="gi-side">
+            {/* Total Remaining highlight */}
+            <div className="r-card stat-card stat-accent">
+              <p className="stat-title">Total Remaining (Units)</p>
+              <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
+              <p className="stat-sub">Based on current filters</p>
+            </div>
+
+            {/* Core KPIs */}
+            <div className="r-card stat-card">
+              <div className="stat-row" style={{ marginBottom: 10 }}>
+                <span className="stat-kpi">Batches Produced</span>
+                <span className="stat-kpi">
+                  {nf(stats.totalBatchesProduced)}
+                </span>
+              </div>
+
+              <div className="stat-row" style={{ marginBottom: 10 }}>
+                <span className="stat-kpi">Units of Waste</span>
+                <span className="stat-kpi">
+                  {nf(stats.totalWaste)}
+                </span>
+              </div>
+
+              <div className="stat-row">
+                <span className="stat-kpi">Active Batches</span>
+                <span className="stat-kpi">
+                  {nf(stats.activeBatches)}
+                </span>
+              </div>
+            </div>
+
+            {/* Top recipes by remaining */}
+            <div className="r-card stat-card">
+              <p className="stat-title">Top Recipes by Remaining</p>
+
+              {stats.topRecipes.length === 0 ? (
+                <p className="stat-sub">No data</p>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {stats.topRecipes.map((t) => (
+                    <div key={t.recipe} className="stat-row">
+                      <span
+                        className="stat-sub"
+                        style={{
+                          fontWeight: 800,
+                          color: "#0f172a",
+                        }}
+                      >
+                        {t.recipe}
+                      </span>
+                      <span className="stat-kpi">{nf(t.units)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
+      {/* END: Main page div */}
+
       {/* ===================== EDIT MODAL ===================== */}
       {editOpen && editingRow && (
         <Portal>
@@ -995,6 +999,7 @@ export default function ProductionLog() {
           </div>
         </Portal>
       )}
+
       {/* ===================== DELETE CONFIRM MODAL ===================== */}
       {deleteOpen && selectedRows.length > 0 && (
         <Portal>
@@ -1058,17 +1063,29 @@ export default function ProductionLog() {
             <div className="r-modal">
               <div className="r-mhdr">
                 <h3 className="r-title" style={{ fontSize: 18 }}>Record Production</h3>
-                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setOpenProductionForm(false)}
+                >
                   Close
                 </button>
               </div>
 
               <div className="r-mbody">
-                <ProductionLogForm cognitoId={cognitoId} />
+                <ProductionLogForm
+                  cognitoId={cognitoId}
+                  onSubmitted={() => {
+                    fetchLogs();
+                    setOpenProductionForm(false);
+                  }}
+                />
               </div>
 
               <div className="r-mfooter">
-                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setOpenProductionForm(false)}
+                >
                   Close
                 </button>
               </div>
@@ -1076,7 +1093,6 @@ export default function ProductionLog() {
           </div>
         </Portal>
       )}
-
-    </div>
+    </> // END: Fragment wrapper
   );
 }
