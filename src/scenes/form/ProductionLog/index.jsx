@@ -1,6 +1,6 @@
-// src/scenes/form/RecipeProduction/index.jsx
+// src/scenes/form/ProductionLog/index.jsx
 // MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"; // <-- FIX: ADDED useCallback
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Box,
   TextField,
@@ -154,18 +154,23 @@ const getInventory = async (cognitoId, recipe) => {
   );
   if (!res.ok) throw new Error("Failed to fetch inventory");
   const data = await res.json();
-  return toNumber(data[0]?.totalUnits ?? 0);
+  // We only care about the total number of units available for the given recipe
+  return toNumber(data[0]?.totalUnits ?? 0); 
 };
 
 // =====================================================================
 // MAIN COMPONENT
 // =====================================================================
 
+// Renamed from ProductionLogForm to RecipeProductionForm to match the file structure convention 
+// (or ensure you import ProductionLogForm from this file in index.jsx)
 export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [recipes, setRecipes] = useState([]);
+  
+  // FIX: recipes state now stores objects { name, units_per_batch } instead of just strings
+  const [recipes, setRecipes] = useState([]); 
   const [loading, setLoading] = useState(false);
 
   // Deficit State
@@ -190,10 +195,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
+        
+        // FIX: Store recipe objects with units_per_batch
         setRecipes(
-          (Array.isArray(data) ? data : []).map(
-            (r) => r.recipe_name ?? r.recipe ?? r.name
-          )
+          (Array.isArray(data) ? data : []).map((r) => ({
+            name: r.recipe_name ?? r.recipe ?? r.name,
+            units_per_batch: toNumber(r.units_per_batch) || 0,
+          }))
         );
       } catch (e) {
         console.error("Recipes fetch error:", e);
@@ -201,6 +209,11 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     };
     fetchRecipes();
   }, [cognitoId]);
+
+  // Utility to find the units per batch for a selected recipe name
+  const getUnitsPerBatch = useCallback((recipeName) => {
+    return recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0;
+  }, [recipes]);
 
   // ===== Submission Handlers =====
 
@@ -216,10 +229,10 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 ...values,
                 batchesProduced: toNumber(values.batchesProduced),
                 unitsOfWaste: toNumber(values.unitsOfWaste),
+                // Calculate units remaining based on recipe data
                 unitsRemaining:
-                  toNumber(values.batchesProduced) *
-                    recipes.find((r) => r.name === values.recipe)
-                      ?.units_per_batch ?? 0, // Placeholder, actual unit calc done on server
+                  toNumber(values.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                  toNumber(values.unitsOfWaste),
               },
             ]
           : values.logs.map((log) => ({
@@ -229,6 +242,10 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               producerName: values.producerName,
               batchesProduced: toNumber(log.batchesProduced),
               unitsOfWaste: toNumber(log.unitsOfWaste),
+              // Calculate units remaining for each log entry
+              unitsRemaining:
+                toNumber(log.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                toNumber(log.unitsOfWaste),
             }));
 
       try {
@@ -249,7 +266,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         setLoading(false);
       }
     },
-    [cognitoId, tabValue, onSubmitted, loading, recipes]
+    [cognitoId, tabValue, onSubmitted, loading, getUnitsPerBatch]
   );
 
   const handleDeficitCheck = useCallback(
@@ -347,10 +364,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           handleBlur,
           handleChange,
           handleSubmit: formikHandleSubmit,
-          setFieldValue,
           setTouched,
           validateForm,
-          submitForm,
         }) => (
           <>
             {tabValue === 0 ? (
@@ -380,9 +395,10 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
                     >
+                      {/* FIX: Map over recipe objects to display the name */}
                       {recipes.map((recipe) => (
-                        <MenuItem key={recipe} value={recipe}>
-                          {recipe}
+                        <MenuItem key={recipe.name} value={recipe.name}>
+                          {recipe.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -473,7 +489,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    // FIX 1: Add type="button" to prevent redundant browser form submission
+                    // FIX: Add type="button" to prevent redundant browser form submission
                     type="button" 
                     onClick={() =>
                       handleSingleClick(
@@ -535,9 +551,10 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
                     >
+                      {/* FIX: Map over recipe objects to display the name */}
                       {recipes.map((recipe) => (
-                        <MenuItem key={recipe} value={recipe}>
-                          {recipe}
+                        <MenuItem key={recipe.name} value={recipe.name}>
+                          {recipe.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -593,6 +610,14 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <FieldArray name="logs">
                   {({ push, remove }) => (
                     <>
+                      {/* FIX: Check for array errors and display them */}
+                      {!!(touched.logs && errors.logs) &&
+                        typeof errors.logs === 'string' && (
+                          <Alert severity="error" sx={{ mb: 2, fontWeight: 700, borderRadius: 2 }}>
+                            {errors.logs}
+                          </Alert>
+                      )}
+
                       <Table
                         size="small"
                         sx={{
@@ -723,7 +748,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    type="submit" // Submission is handled by form submission -> deficit check -> formikHandleSubmit
+                    type="submit" 
                     disabled={loading || !cognitoId}
                     sx={{
                       px: 4,
@@ -750,17 +775,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               </form>
             )}
 
-            {/* ERROR ALERT (for multiple tab errors not tied to a field) */}
-            {tabValue === 1 &&
-              !!(touched.logs && errors.logs) &&
-              typeof errors.logs === "string" && (
-                <Alert
-                  severity="error"
-                  sx={{ mt: 2, fontWeight: 700, borderRadius: 2 }}
-                >
-                  {errors.logs}
-                </Alert>
-              )}
+            {/* ERROR ALERT (Moved up for better visibility in Multiple tab) */}
+            {/* Removed the original logic as the FieldArray section now handles array errors */}
           </>
         )}
       </Formik>
