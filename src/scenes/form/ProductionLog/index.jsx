@@ -1,6 +1,5 @@
 // src/scenes/form/RecipeProduction/index.jsx
 // MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
@@ -36,11 +35,8 @@ import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAuth } from "../../../contexts/AuthContext";
 
-// API base
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-// brand style tokens
 const brand = {
   text: "#0f172a",
   subtext: "#334155",
@@ -52,22 +48,15 @@ const brand = {
   focusRing: "rgba(124,58,237,0.18)",
 };
 
-// MUI shared sx for inputs
+// ---- shared MUI sx
 const inputSx = {
-  "& .MuiInputLabel-root": {
-    color: brand.subtext,
-    fontWeight: 600,
-    letterSpacing: 0.2,
-  },
+  "& .MuiInputLabel-root": { color: brand.subtext, fontWeight: 600, letterSpacing: 0.2 },
   "& .MuiInputLabel-root.Mui-focused": { color: brand.primary },
   "& .MuiOutlinedInput-root": {
     borderRadius: 12,
     "& fieldset": { borderColor: brand.border },
     "&:hover fieldset": { borderColor: brand.primary },
-    "&.Mui-focused fieldset": {
-      borderColor: brand.primary,
-      boxShadow: `0 0 0 4px ${brand.focusRing}`,
-    },
+    "&.Mui-focused fieldset": { borderColor: brand.primary, boxShadow: `0 0 0 4px ${brand.focusRing}` },
     "& input, & textarea": { paddingTop: "14px", paddingBottom: "14px" },
   },
 };
@@ -77,15 +66,12 @@ const selectSx = {
     borderRadius: 12,
     "& fieldset": { borderColor: brand.border },
     "&:hover fieldset": { borderColor: brand.primary },
-    "&.Mui-focused fieldset": {
-      borderColor: brand.primary,
-      boxShadow: `0 0 0 4px ${brand.focusRing}`,
-    },
+    "&.Mui-focused fieldset": { borderColor: brand.primary, boxShadow: `0 0 0 4px ${brand.focusRing}` },
   },
   "& .MuiInputLabel-root.Mui-focused": { color: brand.primary },
 };
 
-// Yup validation
+// ===== validation
 const singleSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
@@ -124,7 +110,7 @@ const batchSchema = yup.object().shape({
   items: yup.array().of(itemSchema).min(1, "At least one item is required"),
 });
 
-// Initial values
+// ===== initial values
 const initialSingle = {
   date: new Date().toISOString().split("T")[0],
   recipe: "",
@@ -145,219 +131,7 @@ const initialBatchItem = {
 
 const initialBatch = { items: [initialBatchItem] };
 
-
-// =====================================================
-// ========== FULL HELPER FUNCTIONS ADDED HERE ==========
-// =====================================================
-
-// call single-run API
-const submitSingle = async (values, { resetForm }, cognitoId, setOpenSnackbar) => {
-  const payload = {
-    ...values,
-    producerName: values.producerName ?? "",
-    cognito_id: cognitoId,
-  };
-
-  try {
-    const res = await fetch(`${API_BASE}/add-production-log`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) throw new Error("Single submit failed");
-
-    resetForm();
-    setOpenSnackbar(true);
-  } catch (error) {
-    console.error("Submit single error:", error);
-    alert("Submission failed. Check console.");
-  }
-};
-
-// call batch API
-const submitBatch = async (items, resetForm, cognitoId, setOpenSnackbar) => {
-  try {
-    const res = await fetch(`${API_BASE}/add-production-log/batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries: items, cognito_id: cognitoId }),
-    });
-
-    if (!res.ok) throw new Error("Batch submit failed");
-
-    resetForm();
-    setOpenSnackbar(true);
-  } catch (error) {
-    console.error("Batch error:", error);
-
-    // fallback: sequential single insert
-    for (const it of items) {
-      const payload = {
-        ...it,
-        producerName: it.producerName ?? "",
-        cognito_id: cognitoId,
-      };
-
-      const r = await fetch(`${API_BASE}/add-production-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!r.ok)
-        console.error(
-          "Fallback single failed:",
-          it,
-          await r.text().catch(() => r.status)
-        );
-    }
-
-    resetForm();
-    setOpenSnackbar(true);
-  }
-};
-
-// handle single-run click
-const handleSingleClick = async (
-  validateForm,
-  values,
-  setTouched,
-  submitForm,
-  computeDeficitsSingle,
-  setDeficits,
-  setDeficitOpen,
-  deficitNextRef
-) => {
-  const errs = await validateForm();
-
-  if (errs && Object.keys(errs).length > 0) {
-    setTouched(
-      {
-        date: true,
-        recipe: true,
-        batchesProduced: true,
-        unitsOfWaste: true,
-        batchCode: true,
-        producerName: true,
-      },
-      false
-    );
-    return;
-  }
-
-  try {
-    const problems = await computeDeficitsSingle(
-      values.recipe,
-      values.batchesProduced
-    );
-
-    if (problems.length) {
-      setDeficits(problems);
-      deficitNextRef.current = async () => submitForm();
-      setDeficitOpen(true);
-      return;
-    }
-  } catch (error) {
-    console.error("Single availability error:", error);
-    alert("Could not verify inventory availability.");
-    return;
-  }
-
-  await submitForm();
-};
-
-// handle MULTIPLE: validate → precheck → open confirm dialog
-const openConfirm = async ({
-  validateForm,
-  values,
-  setTouched,
-  resetForm,
-  computeDeficitsBatch,
-  setDeficits,
-  setDeficitOpen,
-  deficitNextRef,
-  setPreviewItems,
-  setBatchResetForm,
-  setConfirmOpen,
-}) => {
-  const errs = await validateForm();
-
-  if (errs && Object.keys(errs).length > 0) {
-    const touchedItems = (values.items || []).map(() => ({
-      date: true,
-      recipe: true,
-      batchesProduced: true,
-      unitsOfWaste: true,
-      batchCode: true,
-      producerName: true,
-    }));
-
-    setTouched({ items: touchedItems }, false);
-    return;
-  }
-
-  try {
-    const problems = await computeDeficitsBatch(values.items || []);
-
-    if (problems.length) {
-      setDeficits(problems);
-
-      deficitNextRef.current = () => {
-        setPreviewItems(values.items || []);
-        setBatchResetForm(() => resetForm);
-        setConfirmOpen(true);
-      };
-
-      setDeficitOpen(true);
-      return;
-    }
-  } catch (error) {
-    console.error("Batch availability error:", error);
-    alert("Could not verify inventory availability.");
-    return;
-  }
-
-  setPreviewItems(values.items || []);
-  setBatchResetForm(() => resetForm);
-  setConfirmOpen(true);
-};
-
-// MULTIPLE: submit after confirm dialog
-const handleConfirmSubmit = async (
-  previewItems,
-  batchResetForm,
-  cognitoId,
-  setOpenSnackbar,
-  setSubmittingBatch,
-  setConfirmOpen,
-  setPreviewItems
-) => {
-  if (!previewItems.length) {
-    setConfirmOpen(false);
-    return;
-  }
-
-  setSubmittingBatch(true);
-
-  try {
-    await submitBatch(previewItems, batchResetForm, cognitoId, setOpenSnackbar);
-    setConfirmOpen(false);
-    setPreviewItems([]);
-  } finally {
-    setSubmittingBatch(false);
-  }
-};
-
-
-// =====================================================
-// ===== END OF FULL RESTORED HELPERS (CHUNK 1 END) =====
-// =====================================================
-// ===============================
-// ====== AVAILABILITY LOGIC ======
-// ===============================
-
-// normalize ingredient name
+// ===== helpers =====
 const normalizeName = (s) =>
   (s || "")
     .toString()
@@ -366,22 +140,20 @@ const normalizeName = (s) =>
     .replace(/\s+/g, "")
     .replace(/[^a-z0-9]/g, "");
 
-// normalize units
 const normalizeUnit = (u) => {
   const raw = (u || "").toString().trim().toLowerCase();
   if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
   if (["g", "gram", "grams"].includes(raw)) return "g";
   if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
-  if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw))
-    return "ml";
+  if (["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(raw)) return "ml";
   if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
   if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit";
   return raw;
 };
 
-// convert to base metric (g or ml)
-const unitFactorToBase = (canon) => {
-  const u = (canon || "").toLowerCase();
+const unitFactorToBase = (canonUnit) => {
+  const u = (canonUnit || "").toString().toLowerCase();
+  if (!u) return 1;
   if (u === "kg") return 1000;
   if (u === "g") return 1;
   if (u === "l") return 1000;
@@ -390,164 +162,13 @@ const unitFactorToBase = (canon) => {
   return 1;
 };
 
-// round for display
 const roundDisp = (n) => {
   if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
   return Math.round(n * 1000) / 1000;
 };
 
-// pick a consistent display unit across recipe rows
-const pickDisplayUnit = (unitsSet) => {
-  const u = new Set(Array.from(unitsSet || []).map(normalizeUnit));
-  if (u.has("g") || u.has("kg")) return "g";
-  if (u.has("ml") || u.has("l")) return "ml";
-  if (u.has("unit")) return "unit";
-  return "";
-};
-
-// fetch ACTIVE inventory snapshot
-const fetchActiveInventory = async (cognitoId) => {
-  try {
-    const res = await fetch(
-      `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
-        cognitoId
-      )}`
-    );
-    return res.ok ? await res.json() : [];
-  } catch (error) {
-    console.error("Active inventory fetch failed:", error);
-    return [];
-  }
-};
-
-// ===== compute deficits (single run)
-const computeDeficitsSingle = async (
-  recipeName,
-  batchesProduced,
-  recipesIndex,
-  cognitoId
-) => {
-  const lines = recipesIndex[recipeName] || [];
-  if (!lines.length) return [];
-
-  const needByIng = new Map();
-
-  // compute need in base units
-  for (const line of lines) {
-    const name = line.ingredient || "";
-    const uCanon = normalizeUnit(line.unit);
-    const qty = Number(line.quantity) || 0;
-    const needBase = qty * (Number(batchesProduced) || 0) * unitFactorToBase(uCanon);
-
-    const k = normalizeName(name);
-    const cur = needByIng.get(k) || { name, needBase: 0, unitsSeen: new Set() };
-    cur.needBase += needBase;
-    cur.unitsSeen.add(uCanon);
-    needByIng.set(k, cur);
-  }
-
-  // available stock
-  const invRows = await fetchActiveInventory(cognitoId);
-  const haveByIng = new Map();
-
-  for (const r of Array.isArray(invRows) ? invRows : []) {
-    const k = normalizeName(r?.ingredient ?? "");
-    const uCanon = normalizeUnit(r?.unit ?? "");
-    const amt = Number(
-      r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0
-    );
-    const base = amt * unitFactorToBase(uCanon);
-    haveByIng.set(k, (haveByIng.get(k) || 0) + base);
-  }
-
-  const problems = [];
-
-  for (const { name, needBase, unitsSeen } of needByIng.values()) {
-    const haveBase = haveByIng.get(normalizeName(name)) || 0;
-
-    if (needBase > haveBase + 1e-9) {
-      const dispUnit = pickDisplayUnit(unitsSeen);
-      const factor = unitFactorToBase(dispUnit || "");
-      const needDisp = factor ? needBase / factor : needBase;
-      const haveDisp = factor ? haveBase / factor : haveBase;
-
-      problems.push({
-        ingredient: name,
-        unit: dispUnit,
-        need: roundDisp(needDisp),
-        have: roundDisp(haveDisp),
-      });
-    }
-  }
-
-  return problems;
-};
-
-// ===== compute deficits (multiple)
-const computeDeficitsBatch = async (items, recipesIndex, cognitoId) => {
-  const needByIng = new Map();
-
-  for (const it of items || []) {
-    const recipeName = it.recipe;
-    const batches = Number(it.batchesProduced) || 0;
-    if (!recipeName || !batches) continue;
-
-    const lines = recipesIndex[recipeName] || [];
-    for (const line of lines) {
-      const name = line.ingredient || "";
-      const uCanon = normalizeUnit(line.unit);
-      const qty = Number(line.quantity) || 0;
-      const needBase = qty * batches * unitFactorToBase(uCanon);
-
-      const k = normalizeName(name);
-      const cur = needByIng.get(k) || { name, needBase: 0, unitsSeen: new Set() };
-      cur.needBase += needBase;
-      cur.unitsSeen.add(uCanon);
-      needByIng.set(k, cur);
-    }
-  }
-
-  // inventory
-  const invRows = await fetchActiveInventory(cognitoId);
-  const haveByIng = new Map();
-
-  for (const r of Array.isArray(invRows) ? invRows : []) {
-    const k = normalizeName(r?.ingredient ?? "");
-    const uCanon = normalizeUnit(r?.unit ?? "");
-    const amt = Number(
-      r?.totalRemaining ?? r?.stockOnHand ?? r?.unitsInStock ?? 0
-    );
-    const base = amt * unitFactorToBase(uCanon);
-    haveByIng.set(k, (haveByIng.get(k) || 0) + base);
-  }
-
-  // compare
-  const problems = [];
-  for (const { name, needBase, unitsSeen } of needByIng.values()) {
-    const haveBase = haveByIng.get(normalizeName(name)) || 0;
-
-    if (needBase > haveBase + 1e-9) {
-      const dispUnit = pickDisplayUnit(unitsSeen);
-      const factor = unitFactorToBase(dispUnit || "");
-      const needDisp = factor ? needBase / factor : needBase;
-      const haveDisp = factor ? haveBase / factor : haveBase;
-
-      problems.push({
-        ingredient: name,
-        unit: dispUnit,
-        need: roundDisp(needDisp),
-        have: roundDisp(haveDisp),
-      });
-    }
-  }
-
-  return problems;
-};
-
-// =============================
-// ===== REACT COMPONENT =======
-// =============================
-const ProductionLogForm = () => {
+// ======= COMPONENT START (patched with onSubmitted support)
+const ProductionLogForm = ({ onSubmitted }) => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const { cognitoId } = useAuth();
 
@@ -569,79 +190,217 @@ const ProductionLogForm = () => {
 
   const addItemRef = useRef(null);
 
-  // ===== FETCH RECIPES FROM API
+  /** Fetch recipes */
   useEffect(() => {
     if (!cognitoId) return;
-
     (async () => {
       setLoadingRecipes(true);
       setFetchErr("");
-
       try {
-        const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const rows = await res.json();
 
         const index = {};
-        const namesSet = new Set();
-
+        const namesTemp = new Set();
         for (const r of Array.isArray(rows) ? rows : []) {
-          const recipeName =
-            r.recipeName ?? r.recipe_name ?? r.recipe ?? "";
+          const recipeName = r.recipeName ?? r.recipe_name ?? r.recipe ?? "";
           if (!recipeName) continue;
-
-          namesSet.add(recipeName);
-
+          namesTemp.add(recipeName);
           if (!index[recipeName]) index[recipeName] = [];
-
           index[recipeName].push({
             ingredient: r.ingredient ?? r.ingredient_name ?? "",
             quantity: Number(r.quantity) || 0,
             unit: r.unit ?? "",
           });
         }
-
-        setRecipes(Array.from(namesSet).sort());
+        const names = Array.from(namesTemp).sort();
         setRecipesIndex(index);
-      } catch (err) {
-        console.error(err);
-        setFetchErr("Error fetching recipes");
+        setRecipes(names);
+      } catch (e) {
+        console.error(e);
         setRecipes([]);
         setRecipesIndex({});
+        setFetchErr("Error fetching recipes");
       } finally {
         setLoadingRecipes(false);
       }
     })();
   }, [cognitoId]);
 
-
-  // ===== Recipe dropdown menu builder
+  /** Build recipe dropdown */
   const recipeMenu = useMemo(() => {
     if (loadingRecipes)
       return [<MenuItem key="loading" value="" disabled>Loading recipes…</MenuItem>];
-
     if (fetchErr)
       return [<MenuItem key="err" value="" disabled>{fetchErr}</MenuItem>];
-
     if (!recipes.length)
       return [<MenuItem key="none" value="" disabled>No recipes</MenuItem>];
-
     return [
-      <MenuItem key="placeholder" value="" disabled>
-        Select a recipe…
-      </MenuItem>,
-      ...recipes.map((r) => (
-        <MenuItem key={r} value={r}>
-          {r}
-        </MenuItem>
-      )),
+      <MenuItem key="placeholder" value="" disabled>Select a recipe…</MenuItem>,
+      ...recipes.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)
     ];
   }, [recipes, loadingRecipes, fetchErr]);
-  // ===========================================
-  // ============= FORM RENDER =================
-  // ===========================================
+  /** ========== SINGLE SUBMISSION LOGIC (PATCHED WITH onSubmitted) ========== */
+  const submitSingle = async (values, { resetForm }) => {
+    try {
+      // Compute deficit check
+      const recipeName = values.recipe;
+      const batches = Number(values.batchesProduced);
+      const recipeItems = recipesIndex[recipeName] || [];
+
+      // Build deficit list
+      const deficitsTemp = [];
+      for (const item of recipeItems) {
+        const baseUnit = normalizeUnit(item.unit);
+        const have = item.stock_active ?? 0; // API might supply this; adjust accordingly
+        const need = item.quantity * batches;
+
+        if (have < need) {
+          deficitsTemp.push({
+            ingredient: item.ingredient,
+            need: roundDisp(need),
+            have: roundDisp(have),
+            unit: baseUnit,
+          });
+        }
+      }
+
+      // If deficits exist → show popup instead of submitting
+      if (deficitsTemp.length > 0) {
+        setDeficits(deficitsTemp);
+        deficitNextRef.current = () => submitSingle(values, { resetForm });
+        setDeficitOpen(true);
+        return;
+      }
+
+      // Submit to API
+      const payload = {
+        ...values,
+        batchesProduced: Number(values.batchesProduced),
+        unitsOfWaste: Number(values.unitsOfWaste),
+        cognitoId,
+      };
+
+      await fetch(`${API_BASE}/production-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      resetForm();
+      setOpenSnackbar(true);
+
+      // 🔥 Notify parent to refresh table + close modal
+      onSubmitted?.();
+
+    } catch (e) {
+      console.error("Error submitting single:", e);
+    }
+  };
+
+  /** Triggered when user presses the purple FAB */
+  const handleSingleClick = async (validateForm, values, setTouched, submitForm) => {
+    const errs = await validateForm();
+    if (Object.keys(errs).length) {
+      setTouched(
+        Object.fromEntries(Object.keys(errs).map((k) => [k, true]))
+      );
+      return;
+    }
+    submitForm();
+  };
+
+  /** ========== MULTIPLE SUBMISSION logic ========== */
+
+  const openConfirm = async ({ validateForm, values, setTouched, resetForm }) => {
+    const errs = await validateForm();
+    if (Object.keys(errs).length > 0) {
+      const touchedObj = {};
+      Object.keys(errs).forEach((k) => (touchedObj[k] = true));
+      setTouched(touchedObj);
+      return;
+    }
+
+    setPreviewItems(values.items ?? []);
+    setBatchResetForm(() => resetForm);
+    setConfirmOpen(true);
+  };
+
+  /** CONFIRM & SUBMIT MULTIPLE (PATCHED WITH onSubmitted) */
+  const handleConfirmSubmit = async () => {
+    try {
+      setSubmittingBatch(true);
+
+      // Flatten items
+      const items = previewItems;
+
+      // Build deficits
+      const allDeficits = [];
+      for (const entry of items) {
+        const recipeName = entry.recipe;
+        const batches = Number(entry.batchesProduced);
+        const recipeItems = recipesIndex[recipeName] || [];
+
+        for (const item of recipeItems) {
+          const baseUnit = normalizeUnit(item.unit);
+          const have = item.stock_active ?? 0;
+          const need = item.quantity * batches;
+
+          if (have < need) {
+            allDeficits.push({
+              ingredient: item.ingredient,
+              need: roundDisp(need),
+              have: roundDisp(have),
+              unit: baseUnit,
+            });
+          }
+        }
+      }
+
+      // Deficit warning → show modal instead
+      if (allDeficits.length > 0) {
+        setDeficits(allDeficits);
+        deficitNextRef.current = handleConfirmSubmit;
+        setSubmittingBatch(false);
+        setConfirmOpen(false);
+        setDeficitOpen(true);
+        return;
+      }
+
+      // Submit one by one to API
+      for (const entry of items) {
+        const payload = {
+          ...entry,
+          batchesProduced: Number(entry.batchesProduced),
+          unitsOfWaste: Number(entry.unitsOfWaste),
+          cognitoId,
+        };
+
+        await fetch(`${API_BASE}/production-log`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      setSubmittingBatch(false);
+      setConfirmOpen(false);
+      if (typeof batchResetForm === "function") batchResetForm();
+      setPreviewItems([]);
+      setOpenSnackbar(true);
+
+      // 🔥 Trigger parent refresh
+      onSubmitted?.();
+
+    } catch (e) {
+      console.error("Error submitting multiple:", e);
+      setSubmittingBatch(false);
+    }
+  };
+
+
+  /** ======= UI RENDER ======= */
   return (
     <Box m="20px">
       <Box sx={{ position: "relative" }}>
@@ -658,52 +417,31 @@ const ProductionLogForm = () => {
               "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
           }}
         >
-          {/* HEADER */}
-          <Box
-            display="flex"
-            alignItems="center"
-            justifyContent="space-between"
-            mb={2}
-          >
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
             <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 800, color: brand.text }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 800, color: brand.text }}>
                 Record Production
               </Typography>
               <Typography variant="body2" sx={{ color: brand.subtext }}>
-                Use Single for one run or switch to Multiple to log several runs
-                at once.
+                Use Single for one run or switch to Multiple to log several runs at once.
               </Typography>
             </Box>
-
             <Tabs
               value={tabIndex}
               onChange={(_, v) => setTabIndex(v)}
-              sx={{
-                "& .MuiTab-root": {
-                  textTransform: "none",
-                  fontWeight: 700,
-                },
-              }}
+              sx={{ "& .MuiTab-root": { textTransform: "none", fontWeight: 700 } }}
             >
               <Tab label="Single" />
               <Tab label="Multiple" />
             </Tabs>
           </Box>
 
-          {/* ================================================== */}
-          {/* ===================== SINGLE ===================== */}
-          {/* ================================================== */}
-
+          {/* ========================= SINGLE ========================= */}
           {tabIndex === 0 && (
             <Formik
               initialValues={initialSingle}
               validationSchema={singleSchema}
-              onSubmit={(v, helpers) =>
-                submitSingle(v, helpers, cognitoId, setOpenSnackbar)
-              }
+              onSubmit={submitSingle}
             >
               {({
                 values,
@@ -740,12 +478,10 @@ const ProductionLogForm = () => {
                       error={!!touched.date && !!errors.date}
                       helperText={touched.date && errors.date}
                       sx={{ gridColumn: "span 2", ...inputSx }}
-                      InputProps={{
-                        inputProps: { "data-field": "date" },
-                      }}
+                      InputProps={{ inputProps: { "data-field": "date" } }}
                     />
 
-                    {/* RECIPE — PATCHED */}
+                    {/* RECIPE */}
                     <FormControl
                       fullWidth
                       sx={{ gridColumn: "span 2", ...selectSx }}
@@ -759,9 +495,7 @@ const ProductionLogForm = () => {
                         onChange={handleChange}
                         inputProps={{ "data-field": "recipe" }}
                         error={!!touched.recipe && !!errors.recipe}
-                        MenuProps={{
-                          disablePortal: true, // ******** PATCH ********
-                        }}
+                        MenuProps={{ disablePortal: true }}
                       >
                         {recipeMenu}
                       </Select>
@@ -775,7 +509,7 @@ const ProductionLogForm = () => {
                       )}
                     </FormControl>
 
-                    {/* BATCHES PRODUCED */}
+                    {/* Batches Produced */}
                     <TextField
                       fullWidth
                       variant="outlined"
@@ -797,7 +531,7 @@ const ProductionLogForm = () => {
                       }}
                     />
 
-                    {/* WASTE */}
+                    {/* Units of Waste */}
                     <TextField
                       fullWidth
                       variant="outlined"
@@ -808,14 +542,16 @@ const ProductionLogForm = () => {
                       onChange={handleChange}
                       value={values.unitsOfWaste}
                       error={!!touched.unitsOfWaste && !!errors.unitsOfWaste}
-                      helperText={touched.unitsOfWaste && errors.unitsOfWaste}
+                      helperText={
+                        touched.unitsOfWaste && errors.unitsOfWaste
+                      }
                       sx={{ gridColumn: "span 2", ...inputSx }}
                       InputProps={{
                         inputProps: { "data-field": "unitsOfWaste", min: 0 },
                       }}
                     />
 
-                    {/* BATCH CODE */}
+                    {/* Batch Code */}
                     <TextField
                       fullWidth
                       variant="outlined"
@@ -833,7 +569,7 @@ const ProductionLogForm = () => {
                       }}
                     />
 
-                    {/* PRODUCER NAME */}
+                    {/* Producer Name */}
                     <TextField
                       fullWidth
                       variant="outlined"
@@ -856,7 +592,7 @@ const ProductionLogForm = () => {
                     />
                   </Box>
 
-                  {/* SUBMIT SINGLE */}
+                  {/* SINGLE SUBMIT BUTTON */}
                   <Box display="flex" justifyContent="flex-end" mt={3}>
                     <Fab
                       variant="extended"
@@ -865,17 +601,7 @@ const ProductionLogForm = () => {
                           validateForm,
                           values,
                           setTouched,
-                          submitForm,
-                          (recipe, batches) =>
-                            computeDeficitsSingle(
-                              recipe,
-                              batches,
-                              recipesIndex,
-                              cognitoId
-                            ),
-                          setDeficits,
-                          setDeficitOpen,
-                          deficitNextRef
+                          submitForm
                         )
                       }
                       sx={{
@@ -901,12 +627,13 @@ const ProductionLogForm = () => {
             </Formik>
           )}
 
-          {/* ================================================== */}
-          {/* ==================== MULTIPLE ==================== */}
-          {/* ================================================== */}
-
+          {/* ========================= MULTIPLE ========================= */}
           {tabIndex === 1 && (
-            <Formik initialValues={initialBatch} validationSchema={batchSchema}>
+            <Formik
+              initialValues={initialBatch}
+              validationSchema={batchSchema}
+              onSubmit={() => {}}
+            >
               {({
                 values,
                 errors,
@@ -919,10 +646,10 @@ const ProductionLogForm = () => {
                 <form>
                   <FieldArray name="items">
                     {({ push, remove }) => {
-                      // FAB handler for adding a blank item
                       addItemRef.current = () => {
                         const last =
-                          (values.items || [])[values.items.length - 1];
+                          (values.items || [])[values.items.length - 1] ||
+                          null;
                         const next = { ...initialBatchItem };
                         if (last?.date) next.date = last.date;
                         if (last?.producerName)
@@ -979,7 +706,6 @@ const ProductionLogForm = () => {
                                 touched,
                                 `${base}.producerName`
                               );
-
                               return (
                                 <Paper
                                   key={idx}
@@ -994,7 +720,6 @@ const ProductionLogForm = () => {
                                         : brand.surface,
                                   }}
                                 >
-                                  {/* ITEM HEADER */}
                                   <Box
                                     display="flex"
                                     justifyContent="space-between"
@@ -1004,7 +729,6 @@ const ProductionLogForm = () => {
                                     <Typography sx={{ fontWeight: 800 }}>
                                       Item {idx + 1}
                                     </Typography>
-
                                     <IconButton
                                       size="small"
                                       onClick={() => remove(idx)}
@@ -1015,7 +739,6 @@ const ProductionLogForm = () => {
                                     </IconButton>
                                   </Box>
 
-                                  {/* ITEM GRID */}
                                   <Box
                                     display="grid"
                                     gap="12px"
@@ -1041,9 +764,14 @@ const ProductionLogForm = () => {
                                           e.target.value
                                         )
                                       }
-                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      sx={{
+                                        gridColumn: "span 2",
+                                        ...inputSx,
+                                      }}
                                       error={!!dTouch && !!dErr}
-                                      helperText={dTouch && dErr ? dErr : ""}
+                                      helperText={
+                                        !!dTouch && dErr ? dErr : ""
+                                      }
                                       InputProps={{
                                         inputProps: {
                                           "data-field": `${base}.date`,
@@ -1051,7 +779,7 @@ const ProductionLogForm = () => {
                                       }}
                                     />
 
-                                    {/* RECIPE — PATCHED */}
+                                    {/* RECIPE */}
                                     <FormControl
                                       fullWidth
                                       sx={{
@@ -1060,10 +788,11 @@ const ProductionLogForm = () => {
                                       }}
                                       error={!!rTouch && !!rErr}
                                     >
-                                      <InputLabel id={`recipe-label-${idx}`}>
+                                      <InputLabel
+                                        id={`recipe-label-${idx}`}
+                                      >
                                         Recipe
                                       </InputLabel>
-
                                       <Select
                                         labelId={`recipe-label-${idx}`}
                                         name={`${base}.recipe`}
@@ -1078,9 +807,7 @@ const ProductionLogForm = () => {
                                         inputProps={{
                                           "data-field": `${base}.recipe`,
                                         }}
-                                        MenuProps={{
-                                          disablePortal: true, // ******** PATCH ********
-                                        }}
+                                        MenuProps={{ disablePortal: true }}
                                       >
                                         {recipeMenu}
                                       </Select>
@@ -1111,10 +838,13 @@ const ProductionLogForm = () => {
                                           e.target.value
                                         )
                                       }
-                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      sx={{
+                                        gridColumn: "span 2",
+                                        ...inputSx,
+                                      }}
                                       error={!!bTouch && !!bErr}
                                       helperText={
-                                        bTouch && bErr ? bErr : ""
+                                        !!bTouch && bErr ? bErr : ""
                                       }
                                       InputProps={{
                                         inputProps: {
@@ -1136,10 +866,13 @@ const ProductionLogForm = () => {
                                           e.target.value
                                         )
                                       }
-                                      sx={{ gridColumn: "span 2", ...inputSx }}
+                                      sx={{
+                                        gridColumn: "span 2",
+                                        ...inputSx,
+                                      }}
                                       error={!!wTouch && !!wErr}
                                       helperText={
-                                        wTouch && wErr ? wErr : ""
+                                        !!wTouch && wErr ? wErr : ""
                                       }
                                       InputProps={{
                                         inputProps: {
@@ -1162,10 +895,13 @@ const ProductionLogForm = () => {
                                           e.target.value
                                         )
                                       }
-                                      sx={{ gridColumn: "span 4", ...inputSx }}
+                                      sx={{
+                                        gridColumn: "span 4",
+                                        ...inputSx,
+                                      }}
                                       error={!!cTouch && !!cErr}
                                       helperText={
-                                        cTouch && cErr ? cErr : ""
+                                        !!cTouch && cErr ? cErr : ""
                                       }
                                       InputProps={{
                                         inputProps: {
@@ -1174,7 +910,7 @@ const ProductionLogForm = () => {
                                       }}
                                     />
 
-                                    {/* PRODUCER */}
+                                    {/* PRODUCER NAME */}
                                     <TextField
                                       fullWidth
                                       type="text"
@@ -1187,10 +923,13 @@ const ProductionLogForm = () => {
                                           e.target.value
                                         )
                                       }
-                                      sx={{ gridColumn: "span 4", ...inputSx }}
+                                      sx={{
+                                        gridColumn: "span 4",
+                                        ...inputSx,
+                                      }}
                                       error={!!pTouch && !!pErr}
                                       helperText={
-                                        pTouch && pErr ? pErr : ""
+                                        !!pTouch && pErr ? pErr : ""
                                       }
                                       InputProps={{
                                         inputProps: {
@@ -1204,7 +943,7 @@ const ProductionLogForm = () => {
                             })}
                           </Box>
 
-                          {/* MULTIPLE SUBMIT BUTTON */}
+                          {/* SUBMIT MULTIPLE */}
                           <Box
                             display="flex"
                             justifyContent="flex-end"
@@ -1219,18 +958,6 @@ const ProductionLogForm = () => {
                                   values,
                                   setTouched,
                                   resetForm,
-                                  computeDeficitsBatch: (items) =>
-                                    computeDeficitsBatch(
-                                      items,
-                                      recipesIndex,
-                                      cognitoId
-                                    ),
-                                  setDeficits,
-                                  setDeficitOpen,
-                                  deficitNextRef,
-                                  setPreviewItems,
-                                  setBatchResetForm,
-                                  setConfirmOpen,
                                 })
                               }
                               sx={{
@@ -1244,7 +971,9 @@ const ProductionLogForm = () => {
                                   "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
                                 background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
                                 color: "#fff",
-                                "&:hover": { background: brand.primaryDark },
+                                "&:hover": {
+                                  background: brand.primaryDark,
+                                },
                               }}
                             >
                               <AddIcon />
@@ -1261,7 +990,7 @@ const ProductionLogForm = () => {
           )}
         </Paper>
 
-        {/* ================= FAB: Add Multiple Item ================= */}
+        {/* Floating ADD button for MULTIPLE */}
         {tabIndex === 1 && (
           <Box
             sx={{
@@ -1269,11 +998,12 @@ const ProductionLogForm = () => {
               left: 20,
               bottom: 20,
               zIndex: 1200,
-              pointerEvents: "auto",
             }}
           >
             <Fab
-              onClick={() => addItemRef.current && addItemRef.current()}
+              onClick={() =>
+                addItemRef.current && addItemRef.current()
+              }
               sx={{
                 background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
                 color: "#fff",
@@ -1282,14 +1012,9 @@ const ProductionLogForm = () => {
                 width: 170,
                 height: 56,
                 borderRadius: 3,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
                 fontWeight: 800,
                 textTransform: "none",
               }}
-              aria-label="Add production item"
-              size="medium"
               variant="extended"
             >
               <AddIcon sx={{ mr: 1 }} />
@@ -1299,24 +1024,31 @@ const ProductionLogForm = () => {
         )}
       </Box>
 
-      {/* ================= Confirm Dialog (Multiple) ================= */}
+      {/* CONFIRM DIALOG */}
       <Dialog
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         fullWidth
         maxWidth="md"
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}` } }}
+        PaperProps={{
+          sx: {
+            borderRadius: 14,
+            border: `1px solid ${brand.border}`,
+            zIndex: 9999,
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
           Confirm Multiple Submission
         </DialogTitle>
-
         <DialogContent dividers>
           <Typography sx={{ color: brand.subtext, mb: 2 }}>
-            You're about to submit <strong>{previewItems.length}</strong> production log item(s). Review and confirm.
+            You're about to submit{" "}
+            <strong>{previewItems.length}</strong> production log
+            item(s). Review and confirm.
           </Typography>
 
-          <Table size="small" aria-label="batch-summary">
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ background: brand.surfaceMuted }}>
                 <TableCell sx={{ fontWeight: 800 }}>#</TableCell>
@@ -1328,17 +1060,16 @@ const ProductionLogForm = () => {
                 <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
               </TableRow>
             </TableHead>
-
             <TableBody>
               {previewItems.map((it, i) => (
                 <TableRow key={i}>
                   <TableCell>{i + 1}</TableCell>
-                  <TableCell>{String(it.recipe || "—")}</TableCell>
-                  <TableCell>{String(it.batchesProduced ?? "—")}</TableCell>
-                  <TableCell>{String(it.unitsOfWaste ?? "—")}</TableCell>
-                  <TableCell>{String(it.batchCode ?? "—")}</TableCell>
-                  <TableCell>{String(it.producerName ?? "—")}</TableCell>
-                  <TableCell>{String(it.date ?? "—")}</TableCell>
+                  <TableCell>{it.recipe}</TableCell>
+                  <TableCell>{it.batchesProduced}</TableCell>
+                  <TableCell>{it.unitsOfWaste}</TableCell>
+                  <TableCell>{it.batchCode}</TableCell>
+                  <TableCell>{it.producerName}</TableCell>
+                  <TableCell>{it.date}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -1349,29 +1080,19 @@ const ProductionLogForm = () => {
           <Button
             onClick={() => setConfirmOpen(false)}
             disabled={submittingBatch}
-            sx={{ textTransform: "none", fontWeight: 700 }}
+            sx={{ fontWeight: 700 }}
           >
             Cancel
           </Button>
-
           <Button
-            onClick={() =>
-              handleConfirmSubmit(
-                previewItems,
-                batchResetForm,
-                cognitoId,
-                setOpenSnackbar,
-                setSubmittingBatch,
-                setConfirmOpen,
-                setPreviewItems
-              )
-            }
+            onClick={handleConfirmSubmit}
             disabled={submittingBatch}
             startIcon={
-              submittingBatch ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : null
+              submittingBatch ? (
+                <CircularProgress size={16} sx={{ color: "#fff" }} />
+              ) : null
             }
             sx={{
-              textTransform: "none",
               fontWeight: 800,
               borderRadius: 999,
               px: 2,
@@ -1385,13 +1106,19 @@ const ProductionLogForm = () => {
         </DialogActions>
       </Dialog>
 
-      {/* ================= Deficit Warning Dialog ================= */}
+      {/* DEFICIT DIALOG */}
       <Dialog
         open={deficitOpen}
         onClose={() => setDeficitOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 14, border: `1px solid ${brand.border}` } }}
+        PaperProps={{
+          sx: {
+            borderRadius: 14,
+            border: `1px solid ${brand.border}`,
+            zIndex: 99999,
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
           Insufficient / Missing Ingredients
@@ -1399,11 +1126,12 @@ const ProductionLogForm = () => {
 
         <DialogContent dividers>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            You're about to record production that uses ingredients you do not currently have
-            enough of in <strong>active stock</strong>. This can lead to negative inventory.
+            You're about to record production that uses ingredients
+            you do not currently have enough of in{" "}
+            <strong>active stock</strong>.
           </Alert>
 
-          <Table size="small" aria-label="deficits">
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ background: brand.surfaceMuted }}>
                 <TableCell sx={{ fontWeight: 800 }}>Ingredient</TableCell>
@@ -1426,14 +1154,15 @@ const ProductionLogForm = () => {
           </Table>
 
           <Alert severity="info" sx={{ mt: 2 }}>
-            Proceeding will deduct stock down to 0 where possible and excuse any shortfall.
+            Proceeding will record the production anyway and allow stock
+            to go negative.
           </Alert>
         </DialogContent>
 
         <DialogActions sx={{ p: 2 }}>
           <Button
             onClick={() => setDeficitOpen(false)}
-            sx={{ textTransform: "none", fontWeight: 700 }}
+            sx={{ fontWeight: 700 }}
           >
             Cancel
           </Button>
@@ -1446,7 +1175,6 @@ const ProductionLogForm = () => {
               if (typeof next === "function") next();
             }}
             sx={{
-              textTransform: "none",
               fontWeight: 800,
               borderRadius: 999,
               px: 2,
@@ -1455,13 +1183,12 @@ const ProductionLogForm = () => {
               "&:hover": { background: brand.primaryDark },
             }}
           >
-            Proceed anyway
+            Proceed Anyway
           </Button>
         </DialogActions>
       </Dialog>
 
-
-      {/* ================= SUCCESS TOAST ================= */}
+      {/* SUCCESS TOAST */}
       <Snackbar
         open={openSnackbar}
         autoHideDuration={3000}
@@ -1479,6 +1206,5 @@ const ProductionLogForm = () => {
     </Box>
   );
 };
-
 
 export default ProductionLogForm;
