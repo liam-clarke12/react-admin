@@ -146,16 +146,17 @@ const postProductionLog = async (data, cognitoId, isBatch = false) => {
   return res.json();
 };
 
-const getInventory = async (cognitoId, recipe) => {
-  const res = await fetch(
-    `${API_BASE}/inventory/active?cognito_id=${encodeURIComponent(
-      cognitoId
-    )}&recipe=${encodeURIComponent(recipe)}`
-  );
-  if (!res.ok) throw new Error("Failed to fetch inventory");
-  const data = await res.json();
-  // We only care about the total number of units available for the given recipe
-  return toNumber(data[0]?.totalUnits ?? 0); 
+// INGREDIENT INVENTORY FUNCTIONS
+const getRecipeIngredients = async (cognitoId) => {
+  const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+  if (!res.ok) throw new Error("Failed to fetch recipes");
+  return await res.json();
+};
+
+const getIngredientStock = async (cognitoId) => {
+  const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+  if (!res.ok) throw new Error("Failed to fetch ingredient stock");
+  return await res.json();
 };
 
 // =====================================================================
@@ -804,23 +805,28 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         </DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ fontWeight: 700, borderRadius: 2 }}>
-            The production log records a total of{" "}
-            <strong style={{ color: brand.danger }}>
-              {deficitInfoRef.current.required} units of waste
-            </strong>{" "}
-            for recipe "{deficitInfoRef.current.recipe}".
+            Ingredient shortages for recipe <strong>{deficitInfoRef.current.recipe}</strong>
           </Alert>
-          <Alert
-            severity="info"
-            sx={{ fontWeight: 700, borderRadius: 2, mt: 2 }}
-          >
-            Only{" "}
-            <strong style={{ color: brand.info }}>
-              {deficitInfoRef.current.available} units
-            </strong>{" "}
-            of this recipe are currently in stock. Proceeding will allow stock
-            to go negative.
-          </Alert>
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Ingredient</TableCell>
+                <TableCell>Required</TableCell>
+                <TableCell>Available</TableCell>
+                <TableCell>Missing</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(deficitInfoRef.current.deficits ?? []).map((d,i)=>(
+                <TableRow key={i}>
+                  <TableCell>{d.ingredient}</TableCell>
+                  <TableCell>{d.required} {d.unit}</TableCell>
+                  <TableCell>{d.available} {d.unit}</TableCell>
+                  <TableCell sx={{color:brand.danger}}>{d.missing} {d.unit}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </DialogContent>
 
         <DialogActions sx={{ p: 2 }}>
