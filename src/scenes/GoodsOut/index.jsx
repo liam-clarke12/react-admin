@@ -166,6 +166,61 @@ const BrandStyles = () => (
   .dg-wrap { height: 70vh; min-width: 750px; }
   .dg-wrap .MuiDataGrid-root { border:0; }
 
+  /* Sidebar stats */
+  .stat-card {
+    padding:16px;
+    border-radius:16px;
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+  }
+  .stat-accent {
+    background:linear-gradient(180deg,#eef2ff,#fdf2ff);
+  }
+  .stat-title {
+    font-size:12px;
+    font-weight:700;
+    color:#64748b;
+    margin:0 0 4px 0;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .stat-value {
+    font-size:28px;
+    font-weight:900;
+    color:#0f172a;
+    margin:0 0 4px 0;
+  }
+  .stat-sub {
+    font-size:12px;
+    color:#94a3b8;
+    margin:0;
+  }
+  .stat-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:4px 0;
+  }
+  .stat-kpi {
+    font-size:13px;
+    font-weight:700;
+    color:#0f172a;
+  }
+  .r-footer {
+    padding:12px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-top:1px solid #e5e7eb;
+    background:#f8fafc;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .r-muted {
+    font-size:12px;
+    color:#94a3b8;
+  }
+
   /* Layout */
   .gi-layout { display:flex; gap:24px; align-items:flex-start; }
   .gi-main { flex:1 1 0%; min-width:0; }
@@ -837,12 +892,25 @@ const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const safeParse = (val, fallback) => {
   if (val == null) return fallback;
-  try {
-    const p = JSON.parse(val);
-    return p ?? fallback;
-  } catch {
-    return fallback;
+
+  // If it's already an array or object, use as‑is
+  if (Array.isArray(val) || (typeof val === "object" && val !== null)) {
+    return val;
   }
+
+  // Only attempt JSON.parse on strings
+  if (typeof val === "string") {
+    try {
+      const trimmed = val.trim();
+      if (!trimmed) return fallback;
+      const p = JSON.parse(trimmed);
+      return p ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
 };
 
 const formatToYYYYMMDD = (val) => {
@@ -1487,51 +1555,58 @@ const Portal = ({ children }) =>
 
           <Divider sx={{ mb: 2 }} />
 
-          {drawerItems
-            .filter((i) =>
-              i.code.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .map((it, idx) => (
-              <Box
-                key={`${it.code}-${idx}`}
-                sx={{
-                  border:
-                    "1px solid #e5e7eb",
-                  borderRadius: 2,
-                  p: 1.5,
-                  mb: 1,
-                }}
-              >
-                <ListItem
-                  secondaryAction={
-                    <Box
-                      sx={{
-                        borderRadius: 999,
-                        px: 1.5,
-                        py: 0.5,
-                        background: "#f1f5f9",
-                        border: "1px solid #e5e7eb",
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {it.unitsLabel}
-                    </Box>
-                  }
+          {drawerItems && drawerItems.length > 0 ? (
+            drawerItems
+              .filter((i) =>
+                (i.code || "")
+                  .toLowerCase()
+                  .includes(searchTerm.toLowerCase())
+              )
+              .map((it, idx) => (
+                <Box
+                  key={`${it.code}-${idx}`}
+                  sx={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 2,
+                    p: 1.5,
+                    mb: 1,
+                  }}
                 >
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <CheckRoundedIcon sx={{ color: "#7C3AED" }} />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={it.code}
-                    primaryTypographyProps={{
-                      fontWeight: 700,
-                      color: "#0f172a",
-                    }}
-                  />
-                </ListItem>
-              </Box>
-            ))}
+                  <ListItem
+                    secondaryAction={
+                      <Box
+                        sx={{
+                          borderRadius: 999,
+                          px: 1.5,
+                          py: 0.5,
+                          background: "#f1f5f9",
+                          border: "1px solid #e5e7eb",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {it.unitsLabel}
+                      </Box>
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <CheckRoundedIcon sx={{ color: "#7C3AED" }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={it.code}
+                      primaryTypographyProps={{
+                        fontWeight: 700,
+                        color: "#0f172a",
+                      }}
+                    />
+                  </ListItem>
+                </Box>
+              ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No batchcodes recorded for this goods-out entry.
+            </Typography>
+          )}
         </Box>
       </Drawer>
     </div>
