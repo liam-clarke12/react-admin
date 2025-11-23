@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
-import ProductionLogForm from "../../form/ProductionLog";
+import ProductionLogForm from "../form/ProductionLog";
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
