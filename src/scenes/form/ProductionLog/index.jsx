@@ -394,7 +394,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-                    >
+                    
+  MenuProps={{
+    disablePortal: false,
+    anchorOrigin: { vertical: "bottom", horizontal: "left" },
+    transformOrigin: { vertical: "top", horizontal: "left" },
+    PaperProps: { style: { zIndex: 300000, position: "absolute" } }
+  }}>
                       {/* FIX: Map over recipe objects to display the name */}
                       {recipes.map((recipe) => (
                         <MenuItem key={recipe.name} value={recipe.name}>
@@ -550,7 +556,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-                    >
+                    
+  MenuProps={{
+    disablePortal: false,
+    anchorOrigin: { vertical: "bottom", horizontal: "left" },
+    transformOrigin: { vertical: "top", horizontal: "left" },
+    PaperProps: { style: { zIndex: 300000, position: "absolute" } }
+  }}>
                       {/* FIX: Map over recipe objects to display the name */}
                       {recipes.map((recipe) => (
                         <MenuItem key={recipe.name} value={recipe.name}>
@@ -858,4 +870,3 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     </Paper>
   );
 }
-
