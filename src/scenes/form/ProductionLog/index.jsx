@@ -1,6 +1,6 @@
 // src/scenes/form/RecipeProduction/index.jsx
 // MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"; // <-- FIX: ADDED useCallback
 import {
   Box,
   TextField,
@@ -473,7 +473,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    // 👇 FIX: Add type="button" to prevent redundant browser form submission
+                    // FIX 1: Add type="button" to prevent redundant browser form submission
                     type="button" 
                     onClick={() =>
                       handleSingleClick(
