@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
+import ProductionLogForm from "../../form/ProductionLog";
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
@@ -163,6 +164,8 @@ export default function ProductionLog() {
 
   // Delete dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [openProductionForm, setOpenProductionForm] = useState(false);
+
 
   // ===== Recipes map =====
   useEffect(() => {
@@ -440,7 +443,8 @@ export default function ProductionLog() {
                 <p className="r-sub">Track batches, waste and remaining units</p>
               </div>
 
-              <div className="r-flex">
+                              <button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>+ Record Production</button>
+<div className="r-flex">
                 {selectedRows.length > 0 && (
                   <div className="r-chip">
                     <span className="r-pill">{selectedRows.length} selected</span>
@@ -713,6 +717,26 @@ export default function ProductionLog() {
               <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
                 <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Cancel</button>
                 <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+    
+      {/* ===================== RECORD PRODUCTION MODAL ===================== */}
+      {openProductionForm && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal">
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>Record Production</h3>
+                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
+              </div>
+              <div className="r-mbody">
+                <ProductionLogForm />
+              </div>
+              <div className="r-mfooter">
+                <button className="r-btn-ghost" onClick={() => setOpenProductionForm(false)}>Close</button>
               </div>
             </div>
           </div>

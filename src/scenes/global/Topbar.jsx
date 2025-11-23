@@ -57,16 +57,12 @@ const brand = {
 const pageOptions = [
   { label: "Dashboard", path: "/" },
   { label: "Goods In", path: "/GoodsIn" },
-  { label: "Goods In Form", path: "/GoodsInForm" },
   { label: "Recipes", path: "/recipes" },
-  { label: "Recipe Form", path: "/recipeform" },
   { label: "Ingredients Inventory", path: "/IngredientsInventory" },
   { label: "Daily Production Log", path: "/daily_production" },
-  { label: "Production Log Form", path: "/recipe_production" },
   { label: "Stock Inventory", path: "/stock_inventory" },
   { label: "Stock Usage", path: "/stock_usage" },
   { label: "Goods Out", path: "/goods_out" },
-  { label: "Goods Out Form", path: "/goods_out_form" },
   { label: "Settings", path: "/settings" },
   { label: "Account", path: "/account" },
 ];
