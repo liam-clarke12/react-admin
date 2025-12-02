@@ -130,13 +130,23 @@ const multipleSchema = yup.object().shape({
 // =====================================================================
 
 const postProductionLog = async (data, cognitoId, isBatch = false) => {
+  // Match your Express routes:
+  // app.post("/api/add-production-log", ...)
+  // app.post("/api/add-production-log/batch", ...)
   const endpoint = isBatch
-    ? `${API_BASE}/production-log/batch`
-    : `${API_BASE}/production-log`;
+    ? `${API_BASE}/add-production-log/batch`
+    : `${API_BASE}/add-production-log`;
 
+  // Match your Express body shape
   const body = isBatch
-    ? data.map((d) => ({ ...d, cognito_id: cognitoId }))
-    : { ...data, cognito_id: cognitoId };
+    ? {
+        entries: data, // array of entries for batch route
+        cognito_id: cognitoId,
+      }
+    : {
+        ...data, // single-entry fields for single route
+        cognito_id: cognitoId,
+      };
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -145,8 +155,14 @@ const postProductionLog = async (data, cognitoId, isBatch = false) => {
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `Server returned ${res.status}`);
+    let message = `Server returned ${res.status}`;
+    try {
+      const text = await res.text();
+      if (text) message = text;
+    } catch (e) {
+      // ignore parse error
+    }
+    throw new Error(message);
   }
 
   return res.json();
