@@ -161,21 +161,17 @@ const multipleSchema = yup.object().shape({
 // =====================================================================
 
 const postProductionLog = async (data, cognitoId, isBatch = false) => {
-  // Match your Express routes:
-  // app.post("/api/add-production-log", ...)
-  // app.post("/api/add-production-log/batch", ...)
   const endpoint = isBatch
     ? `${API_BASE}/add-production-log/batch`
     : `${API_BASE}/add-production-log`;
 
-  // Match your Express body shape
   const body = isBatch
     ? {
-        entries: data, // array of entries for batch route
+        entries: data,
         cognito_id: cognitoId,
       }
     : {
-        ...data, // single-entry fields for single route
+        ...data,
         cognito_id: cognitoId,
       };
 
@@ -199,7 +195,6 @@ const postProductionLog = async (data, cognitoId, isBatch = false) => {
   return res.json();
 };
 
-// INGREDIENT INVENTORY FUNCTIONS
 const getRecipeIngredients = async (cognitoId) => {
   const res = await fetch(
     `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
@@ -227,7 +222,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // recipes state now stores objects { name, units_per_batch } instead of just strings
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -263,7 +257,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     fetchRecipes();
   }, [cognitoId]);
 
-  // Utility to find the units per batch for a selected recipe name
   const getUnitsPerBatch = useCallback(
     (recipeName) =>
       recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0,
@@ -274,7 +267,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
 
   const handleSubmit = useCallback(
     async (values, { resetForm }) => {
-      if (loading) return;
+      // IMPORTANT: no early return on loading here, otherwise
+      // deficitCheck -> submitFunc() will be blocked.
       setLoading(true);
 
       const logsToPost =
@@ -320,16 +314,14 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         setLoading(false);
       }
     },
-    [cognitoId, tabValue, onSubmitted, loading, getUnitsPerBatch]
+    [cognitoId, tabValue, onSubmitted, getUnitsPerBatch]
   );
 
   // =====================================================================
-  // handleDeficitCheck – supports single recipe OR many recipes in Multiple tab,
-  // with unit normalisation like the backend (g/kg/ml/L/unit)
+  // handleDeficitCheck – unit-normalised (g/kg/ml/L/unit)
   // =====================================================================
   const handleDeficitCheck = useCallback(
     async (values, submitFunc) => {
-      // For Single tab, if no recipe selected, just submit
       if (tabValue === 0 && !values.recipe) {
         submitFunc();
         return;
@@ -340,8 +332,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         const recipeIngredients = await getRecipeIngredients(cognitoId);
         const stock = await getIngredientStock(cognitoId);
 
-        // 1) Build requirements per ingredient in BASE UNITS (g/ml/unit)
-        //    Map: ingredient -> { ingredient, requiredBase, displayUnit }
+        // Requirements per ingredient in BASE UNITS
+        // Map: ingredient -> { ingredient, requiredBase, displayUnit }
         const requirementsMap = new Map();
 
         const addRequirementBase = (ingredient, unit, amount) => {
@@ -353,7 +345,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
             requirementsMap.get(ingredient) || {
               ingredient,
               requiredBase: 0,
-              // keep first non-empty unit as display unit (for UI only)
               displayUnit: canonUnit || unit || "",
             };
 
@@ -362,7 +353,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         };
 
         if (tabValue === 0) {
-          // Single tab: one recipe, one batchesProduced field
           const recipeRows = recipeIngredients.filter(
             (r) =>
               (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
@@ -377,10 +367,9 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
             );
           });
         } else {
-          // Multiple tab: each log has its own recipe & batchesProduced
           (values.logs ?? []).forEach((log) => {
             const recipeName = log.recipe;
-            if (!recipeName) return; // validation should catch but just in case
+            if (!recipeName) return;
 
             const recipeRows = recipeIngredients.filter(
               (r) =>
@@ -398,8 +387,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           });
         }
 
-        // 2) Build stock per ingredient in BASE UNITS (g/ml/unit)
-        //    Map: ingredient -> totalAvailableBase
+        // Stock per ingredient in BASE UNITS
         const stockMap = new Map();
         (stock ?? []).forEach((s) => {
           const canonUnit = normalizeUnit(s.unit);
@@ -409,7 +397,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           stockMap.set(s.ingredient, current + baseAmount);
         });
 
-        // 3) Compare required vs available (all in base units)
         const deficits = [];
         for (const {
           ingredient,
@@ -422,7 +409,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
             const canonDisplay = normalizeUnit(displayUnit);
             const factor = unitFactorToBase(canonDisplay) || 1;
 
-            // Convert back to display unit for the UI
             const required = requiredBase / factor;
             const available = availableBase / factor;
             const missing = required - available;
@@ -447,7 +433,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           return;
         }
 
-        // No deficits -> proceed to actual submit
+        // No deficits -> proceed
         submitFunc();
       } catch (error) {
         console.error("Ingredient Deficit Error:", error);
@@ -1014,7 +1000,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         onClose={() => setDeficitOpen(false)}
         maxWidth="xs"
         fullWidth
-        // Force the dialog to be clearly visible and on top
         sx={{
           zIndex: 400000,
           "& .MuiDialog-container": {
