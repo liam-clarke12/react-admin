@@ -73,6 +73,37 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
+// Normalise units (mirror backend logic, including litres/liters)
+const normalizeUnit = (u) => {
+  const raw = (u || "").toString().trim().toLowerCase();
+  if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+  if (["g", "gram", "grams"].includes(raw)) return "g";
+  if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+  if (
+    ["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(
+      raw
+    )
+  )
+    return "ml";
+  if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+  if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw))
+    return "unit";
+  return raw;
+};
+
+// factor to convert canonical unit -> base numeric unit
+// base units: g, ml, unit (all become 1), kg/L become 1000 of base
+const unitFactorToBase = (canonUnit) => {
+  const u = (canonUnit || "").toString().toLowerCase();
+  if (!u) return 1;
+  if (u === "kg") return 1000; // kg -> g
+  if (u === "g") return 1;
+  if (u === "l") return 1000; // L -> ml
+  if (u === "ml") return 1;
+  if (u === "unit") return 1;
+  return 1;
+};
+
 const defaultSingleLog = {
   recipe: "",
   date: formatDateYMD(new Date()),
@@ -267,8 +298,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               unitsOfWaste: toNumber(log.unitsOfWaste),
               batchCode: log.batchCode,
               unitsRemaining:
-                toNumber(log.batchesProduced) *
-                  getUnitsPerBatch(log.recipe) -
+                toNumber(log.batchesProduced) * getUnitsPerBatch(log.recipe) -
                 toNumber(log.unitsOfWaste),
             }));
 
@@ -294,7 +324,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   );
 
   // =====================================================================
-  // handleDeficitCheck – supports single recipe OR many recipes in Multiple tab
+  // handleDeficitCheck – supports single recipe OR many recipes in Multiple tab,
+  // with unit normalisation like the backend (g/kg/ml/L/unit)
   // =====================================================================
   const handleDeficitCheck = useCallback(
     async (values, submitFunc) => {
@@ -309,18 +340,25 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         const recipeIngredients = await getRecipeIngredients(cognitoId);
         const stock = await getIngredientStock(cognitoId);
 
-        // Aggregate requirements per ingredient+unit
-        const requirementsMap = new Map(); // key: `${ingredient}||${unit}` -> { ingredient, unit, required }
+        // 1) Build requirements per ingredient in BASE UNITS (g/ml/unit)
+        //    Map: ingredient -> { ingredient, requiredBase, displayUnit }
+        const requirementsMap = new Map();
 
-        const addRequirement = (ingredient, unit, amount) => {
-          const key = `${ingredient}||${unit}`;
-          const existing = requirementsMap.get(key) || {
-            ingredient,
-            unit,
-            required: 0,
-          };
-          existing.required += amount;
-          requirementsMap.set(key, existing);
+        const addRequirementBase = (ingredient, unit, amount) => {
+          const canonUnit = normalizeUnit(unit);
+          const factor = unitFactorToBase(canonUnit);
+          const baseAmount = toNumber(amount) * factor;
+
+          const existing =
+            requirementsMap.get(ingredient) || {
+              ingredient,
+              requiredBase: 0,
+              // keep first non-empty unit as display unit (for UI only)
+              displayUnit: canonUnit || unit || "",
+            };
+
+          existing.requiredBase += baseAmount;
+          requirementsMap.set(ingredient, existing);
         };
 
         if (tabValue === 0) {
@@ -332,7 +370,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           const totalBatches = toNumber(values.batchesProduced);
 
           recipeRows.forEach((req) => {
-            addRequirement(
+            addRequirementBase(
               req.ingredient,
               req.unit,
               toNumber(req.quantity) * totalBatches
@@ -351,7 +389,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
             const batches = toNumber(log.batchesProduced);
 
             recipeRows.forEach((req) => {
-              addRequirement(
+              addRequirementBase(
                 req.ingredient,
                 req.unit,
                 toNumber(req.quantity) * batches
@@ -360,19 +398,41 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           });
         }
 
+        // 2) Build stock per ingredient in BASE UNITS (g/ml/unit)
+        //    Map: ingredient -> totalAvailableBase
+        const stockMap = new Map();
+        (stock ?? []).forEach((s) => {
+          const canonUnit = normalizeUnit(s.unit);
+          const factor = unitFactorToBase(canonUnit);
+          const baseAmount = toNumber(s.totalRemaining) * factor;
+          const current = stockMap.get(s.ingredient) || 0;
+          stockMap.set(s.ingredient, current + baseAmount);
+        });
+
+        // 3) Compare required vs available (all in base units)
         const deficits = [];
-        for (const { ingredient, unit, required } of requirementsMap.values()) {
-          const match = stock.find(
-            (s) => s.ingredient === ingredient && s.unit === unit
-          );
-          const available = toNumber(match?.totalRemaining ?? 0);
-          if (required > available) {
+        for (const {
+          ingredient,
+          requiredBase,
+          displayUnit,
+        } of requirementsMap.values()) {
+          const availableBase = stockMap.get(ingredient) || 0;
+
+          if (requiredBase > availableBase) {
+            const canonDisplay = normalizeUnit(displayUnit);
+            const factor = unitFactorToBase(canonDisplay) || 1;
+
+            // Convert back to display unit for the UI
+            const required = requiredBase / factor;
+            const available = availableBase / factor;
+            const missing = required - available;
+
             deficits.push({
               ingredient,
-              unit,
+              unit: canonDisplay || displayUnit || "",
               required,
               available,
-              missing: required - available,
+              missing,
             });
           }
         }
@@ -387,6 +447,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           return;
         }
 
+        // No deficits -> proceed to actual submit
         submitFunc();
       } catch (error) {
         console.error("Ingredient Deficit Error:", error);
