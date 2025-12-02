@@ -1,6 +1,12 @@
 // src/scenes/form/ProductionLog/index.jsx
 // MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import {
   Box,
   TextField,
@@ -33,9 +39,9 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { useAuth } from "../../../contexts/AuthContext";
 
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const brand = {
   text: "#0f172a",
@@ -148,13 +154,19 @@ const postProductionLog = async (data, cognitoId, isBatch = false) => {
 
 // INGREDIENT INVENTORY FUNCTIONS
 const getRecipeIngredients = async (cognitoId) => {
-  const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+  const res = await fetch(
+    `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
+  );
   if (!res.ok) throw new Error("Failed to fetch recipes");
   return await res.json();
 };
 
 const getIngredientStock = async (cognitoId) => {
-  const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
+  const res = await fetch(
+    `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+      cognitoId
+    )}`
+  );
   if (!res.ok) throw new Error("Failed to fetch ingredient stock");
   return await res.json();
 };
@@ -170,7 +182,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
-  // FIX: recipes state now stores objects { name, units_per_batch } instead of just strings
+  // recipes state now stores objects { name, units_per_batch } instead of just strings
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -179,9 +191,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const deficitNextRef = useRef(null);
   const deficitInfoRef = useRef({
     recipe: "",
-    required: 0,
-    available: 0,
-    next: null,
+    deficits: [],
   });
 
   // ===== Fetch Recipes =====
@@ -190,14 +200,12 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     const fetchRecipes = async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
+          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
 
-        // FIX: Store recipe objects with units_per_batch
+        // Store recipe objects with units_per_batch
         setRecipes(
           (Array.isArray(data) ? data : []).map((r) => ({
             name: r.recipe_name ?? r.recipe ?? r.name,
@@ -212,9 +220,11 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   }, [cognitoId]);
 
   // Utility to find the units per batch for a selected recipe name
-  const getUnitsPerBatch = useCallback((recipeName) => {
-    return recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0;
-  }, [recipes]);
+  const getUnitsPerBatch = useCallback(
+    (recipeName) =>
+      recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0,
+    [recipes]
+  );
 
   // ===== Submission Handlers =====
 
@@ -232,7 +242,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 unitsOfWaste: toNumber(values.unitsOfWaste),
                 // Calculate units remaining based on recipe data
                 unitsRemaining:
-                  toNumber(values.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                  toNumber(values.batchesProduced) *
+                    getUnitsPerBatch(values.recipe) -
                   toNumber(values.unitsOfWaste),
               },
             ]
@@ -245,7 +256,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               unitsOfWaste: toNumber(log.unitsOfWaste),
               // Calculate units remaining for each log entry
               unitsRemaining:
-                toNumber(log.batchesProduced) * getUnitsPerBatch(values.recipe) -
+                toNumber(log.batchesProduced) *
+                  getUnitsPerBatch(values.recipe) -
                 toNumber(log.unitsOfWaste),
             }));
 
@@ -270,129 +282,105 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     [cognitoId, tabValue, onSubmitted, loading, getUnitsPerBatch]
   );
 
-
-const handleDeficitCheck = useCallback(
-  async (values, submitFunc) => {
-    if (!values.recipe) {
-      submitFunc();
-
-// =====================================================================
-// FIXED handleSingleClick (final corrected version)
-// =====================================================================
-const handleSingleClick = (
-  validateForm,
-  values,
-  setTouched,
-  submitForm
-) => {
-  setTouched(
-    Object.keys(values).reduce(
-      (acc, key) => ({ ...acc, [key]: true }),
-      {}
-    )
-  );
-
-  validateForm().then((errors) => {
-    if (Object.keys(errors).length === 0) {
-      handleDeficitCheck(values, submitForm); 
-    } else {
-      const firstError = Object.keys(errors)[0];
-      const el = document.getElementById(firstError);
-      if (el) el.focus();
-    }
-  });
-};
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const recipeIngredients = await getRecipeIngredients(cognitoId);
-      const recipeRows = recipeIngredients.filter(
-        (r) => (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
-      );
-
-      const grouped = recipeRows.map((r) => ({
-        ingredient: r.ingredient,
-        quantity: toNumber(r.quantity),
-        unit: r.unit,
-      }));
-
-      const stock = await getIngredientStock(cognitoId);
-
-      const totalBatches =
-        tabValue === 0
-          ? toNumber(values.batchesProduced)
-          : values.logs.reduce(
-              (sum, log) => sum + toNumber(log.batchesProduced),
-              0
-            );
-
-      const deficits = [];
-      grouped.forEach((req) => {
-        const required = req.quantity * totalBatches;
-        const match = stock.find(
-          (s) => s.ingredient === req.ingredient && s.unit === req.unit
-        );
-        const available = toNumber(match?.totalRemaining ?? 0);
-        if (required > available) {
-          deficits.push({
-            ingredient: req.ingredient,
-            unit: req.unit,
-            required,
-            available,
-            missing: required - available,
-          });
-        }
-      });
-
-      if (deficits.length > 0) {
-        deficitInfoRef.current = {
-          recipe: values.recipe,
-          deficits,
-        };
-        deficitNextRef.current = submitFunc;
-        setDeficitOpen(true);
+  // =====================================================================
+  // handleDeficitCheck
+  // =====================================================================
+  const handleDeficitCheck = useCallback(
+    async (values, submitFunc) => {
+      // If no recipe chosen, just submit
+      if (!values.recipe) {
+        submitFunc();
         return;
       }
 
-      submitFunc();
-    } catch (error) {
-      console.error("Ingredient Deficit Error:", error);
-      alert(`Ingredient check failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  },
-  [cognitoId, tabValue]
-);
-// =====================================================================
-// FIXED handleSingleClick
-// =====================================================================
-const handleSingleClick = (
-  validateForm,
-  values,
-  setTouched,
-  submitForm
-) => {
-  setTouched(
-    Object.keys(values).reduce(
-      (acc, key) => ({ ...acc, [key]: true }),
-      {}
-    )
+      setLoading(true);
+      try {
+        const recipeIngredients = await getRecipeIngredients(cognitoId);
+        const recipeRows = recipeIngredients.filter(
+          (r) => (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
+        );
+
+        const grouped = recipeRows.map((r) => ({
+          ingredient: r.ingredient,
+          quantity: toNumber(r.quantity),
+          unit: r.unit,
+        }));
+
+        const stock = await getIngredientStock(cognitoId);
+
+        const totalBatches =
+          tabValue === 0
+            ? toNumber(values.batchesProduced)
+            : (values.logs ?? []).reduce(
+                (sum, log) => sum + toNumber(log.batchesProduced),
+                0
+              );
+
+        const deficits = [];
+        grouped.forEach((req) => {
+          const required = req.quantity * totalBatches;
+          const match = stock.find(
+            (s) => s.ingredient === req.ingredient && s.unit === req.unit
+          );
+          const available = toNumber(match?.totalRemaining ?? 0);
+          if (required > available) {
+            deficits.push({
+              ingredient: req.ingredient,
+              unit: req.unit,
+              required,
+              available,
+              missing: required - available,
+            });
+          }
+        });
+
+        if (deficits.length > 0) {
+          deficitInfoRef.current = {
+            recipe: values.recipe,
+            deficits,
+          };
+          deficitNextRef.current = submitFunc;
+          setDeficitOpen(true);
+          return;
+        }
+
+        submitFunc();
+      } catch (error) {
+        console.error("Ingredient Deficit Error:", error);
+        alert(`Ingredient check failed: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cognitoId, tabValue]
   );
 
-  validateForm().then((errors) => {
-    if (Object.keys(errors).length === 0) {
-      handleDeficitCheck(values, submitFunc);
-    } else {
-      const firstError = Object.keys(errors)[0];
-      const el = document.getElementById(firstError);
-      if (el) el.focus();
-    }
-  });
-};
+  // =====================================================================
+  // handleSingleClick
+  // =====================================================================
+  const handleSingleClick = useCallback(
+    (validateForm, values, setTouched, submitForm) => {
+      // Mark all fields as touched
+      setTouched(
+        Object.keys(values).reduce(
+          (acc, key) => ({ ...acc, [key]: true }),
+          {}
+        )
+      );
 
+      validateForm().then((errors) => {
+        if (Object.keys(errors).length === 0) {
+          // Run inventory deficit check before final submit
+          handleDeficitCheck(values, submitForm);
+        } else {
+          const firstError = Object.keys(errors)[0];
+          const el = document.getElementById(firstError);
+          if (el) el.focus();
+        }
+      });
+    },
+    [handleDeficitCheck]
+  );
 
   return (
     <Paper elevation={0} sx={{ p: isMobile ? 1 : 2, mb: 3 }}>
@@ -426,7 +414,11 @@ const handleSingleClick = (
               // =====================================================================
               // TAB 0: SINGLE BATCH FORM
               // =====================================================================
-              <form onSubmit={(e) => { e.preventDefault(); /* Submission is handled by FAB onClick */ }}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault(); // Submission is handled by FAB onClick
+                }}
+              >
                 <Box
                   display="grid"
                   gap="16px"
@@ -448,14 +440,21 @@ const handleSingleClick = (
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-
-  MenuProps={{
-    disablePortal: false,
-    anchorOrigin: { vertical: "bottom", horizontal: "left" },
-    transformOrigin: { vertical: "top", horizontal: "left" },
-    PaperProps: { style: { zIndex: 300000, position: "absolute" } }
-  }}>
-                      {/* FIX: Map over recipe objects to display the name */}
+                      MenuProps={{
+                        disablePortal: false,
+                        anchorOrigin: {
+                          vertical: "bottom",
+                          horizontal: "left",
+                        },
+                        transformOrigin: {
+                          vertical: "top",
+                          horizontal: "left",
+                        },
+                        PaperProps: {
+                          style: { zIndex: 300000, position: "absolute" },
+                        },
+                      }}
+                    >
                       {recipes.map((recipe) => (
                         <MenuItem key={recipe.name} value={recipe.name}>
                           {recipe.name}
@@ -527,7 +526,9 @@ const handleSingleClick = (
                     onChange={handleChange}
                     value={values.producerName}
                     name="producerName"
-                    error={!!touched.producerName && !!errors.producerName}
+                    error={
+                      !!touched.producerName && !!errors.producerName
+                    }
                     helperText={touched.producerName && errors.producerName}
                     sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
@@ -549,14 +550,13 @@ const handleSingleClick = (
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    // FIX: Add type="button" to prevent redundant browser form submission
-                    type="button"
+                    type="button" // prevent default form submit
                     onClick={() =>
                       handleSingleClick(
                         validateForm,
                         values,
                         setTouched,
-                        formikHandleSubmit // Use formik's own handleSubmit
+                        formikHandleSubmit
                       )
                     }
                     disabled={loading || !cognitoId}
@@ -587,7 +587,12 @@ const handleSingleClick = (
               // =====================================================================
               // TAB 1: MULTIPLE BATCHES FORM
               // =====================================================================
-              <form onSubmit={(e) => { e.preventDefault(); handleDeficitCheck(values, formikHandleSubmit); }}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleDeficitCheck(values, formikHandleSubmit);
+                }}
+              >
                 <Box
                   display="grid"
                   gap="16px"
@@ -610,14 +615,21 @@ const handleSingleClick = (
                       onBlur={handleBlur}
                       label="Recipe *"
                       error={!!touched.recipe && !!errors.recipe}
-
-  MenuProps={{
-    disablePortal: false,
-    anchorOrigin: { vertical: "bottom", horizontal: "left" },
-    transformOrigin: { vertical: "top", horizontal: "left" },
-    PaperProps: { style: { zIndex: 300000, position: "absolute" } }
-  }}>
-                      {/* FIX: Map over recipe objects to display the name */}
+                      MenuProps={{
+                        disablePortal: false,
+                        anchorOrigin: {
+                          vertical: "bottom",
+                          horizontal: "left",
+                        },
+                        transformOrigin: {
+                          vertical: "top",
+                          horizontal: "left",
+                        },
+                        PaperProps: {
+                          style: { zIndex: 300000, position: "absolute" },
+                        },
+                      }}
+                    >
                       {recipes.map((recipe) => (
                         <MenuItem key={recipe.name} value={recipe.name}>
                           {recipe.name}
@@ -655,7 +667,9 @@ const handleSingleClick = (
                     onChange={handleChange}
                     value={values.producerName}
                     name="producerName"
-                    error={!!touched.producerName && !!errors.producerName}
+                    error={
+                      !!touched.producerName && !!errors.producerName
+                    }
                     helperText={touched.producerName && errors.producerName}
                     sx={{ gridColumn: "span 4" }}
                   />
@@ -676,13 +690,19 @@ const handleSingleClick = (
                 <FieldArray name="logs">
                   {({ push, remove }) => (
                     <>
-                      {/* FIX: Check for array errors and display them */}
                       {!!(touched.logs && errors.logs) &&
-                        typeof errors.logs === 'string' && (
-                          <Alert severity="error" sx={{ mb: 2, fontWeight: 700, borderRadius: 2 }}>
+                        typeof errors.logs === "string" && (
+                          <Alert
+                            severity="error"
+                            sx={{
+                              mb: 2,
+                              fontWeight: 700,
+                              borderRadius: 2,
+                            }}
+                          >
                             {errors.logs}
                           </Alert>
-                      )}
+                        )}
 
                       <Table
                         size="small"
@@ -698,7 +718,9 @@ const handleSingleClick = (
                           <TableRow
                             sx={{
                               bgcolor: "#f8fafc",
-                              "& .MuiTableCell-head": { fontWeight: 800 },
+                              "& .MuiTableCell-head": {
+                                fontWeight: 800,
+                              },
                             }}
                           >
                             <TableCell>Batches Produced *</TableCell>
@@ -718,7 +740,9 @@ const handleSingleClick = (
                                 key={index}
                                 sx={{
                                   "&:nth-of-type(odd)": { bgcolor: "#fff" },
-                                  "&:nth-of-type(even)": { bgcolor: "#f8fafc" },
+                                  "&:nth-of-type(even)": {
+                                    bgcolor: "#f8fafc",
+                                  },
                                 }}
                               >
                                 <TableCell>
@@ -730,12 +754,24 @@ const handleSingleClick = (
                                     onChange={handleChange}
                                     onBlur={handleBlur}
                                     error={
-                                      !!getIn(touched, batchesProducedPath) &&
-                                      !!getIn(errors, batchesProducedPath)
+                                      !!getIn(
+                                        touched,
+                                        batchesProducedPath
+                                      ) &&
+                                      !!getIn(
+                                        errors,
+                                        batchesProducedPath
+                                      )
                                     }
                                     helperText={
-                                      getIn(touched, batchesProducedPath) &&
-                                      getIn(errors, batchesProducedPath)
+                                      getIn(
+                                        touched,
+                                        batchesProducedPath
+                                      ) &&
+                                      getIn(
+                                        errors,
+                                        batchesProducedPath
+                                      )
                                     }
                                     sx={{ minWidth: 120 }}
                                   />
@@ -840,9 +876,6 @@ const handleSingleClick = (
                 </Box>
               </form>
             )}
-
-            {/* ERROR ALERT (Moved up for better visibility in Multiple tab) */}
-            {/* Removed the original logic as the FieldArray section now handles array errors */}
           </>
         )}
       </Formik>
@@ -858,7 +891,8 @@ const handleSingleClick = (
         </DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Ingredient shortages for recipe <strong>{deficitInfoRef.current.recipe}</strong>
+            Ingredient shortages for recipe{" "}
+            <strong>{deficitInfoRef.current.recipe}</strong>
           </Alert>
           <Table size="small" sx={{ mt: 2 }}>
             <TableHead>
@@ -870,12 +904,18 @@ const handleSingleClick = (
               </TableRow>
             </TableHead>
             <TableBody>
-              {(deficitInfoRef.current.deficits ?? []).map((d,i)=>(
+              {(deficitInfoRef.current.deficits ?? []).map((d, i) => (
                 <TableRow key={i}>
                   <TableCell>{d.ingredient}</TableCell>
-                  <TableCell>{d.required} {d.unit}</TableCell>
-                  <TableCell>{d.available} {d.unit}</TableCell>
-                  <TableCell sx={{color:brand.danger}}>{d.missing} {d.unit}</TableCell>
+                  <TableCell>
+                    {d.required} {d.unit}
+                  </TableCell>
+                  <TableCell>
+                    {d.available} {d.unit}
+                  </TableCell>
+                  <TableCell sx={{ color: brand.danger }}>
+                    {d.missing} {d.unit}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
