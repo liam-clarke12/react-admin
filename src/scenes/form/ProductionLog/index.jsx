@@ -2,7 +2,6 @@
 // MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
 import React, {
   useEffect,
-  useMemo,
   useRef,
   useState,
   useCallback,
@@ -83,13 +82,13 @@ const defaultSingleLog = {
   batchCode: "",
 };
 
+// Multiple tab: each row has its own recipe
 const defaultMultipleLog = {
-  recipe: "",
   date: formatDateYMD(new Date()),
   producerName: "",
   logs: [
-    { batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
-    { batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
   ],
 };
 
@@ -104,14 +103,15 @@ const singleSchema = yup.object().shape({
   date: yup.date().required("Date is required"),
 });
 
+// Multiple schema: recipe per row
 const multipleSchema = yup.object().shape({
-  recipe: yup.string().required("Recipe is required"),
   producerName: yup.string().required("Producer is required"),
   date: yup.date().required("Date is required"),
   logs: yup
     .array()
     .of(
       yup.object().shape({
+        recipe: yup.string().required("Recipe is required"),
         batchesProduced: yup
           .number()
           .min(1, "Must be at least 1")
@@ -175,8 +175,6 @@ const getIngredientStock = async (cognitoId) => {
 // MAIN COMPONENT
 // =====================================================================
 
-// Renamed from ProductionLogForm to RecipeProductionForm to match the file structure convention
-// (or ensure you import ProductionLogForm from this file in index.jsx)
 export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
@@ -205,7 +203,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
 
-        // Store recipe objects with units_per_batch
         setRecipes(
           (Array.isArray(data) ? data : []).map((r) => ({
             name: r.recipe_name ?? r.recipe ?? r.name,
@@ -240,7 +237,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 ...values,
                 batchesProduced: toNumber(values.batchesProduced),
                 unitsOfWaste: toNumber(values.unitsOfWaste),
-                // Calculate units remaining based on recipe data
                 unitsRemaining:
                   toNumber(values.batchesProduced) *
                     getUnitsPerBatch(values.recipe) -
@@ -248,16 +244,15 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               },
             ]
           : (values.logs ?? []).map((log) => ({
-              ...log,
-              recipe: values.recipe,
               date: values.date,
               producerName: values.producerName,
+              recipe: log.recipe,
               batchesProduced: toNumber(log.batchesProduced),
               unitsOfWaste: toNumber(log.unitsOfWaste),
-              // Calculate units remaining for each log entry
+              batchCode: log.batchCode,
               unitsRemaining:
                 toNumber(log.batchesProduced) *
-                  getUnitsPerBatch(values.recipe) -
+                  getUnitsPerBatch(log.recipe) -
                 toNumber(log.unitsOfWaste),
             }));
 
@@ -283,12 +278,12 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   );
 
   // =====================================================================
-  // handleDeficitCheck
+  // handleDeficitCheck – supports single recipe OR many recipes in Multiple tab
   // =====================================================================
   const handleDeficitCheck = useCallback(
     async (values, submitFunc) => {
-      // If no recipe chosen, just submit
-      if (!values.recipe) {
+      // For Single tab, if no recipe selected, just submit
+      if (tabValue === 0 && !values.recipe) {
         submitFunc();
         return;
       }
@@ -296,47 +291,79 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
       setLoading(true);
       try {
         const recipeIngredients = await getRecipeIngredients(cognitoId);
-        const recipeRows = recipeIngredients.filter(
-          (r) => (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
-        );
-
-        const grouped = recipeRows.map((r) => ({
-          ingredient: r.ingredient,
-          quantity: toNumber(r.quantity),
-          unit: r.unit,
-        }));
-
         const stock = await getIngredientStock(cognitoId);
 
-        const totalBatches =
-          tabValue === 0
-            ? toNumber(values.batchesProduced)
-            : (values.logs ?? []).reduce(
-                (sum, log) => sum + toNumber(log.batchesProduced),
-                0
+        // Aggregate requirements per ingredient+unit
+        const requirementsMap = new Map(); // key: `${ingredient}||${unit}` -> { ingredient, unit, required }
+
+        const addRequirement = (ingredient, unit, amount) => {
+          const key = `${ingredient}||${unit}`;
+          const existing = requirementsMap.get(key) || {
+            ingredient,
+            unit,
+            required: 0,
+          };
+          existing.required += amount;
+          requirementsMap.set(key, existing);
+        };
+
+        if (tabValue === 0) {
+          // Single tab: one recipe, one batchesProduced field
+          const recipeRows = recipeIngredients.filter(
+            (r) =>
+              (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
+          );
+          const totalBatches = toNumber(values.batchesProduced);
+
+          recipeRows.forEach((req) => {
+            addRequirement(
+              req.ingredient,
+              req.unit,
+              toNumber(req.quantity) * totalBatches
+            );
+          });
+        } else {
+          // Multiple tab: each log has its own recipe & batchesProduced
+          (values.logs ?? []).forEach((log) => {
+            const recipeName = log.recipe;
+            if (!recipeName) return; // validation should catch but just in case
+
+            const recipeRows = recipeIngredients.filter(
+              (r) =>
+                (r.recipe_name ?? r.recipe ?? r.name) === recipeName
+            );
+            const batches = toNumber(log.batchesProduced);
+
+            recipeRows.forEach((req) => {
+              addRequirement(
+                req.ingredient,
+                req.unit,
+                toNumber(req.quantity) * batches
               );
+            });
+          });
+        }
 
         const deficits = [];
-        grouped.forEach((req) => {
-          const required = req.quantity * totalBatches;
+        for (const { ingredient, unit, required } of requirementsMap.values()) {
           const match = stock.find(
-            (s) => s.ingredient === req.ingredient && s.unit === req.unit
+            (s) => s.ingredient === ingredient && s.unit === unit
           );
           const available = toNumber(match?.totalRemaining ?? 0);
           if (required > available) {
             deficits.push({
-              ingredient: req.ingredient,
-              unit: req.unit,
+              ingredient,
+              unit,
               required,
               available,
               missing: required - available,
             });
           }
-        });
+        }
 
         if (deficits.length > 0) {
           deficitInfoRef.current = {
-            recipe: values.recipe,
+            recipe: tabValue === 0 ? values.recipe : "Multiple recipes",
             deficits,
           };
           deficitNextRef.current = submitFunc;
@@ -360,7 +387,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   // =====================================================================
   const handleSingleClick = useCallback(
     (validateForm, values, setTouched, submitForm) => {
-      // Mark all fields as touched
       setTouched(
         Object.keys(values).reduce(
           (acc, key) => ({ ...acc, [key]: true }),
@@ -370,7 +396,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
 
       validateForm().then((errors) => {
         if (Object.keys(errors).length === 0) {
-          // Run inventory deficit check before final submit
           handleDeficitCheck(values, submitForm);
         } else {
           const firstError = Object.keys(errors)[0];
@@ -416,7 +441,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               // =====================================================================
               <form
                 onSubmit={(e) => {
-                  e.preventDefault(); // Submission is handled by FAB onClick
+                  e.preventDefault(); // handled via FAB
                 }}
               >
                 <Box
@@ -550,7 +575,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   <Fab
                     variant="extended"
-                    type="button" // prevent default form submit
+                    type="button"
                     onClick={() =>
                       handleSingleClick(
                         validateForm,
@@ -585,7 +610,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               </form>
             ) : (
               // =====================================================================
-              // TAB 1: MULTIPLE BATCHES FORM
+              // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
               // =====================================================================
               <form
                 onSubmit={(e) => {
@@ -599,50 +624,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                   gridTemplateColumns="repeat(4, minmax(0, 1fr))"
                   mb={3}
                 >
-                  {/* RECIPE */}
-                  <FormControl
-                    fullWidth
-                    variant="outlined"
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  >
-                    <InputLabel id="recipe-label">Recipe *</InputLabel>
-                    <Select
-                      labelId="recipe-label"
-                      id="recipe"
-                      name="recipe"
-                      value={values.recipe}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      label="Recipe *"
-                      error={!!touched.recipe && !!errors.recipe}
-                      MenuProps={{
-                        disablePortal: false,
-                        anchorOrigin: {
-                          vertical: "bottom",
-                          horizontal: "left",
-                        },
-                        transformOrigin: {
-                          vertical: "top",
-                          horizontal: "left",
-                        },
-                        PaperProps: {
-                          style: { zIndex: 300000, position: "absolute" },
-                        },
-                      }}
-                    >
-                      {recipes.map((recipe) => (
-                        <MenuItem key={recipe.name} value={recipe.name}>
-                          {recipe.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {!!touched.recipe && !!errors.recipe && (
-                      <Typography variant="caption" color="error">
-                        {errors.recipe}
-                      </Typography>
-                    )}
-                  </FormControl>
-
                   {/* DATE */}
                   <TextField
                     fullWidth
@@ -671,7 +652,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       !!touched.producerName && !!errors.producerName
                     }
                     helperText={touched.producerName && errors.producerName}
-                    sx={{ gridColumn: "span 4" }}
+                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
                 </Box>
 
@@ -684,7 +665,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     fontSize: 14,
                   }}
                 >
-                  Batch Logs:
+                  Batch Logs (different recipes allowed):
                 </Typography>
 
                 <FieldArray name="logs">
@@ -723,6 +704,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                               },
                             }}
                           >
+                            <TableCell>Recipe *</TableCell>
                             <TableCell>Batches Produced *</TableCell>
                             <TableCell>Units of Waste *</TableCell>
                             <TableCell>Batch Code (Optional)</TableCell>
@@ -731,6 +713,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                         </TableHead>
                         <TableBody>
                           {(values.logs ?? []).map((log, index) => {
+                            const recipePath = `logs[${index}].recipe`;
                             const batchesProducedPath = `logs[${index}].batchesProduced`;
                             const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
                             const batchCodePath = `logs[${index}].batchCode`;
@@ -745,6 +728,67 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                   },
                                 }}
                               >
+                                {/* RECIPE PER ROW */}
+                                <TableCell sx={{ minWidth: 180 }}>
+                                  <FormControl
+                                    fullWidth
+                                    size="small"
+                                    variant="outlined"
+                                  >
+                                    <InputLabel id={`recipe-label-${index}`}>
+                                      Recipe *
+                                    </InputLabel>
+                                    <Select
+                                      labelId={`recipe-label-${index}`}
+                                      name={recipePath}
+                                      value={log.recipe || ""}
+                                      onChange={handleChange}
+                                      onBlur={handleBlur}
+                                      label="Recipe *"
+                                      error={
+                                        !!getIn(touched, recipePath) &&
+                                        !!getIn(errors, recipePath)
+                                      }
+                                      MenuProps={{
+                                        disablePortal: false,
+                                        anchorOrigin: {
+                                          vertical: "bottom",
+                                          horizontal: "left",
+                                        },
+                                        transformOrigin: {
+                                          vertical: "top",
+                                          horizontal: "left",
+                                        },
+                                        PaperProps: {
+                                          style: {
+                                            zIndex: 300000,
+                                            position: "absolute",
+                                          },
+                                        },
+                                      }}
+                                    >
+                                      {recipes.map((recipe) => (
+                                        <MenuItem
+                                          key={recipe.name}
+                                          value={recipe.name}
+                                        >
+                                          {recipe.name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                  {!!getIn(touched, recipePath) &&
+                                    !!getIn(errors, recipePath) && (
+                                      <Typography
+                                        variant="caption"
+                                        color="error"
+                                      >
+                                        {getIn(errors, recipePath)}
+                                      </Typography>
+                                    )}
+                                </TableCell>
+
+                                {/* BATCHES PRODUCED */}
                                 <TableCell>
                                   <TextField
                                     size="small"
@@ -776,6 +820,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                     sx={{ minWidth: 120 }}
                                   />
                                 </TableCell>
+
+                                {/* UNITS OF WASTE */}
                                 <TableCell>
                                   <TextField
                                     size="small"
@@ -795,6 +841,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                     sx={{ minWidth: 120 }}
                                   />
                                 </TableCell>
+
+                                {/* BATCH CODE */}
                                 <TableCell>
                                   <TextField
                                     size="small"
@@ -805,6 +853,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                     sx={{ minWidth: 150 }}
                                   />
                                 </TableCell>
+
+                                {/* ACTIONS */}
                                 <TableCell align="right">
                                   <IconButton
                                     onClick={() => remove(index)}
@@ -824,6 +874,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                       <Button
                         onClick={() =>
                           push({
+                            recipe: "",
                             batchesProduced: 1,
                             unitsOfWaste: 0,
                             batchCode: "",
@@ -840,7 +891,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                           "&:hover": { borderColor: brand.primary },
                         }}
                       >
-                        Add Another Batch
+                        Add Another Recipe Batch
                       </Button>
                     </>
                   )}
@@ -891,7 +942,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         </DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Ingredient shortages for recipe{" "}
+            Ingredient shortages for{" "}
             <strong>{deficitInfoRef.current.recipe}</strong>
           </Alert>
           <Table size="small" sx={{ mt: 2 }}>
