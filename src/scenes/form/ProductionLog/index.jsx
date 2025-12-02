@@ -130,13 +130,17 @@ const singleSchema = yup.object().shape({
     .min(1, "Must be at least 1")
     .required("Required"),
   unitsOfWaste: yup.number().min(0, "Cannot be negative").required("Required"),
-  producerName: yup.string().required("Producer is required"),
+  // Producer is OPTIONAL now
+  producerName: yup.string(),
   date: yup.date().required("Date is required"),
+  // Batch code is REQUIRED now
+  batchCode: yup.string().required("Batch code is required"),
 });
 
 // Multiple schema: recipe per row
 const multipleSchema = yup.object().shape({
-  producerName: yup.string().required("Producer is required"),
+  // Producer is OPTIONAL now
+  producerName: yup.string(),
   date: yup.date().required("Date is required"),
   logs: yup
     .array()
@@ -151,6 +155,8 @@ const multipleSchema = yup.object().shape({
           .number()
           .min(0, "Cannot be negative")
           .required("Required"),
+        // Batch code per row is REQUIRED now
+        batchCode: yup.string().required("Batch code is required"),
       })
     )
     .min(1, "Must have at least one batch"),
@@ -605,31 +611,31 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     sx={{ gridColumn: isMobile ? "span 4" : "span 1" }}
                   />
 
-                  {/* PRODUCER NAME */}
+                  {/* PRODUCER NAME (OPTIONAL) */}
                   <TextField
                     fullWidth
                     variant="outlined"
-                    label="Produced By (Name) *"
+                    label="Produced By (Name)"
                     onBlur={handleBlur}
                     onChange={handleChange}
                     value={values.producerName}
                     name="producerName"
-                    error={
-                      !!touched.producerName && !!errors.producerName
-                    }
+                    error={!!touched.producerName && !!errors.producerName}
                     helperText={touched.producerName && errors.producerName}
                     sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
 
-                  {/* BATCH CODE */}
+                  {/* BATCH CODE (REQUIRED) */}
                   <TextField
                     fullWidth
                     variant="outlined"
-                    label="Batch Code (Optional)"
+                    label="Batch Code *"
                     onBlur={handleBlur}
                     onChange={handleChange}
                     value={values.batchCode}
                     name="batchCode"
+                    error={!!touched.batchCode && !!errors.batchCode}
+                    helperText={touched.batchCode && errors.batchCode}
                     sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
                 </Box>
@@ -702,18 +708,16 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
 
-                  {/* PRODUCER NAME */}
+                  {/* PRODUCER NAME (OPTIONAL) */}
                   <TextField
                     fullWidth
                     variant="outlined"
-                    label="Produced By (Name) *"
+                    label="Produced By (Name)"
                     onBlur={handleBlur}
                     onChange={handleChange}
                     value={values.producerName}
                     name="producerName"
-                    error={
-                      !!touched.producerName && !!errors.producerName
-                    }
+                    error={!!touched.producerName && !!errors.producerName}
                     helperText={touched.producerName && errors.producerName}
                     sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
                   />
@@ -770,7 +774,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                             <TableCell>Recipe *</TableCell>
                             <TableCell>Batches Produced *</TableCell>
                             <TableCell>Units of Waste *</TableCell>
-                            <TableCell>Batch Code (Optional)</TableCell>
+                            <TableCell>Batch Code *</TableCell>
                             <TableCell align="right">Actions</TableCell>
                           </TableRow>
                         </TableHead>
@@ -905,7 +909,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                   />
                                 </TableCell>
 
-                                {/* BATCH CODE */}
+                                {/* BATCH CODE (REQUIRED) */}
                                 <TableCell>
                                   <TextField
                                     size="small"
@@ -913,6 +917,14 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                                     value={log.batchCode}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
+                                    error={
+                                      !!getIn(touched, batchCodePath) &&
+                                      !!getIn(errors, batchCodePath)
+                                    }
+                                    helperText={
+                                      getIn(touched, batchCodePath) &&
+                                      getIn(errors, batchCodePath)
+                                    }
                                     sx={{ minWidth: 150 }}
                                   />
                                 </TableCell>
