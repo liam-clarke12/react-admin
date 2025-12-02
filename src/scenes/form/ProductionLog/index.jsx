@@ -952,6 +952,20 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         open={deficitOpen}
         onClose={() => setDeficitOpen(false)}
         maxWidth="xs"
+        fullWidth
+        // Force the dialog to be clearly visible and on top
+        sx={{
+          zIndex: 400000,
+          "& .MuiDialog-container": {
+            alignItems: "flex-start",
+          },
+          "& .MuiDialog-paper": {
+            zIndex: 400001,
+            mt: isMobile ? 6 : 10,
+            mx: 2,
+            borderRadius: 3,
+          },
+        }}
       >
         <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
           Inventory Warning
