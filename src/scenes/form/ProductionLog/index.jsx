@@ -683,9 +683,15 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           color: ${brand.subtext};
         }
 
-        /* Submit pill button – now inline at bottom of form, NOT fixed */
-        .gof-pill {
+        /* Footer area to align submit button bottom-right */
+        .gof-footer {
           margin-top: 24px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        /* Submit pill button */
+        .gof-pill {
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -832,190 +838,191 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         }
       `}</style>
 
-        {/* Tabs */}
-        <div className="gof-tabs" role="tablist">
-          <button
-            type="button"
-            className={`gof-tab ${tabValue === 0 ? "active" : ""}`}
-            onClick={() => setTabValue(0)}
-          >
-            Record Single Batch
-          </button>
-          <button
-            type="button"
-            className={`gof-tab ${tabValue === 1 ? "active" : ""}`}
-            onClick={() => setTabValue(1)}
-          >
-            Record Multiple Batches
-          </button>
-        </div>
-
-        <Formik
-          initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
-          validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
-          onSubmit={handleSubmit}
-          enableReinitialize
+      {/* Tabs */}
+      <div className="gof-tabs" role="tablist">
+        <button
+          type="button"
+          className={`gof-tab ${tabValue === 0 ? "active" : ""}`}
+          onClick={() => setTabValue(0)}
         >
-          {({
-            values,
-            errors,
-            touched,
-            handleBlur,
-            handleChange,
-            handleSubmit: formikHandleSubmit,
-            setTouched,
-            validateForm,
-          }) => (
-            <>
-              {tabValue === 0 ? (
-                // =====================================================================
-                // TAB 0: SINGLE BATCH FORM
-                // =====================================================================
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSingleClick(
-                      validateForm,
-                      values,
-                      setTouched,
-                      formikHandleSubmit
-                    );
-                  }}
-                  noValidate
-                >
-                  <div className="gof-grid">
-                    {/* RECIPE */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label" htmlFor="recipe">
-                        Recipe *
-                      </label>
-                      <select
-                        id="recipe"
-                        name="recipe"
-                        className="gof-select"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.recipe}
-                      >
-                        <option value="" disabled>
-                          Select a recipe…
+          Record Single Batch
+        </button>
+        <button
+          type="button"
+          className={`gof-tab ${tabValue === 1 ? "active" : ""}`}
+          onClick={() => setTabValue(1)}
+        >
+          Record Multiple Batches
+        </button>
+      </div>
+
+      <Formik
+        initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
+        validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
+        onSubmit={handleSubmit}
+        enableReinitialize
+      >
+        {({
+          values,
+          errors,
+          touched,
+          handleBlur,
+          handleChange,
+          handleSubmit: formikHandleSubmit,
+          setTouched,
+          validateForm,
+        }) => (
+          <>
+            {tabValue === 0 ? (
+              // =====================================================================
+              // TAB 0: SINGLE BATCH FORM
+              // =====================================================================
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSingleClick(
+                    validateForm,
+                    values,
+                    setTouched,
+                    formikHandleSubmit
+                  );
+                }}
+                noValidate
+              >
+                <div className="gof-grid">
+                  {/* RECIPE */}
+                  <div className="gof-field col-6">
+                    <label className="gof-label" htmlFor="recipe">
+                      Recipe *
+                    </label>
+                    <select
+                      id="recipe"
+                      name="recipe"
+                      className="gof-select"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.recipe}
+                    >
+                      <option value="" disabled>
+                        Select a recipe…
+                      </option>
+                      {recipes.map((recipe) => (
+                        <option key={recipe.name} value={recipe.name}>
+                          {recipe.name}
                         </option>
-                        {recipes.map((recipe) => (
-                          <option key={recipe.name} value={recipe.name}>
-                            {recipe.name}
-                          </option>
-                        ))}
-                      </select>
-                      {touched.recipe && errors.recipe && (
-                        <div className="gof-error">{errors.recipe}</div>
-                      )}
-                    </div>
-
-                    {/* DATE */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label" htmlFor="date">
-                        Date *
-                      </label>
-                      <input
-                        id="date"
-                        name="date"
-                        type="date"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.date}
-                      />
-                      {touched.date && errors.date && (
-                        <div className="gof-error">{errors.date}</div>
-                      )}
-                    </div>
-
-                    {/* BATCHES PRODUCED */}
-                    <div className="gof-field col-4">
-                      <label className="gof-label" htmlFor="batchesProduced">
-                        Batches Produced *
-                      </label>
-                      <input
-                        id="batchesProduced"
-                        name="batchesProduced"
-                        type="number"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.batchesProduced}
-                        min="1"
-                      />
-                      {touched.batchesProduced && errors.batchesProduced && (
-                        <div className="gof-error">
-                          {errors.batchesProduced}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* UNITS OF WASTE */}
-                    <div className="gof-field col-4">
-                      <label className="gof-label" htmlFor="unitsOfWaste">
-                        Units of Waste *
-                      </label>
-                      <input
-                        id="unitsOfWaste"
-                        name="unitsOfWaste"
-                        type="number"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.unitsOfWaste}
-                        min="0"
-                      />
-                      {touched.unitsOfWaste && errors.unitsOfWaste && (
-                        <div className="gof-error">
-                          {errors.unitsOfWaste}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* PRODUCER NAME (OPTIONAL) */}
-                    <div className="gof-field col-4">
-                      <label className="gof-label" htmlFor="producerName">
-                        Produced By (Name)
-                      </label>
-                      <input
-                        id="producerName"
-                        name="producerName"
-                        type="text"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.producerName}
-                      />
-                      {touched.producerName && errors.producerName && (
-                        <div className="gof-error">
-                          {errors.producerName}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* BATCH CODE (REQUIRED) */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label" htmlFor="batchCode">
-                        Batch Code *
-                      </label>
-                      <input
-                        id="batchCode"
-                        name="batchCode"
-                        type="text"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.batchCode}
-                      />
-                      {touched.batchCode && errors.batchCode && (
-                        <div className="gof-error">{errors.batchCode}</div>
-                      )}
-                    </div>
+                      ))}
+                    </select>
+                    {touched.recipe && errors.recipe && (
+                      <div className="gof-error">{errors.recipe}</div>
+                    )}
                   </div>
 
-                  {/* Submit button at bottom of form */}
+                  {/* DATE */}
+                  <div className="gof-field col-6">
+                    <label className="gof-label" htmlFor="date">
+                      Date *
+                    </label>
+                    <input
+                      id="date"
+                      name="date"
+                      type="date"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.date}
+                    />
+                    {touched.date && errors.date && (
+                      <div className="gof-error">{errors.date}</div>
+                    )}
+                  </div>
+
+                  {/* BATCHES PRODUCED */}
+                  <div className="gof-field col-4">
+                    <label className="gof-label" htmlFor="batchesProduced">
+                      Batches Produced *
+                    </label>
+                    <input
+                      id="batchesProduced"
+                      name="batchesProduced"
+                      type="number"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.batchesProduced}
+                      min="1"
+                    />
+                    {touched.batchesProduced && errors.batchesProduced && (
+                      <div className="gof-error">
+                        {errors.batchesProduced}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* UNITS OF WASTE */}
+                  <div className="gof-field col-4">
+                    <label className="gof-label" htmlFor="unitsOfWaste">
+                      Units of Waste *
+                    </label>
+                    <input
+                      id="unitsOfWaste"
+                      name="unitsOfWaste"
+                      type="number"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.unitsOfWaste}
+                      min="0"
+                    />
+                    {touched.unitsOfWaste && errors.unitsOfWaste && (
+                      <div className="gof-error">
+                        {errors.unitsOfWaste}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* PRODUCER NAME (OPTIONAL) */}
+                  <div className="gof-field col-4">
+                    <label className="gof-label" htmlFor="producerName">
+                      Produced By (Name)
+                    </label>
+                    <input
+                      id="producerName"
+                      name="producerName"
+                      type="text"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.producerName}
+                    />
+                    {touched.producerName && errors.producerName && (
+                      <div className="gof-error">
+                        {errors.producerName}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BATCH CODE (REQUIRED) */}
+                  <div className="gof-field col-6">
+                    <label className="gof-label" htmlFor="batchCode">
+                      Batch Code *
+                    </label>
+                    <input
+                      id="batchCode"
+                      name="batchCode"
+                      type="text"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.batchCode}
+                    />
+                    {touched.batchCode && errors.batchCode && (
+                      <div className="gof-error">{errors.batchCode}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer with Record Production bottom-right */}
+                <div className="gof-footer">
                   <button
                     type="submit"
                     className="gof-pill"
@@ -1038,246 +1045,251 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     </svg>
                     {loading ? "Processing..." : "Record Production"}
                   </button>
-                </form>
-              ) : (
-                // =====================================================================
-                // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
-                // =====================================================================
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleDeficitCheck(values, formikHandleSubmit);
-                  }}
-                  noValidate
-                >
-                  <div className="gof-grid" style={{ marginBottom: 16 }}>
-                    {/* DATE */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label" htmlFor="date">
-                        Date *
-                      </label>
-                      <input
-                        id="date"
-                        name="date"
-                        type="date"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.date}
-                      />
-                      {touched.date && errors.date && (
-                        <div className="gof-error">{errors.date}</div>
-                      )}
-                    </div>
-
-                    {/* PRODUCER NAME (OPTIONAL) */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label" htmlFor="producerName">
-                        Produced By (Name)
-                      </label>
-                      <input
-                        id="producerName"
-                        name="producerName"
-                        type="text"
-                        className="gof-input"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        value={values.producerName}
-                      />
-                      {touched.producerName && errors.producerName && (
-                        <div className="gof-error">
-                          {errors.producerName}
-                        </div>
-                      )}
-                    </div>
+                </div>
+              </form>
+            ) : (
+              // =====================================================================
+              // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
+              // =====================================================================
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleDeficitCheck(values, formikHandleSubmit);
+                }}
+                noValidate
+              >
+                <div className="gof-grid" style={{ marginBottom: 16 }}>
+                  {/* DATE */}
+                  <div className="gof-field col-6">
+                    <label className="gof-label" htmlFor="date">
+                      Date *
+                    </label>
+                    <input
+                      id="date"
+                      name="date"
+                      type="date"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.date}
+                    />
+                    {touched.date && errors.date && (
+                      <div className="gof-error">{errors.date}</div>
+                    )}
                   </div>
 
-                  <p className="gof-sub">
-                    Batch Logs (different recipes allowed, each with its own
-                    batch code).
-                  </p>
+                  {/* PRODUCER NAME (OPTIONAL) */}
+                  <div className="gof-field col-6">
+                    <label className="gof-label" htmlFor="producerName">
+                      Produced By (Name)
+                    </label>
+                    <input
+                      id="producerName"
+                      name="producerName"
+                      type="text"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.producerName}
+                    />
+                    {touched.producerName && errors.producerName && (
+                      <div className="gof-error">
+                        {errors.producerName}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                  <FieldArray name="logs">
-                    {({ push, remove }) => (
-                      <>
-                        {!!(touched.logs && errors.logs) &&
-                          typeof errors.logs === "string" && (
-                            <div className="gof-error" style={{ marginBottom: 8 }}>
-                              {errors.logs}
+                <p className="gof-sub">
+                  Batch Logs (different recipes allowed, each with its own
+                  batch code).
+                </p>
+
+                <FieldArray name="logs">
+                  {({ push, remove }) => (
+                    <>
+                      {!!(touched.logs && errors.logs) &&
+                        typeof errors.logs === "string" && (
+                          <div
+                            className="gof-error"
+                            style={{ marginBottom: 8 }}
+                          >
+                            {errors.logs}
+                          </div>
+                        )}
+
+                      {(values.logs ?? []).map((log, index) => {
+                        const recipePath = `logs[${index}].recipe`;
+                        const batchesProducedPath = `logs[${index}].batchesProduced`;
+                        const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
+                        const batchCodePath = `logs[${index}].batchCode`;
+
+                        const recipeError =
+                          getIn(touched, recipePath) &&
+                          getIn(errors, recipePath);
+                        const batchesError =
+                          getIn(touched, batchesProducedPath) &&
+                          getIn(errors, batchesProducedPath);
+                        const wasteError =
+                          getIn(touched, unitsOfWastePath) &&
+                          getIn(errors, unitsOfWastePath);
+                        const batchCodeError =
+                          getIn(touched, batchCodePath) &&
+                          getIn(errors, batchCodePath);
+
+                        return (
+                          <div className="gof-multi-row" key={index}>
+                            <div className="gof-multi-row-header">
+                              <span className="gof-multi-index">
+                                Batch {index + 1}
+                              </span>
+                              {values.logs.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="gof-multi-remove"
+                                  onClick={() => remove(index)}
+                                >
+                                  Remove
+                                </button>
+                              )}
                             </div>
-                          )}
 
-                        {(values.logs ?? []).map((log, index) => {
-                          const recipePath = `logs[${index}].recipe`;
-                          const batchesProducedPath = `logs[${index}].batchesProduced`;
-                          const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
-                          const batchCodePath = `logs[${index}].batchCode`;
-
-                          const recipeError =
-                            getIn(touched, recipePath) &&
-                            getIn(errors, recipePath);
-                          const batchesError =
-                            getIn(touched, batchesProducedPath) &&
-                            getIn(errors, batchesProducedPath);
-                          const wasteError =
-                            getIn(touched, unitsOfWastePath) &&
-                            getIn(errors, unitsOfWastePath);
-                          const batchCodeError =
-                            getIn(touched, batchCodePath) &&
-                            getIn(errors, batchCodePath);
-
-                          return (
-                            <div className="gof-multi-row" key={index}>
-                              <div className="gof-multi-row-header">
-                                <span className="gof-multi-index">
-                                  Batch {index + 1}
-                                </span>
-                                {values.logs.length > 1 && (
-                                  <button
-                                    type="button"
-                                    className="gof-multi-remove"
-                                    onClick={() => remove(index)}
-                                  >
-                                    Remove
-                                  </button>
+                            <div className="gof-grid">
+                              {/* RECIPE PER ROW */}
+                              <div className="gof-field col-6">
+                                <label
+                                  className="gof-label"
+                                  htmlFor={`logs-${index}-recipe`}
+                                >
+                                  Recipe *
+                                </label>
+                                <select
+                                  id={`logs-${index}-recipe`}
+                                  name={recipePath}
+                                  className="gof-select"
+                                  onBlur={handleBlur}
+                                  onChange={handleChange}
+                                  value={log.recipe || ""}
+                                >
+                                  <option value="" disabled>
+                                    Select a recipe…
+                                  </option>
+                                  {recipes.map((recipe) => (
+                                    <option
+                                      key={recipe.name}
+                                      value={recipe.name}
+                                    >
+                                      {recipe.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                {recipeError && (
+                                  <div className="gof-error">
+                                    {recipeError}
+                                  </div>
                                 )}
                               </div>
 
-                              <div className="gof-grid">
-                                {/* RECIPE PER ROW */}
-                                <div className="gof-field col-6">
-                                  <label
-                                    className="gof-label"
-                                    htmlFor={`logs-${index}-recipe`}
-                                  >
-                                    Recipe *
-                                  </label>
-                                  <select
-                                    id={`logs-${index}-recipe`}
-                                    name={recipePath}
-                                    className="gof-select"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={log.recipe || ""}
-                                  >
-                                    <option value="" disabled>
-                                      Select a recipe…
-                                    </option>
-                                    {recipes.map((recipe) => (
-                                      <option
-                                        key={recipe.name}
-                                        value={recipe.name}
-                                      >
-                                        {recipe.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  {recipeError && (
-                                    <div className="gof-error">
-                                      {recipeError}
-                                    </div>
-                                  )}
-                                </div>
+                              {/* BATCHES PRODUCED */}
+                              <div className="gof-field col-3">
+                                <label
+                                  className="gof-label"
+                                  htmlFor={`logs-${index}-batchesProduced`}
+                                >
+                                  Batches Produced *
+                                </label>
+                                <input
+                                  id={`logs-${index}-batchesProduced`}
+                                  name={batchesProducedPath}
+                                  type="number"
+                                  className="gof-input"
+                                  onBlur={handleBlur}
+                                  onChange={handleChange}
+                                  value={log.batchesProduced}
+                                  min="1"
+                                />
+                                {batchesError && (
+                                  <div className="gof-error">
+                                    {batchesError}
+                                  </div>
+                                )}
+                              </div>
 
-                                {/* BATCHES PRODUCED */}
-                                <div className="gof-field col-3">
-                                  <label
-                                    className="gof-label"
-                                    htmlFor={`logs-${index}-batchesProduced`}
-                                  >
-                                    Batches Produced *
-                                  </label>
-                                  <input
-                                    id={`logs-${index}-batchesProduced`}
-                                    name={batchesProducedPath}
-                                    type="number"
-                                    className="gof-input"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={log.batchesProduced}
-                                    min="1"
-                                  />
-                                  {batchesError && (
-                                    <div className="gof-error">
-                                      {batchesError}
-                                    </div>
-                                  )}
-                                </div>
+                              {/* UNITS OF WASTE */}
+                              <div className="gof-field col-3">
+                                <label
+                                  className="gof-label"
+                                  htmlFor={`logs-${index}-unitsOfWaste`}
+                                >
+                                  Units of Waste *
+                                </label>
+                                <input
+                                  id={`logs-${index}-unitsOfWaste`}
+                                  name={unitsOfWastePath}
+                                  type="number"
+                                  className="gof-input"
+                                  onBlur={handleBlur}
+                                  onChange={handleChange}
+                                  value={log.unitsOfWaste}
+                                  min="0"
+                                />
+                                {wasteError && (
+                                  <div className="gof-error">
+                                    {wasteError}
+                                  </div>
+                                )}
+                              </div>
 
-                                {/* UNITS OF WASTE */}
-                                <div className="gof-field col-3">
-                                  <label
-                                    className="gof-label"
-                                    htmlFor={`logs-${index}-unitsOfWaste`}
-                                  >
-                                    Units of Waste *
-                                  </label>
-                                  <input
-                                    id={`logs-${index}-unitsOfWaste`}
-                                    name={unitsOfWastePath}
-                                    type="number"
-                                    className="gof-input"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={log.unitsOfWaste}
-                                    min="0"
-                                  />
-                                  {wasteError && (
-                                    <div className="gof-error">
-                                      {wasteError}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* BATCH CODE (REQUIRED) */}
-                                <div className="gof-field col-6">
-                                  <label
-                                    className="gof-label"
-                                    htmlFor={`logs-${index}-batchCode`}
-                                  >
-                                    Batch Code *
-                                  </label>
-                                  <input
-                                    id={`logs-${index}-batchCode`}
-                                    name={batchCodePath}
-                                    type="text"
-                                    className="gof-input"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={log.batchCode}
-                                  />
-                                  {batchCodeError && (
-                                    <div className="gof-error">
-                                      {batchCodeError}
-                                    </div>
-                                  )}
-                                </div>
+                              {/* BATCH CODE (REQUIRED) */}
+                              <div className="gof-field col-6">
+                                <label
+                                  className="gof-label"
+                                  htmlFor={`logs-${index}-batchCode`}
+                                >
+                                  Batch Code *
+                                </label>
+                                <input
+                                  id={`logs-${index}-batchCode`}
+                                  name={batchCodePath}
+                                  type="text"
+                                  className="gof-input"
+                                  onBlur={handleBlur}
+                                  onChange={handleChange}
+                                  value={log.batchCode}
+                                />
+                                {batchCodeError && (
+                                  <div className="gof-error">
+                                    {batchCodeError}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          );
-                        })}
+                          </div>
+                        );
+                      })}
 
-                        <div className="gof-multi-actions">
-                          <button
-                            type="button"
-                            className="gof-multi-add-btn"
-                            onClick={() =>
-                              push({
-                                recipe: "",
-                                batchesProduced: 1,
-                                unitsOfWaste: 0,
-                                batchCode: "",
-                              })
-                            }
-                          >
-                            + Add another batch
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </FieldArray>
+                      <div className="gof-multi-actions">
+                        <button
+                          type="button"
+                          className="gof-multi-add-btn"
+                          onClick={() =>
+                            push({
+                              recipe: "",
+                              batchesProduced: 1,
+                              unitsOfWaste: 0,
+                              batchCode: "",
+                            })
+                          }
+                        >
+                          + Add another batch
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </FieldArray>
 
-                  {/* Submit button at bottom of form */}
+                {/* Footer with Record Production bottom-right */}
+                <div className="gof-footer">
                   <button
                     type="submit"
                     className="gof-pill"
@@ -1300,12 +1312,12 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     </svg>
                     {loading ? "Processing..." : "Record Production"}
                   </button>
-                </form>
-              )}
-            </>
-          )}
-        </Formik>
-
+                </div>
+              </form>
+            )}
+          </>
+        )}
+      </Formik>
 
       {/* Soft Deficit Warning Modal (can proceed) */}
       <DeficitModal
