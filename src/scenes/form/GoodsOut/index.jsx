@@ -1,11 +1,10 @@
-// src/scenes/form/GoodsOut/index.jsx
-// Nory-styled, MUI-free form with a HARD precheck against Production Log units.
-// Now supports Single / Multiple tabs, and uses /add-goods-out-batch for multiple.
+// src/scenes/form/ProductionLog/index.jsx
+// Nory-styled, MUI-free Production Log with Single / Multiple tabs
+// + ACTIVE-ingredient inventory precheck & soft deficit warning (can proceed)
 
-import React, { useState, useEffect } from "react";
-import { Formik, FieldArray } from "formik";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
-import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
@@ -23,77 +22,175 @@ const brand = {
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
-// Validation Schema (single row)
-const goodsOutSchema = yup.object().shape({
-  date: yup.string().required("Date is required"),
+// =====================================================================
+// UTILS & SCHEMAS
+// =====================================================================
+
+const toNumber = (v) =>
+  v === "" || v === null || v === undefined ? 0 : Number(v) || 0;
+
+const formatDateYMD = (val) => {
+  if (!val) return "";
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) {
+    const s = String(val);
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    return m ? m[0] : s;
+  }
+  return d.toISOString().split("T")[0];
+};
+
+// Normalise units (mirror backend logic, including litres/liters)
+const normalizeUnit = (u) => {
+  const raw = (u || "").toString().trim().toLowerCase();
+  if (!raw || raw === "n/a" || raw === "na" || raw === "none") return "";
+  if (["g", "gram", "grams"].includes(raw)) return "g";
+  if (["kg", "kilogram", "kilograms"].includes(raw)) return "kg";
+  if (
+    ["ml", "millilitre", "milliliter", "milliliters", "millilitres"].includes(
+      raw
+    )
+  )
+    return "ml";
+  if (["l", "liter", "litre", "liters", "litres"].includes(raw)) return "l";
+  if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw))
+    return "unit";
+  return raw;
+};
+
+// factor to convert canonical unit -> base numeric unit
+// base units: g, ml, unit (all become 1), kg/L become 1000 of base
+const unitFactorToBase = (canonUnit) => {
+  const u = (canonUnit || "").toString().toLowerCase();
+  if (!u) return 1;
+  if (u === "kg") return 1000; // kg -> g
+  if (u === "g") return 1;
+  if (u === "l") return 1000; // L -> ml
+  if (u === "ml") return 1;
+  if (u === "unit") return 1;
+  return 1;
+};
+
+const defaultSingleLog = {
+  recipe: "",
+  date: formatDateYMD(new Date()),
+  batchesProduced: 1,
+  unitsOfWaste: 0,
+  producerName: "",
+  batchCode: "",
+};
+
+// Multiple tab: each row has its own recipe
+const defaultMultipleLog = {
+  date: formatDateYMD(new Date()),
+  producerName: "",
+  logs: [
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+  ],
+};
+
+const singleSchema = yup.object().shape({
   recipe: yup.string().required("Recipe is required"),
-  stockAmount: yup
+  batchesProduced: yup
     .number()
-    .typeError("Must be a number")
-    .required("Amount of units is required")
-    .positive("Must be positive"),
-  recipients: yup.string().required("Recipient is required"),
+    .min(1, "Must be at least 1")
+    .required("Required"),
+  unitsOfWaste: yup.number().min(0, "Cannot be negative").required("Required"),
+  // Producer is OPTIONAL now
+  producerName: yup.string(),
+  date: yup.date().required("Date is required"),
+  // Batch code is REQUIRED now
+  batchCode: yup.string().required("Batch code is required"),
 });
 
-// Validation Schema for multiple rows
-const multiGoodsOutSchema = yup.object().shape({
-  items: yup
+// Multiple schema: recipe per row
+const multipleSchema = yup.object().shape({
+  // Producer is OPTIONAL now
+  producerName: yup.string(),
+  date: yup.date().required("Date is required"),
+  logs: yup
     .array()
-    .of(goodsOutSchema)
-    .min(1, "At least one goods out row is required"),
+    .of(
+      yup.object().shape({
+        recipe: yup.string().required("Recipe is required"),
+        batchesProduced: yup
+          .number()
+          .min(1, "Must be at least 1")
+          .required("Required"),
+        unitsOfWaste: yup
+          .number()
+          .min(0, "Cannot be negative")
+          .required("Required"),
+        // Batch code per row is REQUIRED now
+        batchCode: yup.string().required("Batch code is required"),
+      })
+    )
+    .min(1, "Must have at least one batch"),
 });
 
-/** Serious “insufficient units” modal with NO proceed option */
-function HardBlockModal({ open, onClose, recipe, need, have }) {
-  if (!open) return null;
-  return (
-    <div className="gof-modal-backdrop" onClick={onClose}>
-      <div
-        className="gof-modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="gof-modal-header">
-          <h3>Insufficient Finished Units</h3>
-        </div>
-        <div className="gof-modal-body">
-          <p className="gof-warning">
-            You’re trying to send out more{" "}
-            <strong>{recipe || "this recipe"}</strong> units than are currently
-            available in your Recipe Inventory.
-          </p>
-          <div className="gof-block-stats">
-            <div className="stat">
-              <div className="label">Requested</div>
-              <div className="value">
-                {Number(need || 0).toLocaleString()}
-              </div>
-            </div>
-            <div className="stat">
-              <div className="label">Available</div>
-              <div className="value">
-                {Number(have || 0).toLocaleString()}
-              </div>
-            </div>
-          </div>
-          <p className="gof-callout">
-            Please produce more of{" "}
-            <strong>{recipe || "this recipe"}</strong> before recording these
-            goods out.
-          </p>
-        </div>
-        <div className="gof-modal-footer">
-          <button type="button" className="btn danger" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// =====================================================================
+// API FUNCTIONS
+// =====================================================================
 
-/** Simple toast */
+const postProductionLog = async (data, cognitoId, isBatch = false) => {
+  const endpoint = isBatch
+    ? `${API_BASE}/add-production-log/batch`
+    : `${API_BASE}/add-production-log`;
+
+  const body = isBatch
+    ? {
+        entries: data,
+        cognito_id: cognitoId,
+      }
+    : {
+        ...data,
+        cognito_id: cognitoId,
+      };
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let message = `Server returned ${res.status}`;
+    try {
+      const text = await res.text();
+      if (text) message = text;
+    } catch (e) {
+      // ignore parse error
+    }
+    throw new Error(message);
+  }
+
+  return res.json();
+};
+
+const getRecipeIngredients = async (cognitoId) => {
+  const res = await fetch(
+    `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch recipes");
+  return await res.json();
+};
+
+const getIngredientStock = async (cognitoId) => {
+  const res = await fetch(
+    `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+      cognitoId
+    )}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch ingredient stock");
+  return await res.json();
+};
+
+// =====================================================================
+// UI HELPERS – Toast + Soft Deficit Modal
+// =====================================================================
+
+/** Simple toast (same pattern as GoodsOut) */
 function Toast({ open, children, onClose }) {
   if (!open) return null;
   return (
@@ -103,220 +200,365 @@ function Toast({ open, children, onClose }) {
   );
 }
 
-const GoodsOutForm = () => {
-  const { cognitoId } = useAuth();
+/** Soft “ingredient deficit” modal – CAN proceed */
+function DeficitModal({ open, info, onCancel, onProceed }) {
+  if (!open) return null;
+  const recipe = info?.recipe || "this recipe";
+  const deficits = info?.deficits || [];
 
+  return (
+    <div className="gof-modal-backdrop" onClick={onCancel}>
+      <div
+        className="gof-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="gof-modal-header">
+          <h3>Inventory Warning</h3>
+        </div>
+        <div className="gof-modal-body">
+          <p className="gof-warning">
+            Ingredient shortages for <strong>{recipe}</strong>.
+          </p>
+
+          {deficits.length > 0 && (
+            <table className="pl-deficit-table">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Required</th>
+                  <th>Available</th>
+                  <th>Missing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deficits.map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.ingredient}</td>
+                    <td>
+                      {d.required} {d.unit}
+                    </td>
+                    <td>
+                      {d.available} {d.unit}
+                    </td>
+                    <td className="pl-missing">
+                      {d.missing} {d.unit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <p className="gof-callout">
+            You can still record this production, but your ingredient inventory
+            will go negative for the items above.
+          </p>
+        </div>
+        <div className="gof-modal-footer">
+          <button type="button" className="btn danger" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn primary" onClick={onProceed}>
+            Proceed Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// MAIN COMPONENT
+// =====================================================================
+
+export default function ProductionLogForm({ cognitoId, onSubmitted }) {
+  // 0 = Single, 1 = Multiple
+  const [tabValue, setTabValue] = useState(0);
   const [openToast, setOpenToast] = useState(false);
-  const [filteredRecipes, setFilteredRecipes] = useState([]);
+
+  const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fetchErr, setFetchErr] = useState(null);
 
-  // Hard-block modal state
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [blockInfo, setBlockInfo] = useState({
+  // Deficit State
+  const [deficitOpen, setDeficitOpen] = useState(false);
+  const deficitNextRef = useRef(null);
+  const deficitInfoRef = useRef({
     recipe: "",
-    need: 0,
-    have: 0,
+    deficits: [],
   });
 
-  // Single form initial values
-  const [initialValues] = useState({
-    date: new Date().toISOString().split("T")[0],
-    recipe: "",
-    stockAmount: "",
-    recipients: "",
-  });
-
-  // Tab state: "single" | "multiple"
-  const [view, setView] = useState("single");
-
-  // Fetch recipes (shared by single + multiple)
+  // ===== Fetch Recipes =====
   useEffect(() => {
+    if (!cognitoId) return;
     const fetchRecipes = async () => {
-      if (!cognitoId) return;
-      setLoading(true);
-      setFetchErr(null);
       try {
         const res = await fetch(
           `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
         );
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
-        const names = Array.isArray(data)
-          ? data
-              .map((r) => r.recipe_name ?? r.recipe ?? r.name)
-              .filter(Boolean)
-          : [];
-        setFilteredRecipes([...new Set(names)]);
-      } catch (err) {
-        console.error("Error fetching recipes:", err);
-        setFetchErr("Error fetching recipes");
-        setFilteredRecipes([]);
-      } finally {
-        setLoading(false);
+
+        setRecipes(
+          (Array.isArray(data) ? data : []).map((r) => ({
+            name: r.recipe_name ?? r.recipe ?? r.name,
+            units_per_batch: toNumber(r.units_per_batch) || 0,
+          }))
+        );
+      } catch (e) {
+        console.error("Recipes fetch error:", e);
+        setRecipes([]);
       }
     };
     fetchRecipes();
   }, [cognitoId]);
 
-  // Fetch available units for a recipe from active Production Log
-  const fetchAvailableUnitsForRecipe = async (recipeName) => {
-    if (!cognitoId || !recipeName) return 0;
-    try {
-      const res = await fetch(
-        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
-          cognitoId
-        )}`
-      );
-      if (!res.ok) throw new Error("Failed to fetch production log");
-      const rows = await res.json();
+  const getUnitsPerBatch = useCallback(
+    (recipeName) =>
+      recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0,
+    [recipes]
+  );
 
-      let total = 0;
-      (Array.isArray(rows) ? rows : []).forEach((r) => {
-        const rName = r.recipe ?? r.recipe_name ?? r.name ?? "";
-        if ((rName || "").toString().trim() !== recipeName.toString().trim())
-          return;
+  // Auto-hide toast
+  useEffect(() => {
+    if (!openToast) return;
+    const t = setTimeout(() => setOpenToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [openToast]);
 
-        const br = Number(
-          r.batchRemaining ?? r.batch_remaining ?? r.units_per_batch_total ?? 0
+  // ===== Submission Handlers =====
+
+  const handleSubmit = useCallback(
+    async (values, { resetForm }) => {
+      setLoading(true);
+
+      const logsToPost =
+        tabValue === 0
+          ? [
+              {
+                ...values,
+                batchesProduced: toNumber(values.batchesProduced),
+                unitsOfWaste: toNumber(values.unitsOfWaste),
+                unitsRemaining:
+                  toNumber(values.batchesProduced) *
+                    getUnitsPerBatch(values.recipe) -
+                  toNumber(values.unitsOfWaste),
+              },
+            ]
+          : (values.logs ?? []).map((log) => ({
+              date: values.date,
+              producerName: values.producerName,
+              recipe: log.recipe,
+              batchesProduced: toNumber(log.batchesProduced),
+              unitsOfWaste: toNumber(log.unitsOfWaste),
+              batchCode: log.batchCode,
+              unitsRemaining:
+                toNumber(log.batchesProduced) * getUnitsPerBatch(log.recipe) -
+                toNumber(log.unitsOfWaste),
+            }));
+
+      try {
+        await postProductionLog(
+          tabValue === 0 ? logsToPost[0] : logsToPost,
+          cognitoId,
+          tabValue === 1
         );
-        const waste = Number(r.units_of_waste ?? r.unitsOfWaste ?? 0);
-        const out = Number(r.units_out ?? r.unitsOut ?? 0);
-        const apiUnitsRemaining = Number(
-          r.units_remaining ?? r.unitsRemaining ?? NaN
-        );
+        resetForm({
+          values: tabValue === 0 ? defaultSingleLog : defaultMultipleLog,
+        });
+        if (onSubmitted) onSubmitted();
+        setOpenToast(true);
+      } catch (e) {
+        console.error("Submission error:", e);
+        alert(`Submission failed: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cognitoId, tabValue, onSubmitted, getUnitsPerBatch]
+  );
 
-        let remain;
-        if (Number.isFinite(apiUnitsRemaining)) {
-          remain = apiUnitsRemaining;
-        } else {
-          // Defensive fallback: unitsRemaining = batchRemaining - waste - unitsOut
-          remain = Math.max(0, br - waste - out);
-        }
-
-        if (Number.isFinite(remain)) total += remain;
-      });
-
-      return total;
-    } catch (err) {
-      console.error("[GoodsOut] Availability check failed:", err);
-      // If we can't verify, safest is to block by returning 0
-      return 0;
-    }
-  };
-
-  // Single submit with HARD precheck, calls /add-goods-out
-  const handleFormSubmit = async (values, { resetForm }) => {
-    const payload = { ...values, cognito_id: cognitoId };
-    const need = Number(values.stockAmount) || 0;
-
-    try {
-      const have = await fetchAvailableUnitsForRecipe(values.recipe);
-
-      if (need > have) {
-        // Hard block — show modal, do NOT submit
-        setBlockInfo({ recipe: values.recipe, need, have });
-        setBlockOpen(true);
+  // =====================================================================
+  // handleDeficitCheck – unit-normalised (g/kg/ml/L/unit)
+  // =====================================================================
+  const handleDeficitCheck = useCallback(
+    async (values, submitFunc) => {
+      if (tabValue === 0 && !values.recipe) {
+        submitFunc();
         return;
       }
 
-      // OK: submit
-      const response = await fetch(`${API_BASE}/add-goods-out`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        let errMsg = "Failed to submit data";
-        try {
-          const errJson = await response.json();
-          errMsg = errJson?.error || response.statusText || errMsg;
-        } catch {}
-        throw new Error(errMsg);
-      }
+      setLoading(true);
+      try {
+        const recipeIngredients = await getRecipeIngredients(cognitoId);
+        const stock = await getIngredientStock(cognitoId);
 
-      await response.json().catch(() => null);
-      resetForm();
-      setOpenToast(true);
-    } catch (error) {
-      console.error("❌ Error submitting data:", error?.message || error);
-      alert("Submission failed. Check console.");
-    }
-  };
+        // Requirements per ingredient in BASE UNITS
+        // Map: ingredient -> { ingredient, requiredBase, displayUnit }
+        const requirementsMap = new Map();
 
-  // Multiple submit with HARD precheck across the whole batch, calls /add-goods-out-batch
-  const handleBatchSubmit = async (values, { resetForm }) => {
-    const items = values.items || [];
+        const addRequirementBase = (ingredient, unit, amount) => {
+          const canonUnit = normalizeUnit(unit);
+          const factor = unitFactorToBase(canonUnit);
+          const baseAmount = toNumber(amount) * factor;
 
-    // Build aggregated needed units per recipe
-    const needByRecipe = {};
-    items.forEach((e) => {
-      const recipeName = (e.recipe || "").toString().trim();
-      if (!recipeName) return;
-      const amount = Number(e.stockAmount) || 0;
-      if (!needByRecipe[recipeName]) needByRecipe[recipeName] = 0;
-      needByRecipe[recipeName] += amount;
-    });
+          const existing =
+            requirementsMap.get(ingredient) || {
+              ingredient,
+              requiredBase: 0,
+              displayUnit: canonUnit || unit || "",
+            };
 
-    try {
-      // HARD precheck: aggregated per recipe vs available
-      for (const [recipeName, totalNeed] of Object.entries(needByRecipe)) {
-        const have = await fetchAvailableUnitsForRecipe(recipeName);
-        if (totalNeed > have) {
-          setBlockInfo({ recipe: recipeName, need: totalNeed, have });
-          setBlockOpen(true);
+          existing.requiredBase += baseAmount;
+          requirementsMap.set(ingredient, existing);
+        };
+
+        if (tabValue === 0) {
+          const recipeRows = recipeIngredients.filter(
+            (r) =>
+              (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
+          );
+          const totalBatches = toNumber(values.batchesProduced);
+
+          recipeRows.forEach((req) => {
+            addRequirementBase(
+              req.ingredient,
+              req.unit,
+              toNumber(req.quantity) * totalBatches
+            );
+          });
+        } else {
+          (values.logs ?? []).forEach((log) => {
+            const recipeName = log.recipe;
+            if (!recipeName) return;
+
+            const recipeRows = recipeIngredients.filter(
+              (r) =>
+                (r.recipe_name ?? r.recipe ?? r.name) === recipeName
+            );
+            const batches = toNumber(log.batchesProduced);
+
+            recipeRows.forEach((req) => {
+              addRequirementBase(
+                req.ingredient,
+                req.unit,
+                toNumber(req.quantity) * batches
+              );
+            });
+          });
+        }
+
+        // Stock per ingredient in BASE UNITS
+        const stockMap = new Map();
+        (stock ?? []).forEach((s) => {
+          const canonUnit = normalizeUnit(s.unit);
+          const factor = unitFactorToBase(canonUnit);
+          const baseAmount = toNumber(s.totalRemaining) * factor;
+          const current = stockMap.get(s.ingredient) || 0;
+          stockMap.set(s.ingredient, current + baseAmount);
+        });
+
+        const deficits = [];
+        for (const {
+          ingredient,
+          requiredBase,
+          displayUnit,
+        } of requirementsMap.values()) {
+          const availableBase = stockMap.get(ingredient) || 0;
+
+          if (requiredBase > availableBase) {
+            const canonDisplay = normalizeUnit(displayUnit);
+            const factor = unitFactorToBase(canonDisplay) || 1;
+
+            const required = requiredBase / factor;
+            const available = availableBase / factor;
+            const missing = required - available;
+
+            deficits.push({
+              ingredient,
+              unit: canonDisplay || displayUnit || "",
+              required,
+              available,
+              missing,
+            });
+          }
+        }
+
+        if (deficits.length > 0) {
+          deficitInfoRef.current = {
+            recipe: tabValue === 0 ? values.recipe : "Multiple recipes",
+            deficits,
+          };
+          deficitNextRef.current = submitFunc;
+          setDeficitOpen(true);
           return;
         }
+
+        // No deficits -> proceed
+        submitFunc();
+      } catch (error) {
+        console.error("Ingredient Deficit Error:", error);
+        alert(`Ingredient check failed: ${error.message}`);
+      } finally {
+        setLoading(false);
       }
+    },
+    [cognitoId, tabValue]
+  );
 
-      // Shape payload just like single route, but as entries[]
-      const payload = {
-        entries: items.map((e) => ({
-          date: e.date,
-          recipe: e.recipe,
-          stockAmount: e.stockAmount,
-          recipients: e.recipients,
-        })),
-        cognito_id: cognitoId,
-      };
+  // =====================================================================
+  // handleSingleClick – validation + deficit check + submit
+  // =====================================================================
+  const handleSingleClick = useCallback(
+    (validateForm, values, setTouched, submitForm) => {
+      setTouched(
+        Object.keys(values).reduce(
+          (acc, key) => ({ ...acc, [key]: true }),
+          {}
+        )
+      );
 
-      const response = await fetch(`${API_BASE}/add-goods-out-batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      validateForm().then((errors) => {
+        if (Object.keys(errors).length === 0) {
+          handleDeficitCheck(values, submitForm);
+        } else {
+          const firstError = Object.keys(errors)[0];
+          const el = document.getElementById(firstError);
+          if (el) el.focus();
+        }
       });
+    },
+    [handleDeficitCheck]
+  );
 
-      if (!response.ok) {
-        let errMsg = "Failed to submit batch";
-        try {
-          const errJson = await response.json();
-          errMsg = errJson?.error || response.statusText || errMsg;
-        } catch {}
-        throw new Error(errMsg);
-      }
+  const handleDeficitProceed = useCallback(() => {
+    setDeficitOpen(false);
+    const next = deficitNextRef.current;
+    deficitNextRef.current = null;
+    if (typeof next === "function") next();
+  }, []);
 
-      await response.json().catch(() => null);
-      resetForm();
-      setOpenToast(true);
-    } catch (err) {
-      console.error("❌ Error submitting batch:", err?.message || err);
-      alert("Batch submission failed. Check console.");
-    }
-  };
+  const handleDeficitCancel = useCallback(() => {
+    setDeficitOpen(false);
+    deficitNextRef.current = null;
+  }, []);
 
   return (
     <div className="gof-wrap">
-      {/* Scoped CSS */}
+      {/* Scoped CSS – matches GoodsOut styling */}
       <style>{`
         .gof-wrap {
           padding: 20px;
           color: ${brand.text};
           background: ${brand.surfaceMuted};
           min-height: 100%;
+          box-sizing: border-box;
+          overflow-y: auto;
         }
         .gof-card {
           margin-top: 12px;
-          padding: 16px;
+          padding: 16px 16px 80px; /* extra bottom padding so fields don't hide behind pill */
           border: 1px solid ${brand.border};
           background: ${brand.surface};
           border-radius: 16px;
@@ -363,8 +605,12 @@ const GoodsOutForm = () => {
         }
         .col-12 { grid-column: span 12; }
         .col-6 { grid-column: span 6; }
+        .col-4 { grid-column: span 4; }
+        .col-3 { grid-column: span 3; }
         @media (max-width: 900px) {
-          .col-6 { grid-column: span 12; }
+          .col-6,
+          .col-4,
+          .col-3 { grid-column: span 12; }
         }
 
         .gof-field {
@@ -438,7 +684,7 @@ const GoodsOutForm = () => {
           color: ${brand.subtext};
         }
 
-        /* Submit pill button */
+        /* Submit pill button – same visual as GoodsOut */
         .gof-pill {
           position: fixed;
           right: 20px;
@@ -457,12 +703,17 @@ const GoodsOutForm = () => {
           box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
           transition: transform .2s ease;
         }
-        .gof-pill:hover {
+        .gof-pill[disabled] {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .gof-pill:not([disabled]):hover {
           transform: scale(1.06);
           background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
         }
 
-        /* Toast */
+        /* Toast (same as GoodsOut) */
         .gof-toast {
           position: fixed;
           top: 16px;
@@ -487,7 +738,7 @@ const GoodsOutForm = () => {
           }
         }
 
-        /* Modal */
+        /* Modal – extended to support primary button for Proceed */
         .gof-modal-backdrop {
           position: fixed;
           inset: 0;
@@ -528,28 +779,6 @@ const GoodsOutForm = () => {
           font-weight: 600;
           margin-bottom: 12px;
         }
-        .gof-block-stats {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        .gof-block-stats .stat {
-          border-radius: 12px;
-          border: 1px solid ${brand.border};
-          padding: 10px 12px;
-          background: ${brand.surfaceMuted};
-        }
-        .gof-block-stats .label {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: ${brand.subtext};
-        }
-        .gof-block-stats .value {
-          font-size: 16px;
-          font-weight: 800;
-        }
         .gof-callout {
           font-size: 13px;
           color: ${brand.subtext};
@@ -575,232 +804,353 @@ const GoodsOutForm = () => {
           color: #b91c1c;
           border-color: #fecaca;
         }
+        .btn.primary {
+          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
+          color: #fff;
+          border-color: transparent;
+        }
+
+        /* Deficit table */
+        .pl-deficit-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+          font-size: 13px;
+        }
+        .pl-deficit-table th,
+        .pl-deficit-table td {
+          padding: 6px 8px;
+          border-bottom: 1px solid ${brand.border};
+          text-align: left;
+        }
+        .pl-deficit-table th {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: ${brand.subtext};
+          font-weight: 700;
+        }
+        .pl-missing {
+          color: ${brand.danger};
+          font-weight: 600;
+        }
       `}</style>
 
       <div className="gof-card">
-        <h2 className="gof-title">Goods Out Form</h2>
+        <h2 className="gof-title">Production Log</h2>
         <p className="gof-sub">
-          Record finished units leaving the factory. Use Single for one movement
-          or Multiple to batch them.
+          Record batches produced, track waste and auto-calc units into Finished
+          Goods inventory.
         </p>
 
-        {/* Tabs */}
+        {/* Tabs – same style as GoodsOut */}
         <div className="gof-tabs" role="tablist">
           <button
             type="button"
-            className={`gof-tab ${view === "single" ? "active" : ""}`}
-            onClick={() => setView("single")}
+            className={`gof-tab ${tabValue === 0 ? "active" : ""}`}
+            onClick={() => setTabValue(0)}
           >
             Single
           </button>
           <button
             type="button"
-            className={`gof-tab ${view === "multiple" ? "active" : ""}`}
-            onClick={() => setView("multiple")}
+            className={`gof-tab ${tabValue === 1 ? "active" : ""}`}
+            onClick={() => setTabValue(1)}
           >
             Multiple
           </button>
         </div>
 
-        {/* SINGLE VIEW */}
-        {view === "single" && (
-          <Formik
-            key={`single-${initialValues.date}`}
-            initialValues={initialValues}
-            validationSchema={goodsOutSchema}
-            onSubmit={handleFormSubmit}
-            enableReinitialize
-          >
-            {({
-              values,
-              errors,
-              touched,
-              handleBlur,
-              handleChange,
-              handleSubmit,
-            }) => (
-              <form onSubmit={handleSubmit} noValidate>
-                <div className="gof-grid">
-                  {/* Date */}
-                  <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="date">
-                      Date
-                    </label>
-                    <input
-                      id="date"
-                      name="date"
-                      type="date"
-                      className="gof-input"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.date}
-                    />
-                    {touched.date && errors.date && (
-                      <div className="gof-error">{errors.date}</div>
-                    )}
-                  </div>
-
-                  {/* Recipe */}
-                  <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="recipe">
-                      Recipe
-                    </label>
-                    <select
-                      id="recipe"
-                      name="recipe"
-                      className="gof-select"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.recipe}
-                    >
-                      {loading ? (
-                        <option value="" disabled>
-                          Loading recipes...
-                        </option>
-                      ) : fetchErr ? (
-                        <option value="" disabled>
-                          {fetchErr}
-                        </option>
-                      ) : filteredRecipes.length > 0 ? (
-                        <>
-                          <option value="" disabled>
-                            Select a recipe…
-                          </option>
-                          {filteredRecipes.map((recipe, idx) => (
-                            <option key={idx} value={recipe}>
-                              {recipe}
-                            </option>
-                          ))}
-                        </>
-                      ) : (
-                        <option value="" disabled>
-                          No recipes available
-                        </option>
-                      )}
-                    </select>
-                    {touched.recipe && errors.recipe && (
-                      <div className="gof-error">{errors.recipe}</div>
-                    )}
-                  </div>
-
-                  {/* Amount of Units */}
-                  <div className="gof-field col-12">
-                    <label className="gof-label" htmlFor="stockAmount">
-                      Amount of Units
-                    </label>
-                    <input
-                      id="stockAmount"
-                      name="stockAmount"
-                      type="number"
-                      className="gof-input"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.stockAmount}
-                      step="any"
-                      placeholder="0"
-                    />
-                    {touched.stockAmount && errors.stockAmount && (
-                      <div className="gof-error">{errors.stockAmount}</div>
-                    )}
-                  </div>
-
-                  {/* Recipient */}
-                  <div className="gof-field col-12">
-                    <label className="gof-label" htmlFor="recipients">
-                      Recipient
-                    </label>
-                    <input
-                      id="recipients"
-                      name="recipients"
-                      type="text"
-                      className="gof-input"
-                      onBlur={handleBlur}
-                      onChange={handleChange}
-                      value={values.recipients}
-                      placeholder="e.g., Customer / Store / Dept"
-                    />
-                    {touched.recipients && errors.recipients && (
-                      <div className="gof-error">{errors.recipients}</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Fixed gradient pill submit */}
-                <button
-                  type="submit"
-                  className="gof-pill"
-                  aria-label="Record goods out"
+        <Formik
+          initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
+          validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize
+        >
+          {({
+            values,
+            errors,
+            touched,
+            handleBlur,
+            handleChange,
+            handleSubmit: formikHandleSubmit,
+            setTouched,
+            validateForm,
+          }) => (
+            <>
+              {tabValue === 0 ? (
+                // =====================================================================
+                // TAB 0: SINGLE BATCH FORM
+                // =====================================================================
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSingleClick(
+                      validateForm,
+                      values,
+                      setTouched,
+                      formikHandleSubmit
+                    );
+                  }}
+                  noValidate
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M12 5v14M5 12h14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Record Goods Out
-                </button>
-              </form>
-            )}
-          </Formik>
-        )}
+                  <div className="gof-grid">
+                    {/* RECIPE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="recipe">
+                        Recipe *
+                      </label>
+                      <select
+                        id="recipe"
+                        name="recipe"
+                        className="gof-select"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.recipe}
+                      >
+                        <option value="" disabled>
+                          Select a recipe…
+                        </option>
+                        {recipes.map((recipe) => (
+                          <option key={recipe.name} value={recipe.name}>
+                            {recipe.name}
+                          </option>
+                        ))}
+                      </select>
+                      {touched.recipe && errors.recipe && (
+                        <div className="gof-error">{errors.recipe}</div>
+                      )}
+                    </div>
 
-        {/* MULTIPLE VIEW */}
-        {view === "multiple" && (
-          <Formik
-            key="multiple-goods-out"
-            initialValues={{
-              items: [
-                {
-                  date: initialValues.date,
-                  recipe: "",
-                  stockAmount: "",
-                  recipients: "",
-                },
-              ],
-            }}
-            validationSchema={multiGoodsOutSchema}
-            onSubmit={handleBatchSubmit}
-          >
-            {({
-              values,
-              errors,
-              touched,
-              handleBlur,
-              handleChange,
-              handleSubmit,
-            }) => (
-              <form onSubmit={handleSubmit} noValidate>
-                <FieldArray name="items">
-                  {({ push, remove }) => (
-                    <>
-                      {values.items &&
-                      Array.isArray(values.items) &&
-                      values.items.length > 0 ? (
-                        values.items.map((item, idx) => {
-                          const itemErrors =
-                            (errors.items && errors.items[idx]) || {};
-                          const itemTouched =
-                            (touched.items && touched.items[idx]) || {};
+                    {/* DATE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="date">
+                        Date *
+                      </label>
+                      <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.date}
+                      />
+                      {touched.date && errors.date && (
+                        <div className="gof-error">{errors.date}</div>
+                      )}
+                    </div>
+
+                    {/* BATCHES PRODUCED */}
+                    <div className="gof-field col-4">
+                      <label
+                        className="gof-label"
+                        htmlFor="batchesProduced"
+                      >
+                        Batches Produced *
+                      </label>
+                      <input
+                        id="batchesProduced"
+                        name="batchesProduced"
+                        type="number"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.batchesProduced}
+                        min="1"
+                      />
+                      {touched.batchesProduced && errors.batchesProduced && (
+                        <div className="gof-error">
+                          {errors.batchesProduced}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* UNITS OF WASTE */}
+                    <div className="gof-field col-4">
+                      <label className="gof-label" htmlFor="unitsOfWaste">
+                        Units of Waste *
+                      </label>
+                      <input
+                        id="unitsOfWaste"
+                        name="unitsOfWaste"
+                        type="number"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.unitsOfWaste}
+                        min="0"
+                      />
+                      {touched.unitsOfWaste && errors.unitsOfWaste && (
+                        <div className="gof-error">
+                          {errors.unitsOfWaste}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PRODUCER NAME (OPTIONAL) */}
+                    <div className="gof-field col-4">
+                      <label className="gof-label" htmlFor="producerName">
+                        Produced By (Name)
+                      </label>
+                      <input
+                        id="producerName"
+                        name="producerName"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.producerName}
+                      />
+                      {touched.producerName && errors.producerName && (
+                        <div className="gof-error">
+                          {errors.producerName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BATCH CODE (REQUIRED) */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="batchCode">
+                        Batch Code *
+                      </label>
+                      <input
+                        id="batchCode"
+                        name="batchCode"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.batchCode}
+                      />
+                      {touched.batchCode && errors.batchCode && (
+                        <div className="gof-error">{errors.batchCode}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Fixed gradient pill submit */}
+                  <button
+                    type="submit"
+                    className="gof-pill"
+                    aria-label="Record production"
+                    disabled={loading || !cognitoId}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    {loading ? "Processing..." : "Record Production"}
+                  </button>
+                </form>
+              ) : (
+                // =====================================================================
+                // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
+                // =====================================================================
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleDeficitCheck(values, formikHandleSubmit);
+                  }}
+                  noValidate
+                >
+                  <div className="gof-grid" style={{ marginBottom: 16 }}>
+                    {/* DATE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="date">
+                        Date *
+                      </label>
+                      <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.date}
+                      />
+                      {touched.date && errors.date && (
+                        <div className="gof-error">{errors.date}</div>
+                      )}
+                    </div>
+
+                    {/* PRODUCER NAME (OPTIONAL) */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="producerName">
+                        Produced By (Name)
+                      </label>
+                      <input
+                        id="producerName"
+                        name="producerName"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.producerName}
+                      />
+                      {touched.producerName && errors.producerName && (
+                        <div className="gof-error">
+                          {errors.producerName}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="gof-sub">
+                    Batch Logs (different recipes allowed, each with its own
+                    batch code).
+                  </p>
+
+                  <FieldArray name="logs">
+                    {({ push, remove }) => (
+                      <>
+                        {!!(touched.logs && errors.logs) &&
+                          typeof errors.logs === "string" && (
+                            <div className="gof-error" style={{ marginBottom: 8 }}>
+                              {errors.logs}
+                            </div>
+                          )}
+
+                        {(values.logs ?? []).map((log, index) => {
+                          const recipePath = `logs[${index}].recipe`;
+                          const batchesProducedPath = `logs[${index}].batchesProduced`;
+                          const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
+                          const batchCodePath = `logs[${index}].batchCode`;
+
+                          const recipeError =
+                            getIn(touched, recipePath) &&
+                            getIn(errors, recipePath);
+                          const batchesError =
+                            getIn(touched, batchesProducedPath) &&
+                            getIn(errors, batchesProducedPath);
+                          const wasteError =
+                            getIn(touched, unitsOfWastePath) &&
+                            getIn(errors, unitsOfWastePath);
+                          const batchCodeError =
+                            getIn(touched, batchCodePath) &&
+                            getIn(errors, batchCodePath);
 
                           return (
-                            <div className="gof-multi-row" key={idx}>
+                            <div className="gof-multi-row" key={index}>
                               <div className="gof-multi-row-header">
                                 <span className="gof-multi-index">
-                                  Goods Out {idx + 1}
+                                  Batch {index + 1}
                                 </span>
-                                {values.items.length > 1 && (
+                                {values.logs.length > 1 && (
                                   <button
                                     type="button"
                                     className="gof-multi-remove"
-                                    onClick={() => remove(idx)}
+                                    onClick={() => remove(index)}
                                   >
                                     Remove
                                   </button>
@@ -808,209 +1158,181 @@ const GoodsOutForm = () => {
                               </div>
 
                               <div className="gof-grid">
-                                {/* Date */}
+                                {/* RECIPE PER ROW */}
                                 <div className="gof-field col-6">
                                   <label
                                     className="gof-label"
-                                    htmlFor={`items-${idx}-date`}
+                                    htmlFor={`logs-${index}-recipe`}
                                   >
-                                    Date
-                                  </label>
-                                  <input
-                                    id={`items-${idx}-date`}
-                                    name={`items[${idx}].date`}
-                                    type="date"
-                                    className="gof-input"
-                                    onBlur={handleBlur}
-                                    onChange={handleChange}
-                                    value={item.date}
-                                  />
-                                  {itemTouched.date && itemErrors.date && (
-                                    <div className="gof-error">
-                                      {itemErrors.date}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Recipe */}
-                                <div className="gof-field col-6">
-                                  <label
-                                    className="gof-label"
-                                    htmlFor={`items-${idx}-recipe`}
-                                  >
-                                    Recipe
+                                    Recipe *
                                   </label>
                                   <select
-                                    id={`items-${idx}-recipe`}
-                                    name={`items[${idx}].recipe`}
+                                    id={`logs-${index}-recipe`}
+                                    name={recipePath}
                                     className="gof-select"
                                     onBlur={handleBlur}
                                     onChange={handleChange}
-                                    value={item.recipe}
+                                    value={log.recipe || ""}
                                   >
-                                    {loading ? (
-                                      <option value="" disabled>
-                                        Loading recipes...
+                                    <option value="" disabled>
+                                      Select a recipe…
+                                    </option>
+                                    {recipes.map((recipe) => (
+                                      <option
+                                        key={recipe.name}
+                                        value={recipe.name}
+                                      >
+                                        {recipe.name}
                                       </option>
-                                    ) : fetchErr ? (
-                                      <option value="" disabled>
-                                        {fetchErr}
-                                      </option>
-                                    ) : filteredRecipes.length > 0 ? (
-                                      <>
-                                        <option value="" disabled>
-                                          Select a recipe…
-                                        </option>
-                                        {filteredRecipes.map(
-                                          (recipe, rIdx) => (
-                                            <option
-                                              key={rIdx}
-                                              value={recipe}
-                                            >
-                                              {recipe}
-                                            </option>
-                                          )
-                                        )}
-                                      </>
-                                    ) : (
-                                      <option value="" disabled>
-                                        No recipes available
-                                      </option>
-                                    )}
+                                    ))}
                                   </select>
-                                  {itemTouched.recipe && itemErrors.recipe && (
+                                  {recipeError && (
                                     <div className="gof-error">
-                                      {itemErrors.recipe}
+                                      {recipeError}
                                     </div>
                                   )}
                                 </div>
 
-                                {/* Amount of Units */}
-                                <div className="gof-field col-12">
+                                {/* BATCHES PRODUCED */}
+                                <div className="gof-field col-3">
                                   <label
                                     className="gof-label"
-                                    htmlFor={`items-${idx}-stockAmount`}
+                                    htmlFor={`logs-${index}-batchesProduced`}
                                   >
-                                    Amount of Units
+                                    Batches Produced *
                                   </label>
                                   <input
-                                    id={`items-${idx}-stockAmount`}
-                                    name={`items[${idx}].stockAmount`}
+                                    id={`logs-${index}-batchesProduced`}
+                                    name={batchesProducedPath}
                                     type="number"
                                     className="gof-input"
                                     onBlur={handleBlur}
                                     onChange={handleChange}
-                                    value={item.stockAmount}
-                                    step="any"
-                                    placeholder="0"
+                                    value={log.batchesProduced}
+                                    min="1"
                                   />
-                                  {itemTouched.stockAmount &&
-                                    itemErrors.stockAmount && (
-                                      <div className="gof-error">
-                                        {itemErrors.stockAmount}
-                                      </div>
-                                    )}
+                                  {batchesError && (
+                                    <div className="gof-error">
+                                      {batchesError}
+                                    </div>
+                                  )}
                                 </div>
 
-                                {/* Recipient */}
-                                <div className="gof-field col-12">
+                                {/* UNITS OF WASTE */}
+                                <div className="gof-field col-3">
                                   <label
                                     className="gof-label"
-                                    htmlFor={`items-${idx}-recipients`}
+                                    htmlFor={`logs-${index}-unitsOfWaste`}
                                   >
-                                    Recipient
+                                    Units of Waste *
                                   </label>
                                   <input
-                                    id={`items-${idx}-recipients`}
-                                    name={`items[${idx}].recipients`}
+                                    id={`logs-${index}-unitsOfWaste`}
+                                    name={unitsOfWastePath}
+                                    type="number"
+                                    className="gof-input"
+                                    onBlur={handleBlur}
+                                    onChange={handleChange}
+                                    value={log.unitsOfWaste}
+                                    min="0"
+                                  />
+                                  {wasteError && (
+                                    <div className="gof-error">
+                                      {wasteError}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* BATCH CODE (REQUIRED) */}
+                                <div className="gof-field col-6">
+                                  <label
+                                    className="gof-label"
+                                    htmlFor={`logs-${index}-batchCode`}
+                                  >
+                                    Batch Code *
+                                  </label>
+                                  <input
+                                    id={`logs-${index}-batchCode`}
+                                    name={batchCodePath}
                                     type="text"
                                     className="gof-input"
                                     onBlur={handleBlur}
                                     onChange={handleChange}
-                                    value={item.recipients}
-                                    placeholder="e.g., Customer / Store / Dept"
+                                    value={log.batchCode}
                                   />
-                                  {itemTouched.recipients &&
-                                    itemErrors.recipients && (
-                                      <div className="gof-error">
-                                        {itemErrors.recipients}
-                                      </div>
-                                    )}
+                                  {batchCodeError && (
+                                    <div className="gof-error">
+                                      {batchCodeError}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
                           );
-                        })
-                      ) : (
-                        <p className="gof-sub">
-                          No rows yet – add at least one goods out row.
-                        </p>
-                      )}
+                        })}
 
-                      <div className="gof-multi-actions">
-                        <button
-                          type="button"
-                          className="gof-multi-add-btn"
-                          onClick={() =>
-                            push({
-                              date: initialValues.date,
-                              recipe: "",
-                              stockAmount: "",
-                              recipients: "",
-                            })
-                          }
-                        >
-                          + Add another row
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </FieldArray>
+                        <div className="gof-multi-actions">
+                          <button
+                            type="button"
+                            className="gof-multi-add-btn"
+                            onClick={() =>
+                              push({
+                                recipe: "",
+                                batchesProduced: 1,
+                                unitsOfWaste: 0,
+                                batchCode: "",
+                              })
+                            }
+                          >
+                            + Add another batch
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </FieldArray>
 
-                {/* Fixed gradient pill submit */}
-                <button
-                  type="submit"
-                  className="gof-pill"
-                  aria-label="Record multiple goods out"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
+                  {/* Fixed gradient pill submit */}
+                  <button
+                    type="submit"
+                    className="gof-pill"
+                    aria-label="Record multiple production batches"
+                    disabled={loading || !cognitoId}
                   >
-                    <path
-                      d="M12 5v14M5 12h14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Submit Multiple
-                </button>
-              </form>
-            )}
-          </Formik>
-        )}
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    {loading ? "Processing..." : "Record Production"}
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+        </Formik>
       </div>
 
-      {/* Hard-block modal (no proceed) */}
-      <HardBlockModal
-        open={blockOpen}
-        onClose={() => setBlockOpen(false)}
-        recipe={blockInfo.recipe}
-        need={blockInfo.need}
-        have={blockInfo.have}
+      {/* Soft Deficit Warning Modal (can proceed) */}
+      <DeficitModal
+        open={deficitOpen}
+        info={deficitInfoRef.current}
+        onCancel={handleDeficitCancel}
+        onProceed={handleDeficitProceed}
       />
 
-      {/* Success Toast */}
+      {/* Success Toast – same pattern text as GoodsOut */}
       <Toast open={openToast} onClose={() => setOpenToast(false)}>
-        Goods Out has been successfully recorded!
+        Production has been successfully recorded!
       </Toast>
     </div>
   );
-};
-
-//update
-export default GoodsOutForm;
+}
