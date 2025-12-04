@@ -34,7 +34,7 @@ const formatDateYMD = (val) => {
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) {
     const s = String(val);
-    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    const m = s.match(/\d{4}-\{2}-\{2}/);
     return m ? m[0] : s;
   }
   return d.toISOString().split("T")[0];
@@ -329,8 +329,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
 
   const handleSubmit = useCallback(
     async (values, { resetForm }) => {
-      // IMPORTANT: no early return on loading here, otherwise
-      // deficitCheck -> submitFunc() will be blocked.
       setLoading(true);
 
       const logsToPost =
@@ -552,11 +550,14 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           padding: 20px;
           color: ${brand.text};
           background: ${brand.surfaceMuted};
-          min-height: 100%;
+          height: 100%;
+          max-height: 100%;
+          overflow-y: auto;
+          box-sizing: border-box;
         }
         .gof-card {
           margin-top: 12px;
-          padding: 16px;
+          padding: 16px 16px 80px;
           border: 1px solid ${brand.border};
           background: ${brand.surface};
           border-radius: 16px;
