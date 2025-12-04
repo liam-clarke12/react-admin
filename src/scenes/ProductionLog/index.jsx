@@ -56,9 +56,19 @@ const BrandStyles = () => (
 
   /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow: visible !important; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative; }
+  .r-modal {
+    background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh;
+    overflow:hidden; /* changed from visible to hidden so body can scroll */
+    box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative;
+  }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow: visible !important; background:#fff; flex:1; }
+  .r-mbody {
+    padding:16px;
+    overflow-y:auto; /* allow scrolling inside modal */
+    overflow-x:visible;
+    background:#fff;
+    flex:1;
+  }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Grid form bits in modal */
@@ -94,20 +104,23 @@ const BrandStyles = () => (
 
   /* === FIX: modal dropdown stacking === */
   .r-modal-dim { z-index:200000 !important; }
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow: visible !important; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative; }
+  .r-modal {
+    background:#fff; border-radius:14px; width:100%; max-width:900px; max-height:90vh;
+    /* keep overflow from earlier definition: hidden */
+    box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; z-index:10000; position:relative;
+  }
   .ag-grid { overflow:visible !important; }
   .ag-select, .ag-input, select { z-index:200002 !important; position:relative; }
 
-  
-/* Force MUI dropdowns above modal */
-.MuiPopover-root,
-.MuiPopover-root .MuiPaper-root,
-.MuiMenu-root,
-.MuiMenu-paper,
-.MuiPopper-root {
-  z-index: 300000 !important;
-  position: absolute !important;
-}
+  /* Force MUI dropdowns above modal */
+  .MuiPopover-root,
+  .MuiPopover-root .MuiPaper-root,
+  .MuiMenu-root,
+  .MuiMenu-paper,
+  .MuiPopper-root {
+    z-index: 300000 !important;
+    position: absolute !important;
+  }
 `}</style>
 );
 
@@ -252,10 +265,7 @@ export default function ProductionLog() {
 
         const normalized = {
           id: String(
-            dbId ??
-              row.batchCode ??
-              row.batch_code ??
-              makeStableId(row)
+            dbId ?? row.batchCode ?? row.batch_code ?? makeStableId(row)
           ),
           batchCode: row.batchCode ?? row.batch_code ?? null,
           recipe: row.recipe ?? "",
@@ -361,10 +371,7 @@ export default function ProductionLog() {
     rows.sort((a, b) => {
       const fa = a[sortBy.field] ?? "";
       const fb = b[sortBy.field] ?? "";
-      if (
-        typeof fa === "number" &&
-        typeof fb === "number"
-      )
+      if (typeof fa === "number" && typeof fb === "number")
         return (fa - fb) * dir;
       return String(fa).localeCompare(String(fb)) * dir;
     });
@@ -388,8 +395,7 @@ export default function ProductionLog() {
     const activeBatches = filteredRows.length;
     const byRecipe = filteredRows.reduce((acc, r) => {
       const k = r.recipe || "Unknown";
-      acc[k] =
-        (acc[k] || 0) + toNumber(r.unitsRemaining);
+      acc[k] = (acc[k] || 0) + toNumber(r.unitsRemaining);
       return acc;
     }, {});
     const topRecipes = Object.entries(byRecipe)
@@ -422,8 +428,7 @@ export default function ProductionLog() {
       updatedRow.batchesProduced ?? updatedRow.batches_produced
     );
     const unitsOfWaste = toNumber(
-      updatedRow.unitsOfWaste ??
-        updatedRow.units_of_waste
+      updatedRow.unitsOfWaste ?? updatedRow.units_of_waste
     );
     const unitsRemaining = toNumber(
       updatedRow.unitsRemaining
@@ -475,8 +480,7 @@ export default function ProductionLog() {
         ...editingRow,
         id: getRowKey(editingRow),
         batchCode:
-          editingRow.batchCode ??
-          editingRow.batch_code,
+          editingRow.batchCode ?? editingRow.batch_code,
         date: formatDateYMD(editingRow.date),
         recipe: editingRow.recipe ?? "",
         batchesProduced: toNumber(
@@ -540,8 +544,7 @@ export default function ProductionLog() {
               const t =
                 await res.text().catch(() => "");
               throw new Error(
-                t ||
-                  `Delete failed for ${row.batchCode}`
+                t || `Delete failed for ${row.batchCode}`
               );
             }
           })
@@ -549,8 +552,7 @@ export default function ProductionLog() {
       );
       setProductionLogs((prev) =>
         prev.filter(
-          (r) =>
-            !selectedRows.includes(getRowKey(r))
+          (r) => !selectedRows.includes(getRowKey(r))
         )
       );
       setSelectedRows([]);
@@ -586,8 +588,7 @@ export default function ProductionLog() {
             marginBottom: 12,
           }}
         >
-          <strong>Can’t load data:</strong> No cognito_id
-          detected.
+          <strong>Can’t load data:</strong> No cognito_id detected.
         </div>
       )}
       {fatalMsg && (
@@ -665,22 +666,28 @@ export default function ProductionLog() {
                 }}
               />
 
-              {!openProductionForm && (<select
-                className="r-select"
-                value={`${sortBy.field}:${sortBy.dir}`}
-                onChange={(e) => {
-                  const [field, dir] = e.target.value.split(":");
-                  setSortBy({ field, dir });
-                  setPage(0);
-                }}
-              >
-                <option value="date:desc">Date (new → old)</option>
-                <option value="date:asc">Date (old → new)</option>
-                <option value="recipe:asc">Recipe A→Z</option>
-                <option value="recipe:desc">Recipe Z→A</option>
-                <option value="unitsRemaining:desc">Units remaining (high → low)</option>
-                <option value="unitsRemaining:asc">Units remaining (low → high)</option>
-              </select>)}
+              {!openProductionForm && (
+                <select
+                  className="r-select"
+                  value={`${sortBy.field}:${sortBy.dir}`}
+                  onChange={(e) => {
+                    const [field, dir] = e.target.value.split(":");
+                    setSortBy({ field, dir });
+                    setPage(0);
+                  }}
+                >
+                  <option value="date:desc">Date (new → old)</option>
+                  <option value="date:asc">Date (old → new)</option>
+                  <option value="recipe:asc">Recipe A→Z</option>
+                  <option value="recipe:desc">Recipe Z→A</option>
+                  <option value="unitsRemaining:desc">
+                    Units remaining (high → low)
+                  </option>
+                  <option value="unitsRemaining:asc">
+                    Units remaining (low → high)
+                  </option>
+                </select>
+              )}
             </div>
 
             {/* DataGrid */}
@@ -757,19 +764,21 @@ export default function ProductionLog() {
                   Next
                 </button>
 
-                {!openProductionForm && (<select
-                  className="r-select"
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setPage(0);
-                  }}
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>)}
+                {!openProductionForm && (
+                  <select
+                    className="r-select"
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(0);
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                )}
               </div>
             </div>
           </div>
@@ -835,6 +844,7 @@ export default function ProductionLog() {
           </div>
         </aside>
       </div>
+
       {/* ===================== EDIT MODAL ===================== */}
       {editOpen && editingRow && (
         <Portal>
@@ -1005,14 +1015,22 @@ export default function ProductionLog() {
           </div>
         </Portal>
       )}
+
       {/* ===================== DELETE CONFIRM MODAL ===================== */}
       {deleteOpen && selectedRows.length > 0 && (
         <Portal>
           <div className="r-modal-dim">
             <div className="r-modal" style={{ maxWidth: 420 }}>
               <div className="r-mhdr">
-                <h3 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h3>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>Close</button>
+                <h3 className="r-title" style={{ fontSize: 18 }}>
+                  Confirm Deletion
+                </h3>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setDeleteOpen(false)}
+                >
+                  Close
+                </button>
               </div>
 
               <div className="r-mbody" style={{ textAlign: "center" }}>
@@ -1040,7 +1058,8 @@ export default function ProductionLog() {
                     fontSize: 18,
                   }}
                 >
-                  Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
+                  Delete {selectedRows.length} record
+                  {selectedRows.length > 1 ? "s" : ""}?
                 </h3>
 
                 <p className="r-muted" style={{ marginTop: 6 }}>
@@ -1049,10 +1068,16 @@ export default function ProductionLog() {
               </div>
 
               <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
-                <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setDeleteOpen(false)}
+                >
                   Cancel
                 </button>
-                <button className="r-btn-primary r-btn-danger" onClick={handleDeleteSelectedRows}>
+                <button
+                  className="r-btn-primary r-btn-danger"
+                  onClick={handleDeleteSelectedRows}
+                >
                   Delete
                 </button>
               </div>
@@ -1061,43 +1086,45 @@ export default function ProductionLog() {
         </Portal>
       )}
 
-     {/* ===================== RECORD PRODUCTION MODAL ===================== */}
-{openProductionForm && (
-  <Portal>
-    <div className="r-modal-dim">
-      <div className="r-modal">
-        <div className="r-mhdr">
-          <h3 className="r-title" style={{ fontSize: 18 }}>Record Production</h3>
-          <button
-            className="r-btn-ghost"
-            onClick={() => setOpenProductionForm(false)}
-          >
-            Close
-          </button>
-        </div>
+      {/* ===================== RECORD PRODUCTION MODAL ===================== */}
+      {openProductionForm && (
+        <Portal>
+          <div className="r-modal-dim">
+            <div className="r-modal">
+              <div className="r-mhdr">
+                <h3 className="r-title" style={{ fontSize: 18 }}>
+                  Record Production
+                </h3>
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setOpenProductionForm(false)}
+                >
+                  Close
+                </button>
+              </div>
 
-        <div className="r-mbody">
-          <ProductionLogForm
-            cognitoId={cognitoId}
-            onSubmitted={() => {
-              fetchLogs();
-              setOpenProductionForm(false);
-            }}
-          />
-        </div>
+              <div className="r-mbody">
+                <ProductionLogForm
+                  cognitoId={cognitoId}
+                  onSubmitted={() => {
+                    fetchLogs();
+                    setOpenProductionForm(false);
+                  }}
+                />
+              </div>
 
-        <div className="r-mfooter">
-          <button
-            className="r-btn-ghost"
-            onClick={() => setOpenProductionForm(false)}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  </Portal>
-)}
+              <div className="r-mfooter">
+                <button
+                  className="r-btn-ghost"
+                  onClick={() => setOpenProductionForm(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   );
 }
