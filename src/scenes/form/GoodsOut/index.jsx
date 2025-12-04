@@ -190,7 +190,6 @@ const getIngredientStock = async (cognitoId) => {
 // UI HELPERS – Toast + Soft Deficit Modal
 // =====================================================================
 
-/** Simple toast (same pattern as GoodsOut) */
 function Toast({ open, children, onClose }) {
   if (!open) return null;
   return (
@@ -200,7 +199,6 @@ function Toast({ open, children, onClose }) {
   );
 }
 
-/** Soft “ingredient deficit” modal – CAN proceed */
 function DeficitModal({ open, info, onCancel, onProceed }) {
   if (!open) return null;
   const recipe = info?.recipe || "this recipe";
@@ -546,7 +544,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
 
   return (
     <div className="gof-wrap">
-      {/* Scoped CSS – matches GoodsOut styling */}
+      {/* Scoped CSS – mirrors GoodsOut styling, with form-bottom submit */}
       <style>{`
         .gof-wrap {
           padding: 20px;
@@ -554,11 +552,10 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           background: ${brand.surfaceMuted};
           min-height: 100%;
           box-sizing: border-box;
-          overflow-y: auto;
         }
         .gof-card {
           margin-top: 12px;
-          padding: 16px 16px 80px; /* extra bottom padding so fields don't hide behind pill */
+          padding: 16px 16px 24px;
           border: 1px solid ${brand.border};
           background: ${brand.surface};
           border-radius: 16px;
@@ -684,33 +681,27 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           color: ${brand.subtext};
         }
 
-        /* Submit pill button – same visual as GoodsOut */
-        .gof-pill {
-          position: fixed;
-          right: 20px;
-          bottom: 20px;
-          z-index: 10;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border-radius: 999px;
-          padding: 12px 18px;
+        /* Submit button at bottom of form (not fixed) */
+        .gof-submit {
+          width: 100%;
+          margin-top: 24px;
+          border-radius: 12px;
+          padding: 14px;
           border: 0;
           cursor: pointer;
-          font-weight: 800;
+          font-weight: 700;
+          font-size: 15px;
           color: #fff;
           background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
-          transition: transform .2s ease;
+          box-shadow: 0 4px 8px rgba(29,78,216,0.15);
+          transition: opacity .15s ease, transform .15s ease;
         }
-        .gof-pill[disabled] {
+        .gof-submit:disabled {
           opacity: 0.6;
           cursor: not-allowed;
-          transform: none;
         }
-        .gof-pill:not([disabled]):hover {
-          transform: scale(1.06);
-          background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
+        .gof-submit:not(:disabled):hover {
+          transform: translateY(-2px);
         }
 
         /* Toast (same as GoodsOut) */
@@ -843,7 +834,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           Goods inventory.
         </p>
 
-        {/* Tabs – same style as GoodsOut */}
+        {/* Tabs – same style family as GoodsOut */}
         <div className="gof-tabs" role="tablist">
           <button
             type="button"
@@ -1029,27 +1020,12 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     </div>
                   </div>
 
-                  {/* Fixed gradient pill submit */}
+                  {/* Submit button at bottom of form */}
                   <button
                     type="submit"
-                    className="gof-pill"
-                    aria-label="Record production"
+                    className="gof-submit"
                     disabled={loading || !cognitoId}
                   >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 5v14M5 12h14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
                     {loading ? "Processing..." : "Record Production"}
                   </button>
                 </form>
@@ -1291,27 +1267,12 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     )}
                   </FieldArray>
 
-                  {/* Fixed gradient pill submit */}
+                  {/* Submit button at bottom of form */}
                   <button
                     type="submit"
-                    className="gof-pill"
-                    aria-label="Record multiple production batches"
+                    className="gof-submit"
                     disabled={loading || !cognitoId}
                   >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 5v14M5 12h14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
                     {loading ? "Processing..." : "Record Production"}
                   </button>
                 </form>
@@ -1329,7 +1290,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         onProceed={handleDeficitProceed}
       />
 
-      {/* Success Toast – same pattern text as GoodsOut */}
+      {/* Success Toast */}
       <Toast open={openToast} onClose={() => setOpenToast(false)}>
         Production has been successfully recorded!
       </Toast>
