@@ -1,43 +1,10 @@
 // src/scenes/form/ProductionLog/index.jsx
-// MUI-styled Production Log with Single / Multiple tabs + ACTIVE-inventory precheck & deficit warning
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import {
-  Box,
-  TextField,
-  Snackbar,
-  Alert,
-  Fab,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Paper,
-  Typography,
-  Tabs,
-  Tab,
-  IconButton,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
+// Nory-styled Production Log with Single / Multiple tabs
+// + ACTIVE-ingredient inventory precheck & soft deficit warning (can proceed)
+
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
-import useMediaQuery from "@mui/material/useMediaQuery";
 
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
@@ -47,12 +14,12 @@ const brand = {
   subtext: "#334155",
   border: "#e5e7eb",
   surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
+  danger: "#dc2626",
   primary: "#7C3AED",
   primaryDark: "#5B21B6",
-  danger: "#dc2626",
-  dangerSoft: "#fecaca",
-  info: "#3b82f6",
-  infoSoft: "#bfdbfe",
+  focusRing: "rgba(124,58,237,0.18)",
+  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
 };
 
 // =====================================================================
@@ -220,12 +187,93 @@ const getIngredientStock = async (cognitoId) => {
 };
 
 // =====================================================================
+// UI HELPERS – Toast + Soft Deficit Modal
+// =====================================================================
+
+function Toast({ open, children, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="gof-toast" onClick={onClose}>
+      <div className="gof-toast-inner">{children}</div>
+    </div>
+  );
+}
+
+function DeficitModal({ open, info, onCancel, onProceed }) {
+  if (!open) return null;
+  const recipe = info?.recipe || "this recipe";
+  const deficits = info?.deficits || [];
+
+  return (
+    <div className="gof-modal-backdrop" onClick={onCancel}>
+      <div
+        className="gof-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="gof-modal-header">
+          <h3>Inventory Warning</h3>
+        </div>
+        <div className="gof-modal-body">
+          <p className="gof-warning">
+            Ingredient shortages for <strong>{recipe}</strong>.
+          </p>
+
+          {deficits.length > 0 && (
+            <table className="pl-deficit-table">
+              <thead>
+                <tr>
+                  <th>Ingredient</th>
+                  <th>Required</th>
+                  <th>Available</th>
+                  <th>Missing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deficits.map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.ingredient}</td>
+                    <td>
+                      {d.required} {d.unit}
+                    </td>
+                    <td>
+                      {d.available} {d.unit}
+                    </td>
+                    <td className="pl-missing">
+                      {d.missing} {d.unit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <p className="gof-callout">
+            You can still record this production, but your ingredient inventory
+            will go negative for the items above.
+          </p>
+        </div>
+        <div className="gof-modal-footer">
+          <button type="button" className="btn ghost" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn primary" onClick={onProceed}>
+            Proceed Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
 // MAIN COMPONENT
 // =====================================================================
 
 export default function ProductionLogForm({ cognitoId, onSubmitted }) {
-  const isMobile = useMediaQuery("(max-width:600px)");
-  const [tabValue, setTabValue] = useState(0); // 0 = Single, 1 = Multiple
+  // 0 = Single, 1 = Multiple
+  const [tabValue, setTabValue] = useState(0);
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
   const [recipes, setRecipes] = useState([]);
@@ -258,6 +306,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         );
       } catch (e) {
         console.error("Recipes fetch error:", e);
+        setRecipes([]);
       }
     };
     fetchRecipes();
@@ -268,6 +317,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
       recipes.find((r) => r.name === recipeName)?.units_per_batch ?? 0,
     [recipes]
   );
+
+  // Snackbar auto-hide
+  useEffect(() => {
+    if (!openSnackbar) return;
+    const t = setTimeout(() => setOpenSnackbar(false), 3000);
+    return () => clearTimeout(t);
+  }, [openSnackbar]);
 
   // ===== Submission Handlers =====
 
@@ -452,7 +508,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   );
 
   // =====================================================================
-  // handleSingleClick
+  // handleSingleClick – validation + deficit check + submit
   // =====================================================================
   const handleSingleClick = useCallback(
     (validateForm, values, setTouched, submitForm) => {
@@ -476,635 +532,804 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
     [handleDeficitCheck]
   );
 
+  const handleDeficitProceed = useCallback(() => {
+    setDeficitOpen(false);
+    const next = deficitNextRef.current;
+    deficitNextRef.current = null;
+    if (typeof next === "function") next();
+  }, []);
+
+  const handleDeficitCancel = useCallback(() => {
+    setDeficitOpen(false);
+    deficitNextRef.current = null;
+  }, []);
+
   return (
-    <Paper elevation={0} sx={{ p: isMobile ? 1 : 2, mb: 3 }}>
-      <Tabs
-        value={tabValue}
-        onChange={(e, newValue) => setTabValue(newValue)}
-        sx={{ mb: 2 }}
-      >
-        <Tab label="Record Single Batch" />
-        <Tab label="Record Multiple Batches" />
-      </Tabs>
+    <div className="gof-wrap">
+      {/* Scoped CSS (shared style with Goods Out form) */}
+      <style>{`
+        .gof-wrap {
+          padding: 20px;
+          color: ${brand.text};
+          background: ${brand.surfaceMuted};
+          min-height: 100%;
+        }
+        .gof-card {
+          margin-top: 12px;
+          padding: 16px;
+          border: 1px solid ${brand.border};
+          background: ${brand.surface};
+          border-radius: 16px;
+          box-shadow: ${brand.shadow};
+        }
+        .gof-title {
+          font-weight: 800;
+          margin: 0 0 4px;
+        }
+        .gof-sub {
+          color: ${brand.subtext};
+          margin: 0 0 18px;
+          font-size: 13px;
+        }
 
-      <Formik
-        initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
-        validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
-        onSubmit={handleSubmit}
-        enableReinitialize
-      >
-        {({
-          values,
-          errors,
-          touched,
-          handleBlur,
-          handleChange,
-          handleSubmit: formikHandleSubmit,
-          setTouched,
-          validateForm,
-        }) => (
-          <>
-            {tabValue === 0 ? (
-              // =====================================================================
-              // TAB 0: SINGLE BATCH FORM
-              // =====================================================================
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault(); // handled via FAB
-                }}
-              >
-                <Box
-                  display="grid"
-                  gap="16px"
-                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                >
-                  {/* RECIPE */}
-                  <FormControl
-                    fullWidth
-                    variant="outlined"
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  >
-                    <InputLabel id="recipe-label">Recipe *</InputLabel>
-                    <Select
-                      labelId="recipe-label"
-                      id="recipe"
-                      name="recipe"
-                      value={values.recipe}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      label="Recipe *"
-                      error={!!touched.recipe && !!errors.recipe}
-                      MenuProps={{
-                        disablePortal: false,
-                        anchorOrigin: {
-                          vertical: "bottom",
-                          horizontal: "left",
-                        },
-                        transformOrigin: {
-                          vertical: "top",
-                          horizontal: "left",
-                        },
-                        PaperProps: {
-                          style: { zIndex: 300000, position: "absolute" },
-                        },
-                      }}
-                    >
-                      {recipes.map((recipe) => (
-                        <MenuItem key={recipe.name} value={recipe.name}>
-                          {recipe.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {!!touched.recipe && !!errors.recipe && (
-                      <Typography variant="caption" color="error">
-                        {errors.recipe}
-                      </Typography>
-                    )}
-                  </FormControl>
+        /* Tabs */
+        .gof-tabs {
+          display: inline-flex;
+          padding: 4px;
+          border-radius: 999px;
+          background: #e2e8f0;
+          margin-bottom: 18px;
+          gap: 4px;
+        }
+        .gof-tab {
+          border-radius: 999px;
+          border: none;
+          padding: 6px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          background: transparent;
+          color: ${brand.subtext};
+        }
+        .gof-tab.active {
+          background: #ffffff;
+          color: ${brand.primary};
+          box-shadow: ${brand.shadow};
+        }
 
-                  {/* DATE */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    type="date"
-                    label="Date *"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.date}
-                    name="date"
-                    error={!!touched.date && !!errors.date}
-                    helperText={touched.date && errors.date}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  />
+        .gof-grid {
+          display: grid;
+          grid-template-columns: repeat(12, minmax(0, 1fr));
+          gap: 20px;
+        }
+        .col-12 { grid-column: span 12; }
+        .col-6 { grid-column: span 6; }
+        .col-4 { grid-column: span 4; }
+        .col-3 { grid-column: span 3; }
+        @media (max-width: 900px) {
+          .col-6, .col-4, .col-3 { grid-column: span 12; }
+        }
 
-                  {/* BATCHES PRODUCED */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    type="number"
-                    label="Batches Produced *"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.batchesProduced}
-                    name="batchesProduced"
-                    error={
-                      !!touched.batchesProduced && !!errors.batchesProduced
-                    }
-                    helperText={
-                      touched.batchesProduced && errors.batchesProduced
-                    }
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 1" }}
-                  />
+        .gof-field {
+          display: flex;
+          flex-direction: column;
+        }
+        .gof-label {
+          font-size: 13px;
+          font-weight: 600;
+          color: ${brand.subtext};
+          margin-bottom: 6px;
+        }
+        .gof-input,
+        .gof-select {
+          background: ${brand.surfaceMuted};
+          border: 1px solid ${brand.border};
+          border-radius: 12px;
+          padding: 12px 14px;
+          font-size: 14px;
+          outline: none;
+          transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        .gof-input:focus,
+        .gof-select:focus {
+          border-color: ${brand.primary};
+          box-shadow: 0 0 0 4px ${brand.focusRing};
+        }
+        .gof-error {
+          color: ${brand.danger};
+          font-size: 12px;
+          margin-top: 6px;
+        }
 
-                  {/* UNITS OF WASTE */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    type="number"
-                    label="Units of Waste *"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.unitsOfWaste}
-                    name="unitsOfWaste"
-                    error={!!touched.unitsOfWaste && !!errors.unitsOfWaste}
-                    helperText={touched.unitsOfWaste && errors.unitsOfWaste}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 1" }}
-                  />
+        /* Multiple rows */
+        .gof-multi-row {
+          border: 1px solid ${brand.border};
+          border-radius: 12px;
+          padding: 12px;
+          margin-bottom: 12px;
+          background: ${brand.surfaceMuted};
+        }
+        .gof-multi-row-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .gof-multi-index {
+          font-size: 12px;
+          font-weight: 700;
+          color: ${brand.subtext};
+        }
+        .gof-multi-remove {
+          border: none;
+          background: none;
+          color: ${brand.danger};
+          font-size: 12px;
+          cursor: pointer;
+        }
+        .gof-multi-actions {
+          margin-top: 8px;
+        }
+        .gof-multi-add-btn {
+          border-radius: 999px;
+          border: 1px dashed ${brand.border};
+          background: #f1f5f9;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          color: ${brand.subtext};
+        }
 
-                  {/* PRODUCER NAME (OPTIONAL) */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    label="Produced By (Name)"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.producerName}
-                    name="producerName"
-                    error={!!touched.producerName && !!errors.producerName}
-                    helperText={touched.producerName && errors.producerName}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  />
+        /* Submit pill button */
+        .gof-pill {
+          position: fixed;
+          right: 20px;
+          bottom: 20px;
+          z-index: 10;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border-radius: 999px;
+          padding: 12px 18px;
+          border: 0;
+          cursor: pointer;
+          font-weight: 800;
+          color: #fff;
+          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
+          box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
+          transition: transform .2s ease;
+        }
+        .gof-pill[disabled] {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .gof-pill:not([disabled]):hover {
+          transform: scale(1.06);
+          background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
+        }
 
-                  {/* BATCH CODE (REQUIRED) */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    label="Batch Code *"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.batchCode}
-                    name="batchCode"
-                    error={!!touched.batchCode && !!errors.batchCode}
-                    helperText={touched.batchCode && errors.batchCode}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  />
-                </Box>
+        /* Toast */
+        .gof-toast {
+          position: fixed;
+          top: 16px;
+          right: 16px;
+          transform: translateY(-20px);
+          opacity: 0;
+          animation: gof-toast-in .2s forwards;
+          z-index: 20;
+        }
+        .gof-toast-inner {
+          background: #0f172a;
+          color: #e5e7eb;
+          padding: 10px 14px;
+          border-radius: 999px;
+          font-size: 13px;
+          box-shadow: ${brand.shadow};
+        }
+        @keyframes gof-toast-in {
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
 
-                {/* SINGLE SUBMIT BUTTON */}
-                <Box display="flex" justifyContent="flex-end" mt={3}>
-                  <Fab
-                    variant="extended"
-                    type="button"
-                    onClick={() =>
-                      handleSingleClick(
-                        validateForm,
-                        values,
-                        setTouched,
-                        formikHandleSubmit
-                      )
-                    }
-                    disabled={loading || !cognitoId}
-                    sx={{
-                      px: 4,
-                      py: 1.25,
-                      gap: 1,
-                      borderRadius: 999,
-                      fontWeight: 800,
-                      textTransform: "none",
-                      boxShadow:
-                        "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                      background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                      color: "#fff",
-                      "&:hover": { background: brand.primaryDark },
-                    }}
-                  >
-                    {loading ? (
-                      <CircularProgress size={20} color="inherit" />
-                    ) : (
-                      <AddIcon />
-                    )}
-                    {loading ? "Processing..." : "Record Production"}
-                  </Fab>
-                </Box>
-              </form>
-            ) : (
-              // =====================================================================
-              // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
-              // =====================================================================
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleDeficitCheck(values, formikHandleSubmit);
-                }}
-              >
-                <Box
-                  display="grid"
-                  gap="16px"
-                  gridTemplateColumns="repeat(4, minmax(0, 1fr))"
-                  mb={3}
-                >
-                  {/* DATE */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    type="date"
-                    label="Date *"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.date}
-                    name="date"
-                    error={!!touched.date && !!errors.date}
-                    helperText={touched.date && errors.date}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  />
+        /* Modal (shared with GoodsOut style) */
+        .gof-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15,23,42,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 30;
+        }
+        .gof-modal {
+          width: 100%;
+          max-width: 480px;
+          background: #fff;
+          border-radius: 16px;
+          border: 1px solid ${brand.border};
+          box-shadow: 0 20px 40px rgba(15,23,42,0.35);
+          overflow: hidden;
+        }
+        .gof-modal-header {
+          padding: 12px 16px;
+          border-bottom: 1px solid ${brand.border};
+        }
+        .gof-modal-header h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 800;
+        }
+        .gof-modal-body {
+          padding: 16px;
+        }
+        .gof-warning {
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          color: #b91c1c;
+          border-radius: 12px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 600;
+          margin-bottom: 12px;
+        }
+        .gof-callout {
+          font-size: 13px;
+          color: ${brand.subtext};
+          margin: 12px 0 0;
+        }
+        .gof-modal-footer {
+          padding: 10px 16px 14px;
+          border-top: 1px solid ${brand.border};
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+        .btn {
+          font-size: 13px;
+          border-radius: 999px;
+          padding: 6px 12px;
+          border: 1px solid transparent;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .btn.ghost {
+          background: #ffffff;
+          color: ${brand.subtext};
+          border-color: ${brand.border};
+        }
+        .btn.primary {
+          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
+          color: #fff;
+          box-shadow: ${brand.shadow};
+        }
 
-                  {/* PRODUCER NAME (OPTIONAL) */}
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    label="Produced By (Name)"
-                    onBlur={handleBlur}
-                    onChange={handleChange}
-                    value={values.producerName}
-                    name="producerName"
-                    error={!!touched.producerName && !!errors.producerName}
-                    helperText={touched.producerName && errors.producerName}
-                    sx={{ gridColumn: isMobile ? "span 4" : "span 2" }}
-                  />
-                </Box>
+        /* Deficit table */
+        .pl-deficit-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+          font-size: 13px;
+        }
+        .pl-deficit-table th,
+        .pl-deficit-table td {
+          padding: 6px 8px;
+          border-bottom: 1px solid ${brand.border};
+          text-align: left;
+        }
+        .pl-deficit-table th {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: ${brand.subtext};
+          font-weight: 700;
+        }
+        .pl-missing {
+          color: ${brand.danger};
+          font-weight: 600;
+        }
+      `}</style>
 
-                <Typography
-                  variant="h6"
-                  sx={{
-                    mb: 1,
-                    fontWeight: 800,
-                    color: brand.text,
-                    fontSize: 14,
+      <div className="gof-card">
+        <h2 className="gof-title">Production Log</h2>
+        <p className="gof-sub">
+          Record batches produced, track waste and auto-calc units into Finished
+          Goods inventory.
+        </p>
+
+        {/* Tabs */}
+        <div className="gof-tabs" role="tablist">
+          <button
+            type="button"
+            className={`gof-tab ${tabValue === 0 ? "active" : ""}`}
+            onClick={() => setTabValue(0)}
+          >
+            Record Single Batch
+          </button>
+          <button
+            type="button"
+            className={`gof-tab ${tabValue === 1 ? "active" : ""}`}
+            onClick={() => setTabValue(1)}
+          >
+            Record Multiple Batches
+          </button>
+        </div>
+
+        <Formik
+          initialValues={tabValue === 0 ? defaultSingleLog : defaultMultipleLog}
+          validationSchema={tabValue === 0 ? singleSchema : multipleSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize
+        >
+          {({
+            values,
+            errors,
+            touched,
+            handleBlur,
+            handleChange,
+            handleSubmit: formikHandleSubmit,
+            setTouched,
+            validateForm,
+          }) => (
+            <>
+              {tabValue === 0 ? (
+                // =====================================================================
+                // TAB 0: SINGLE BATCH FORM
+                // =====================================================================
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSingleClick(
+                      validateForm,
+                      values,
+                      setTouched,
+                      formikHandleSubmit
+                    );
                   }}
+                  noValidate
                 >
-                  Batch Logs (different recipes allowed):
-                </Typography>
-
-                <FieldArray name="logs">
-                  {({ push, remove }) => (
-                    <>
-                      {!!(touched.logs && errors.logs) &&
-                        typeof errors.logs === "string" && (
-                          <Alert
-                            severity="error"
-                            sx={{
-                              mb: 2,
-                              fontWeight: 700,
-                              borderRadius: 2,
-                            }}
-                          >
-                            {errors.logs}
-                          </Alert>
-                        )}
-
-                      <Table
-                        size="small"
-                        sx={{
-                          mb: 2,
-                          "& .MuiTableCell-root": {
-                            p: 1,
-                            borderColor: brand.border,
-                          },
-                        }}
+                  <div className="gof-grid">
+                    {/* RECIPE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="recipe">
+                        Recipe *
+                      </label>
+                      <select
+                        id="recipe"
+                        name="recipe"
+                        className="gof-select"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.recipe}
                       >
-                        <TableHead>
-                          <TableRow
-                            sx={{
-                              bgcolor: "#f8fafc",
-                              "& .MuiTableCell-head": {
-                                fontWeight: 800,
-                              },
-                            }}
-                          >
-                            <TableCell>Recipe *</TableCell>
-                            <TableCell>Batches Produced *</TableCell>
-                            <TableCell>Units of Waste *</TableCell>
-                            <TableCell>Batch Code *</TableCell>
-                            <TableCell align="right">Actions</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(values.logs ?? []).map((log, index) => {
-                            const recipePath = `logs[${index}].recipe`;
-                            const batchesProducedPath = `logs[${index}].batchesProduced`;
-                            const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
-                            const batchCodePath = `logs[${index}].batchCode`;
+                        <option value="" disabled>
+                          Select a recipe…
+                        </option>
+                        {recipes.map((recipe) => (
+                          <option key={recipe.name} value={recipe.name}>
+                            {recipe.name}
+                          </option>
+                        ))}
+                      </select>
+                      {touched.recipe && errors.recipe && (
+                        <div className="gof-error">{errors.recipe}</div>
+                      )}
+                    </div>
 
-                            return (
-                              <TableRow
-                                key={index}
-                                sx={{
-                                  "&:nth-of-type(odd)": { bgcolor: "#fff" },
-                                  "&:nth-of-type(even)": {
-                                    bgcolor: "#f8fafc",
-                                  },
-                                }}
-                              >
-                                {/* RECIPE PER ROW */}
-                                <TableCell sx={{ minWidth: 180 }}>
-                                  <FormControl
-                                    fullWidth
-                                    size="small"
-                                    variant="outlined"
+                    {/* DATE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="date">
+                        Date *
+                      </label>
+                      <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.date}
+                      />
+                      {touched.date && errors.date && (
+                        <div className="gof-error">{errors.date}</div>
+                      )}
+                    </div>
+
+                    {/* BATCHES PRODUCED */}
+                    <div className="gof-field col-4">
+                      <label
+                        className="gof-label"
+                        htmlFor="batchesProduced"
+                      >
+                        Batches Produced *
+                      </label>
+                      <input
+                        id="batchesProduced"
+                        name="batchesProduced"
+                        type="number"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.batchesProduced}
+                        min="1"
+                      />
+                      {touched.batchesProduced && errors.batchesProduced && (
+                        <div className="gof-error">
+                          {errors.batchesProduced}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* UNITS OF WASTE */}
+                    <div className="gof-field col-4">
+                      <label className="gof-label" htmlFor="unitsOfWaste">
+                        Units of Waste *
+                      </label>
+                      <input
+                        id="unitsOfWaste"
+                        name="unitsOfWaste"
+                        type="number"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.unitsOfWaste}
+                        min="0"
+                      />
+                      {touched.unitsOfWaste && errors.unitsOfWaste && (
+                        <div className="gof-error">
+                          {errors.unitsOfWaste}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PRODUCER NAME (OPTIONAL) */}
+                    <div className="gof-field col-4">
+                      <label className="gof-label" htmlFor="producerName">
+                        Produced By (Name)
+                      </label>
+                      <input
+                        id="producerName"
+                        name="producerName"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.producerName}
+                      />
+                      {touched.producerName && errors.producerName && (
+                        <div className="gof-error">
+                          {errors.producerName}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BATCH CODE (REQUIRED) */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="batchCode">
+                        Batch Code *
+                      </label>
+                      <input
+                        id="batchCode"
+                        name="batchCode"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.batchCode}
+                      />
+                      {touched.batchCode && errors.batchCode && (
+                        <div className="gof-error">{errors.batchCode}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Fixed gradient pill submit */}
+                  <button
+                    type="submit"
+                    className="gof-pill"
+                    aria-label="Record production"
+                    disabled={loading || !cognitoId}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    {loading ? "Processing..." : "Record Production"}
+                  </button>
+                </form>
+              ) : (
+                // =====================================================================
+                // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
+                // =====================================================================
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleDeficitCheck(values, formikHandleSubmit);
+                  }}
+                  noValidate
+                >
+                  <div className="gof-grid" style={{ marginBottom: 16 }}>
+                    {/* DATE */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="date">
+                        Date *
+                      </label>
+                      <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.date}
+                      />
+                      {touched.date && errors.date && (
+                        <div className="gof-error">{errors.date}</div>
+                      )}
+                    </div>
+
+                    {/* PRODUCER NAME (OPTIONAL) */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label" htmlFor="producerName">
+                        Produced By (Name)
+                      </label>
+                      <input
+                        id="producerName"
+                        name="producerName"
+                        type="text"
+                        className="gof-input"
+                        onBlur={handleBlur}
+                        onChange={handleChange}
+                        value={values.producerName}
+                      />
+                      {touched.producerName && errors.producerName && (
+                        <div className="gof-error">
+                          {errors.producerName}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="gof-sub">
+                    Batch Logs (different recipes allowed, each with its own
+                    batch code).
+                  </p>
+
+                  <FieldArray name="logs">
+                    {({ push, remove }) => (
+                      <>
+                        {!!(touched.logs && errors.logs) &&
+                          typeof errors.logs === "string" && (
+                            <div className="gof-error" style={{ marginBottom: 8 }}>
+                              {errors.logs}
+                            </div>
+                          )}
+
+                        {(values.logs ?? []).map((log, index) => {
+                          const recipePath = `logs[${index}].recipe`;
+                          const batchesProducedPath = `logs[${index}].batchesProduced`;
+                          const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
+                          const batchCodePath = `logs[${index}].batchCode`;
+
+                          const recipeError =
+                            getIn(touched, recipePath) &&
+                            getIn(errors, recipePath);
+                          const batchesError =
+                            getIn(touched, batchesProducedPath) &&
+                            getIn(errors, batchesProducedPath);
+                          const wasteError =
+                            getIn(touched, unitsOfWastePath) &&
+                            getIn(errors, unitsOfWastePath);
+                          const batchCodeError =
+                            getIn(touched, batchCodePath) &&
+                            getIn(errors, batchCodePath);
+
+                          return (
+                            <div className="gof-multi-row" key={index}>
+                              <div className="gof-multi-row-header">
+                                <span className="gof-multi-index">
+                                  Batch {index + 1}
+                                </span>
+                                {values.logs.length > 1 && (
+                                  <button
+                                    type="button"
+                                    className="gof-multi-remove"
+                                    onClick={() => remove(index)}
                                   >
-                                    <InputLabel id={`recipe-label-${index}`}>
-                                      Recipe *
-                                    </InputLabel>
-                                    <Select
-                                      labelId={`recipe-label-${index}`}
-                                      name={recipePath}
-                                      value={log.recipe || ""}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                      label="Recipe *"
-                                      error={
-                                        !!getIn(touched, recipePath) &&
-                                        !!getIn(errors, recipePath)
-                                      }
-                                      MenuProps={{
-                                        disablePortal: false,
-                                        anchorOrigin: {
-                                          vertical: "bottom",
-                                          horizontal: "left",
-                                        },
-                                        transformOrigin: {
-                                          vertical: "top",
-                                          horizontal: "left",
-                                        },
-                                        PaperProps: {
-                                          style: {
-                                            zIndex: 300000,
-                                            position: "absolute",
-                                          },
-                                        },
-                                      }}
-                                    >
-                                      {recipes.map((recipe) => (
-                                        <MenuItem
-                                          key={recipe.name}
-                                          value={recipe.name}
-                                        >
-                                          {recipe.name}
-                                        </MenuItem>
-                                      ))}
-                                    </Select>
-                                  </FormControl>
-                                  {!!getIn(touched, recipePath) &&
-                                    !!getIn(errors, recipePath) && (
-                                      <Typography
-                                        variant="caption"
-                                        color="error"
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="gof-grid">
+                                {/* RECIPE PER ROW */}
+                                <div className="gof-field col-6">
+                                  <label
+                                    className="gof-label"
+                                    htmlFor={`logs-${index}-recipe`}
+                                  >
+                                    Recipe *
+                                  </label>
+                                  <select
+                                    id={`logs-${index}-recipe`}
+                                    name={recipePath}
+                                    className="gof-select"
+                                    onBlur={handleBlur}
+                                    onChange={handleChange}
+                                    value={log.recipe || ""}
+                                  >
+                                    <option value="" disabled>
+                                      Select a recipe…
+                                    </option>
+                                    {recipes.map((recipe) => (
+                                      <option
+                                        key={recipe.name}
+                                        value={recipe.name}
                                       >
-                                        {getIn(errors, recipePath)}
-                                      </Typography>
-                                    )}
-                                </TableCell>
+                                        {recipe.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {recipeError && (
+                                    <div className="gof-error">
+                                      {recipeError}
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* BATCHES PRODUCED */}
-                                <TableCell>
-                                  <TextField
-                                    size="small"
-                                    type="number"
+                                <div className="gof-field col-3">
+                                  <label
+                                    className="gof-label"
+                                    htmlFor={`logs-${index}-batchesProduced`}
+                                  >
+                                    Batches Produced *
+                                  </label>
+                                  <input
+                                    id={`logs-${index}-batchesProduced`}
                                     name={batchesProducedPath}
-                                    value={log.batchesProduced}
-                                    onChange={handleChange}
+                                    type="number"
+                                    className="gof-input"
                                     onBlur={handleBlur}
-                                    error={
-                                      !!getIn(
-                                        touched,
-                                        batchesProducedPath
-                                      ) &&
-                                      !!getIn(
-                                        errors,
-                                        batchesProducedPath
-                                      )
-                                    }
-                                    helperText={
-                                      getIn(
-                                        touched,
-                                        batchesProducedPath
-                                      ) &&
-                                      getIn(
-                                        errors,
-                                        batchesProducedPath
-                                      )
-                                    }
-                                    sx={{ minWidth: 120 }}
+                                    onChange={handleChange}
+                                    value={log.batchesProduced}
+                                    min="1"
                                   />
-                                </TableCell>
+                                  {batchesError && (
+                                    <div className="gof-error">
+                                      {batchesError}
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* UNITS OF WASTE */}
-                                <TableCell>
-                                  <TextField
-                                    size="small"
-                                    type="number"
+                                <div className="gof-field col-3">
+                                  <label
+                                    className="gof-label"
+                                    htmlFor={`logs-${index}-unitsOfWaste`}
+                                  >
+                                    Units of Waste *
+                                  </label>
+                                  <input
+                                    id={`logs-${index}-unitsOfWaste`}
                                     name={unitsOfWastePath}
-                                    value={log.unitsOfWaste}
-                                    onChange={handleChange}
+                                    type="number"
+                                    className="gof-input"
                                     onBlur={handleBlur}
-                                    error={
-                                      !!getIn(touched, unitsOfWastePath) &&
-                                      !!getIn(errors, unitsOfWastePath)
-                                    }
-                                    helperText={
-                                      getIn(touched, unitsOfWastePath) &&
-                                      getIn(errors, unitsOfWastePath)
-                                    }
-                                    sx={{ minWidth: 120 }}
+                                    onChange={handleChange}
+                                    value={log.unitsOfWaste}
+                                    min="0"
                                   />
-                                </TableCell>
+                                  {wasteError && (
+                                    <div className="gof-error">
+                                      {wasteError}
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* BATCH CODE (REQUIRED) */}
-                                <TableCell>
-                                  <TextField
-                                    size="small"
-                                    name={batchCodePath}
-                                    value={log.batchCode}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    error={
-                                      !!getIn(touched, batchCodePath) &&
-                                      !!getIn(errors, batchCodePath)
-                                    }
-                                    helperText={
-                                      getIn(touched, batchCodePath) &&
-                                      getIn(errors, batchCodePath)
-                                    }
-                                    sx={{ minWidth: 150 }}
-                                  />
-                                </TableCell>
-
-                                {/* ACTIONS */}
-                                <TableCell align="right">
-                                  <IconButton
-                                    onClick={() => remove(index)}
-                                    color="error"
-                                    disabled={values.logs.length === 1}
-                                    aria-label="Delete batch log"
+                                <div className="gof-field col-6">
+                                  <label
+                                    className="gof-label"
+                                    htmlFor={`logs-${index}-batchCode`}
                                   >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                                    Batch Code *
+                                  </label>
+                                  <input
+                                    id={`logs-${index}-batchCode`}
+                                    name={batchCodePath}
+                                    type="text"
+                                    className="gof-input"
+                                    onBlur={handleBlur}
+                                    onChange={handleChange}
+                                    value={log.batchCode}
+                                  />
+                                  {batchCodeError && (
+                                    <div className="gof-error">
+                                      {batchCodeError}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
 
-                      <Button
-                        onClick={() =>
-                          push({
-                            recipe: "",
-                            batchesProduced: 1,
-                            unitsOfWaste: 0,
-                            batchCode: "",
-                          })
-                        }
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        sx={{
-                          fontWeight: 700,
-                          textTransform: "none",
-                          borderRadius: 999,
-                          borderColor: brand.border,
-                          color: brand.text,
-                          "&:hover": { borderColor: brand.primary },
-                        }}
-                      >
-                        Add Another Recipe Batch
-                      </Button>
-                    </>
-                  )}
-                </FieldArray>
-
-                {/* MULTIPLE SUBMIT BUTTON */}
-                <Box display="flex" justifyContent="flex-end" mt={3}>
-                  <Fab
-                    variant="extended"
-                    type="submit"
-                    disabled={loading || !cognitoId}
-                    sx={{
-                      px: 4,
-                      py: 1.25,
-                      gap: 1,
-                      borderRadius: 999,
-                      fontWeight: 800,
-                      textTransform: "none",
-                      boxShadow:
-                        "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                      background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                      color: "#fff",
-                      "&:hover": { background: brand.primaryDark },
-                    }}
-                  >
-                    {loading ? (
-                      <CircularProgress size={20} color="inherit" />
-                    ) : (
-                      <AddIcon />
+                        <div className="gof-multi-actions">
+                          <button
+                            type="button"
+                            className="gof-multi-add-btn"
+                            onClick={() =>
+                              push({
+                                recipe: "",
+                                batchesProduced: 1,
+                                unitsOfWaste: 0,
+                                batchCode: "",
+                              })
+                            }
+                          >
+                            + Add another batch
+                          </button>
+                        </div>
+                      </>
                     )}
+                  </FieldArray>
+
+                  {/* Fixed gradient pill submit */}
+                  <button
+                    type="submit"
+                    className="gof-pill"
+                    aria-label="Record multiple production batches"
+                    disabled={loading || !cognitoId}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 5v14M5 12h14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                     {loading ? "Processing..." : "Record Production"}
-                  </Fab>
-                </Box>
-              </form>
-            )}
-          </>
-        )}
-      </Formik>
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+        </Formik>
+      </div>
 
-      {/* DEFICIT WARNING MODAL */}
-      <Dialog
+      {/* Soft Deficit Warning Modal (can proceed) */}
+      <DeficitModal
         open={deficitOpen}
-        onClose={() => setDeficitOpen(false)}
-        maxWidth="xs"
-        fullWidth
-        sx={{
-          zIndex: 400000,
-          "& .MuiDialog-container": {
-            alignItems: "flex-start",
-          },
-          "& .MuiDialog-paper": {
-            zIndex: 400001,
-            mt: isMobile ? 6 : 10,
-            mx: 2,
-            borderRadius: 3,
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>
-          Inventory Warning
-        </DialogTitle>
-        <DialogContent dividers>
-          <Alert severity="warning" sx={{ fontWeight: 700, borderRadius: 2 }}>
-            Ingredient shortages for{" "}
-            <strong>{deficitInfoRef.current.recipe}</strong>
-          </Alert>
-          <Table size="small" sx={{ mt: 2 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell>Ingredient</TableCell>
-                <TableCell>Required</TableCell>
-                <TableCell>Available</TableCell>
-                <TableCell>Missing</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(deficitInfoRef.current.deficits ?? []).map((d, i) => (
-                <TableRow key={i}>
-                  <TableCell>{d.ingredient}</TableCell>
-                  <TableCell>
-                    {d.required} {d.unit}
-                  </TableCell>
-                  <TableCell>
-                    {d.available} {d.unit}
-                  </TableCell>
-                  <TableCell sx={{ color: brand.danger }}>
-                    {d.missing} {d.unit}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </DialogContent>
+        info={deficitInfoRef.current}
+        onCancel={handleDeficitCancel}
+        onProceed={handleDeficitProceed}
+      />
 
-        <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => setDeficitOpen(false)}
-            sx={{ fontWeight: 700 }}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            onClick={() => {
-              setDeficitOpen(false);
-              const next = deficitNextRef.current;
-              deficitNextRef.current = null;
-              if (typeof next === "function") next();
-            }}
-            sx={{
-              fontWeight: 800,
-              borderRadius: 999,
-              px: 2,
-              color: "#fff",
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              "&:hover": { background: brand.primaryDark },
-            }}
-          >
-            Proceed Anyway
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* SUCCESS TOAST */}
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={3000}
-        onClose={() => setOpenSnackbar(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setOpenSnackbar(false)}
-          severity="success"
-          sx={{ fontWeight: 700, borderRadius: 2 }}
-        >
-          Production recorded successfully!
-        </Alert>
-      </Snackbar>
-    </Paper>
+      {/* Success Toast */}
+      <Toast open={openSnackbar} onClose={() => setOpenSnackbar(false)}>
+        Production recorded successfully!
+      </Toast>
+    </div>
   );
 }
