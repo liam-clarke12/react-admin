@@ -34,7 +34,7 @@ const formatDateYMD = (val) => {
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) {
     const s = String(val);
-    const m = s.match(/\d{4}-\{2}-\{2}/);
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
     return m ? m[0] : s;
   }
   return d.toISOString().split("T")[0];
@@ -352,7 +352,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               unitsOfWaste: toNumber(log.unitsOfWaste),
               batchCode: log.batchCode,
               unitsRemaining:
-                toNumber(log.batchesProduced) * getUnitsPerBatch(log.recipe) -
+                toNumber(log.batchesProduced) *
+                  getUnitsPerBatch(log.recipe) -
                 toNumber(log.unitsOfWaste),
             }));
 
@@ -557,7 +558,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         }
         .gof-card {
           margin-top: 12px;
-          padding: 16px 16px 80px;
+          padding: 16px 16px 24px;
           border: 1px solid ${brand.border};
           background: ${brand.surface};
           border-radius: 16px;
@@ -682,12 +683,9 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           color: ${brand.subtext};
         }
 
-        /* Submit pill button */
+        /* Submit pill button – now inline at bottom of form, NOT fixed */
         .gof-pill {
-          position: fixed;
-          right: 20px;
-          bottom: 20px;
-          z-index: 10;
+          margin-top: 24px;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -707,7 +705,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           transform: none;
         }
         .gof-pill:not([disabled]):hover {
-          transform: scale(1.06);
+          transform: scale(1.03);
           background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
         }
 
@@ -834,13 +832,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         }
       `}</style>
 
-      <div className="gof-card">
-        <h2 className="gof-title">Production Log</h2>
-        <p className="gof-sub">
-          Record batches produced, track waste and auto-calc units into Finished
-          Goods inventory.
-        </p>
-
         {/* Tabs */}
         <div className="gof-tabs" role="tablist">
           <button
@@ -941,10 +932,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
 
                     {/* BATCHES PRODUCED */}
                     <div className="gof-field col-4">
-                      <label
-                        className="gof-label"
-                        htmlFor="batchesProduced"
-                      >
+                      <label className="gof-label" htmlFor="batchesProduced">
                         Batches Produced *
                       </label>
                       <input
@@ -1027,7 +1015,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     </div>
                   </div>
 
-                  {/* Fixed gradient pill submit */}
+                  {/* Submit button at bottom of form */}
                   <button
                     type="submit"
                     className="gof-pill"
@@ -1289,7 +1277,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     )}
                   </FieldArray>
 
-                  {/* Fixed gradient pill submit */}
+                  {/* Submit button at bottom of form */}
                   <button
                     type="submit"
                     className="gof-pill"
@@ -1317,7 +1305,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
             </>
           )}
         </Formik>
-      </div>
+
 
       {/* Soft Deficit Warning Modal (can proceed) */}
       <DeficitModal
