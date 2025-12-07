@@ -183,7 +183,7 @@ const BrandStyles = () => (
   }
   .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
   .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
-  .r-dbody { padding:14px; background:#f1f5s9; overflow:auto; flex:1; }
+  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
   .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
   .r-stat { text-align:right; }
   .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
@@ -234,9 +234,10 @@ const BrandStyles = () => (
   .col-6 { grid-column: span 6; }
   .col-4 { grid-column: span 4; }
   .col-3 { grid-column: span 3; }
+  .col-8 { grid-column: span 8; }
 
   @media (max-width: 900px) {
-    .col-6, .col-4, .col-3 { grid-column: span 12; }
+    .col-6, .col-4, .col-3, .col-8 { grid-column: span 12; }
   }
 
   .gof-field {
