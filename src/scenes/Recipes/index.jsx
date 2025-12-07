@@ -1311,8 +1311,8 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   };
 
-  /* ------- Combine existing recipes ------- */
-  const combinedBaseIngredients = useMemo(() => {
+  /* ------- Combine existing recipes (no hooks here) ------- */
+  const combinedBaseIngredients = (() => {
     const selectedSet = new Set(selectedRecipeIdsLocal);
     const map = new Map(); // key: name::unit → { name, unit, quantity }
 
@@ -1334,7 +1334,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       id: `combo_${idx}`,
       ...it,
     }));
-  }, [existingRecipes, selectedRecipeIdsLocal]);
+  })();
 
   const toggleRecipeSelect = (id) => {
     setSelectedRecipeIdsLocal((prev) =>
