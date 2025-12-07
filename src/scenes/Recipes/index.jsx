@@ -285,6 +285,50 @@ const BrandStyles = () => (
     transform: scale(1.03);
     background: linear-gradient(180deg, #5B21B6, #5B21B6);
   }
+
+  /* Tabs for Add Recipe modal */
+  .tab-switch {
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .tab-pill {
+    padding:6px 12px;
+    border-radius:999px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    font-size:13px;
+    cursor:pointer;
+    font-weight:600;
+    color:#64748b;
+  }
+  .tab-pill.active {
+    background:#ede9fe;
+    color:#5B21B6;
+    border-color:#c4b5fd;
+  }
+
+  /* Simple recipe list for combine tab */
+  .combine-recipes-list {
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    padding:10px;
+    max-height:220px;
+    overflow:auto;
+    margin-top:6px;
+  }
+  .combine-recipes-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 4px;
+    border-bottom:1px solid #f1f5f9;
+    font-size:13px;
+  }
+  .combine-recipes-row:last-child {
+    border-bottom:none;
+  }
 `}</style>
 );
 
@@ -662,6 +706,187 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   );
 };
 
+/* ---------------- Summary Modal for new recipe ---------------- */
+const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
+  const [draft, setDraft] = useState(initialRecipe || null);
+
+  useEffect(() => {
+    if (open && initialRecipe) {
+      // deep clone
+      setDraft(JSON.parse(JSON.stringify(initialRecipe)));
+    }
+  }, [open, initialRecipe]);
+
+  if (!open || !draft) return null;
+
+  const handleField = (k, v) =>
+    setDraft((p) => ({
+      ...p,
+      [k]: v,
+    }));
+
+  const handleIngredient = (idx, k, v) => {
+    const arr = [...(draft.ingredients || [])];
+    arr[idx] = { ...(arr[idx] || {}), [k]: v };
+    setDraft((p) => ({ ...p, ingredients: arr }));
+  };
+
+  const addIngredientRow = () => {
+    setDraft((p) => ({
+      ...p,
+      ingredients: [
+        ...(p.ingredients || []),
+        {
+          id: `sum_${Date.now()}`,
+          name: "",
+          quantity: 0,
+          unit: UNIT_OPTIONS[0].value,
+        },
+      ],
+    }));
+  };
+
+  const removeIngredient = (idx) => {
+    setDraft((p) => ({
+      ...p,
+      ingredients: p.ingredients.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleConfirm = () => {
+    onConfirm(draft);
+  };
+
+  return (
+    <div className="r-modal-dim">
+      <div className="r-modal">
+        <div className="r-mhdr">
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Review New Recipe
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
+        </div>
+        <div className="r-mbody">
+          <p className="r-muted" style={{ marginBottom: 12 }}>
+            Make any final tweaks to the combined recipe before saving.
+          </p>
+
+          <div className="gof-grid">
+            <div className="gof-field col-6">
+              <label className="gof-label">Recipe Name</label>
+              <input
+                type="text"
+                className="gof-input"
+                value={draft.name}
+                onChange={(e) => handleField("name", e.target.value)}
+              />
+            </div>
+            <div className="gof-field col-6">
+              <label className="gof-label">Units per Batch</label>
+              <input
+                type="number"
+                className="gof-input"
+                value={draft.unitsPerBatch}
+                onChange={(e) =>
+                  handleField(
+                    "unitsPerBatch",
+                    parseInt(e.target.value || "0", 10)
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <h3 className="r-strong" style={{ marginBottom: 8 }}>
+              Ingredients
+            </h3>
+            <div style={{ display: "grid", gap: 8 }}>
+              {(draft.ingredients || []).map((ing, idx) => (
+                <div key={ing.id || idx} className="gof-multi-row">
+                  <div className="gof-grid">
+                    <div className="gof-field col-6">
+                      <label className="gof-label">Ingredient</label>
+                      <input
+                        type="text"
+                        className="gof-input"
+                        value={ing.name}
+                        onChange={(e) =>
+                          handleIngredient(idx, "name", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="gof-field col-3">
+                      <label className="gof-label">Quantity</label>
+                      <input
+                        type="number"
+                        className="gof-input"
+                        value={ing.quantity}
+                        onChange={(e) =>
+                          handleIngredient(
+                            idx,
+                            "quantity",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="gof-field col-3">
+                      <label className="gof-label">Unit</label>
+                      <select
+                        className="gof-select"
+                        value={ing.unit}
+                        onChange={(e) =>
+                          handleIngredient(idx, "unit", e.target.value)
+                        }
+                      >
+                        {UNIT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8, textAlign: "right" }}>
+                    <button
+                      type="button"
+                      className="r-btn-icon"
+                      onClick={() => removeIngredient(idx)}
+                      title="Remove"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="gof-multi-add-btn"
+              style={{ marginTop: 10 }}
+              onClick={addIngredientRow}
+            >
+              + Add Ingredient
+            </button>
+          </div>
+        </div>
+        <div className="r-mfooter">
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="gof-pill" onClick={handleConfirm}>
+            Confirm & Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---------------- Edit Modal (Nory-style form) ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const { cognitoId } = useAuth();
@@ -929,13 +1154,15 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   );
 };
 
-/* ---------------- Add Recipe Modal (popup form, Nory-style) ---------------- */
-const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
+/* ---------------- Add Recipe Modal (popup form, Nory-style + combine tab) ---------------- */
+const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const { cognitoId } = useAuth();
   const { ingredients, reload } = useIngredientOptions(
     cognitoId,
     isOpen ? 1 : 0
   );
+
+  const [mode, setMode] = useState("manual"); // "manual" | "combine"
 
   const [newRecipe, setNewRecipe] = useState({
     name: "",
@@ -949,15 +1176,25 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       },
     ],
   });
+
   const [saving, setSaving] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addTargetIndex, setAddTargetIndex] = useState(null);
 
+  // For combine tab
+  const [selectedRecipeIdsLocal, setSelectedRecipeIdsLocal] = useState([]);
+  const [extraIngredients, setExtraIngredients] = useState([]);
+
+  // Summary modal state
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryRecipe, setSummaryRecipe] = useState(null);
+
+  // Reset when closing
   useEffect(() => {
     if (!isOpen) {
-      // reset when closing
+      setMode("manual");
       setNewRecipe({
         name: "",
         unitsPerBatch: 1,
@@ -970,6 +1207,10 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
           },
         ],
       });
+      setSelectedRecipeIdsLocal([]);
+      setExtraIngredients([]);
+      setSummaryOpen(false);
+      setSummaryRecipe(null);
     }
   }, [isOpen]);
 
@@ -980,6 +1221,8 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       ...p,
       [k]: v,
     }));
+
+  /* ------- Manual ingredient handlers ------- */
   const handleIngredient = (idx, k, v) => {
     const arr = [...newRecipe.ingredients];
     arr[idx] = { ...arr[idx], [k]: v };
@@ -1005,16 +1248,34 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       ingredients: p.ingredients.filter((_, i) => i !== idx),
     }));
   };
-  const create = async () => {
-    setSaving(true);
-    await onSave(newRecipe);
-    setSaving(false);
+
+  /* ------- Extra ingredients for combine mode ------- */
+  const handleExtraIngredient = (idx, k, v) => {
+    const arr = [...extraIngredients];
+    arr[idx] = { ...arr[idx], [k]: v };
+    setExtraIngredients(arr);
+  };
+  const addExtraIngredientRow = () => {
+    setExtraIngredients((prev) => [
+      ...prev,
+      {
+        id: `extra_${Date.now()}`,
+        name: "",
+        quantity: 0,
+        unit: UNIT_OPTIONS[0].value,
+      },
+    ]);
+  };
+  const removeExtraIngredient = (idx) => {
+    setExtraIngredients((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const openAddCustom = (index) => {
-    setAddTargetIndex(index);
+  /* ------- Add custom ingredient dialog ------- */
+  const openAddCustom = (index, isExtra = false) => {
+    setAddTargetIndex({ index, isExtra });
     setAddOpen(true);
   };
+
   const doAddCustom = async (name) => {
     if (!cognitoId || !name?.trim()) return;
     setAdding(true);
@@ -1033,7 +1294,12 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
       if (just && addTargetIndex != null) {
-        handleIngredient(addTargetIndex, "name", just.name);
+        const { index, isExtra } = addTargetIndex;
+        if (isExtra) {
+          handleExtraIngredient(index, "name", just.name);
+        } else {
+          handleIngredient(index, "name", just.name);
+        }
       }
       setAddOpen(false);
       setAddTargetIndex(null);
@@ -1044,6 +1310,391 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       setAdding(false);
     }
   };
+
+  /* ------- Combine existing recipes ------- */
+  const combinedBaseIngredients = useMemo(() => {
+    const selectedSet = new Set(selectedRecipeIdsLocal);
+    const map = new Map(); // key: name::unit → { name, unit, quantity }
+
+    (existingRecipes || []).forEach((rec) => {
+      if (!selectedSet.has(rec.id)) return;
+      (rec.ingredients || []).forEach((ing) => {
+        if (!ing.name) return;
+        const unitVal = ing.unit || "";
+        const key = `${ing.name}::${unitVal}`;
+        const prev =
+          map.get(key) || { name: ing.name, unit: unitVal, quantity: 0 };
+        const qty = parseFloat(ing.quantity) || 0;
+        prev.quantity += qty;
+        map.set(key, prev);
+      });
+    });
+
+    return Array.from(map.values()).map((it, idx) => ({
+      id: `combo_${idx}`,
+      ...it,
+    }));
+  }, [existingRecipes, selectedRecipeIdsLocal]);
+
+  const toggleRecipeSelect = (id) => {
+    setSelectedRecipeIdsLocal((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  /* ------- Merge ingredients for summary ------- */
+  const mergeIngredients = (arrays) => {
+    const map = new Map();
+    arrays
+      .flat()
+      .filter(Boolean)
+      .forEach((ing) => {
+        if (!ing.name) return;
+        const unitVal = ing.unit || "";
+        const key = `${ing.name}::${unitVal}`;
+        const existing = map.get(key) || {
+          id: ing.id || `m_${map.size}`,
+          name: ing.name,
+          unit: unitVal,
+          quantity: 0,
+        };
+        existing.quantity += Number(ing.quantity) || 0;
+        map.set(key, existing);
+      });
+    return Array.from(map.values());
+  };
+
+  /* ------- Open summary (used for both modes) ------- */
+  const handleOpenSummary = () => {
+    let candidateIngredients = [];
+
+    if (mode === "manual") {
+      candidateIngredients = mergeIngredients([newRecipe.ingredients]);
+    } else {
+      // combine: base from selected recipes + extra ingredients
+      candidateIngredients = mergeIngredients([
+        combinedBaseIngredients,
+        extraIngredients,
+      ]);
+    }
+
+    if (!newRecipe.name.trim()) {
+      alert("Please provide a recipe name.");
+      return;
+    }
+    if (!candidateIngredients.length) {
+      alert("Please add at least one ingredient.");
+      return;
+    }
+
+    const candidate = {
+      name: newRecipe.name,
+      unitsPerBatch: newRecipe.unitsPerBatch || 0,
+      ingredients: candidateIngredients,
+    };
+
+    setSummaryRecipe(candidate);
+    setSummaryOpen(true);
+  };
+
+  const handleConfirmSummary = async (finalRecipe) => {
+    setSummaryOpen(false);
+    setSaving(true);
+    await onSave(finalRecipe);
+    setSaving(false);
+  };
+
+  /* ------- Render sections ------- */
+  const renderManualIngredients = () => (
+    <div style={{ marginTop: 16 }}>
+      <h3 className="r-strong" style={{ marginBottom: 8 }}>
+        Ingredients
+      </h3>
+      <div style={{ display: "grid", gap: 8 }}>
+        {newRecipe.ingredients.map((ing, idx) => (
+          <div key={ing.id} className="gof-multi-row">
+            <div className="gof-grid">
+              {/* Ingredient dropdown */}
+              <div className="gof-field col-6">
+                <label className="gof-label">Ingredient</label>
+                <Autocomplete
+                  options={ingredients}
+                  value={
+                    ingredients.find((i) => i.name === ing.name) || null
+                  }
+                  onChange={(_, val) =>
+                    handleIngredient(idx, "name", val ? val.name : "")
+                  }
+                  getOptionLabel={(opt) =>
+                    typeof opt === "string" ? opt : opt?.name ?? ""
+                  }
+                  isOptionEqualToValue={(opt, val) =>
+                    (opt?.id ?? opt) === (val?.id ?? val)
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Select an ingredient"
+                    />
+                  )}
+                  disableClearable={false}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="r-btn-ghost"
+                    onClick={() => openAddCustom(idx, false)}
+                  >
+                    Add Ingredient +
+                  </button>
+                </div>
+              </div>
+
+              {/* Quantity */}
+              <div className="gof-field col-3">
+                <label className="gof-label">Quantity</label>
+                <input
+                  type="number"
+                  className="gof-input"
+                  placeholder="Qty"
+                  value={ing.quantity}
+                  onChange={(e) =>
+                    handleIngredient(
+                      idx,
+                      "quantity",
+                      parseFloat(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
+
+              {/* Unit */}
+              <div className="gof-field col-3">
+                <label className="gof-label">Unit</label>
+                <select
+                  className="gof-select"
+                  value={ing.unit}
+                  onChange={(e) =>
+                    handleIngredient(idx, "unit", e.target.value)
+                  }
+                >
+                  {UNIT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 8, textAlign: "right" }}>
+              <button
+                type="button"
+                className="r-btn-icon"
+                onClick={() => removeIngredient(idx)}
+                title="Remove"
+              >
+                <DeleteIcon />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        className="gof-multi-add-btn"
+        style={{ marginTop: 10 }}
+        onClick={addIngredientRow}
+      >
+        + Add Ingredient
+      </button>
+    </div>
+  );
+
+  const renderCombineMode = () => (
+    <>
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Select Recipes to Combine
+        </h3>
+        <p className="r-muted">
+          Pick existing recipes to merge. Ingredients with the same name and
+          unit will have their quantities summed.
+        </p>
+
+        <div className="combine-recipes-list">
+          {(existingRecipes || []).map((r) => (
+            <div key={r.id} className="combine-recipes-row">
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedRecipeIdsLocal.includes(r.id)}
+                  onChange={() => toggleRecipeSelect(r.id)}
+                />
+                <span className="r-td--name" style={{ fontSize: 13 }}>
+                  {r.name}
+                </span>
+              </label>
+              <span className="r-muted">
+                Units/batch: {r.unitsPerBatch ?? "—"}
+              </span>
+            </div>
+          ))}
+          {(!existingRecipes || existingRecipes.length === 0) && (
+            <div className="r-muted">No recipes available yet.</div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Combined Ingredients (auto)
+        </h3>
+        {combinedBaseIngredients.length === 0 ? (
+          <p className="r-muted">Select recipes above to see combined ingredients.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {combinedBaseIngredients.map((ing) => (
+              <div key={ing.id} className="gof-multi-row">
+                <div className="gof-grid">
+                  <div className="gof-field col-6">
+                    <label className="gof-label">Ingredient</label>
+                    <input
+                      type="text"
+                      className="gof-input"
+                      value={ing.name}
+                      readOnly
+                    />
+                  </div>
+                  <div className="gof-field col-3">
+                    <label className="gof-label">Quantity</label>
+                    <input
+                      type="number"
+                      className="gof-input"
+                      value={ing.quantity}
+                      readOnly
+                    />
+                  </div>
+                  <div className="gof-field col-3">
+                    <label className="gof-label">Unit</label>
+                    <input
+                      type="text"
+                      className="gof-input"
+                      value={ing.unit}
+                      readOnly
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Additional Ingredients
+        </h3>
+        <p className="r-muted" style={{ marginBottom: 6 }}>
+          Add any extra ingredients to this combined recipe.
+        </p>
+        <div style={{ display: "grid", gap: 8 }}>
+          {extraIngredients.map((ing, idx) => (
+            <div key={ing.id} className="gof-multi-row">
+              <div className="gof-grid">
+                <div className="gof-field col-6">
+                  <label className="gof-label">Ingredient</label>
+                  <Autocomplete
+                    options={ingredients}
+                    value={
+                      ingredients.find((i) => i.name === ing.name) || null
+                    }
+                    onChange={(_, val) =>
+                      handleExtraIngredient(idx, "name", val ? val.name : "")
+                    }
+                    getOptionLabel={(opt) =>
+                      typeof opt === "string" ? opt : opt?.name ?? ""
+                    }
+                    isOptionEqualToValue={(opt, val) =>
+                      (opt?.id ?? opt) === (val?.id ?? val)
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Select an ingredient"
+                      />
+                    )}
+                    disableClearable={false}
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="r-btn-ghost"
+                      onClick={() => openAddCustom(idx, true)}
+                    >
+                      Add Ingredient +
+                    </button>
+                  </div>
+                </div>
+                <div className="gof-field col-3">
+                  <label className="gof-label">Quantity</label>
+                  <input
+                    type="number"
+                    className="gof-input"
+                    placeholder="Qty"
+                    value={ing.quantity}
+                    onChange={(e) =>
+                      handleExtraIngredient(
+                        idx,
+                        "quantity",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
+                  />
+                </div>
+                <div className="gof-field col-3">
+                  <label className="gof-label">Unit</label>
+                  <select
+                    className="gof-select"
+                    value={ing.unit}
+                    onChange={(e) =>
+                      handleExtraIngredient(idx, "unit", e.target.value)
+                    }
+                  >
+                    {UNIT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, textAlign: "right" }}>
+                <button
+                  type="button"
+                  className="r-btn-icon"
+                  onClick={() => removeExtraIngredient(idx)}
+                  title="Remove"
+                >
+                  <DeleteIcon />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="gof-multi-add-btn"
+          style={{ marginTop: 10 }}
+          onClick={addExtraIngredientRow}
+        >
+          + Add Extra Ingredient
+        </button>
+      </div>
+    </>
+  );
 
   return (
     <div className="r-modal-dim">
@@ -1058,6 +1709,24 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
         </div>
 
         <div className="r-mbody">
+          {/* Tabs */}
+          <div className="tab-switch">
+            <button
+              type="button"
+              className={`tab-pill ${mode === "manual" ? "active" : ""}`}
+              onClick={() => setMode("manual")}
+            >
+              Manual Recipe
+            </button>
+            <button
+              type="button"
+              className={`tab-pill ${mode === "combine" ? "active" : ""}`}
+              onClick={() => setMode("combine")}
+            >
+              Combine Recipes
+            </button>
+          </div>
+
           {/* Top grid - Nory style */}
           <div className="gof-grid">
             <div className="gof-field col-6">
@@ -1086,117 +1755,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
             </div>
           </div>
 
-          <div style={{ marginTop: 16 }}>
-            <h3 className="r-strong" style={{ marginBottom: 8 }}>
-              Ingredients
-            </h3>
-            <div style={{ display: "grid", gap: 8 }}>
-              {newRecipe.ingredients.map((ing, idx) => (
-                <div key={ing.id} className="gof-multi-row">
-                  <div className="gof-grid">
-                    {/* Ingredient dropdown */}
-                    <div className="gof-field col-6">
-                      <label className="gof-label">
-                        Ingredient
-                      </label>
-                      <Autocomplete
-                        options={ingredients}
-                        value={
-                          ingredients.find((i) => i.name === ing.name) ||
-                          null
-                        }
-                        onChange={(_, val) =>
-                          handleIngredient(idx, "name", val ? val.name : "")
-                        }
-                        getOptionLabel={(opt) =>
-                          typeof opt === "string" ? opt : opt?.name ?? ""
-                        }
-                        isOptionEqualToValue={(opt, val) =>
-                          (opt?.id ?? opt) === (val?.id ?? val)
-                        }
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            placeholder="Select an ingredient"
-                          />
-                        )}
-                        disableClearable={false}
-                      />
-                      <div style={{ marginTop: 8 }}>
-                        <button
-                          type="button"
-                          className="r-btn-ghost"
-                          onClick={() => openAddCustom(idx)}
-                        >
-                          Add Ingredient +
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Quantity */}
-                    <div className="gof-field col-3">
-                      <label className="gof-label">
-                        Quantity
-                      </label>
-                      <input
-                        type="number"
-                        className="gof-input"
-                        placeholder="Qty"
-                        value={ing.quantity}
-                        onChange={(e) =>
-                          handleIngredient(
-                            idx,
-                            "quantity",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                      />
-                    </div>
-
-                    {/* Unit */}
-                    <div className="gof-field col-3">
-                      <label className="gof-label">
-                        Unit
-                      </label>
-                      <select
-                        className="gof-select"
-                        value={ing.unit}
-                        onChange={(e) =>
-                          handleIngredient(idx, "unit", e.target.value)
-                        }
-                      >
-                        {UNIT_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 8, textAlign: "right" }}>
-                    <button
-                      type="button"
-                      className="r-btn-icon"
-                      onClick={() => removeIngredient(idx)}
-                      title="Remove"
-                    >
-                      <DeleteIcon />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="gof-multi-add-btn"
-              style={{ marginTop: 10 }}
-              onClick={addIngredientRow}
-            >
-              + Add Ingredient
-            </button>
-          </div>
+          {mode === "manual" ? renderManualIngredients() : renderCombineMode()}
         </div>
 
         <div className="r-mfooter">
@@ -1205,7 +1764,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
           </button>
           <button
             className="gof-pill"
-            onClick={create}
+            onClick={handleOpenSummary}
             disabled={saving}
           >
             {saving ? "Creating..." : "Create Recipe"}
@@ -1221,6 +1780,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
         }}
         onAdd={doAddCustom}
         adding={adding}
+      />
+
+      <RecipeSummaryModal
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        onConfirm={handleConfirmSummary}
+        initialRecipe={summaryRecipe}
       />
     </div>
   );
@@ -1519,6 +2085,7 @@ const Recipes = () => {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         onSave={handleCreateRecipe}
+        existingRecipes={recipes}
       />
     </div>
   );
