@@ -1,11 +1,5 @@
 // src/scenes/recipes/Recipes.jsx
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useData } from "../../contexts/DataContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -21,8 +15,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /* ---------------- Unit options (local) ---------------- */
 const UNIT_OPTIONS = [
@@ -121,7 +114,7 @@ const PlusIcon = (props) => (
   </Svg>
 );
 
-/* ---------------- Scoped styles ---------------- */
+/* ---------------- Scoped styles (kept identical + Nory-style form bits) ---------------- */
 const BrandStyles = () => (
   <style>{`
   .r-wrap { padding: 20px; }
@@ -195,27 +188,12 @@ const BrandStyles = () => (
   .r-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
   .r-chip { font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; padding:4px 8px; border-radius:999px; }
 
-  /* Modal (shared for edit/add/delete) */
+  /* Modal (shared) */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
   .r-mbody { padding:16px; overflow:auto; background:#f8fafc; }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
-
-  /* Summary modal (sits ABOVE add/edit modal) */
-  .r-summary-dim {
-    position:fixed; inset:0;
-    background:rgba(0,0,0,.55);
-    display:flex; align-items:center; justify-content:center;
-    z-index:80; padding:16px;
-  }
-  .r-summary-modal {
-    background:#fff; border-radius:14px;
-    width:100%; max-width:720px; max-height:90vh; overflow:hidden;
-    box-shadow:0 10px 30px rgba(2,6,23,.30);
-    display:flex; flex-direction:column;
-    z-index:81;
-  }
 
   /* Small helpers */
   .r-flex { display:flex; align-items:center; gap:10px; }
@@ -223,7 +201,7 @@ const BrandStyles = () => (
   .r-muted { color:#64748b; font-size:12px; }
   .r-strong { font-weight:900; color:#0f172a; }
 
-  /* ===================== Nory-style form bits ===================== */
+  /* ===================== Nory-style form bits (copied from Production form) ===================== */
 
   .gof-grid {
     display: grid;
@@ -234,10 +212,9 @@ const BrandStyles = () => (
   .col-6 { grid-column: span 6; }
   .col-4 { grid-column: span 4; }
   .col-3 { grid-column: span 3; }
-  .col-8 { grid-column: span 8; }
 
   @media (max-width: 900px) {
-    .col-6, .col-4, .col-3, .col-8 { grid-column: span 12; }
+    .col-6, .col-4, .col-3 { grid-column: span 12; }
   }
 
   .gof-field {
@@ -309,60 +286,48 @@ const BrandStyles = () => (
     background: linear-gradient(180deg, #5B21B6, #5B21B6);
   }
 
-  /* Tabs */
-  .gof-tabs {
-    margin-bottom: 16px;
-    display: inline-flex;
-    padding: 4px;
-    background:#e5e7eb;
-    border-radius:999px;
+  /* Tabs for Add Recipe modal */
+  .tab-switch {
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
   }
-  .gof-tab {
+  .tab-pill {
+    padding:6px 12px;
     border-radius:999px;
-    border:0;
-    padding:6px 14px;
-    font-size:12px;
-    font-weight:700;
-    cursor:pointer;
-    color:#4b5563;
-    background:transparent;
-  }
-  .gof-tab.active {
+    border:1px solid #e5e7eb;
     background:#fff;
-    color:#111827;
-    box-shadow:0 1px 2px rgba(15,23,42,0.08);
+    font-size:13px;
+    cursor:pointer;
+    font-weight:600;
+    color:#64748b;
+  }
+  .tab-pill.active {
+    background:#ede9fe;
+    color:#5B21B6;
+    border-color:#c4b5fd;
   }
 
+  /* Simple recipe list for combine tab */
   .combine-recipes-list {
     border-radius:12px;
     border:1px solid #e5e7eb;
     background:#fff;
-    max-height:260px;
+    padding:10px;
+    max-height:220px;
     overflow:auto;
-    padding:8px;
+    margin-top:6px;
   }
-  .combine-recipes-item {
+  .combine-recipes-row {
     display:flex;
     align-items:center;
     justify-content:space-between;
-    padding:6px 8px;
-    border-radius:8px;
-    cursor:pointer;
-  }
-  .combine-recipes-item:hover {
-    background:#f3f4ff;
-  }
-  .combine-recipes-item input {
-    margin-right:8px;
-  }
-  .combine-recipes-name {
+    padding:6px 4px;
+    border-bottom:1px solid #f1f5f9;
     font-size:13px;
-    font-weight:600;
-    color:#0f172a;
   }
-  .combine-recipes-meta {
-    font-size:11px;
-    color:#6b7280;
+  .combine-recipes-row:last-child {
+    border-bottom:none;
   }
 `}</style>
 );
@@ -393,8 +358,7 @@ const RecipeTable = ({
 
   useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate =
-        numSelected > 0 && numSelected < rowCount;
+      checkboxRef.current.indeterminate = numSelected > 0 && numSelected < rowCount;
     }
   }, [numSelected, rowCount]);
 
@@ -742,75 +706,71 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   );
 };
 
-/* ---------------- Summary Modal (Review before create) ---------------- */
-const RecipeSummaryModal = ({
-  open,
-  recipe,
-  onChange,
-  onCancel,
-  onConfirm,
-  saving,
-}) => {
-  const [draft, setDraft] = useState(recipe || null);
+/* ---------------- Summary Modal for new recipe ---------------- */
+const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
+  const [draft, setDraft] = useState(initialRecipe || null);
 
   useEffect(() => {
-    setDraft(recipe || null);
-  }, [recipe]);
+    if (open && initialRecipe) {
+      // deep clone
+      setDraft(JSON.parse(JSON.stringify(initialRecipe)));
+    }
+  }, [open, initialRecipe]);
 
   if (!open || !draft) return null;
 
-  const handleField = (k, v) => {
-    const next = { ...draft, [k]: v };
-    setDraft(next);
-    onChange?.(next);
-  };
+  const handleField = (k, v) =>
+    setDraft((p) => ({
+      ...p,
+      [k]: v,
+    }));
 
   const handleIngredient = (idx, k, v) => {
     const arr = [...(draft.ingredients || [])];
     arr[idx] = { ...(arr[idx] || {}), [k]: v };
-    const next = { ...draft, ingredients: arr };
-    setDraft(next);
-    onChange?.(next);
+    setDraft((p) => ({ ...p, ingredients: arr }));
   };
 
   const addIngredientRow = () => {
-    const arr = [
-      ...(draft.ingredients || []),
-      {
-        id: `sum_${Date.now()}`,
-        name: "",
-        quantity: 0,
-        unit: UNIT_OPTIONS[0].value,
-      },
-    ];
-    const next = { ...draft, ingredients: arr };
-    setDraft(next);
-    onChange?.(next);
+    setDraft((p) => ({
+      ...p,
+      ingredients: [
+        ...(p.ingredients || []),
+        {
+          id: `sum_${Date.now()}`,
+          name: "",
+          quantity: 0,
+          unit: UNIT_OPTIONS[0].value,
+        },
+      ],
+    }));
   };
 
   const removeIngredient = (idx) => {
-    const arr = (draft.ingredients || []).filter((_, i) => i !== idx);
-    const next = { ...draft, ingredients: arr };
-    setDraft(next);
-    onChange?.(next);
+    setDraft((p) => ({
+      ...p,
+      ingredients: p.ingredients.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleConfirm = () => {
+    onConfirm(draft);
   };
 
   return (
-    <div className="r-summary-dim">
-      <div className="r-summary-modal">
+    <div className="r-modal-dim">
+      <div className="r-modal">
         <div className="r-mhdr">
           <h2 className="r-title" style={{ fontSize: 18 }}>
-            Review Recipe
+            Review New Recipe
           </h2>
-          <button className="r-btn-ghost" onClick={onCancel}>
+          <button className="r-btn-ghost" onClick={onClose}>
             <CloseIcon /> Close
           </button>
         </div>
-
         <div className="r-mbody">
-          <p className="r-muted" style={{ marginBottom: 10 }}>
-            This is the final recipe. You can still tweak name, batch size, or any
-            ingredient before confirming.
+          <p className="r-muted" style={{ marginBottom: 12 }}>
+            Make any final tweaks to the combined recipe before saving.
           </p>
 
           <div className="gof-grid">
@@ -819,16 +779,16 @@ const RecipeSummaryModal = ({
               <input
                 type="text"
                 className="gof-input"
-                value={draft.name || ""}
+                value={draft.name}
                 onChange={(e) => handleField("name", e.target.value)}
               />
             </div>
-            <div className="gof-field col-3">
+            <div className="gof-field col-6">
               <label className="gof-label">Units per Batch</label>
               <input
                 type="number"
                 className="gof-input"
-                value={draft.unitsPerBatch ?? 1}
+                value={draft.unitsPerBatch}
                 onChange={(e) =>
                   handleField(
                     "unitsPerBatch",
@@ -841,7 +801,7 @@ const RecipeSummaryModal = ({
 
           <div style={{ marginTop: 16 }}>
             <h3 className="r-strong" style={{ marginBottom: 8 }}>
-              Ingredients ({draft.ingredients?.length || 0})
+              Ingredients
             </h3>
             <div style={{ display: "grid", gap: 8 }}>
               {(draft.ingredients || []).map((ing, idx) => (
@@ -914,17 +874,12 @@ const RecipeSummaryModal = ({
             </button>
           </div>
         </div>
-
         <div className="r-mfooter">
-          <button className="r-btn-ghost" onClick={onCancel}>
-            Back
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
           </button>
-          <button
-            className="gof-pill"
-            onClick={() => onConfirm(draft)}
-            disabled={saving}
-          >
-            {saving ? "Creating..." : "Confirm & Create"}
+          <button className="gof-pill" onClick={handleConfirm}>
+            Confirm & Create
           </button>
         </div>
       </div>
@@ -932,7 +887,7 @@ const RecipeSummaryModal = ({
   );
 };
 
-/* ---------------- Edit Modal ---------------- */
+/* ---------------- Edit Modal (Nory-style form) ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const { cognitoId } = useAuth();
   const { ingredients, reload } = useIngredientOptions(
@@ -945,7 +900,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
 
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addTargetIndex, setAddTargetIndex] = useState(null);
+  const [addTargetIndex, setAddTargetIndex] = useState(null); // which ingredient row to auto-select into
 
   useEffect(() => {
     if (recipe) setEdited(JSON.parse(JSON.stringify(recipe)));
@@ -1002,6 +957,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
+      // auto-select newly added (name match)
       const just = (ingredients || []).find(
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
@@ -1031,6 +987,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
         </div>
 
         <div className="r-mbody">
+          {/* Top grid - Nory style */}
           <div className="gof-grid">
             <div className="gof-field col-6">
               <label className="gof-label">Recipe Name</label>
@@ -1065,8 +1022,11 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
               {(edited?.ingredients || []).map((ing, idx) => (
                 <div key={ing.id || idx} className="gof-multi-row">
                   <div className="gof-grid">
+                    {/* Ingredient dropdown */}
                     <div className="gof-field col-6">
-                      <label className="gof-label">Ingredient</label>
+                      <label className="gof-label">
+                        Ingredient
+                      </label>
                       <Autocomplete
                         options={ingredients}
                         value={
@@ -1101,8 +1061,11 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                       </div>
                     </div>
 
+                    {/* Quantity */}
                     <div className="gof-field col-3">
-                      <label className="gof-label">Quantity</label>
+                      <label className="gof-label">
+                        Quantity
+                      </label>
                       <input
                         type="number"
                         className="gof-input"
@@ -1118,8 +1081,11 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                       />
                     </div>
 
+                    {/* Unit */}
                     <div className="gof-field col-3">
-                      <label className="gof-label">Unit</label>
+                      <label className="gof-label">
+                        Unit
+                      </label>
                       <select
                         className="gof-select"
                         value={ing.unit}
@@ -1188,13 +1154,15 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   );
 };
 
-/* ---------------- Add Recipe Modal (manual + combine tab) ---------------- */
+/* ---------------- Add Recipe Modal (popup form, Nory-style + combine tab) ---------------- */
 const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const { cognitoId } = useAuth();
   const { ingredients, reload } = useIngredientOptions(
     cognitoId,
     isOpen ? 1 : 0
   );
+
+  const [mode, setMode] = useState("manual"); // "manual" | "combine"
 
   const [newRecipe, setNewRecipe] = useState({
     name: "",
@@ -1208,21 +1176,25 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       },
     ],
   });
+
   const [saving, setSaving] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addTargetIndex, setAddTargetIndex] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("manual"); // "manual" | "combine"
-  const [combineSelectedIds, setCombineSelectedIds] = useState([]);
+  // For combine tab
+  const [selectedRecipeIdsLocal, setSelectedRecipeIdsLocal] = useState([]);
+  const [extraIngredients, setExtraIngredients] = useState([]);
 
+  // Summary modal state
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryRecipe, setSummaryRecipe] = useState(null);
 
   // Reset when closing
   useEffect(() => {
     if (!isOpen) {
+      setMode("manual");
       setNewRecipe({
         name: "",
         unitsPerBatch: 1,
@@ -1235,54 +1207,12 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
           },
         ],
       });
-      setActiveTab("manual");
-      setCombineSelectedIds([]);
+      setSelectedRecipeIdsLocal([]);
+      setExtraIngredients([]);
       setSummaryOpen(false);
       setSummaryRecipe(null);
     }
   }, [isOpen]);
-
-  // Combined ingredients from selected recipes
-  const combinedFromSelection = useMemo(() => {
-    if (!existingRecipes || !combineSelectedIds.length) return [];
-    const map = new Map(); // key: name|unit, value: {name, quantity, unit}
-    for (const rec of existingRecipes) {
-      if (!combineSelectedIds.includes(rec.id)) continue;
-      for (const ing of rec.ingredients || []) {
-        const key = `${ing.name}||${ing.unit}`;
-        const current = map.get(key) || {
-          name: ing.name,
-          quantity: 0,
-          unit: ing.unit,
-        };
-        const qty = parseFloat(ing.quantity) || 0;
-        current.quantity += qty;
-        map.set(key, current);
-      }
-    }
-    return Array.from(map.values()).map((ing, idx) => ({
-      id: `comb_${idx}_${ing.name}`,
-      name: ing.name,
-      quantity: ing.quantity,
-      unit: ing.unit || UNIT_OPTIONS[0].value,
-    }));
-  }, [existingRecipes, combineSelectedIds]);
-
-  // Pre-fill ingredient list when switching to combine tab and first selecting recipes
-  useEffect(() => {
-    if (
-      activeTab === "combine" &&
-      combinedFromSelection.length > 0 &&
-      newRecipe.ingredients.length === 1 &&
-      !newRecipe.ingredients[0].name &&
-      !newRecipe.ingredients[0].quantity
-    ) {
-      setNewRecipe((p) => ({
-        ...p,
-        ingredients: combinedFromSelection,
-      }));
-    }
-  }, [activeTab, combinedFromSelection, newRecipe.ingredients]);
 
   if (!isOpen) return null;
 
@@ -1291,6 +1221,8 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       ...p,
       [k]: v,
     }));
+
+  /* ------- Manual ingredient handlers ------- */
   const handleIngredient = (idx, k, v) => {
     const arr = [...newRecipe.ingredients];
     arr[idx] = { ...arr[idx], [k]: v };
@@ -1317,10 +1249,33 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }));
   };
 
-  const openAddCustom = (index) => {
-    setAddTargetIndex(index);
+  /* ------- Extra ingredients for combine mode ------- */
+  const handleExtraIngredient = (idx, k, v) => {
+    const arr = [...extraIngredients];
+    arr[idx] = { ...arr[idx], [k]: v };
+    setExtraIngredients(arr);
+  };
+  const addExtraIngredientRow = () => {
+    setExtraIngredients((prev) => [
+      ...prev,
+      {
+        id: `extra_${Date.now()}`,
+        name: "",
+        quantity: 0,
+        unit: UNIT_OPTIONS[0].value,
+      },
+    ]);
+  };
+  const removeExtraIngredient = (idx) => {
+    setExtraIngredients((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  /* ------- Add custom ingredient dialog ------- */
+  const openAddCustom = (index, isExtra = false) => {
+    setAddTargetIndex({ index, isExtra });
     setAddOpen(true);
   };
+
   const doAddCustom = async (name) => {
     if (!cognitoId || !name?.trim()) return;
     setAdding(true);
@@ -1339,7 +1294,12 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
       if (just && addTargetIndex != null) {
-        handleIngredient(addTargetIndex, "name", just.name);
+        const { index, isExtra } = addTargetIndex;
+        if (isExtra) {
+          handleExtraIngredient(index, "name", just.name);
+        } else {
+          handleIngredient(index, "name", just.name);
+        }
       }
       setAddOpen(false);
       setAddTargetIndex(null);
@@ -1351,41 +1311,101 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   };
 
-  const toggleCombineSelection = (id) => {
-    setCombineSelectedIds((prev) =>
+  /* ------- Combine existing recipes (no hooks here) ------- */
+  const combinedBaseIngredients = (() => {
+    const selectedSet = new Set(selectedRecipeIdsLocal);
+    const map = new Map(); // key: name::unit → { name, unit, quantity }
+
+    (existingRecipes || []).forEach((rec) => {
+      if (!selectedSet.has(rec.id)) return;
+      (rec.ingredients || []).forEach((ing) => {
+        if (!ing.name) return;
+        const unitVal = ing.unit || "";
+        const key = `${ing.name}::${unitVal}`;
+        const prev =
+          map.get(key) || { name: ing.name, unit: unitVal, quantity: 0 };
+        const qty = parseFloat(ing.quantity) || 0;
+        prev.quantity += qty;
+        map.set(key, prev);
+      });
+    });
+
+    return Array.from(map.values()).map((it, idx) => ({
+      id: `combo_${idx}`,
+      ...it,
+    }));
+  })();
+
+  const toggleRecipeSelect = (id) => {
+    setSelectedRecipeIdsLocal((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  const applyCombinedToIngredients = () => {
-    setNewRecipe((p) => ({
-      ...p,
-      ingredients: combinedFromSelection.length
-        ? combinedFromSelection
-        : p.ingredients,
-    }));
+  /* ------- Merge ingredients for summary ------- */
+  const mergeIngredients = (arrays) => {
+    const map = new Map();
+    arrays
+      .flat()
+      .filter(Boolean)
+      .forEach((ing) => {
+        if (!ing.name) return;
+        const unitVal = ing.unit || "";
+        const key = `${ing.name}::${unitVal}`;
+        const existing = map.get(key) || {
+          id: ing.id || `m_${map.size}`,
+          name: ing.name,
+          unit: unitVal,
+          quantity: 0,
+        };
+        existing.quantity += Number(ing.quantity) || 0;
+        map.set(key, existing);
+      });
+    return Array.from(map.values());
   };
 
-  /* ---------- Summary flow ---------- */
-  const openSummary = () => {
-    setSummaryRecipe({ ...newRecipe });
+  /* ------- Open summary (used for both modes) ------- */
+  const handleOpenSummary = () => {
+    let candidateIngredients = [];
+
+    if (mode === "manual") {
+      candidateIngredients = mergeIngredients([newRecipe.ingredients]);
+    } else {
+      // combine: base from selected recipes + extra ingredients
+      candidateIngredients = mergeIngredients([
+        combinedBaseIngredients,
+        extraIngredients,
+      ]);
+    }
+
+    if (!newRecipe.name.trim()) {
+      alert("Please provide a recipe name.");
+      return;
+    }
+    if (!candidateIngredients.length) {
+      alert("Please add at least one ingredient.");
+      return;
+    }
+
+    const candidate = {
+      name: newRecipe.name,
+      unitsPerBatch: newRecipe.unitsPerBatch || 0,
+      ingredients: candidateIngredients,
+    };
+
+    setSummaryRecipe(candidate);
     setSummaryOpen(true);
   };
 
-  const handleSummaryChange = (updated) => {
-    setSummaryRecipe(updated);
-  };
-
   const handleConfirmSummary = async (finalRecipe) => {
+    setSummaryOpen(false);
     setSaving(true);
     await onSave(finalRecipe);
     setSaving(false);
-    setSummaryOpen(false);
-    onClose();
   };
 
-  /* ---------- Render helpers ---------- */
-  const renderIngredientsEditor = () => (
+  /* ------- Render sections ------- */
+  const renderManualIngredients = () => (
     <div style={{ marginTop: 16 }}>
       <h3 className="r-strong" style={{ marginBottom: 8 }}>
         Ingredients
@@ -1394,6 +1414,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         {newRecipe.ingredients.map((ing, idx) => (
           <div key={ing.id} className="gof-multi-row">
             <div className="gof-grid">
+              {/* Ingredient dropdown */}
               <div className="gof-field col-6">
                 <label className="gof-label">Ingredient</label>
                 <Autocomplete
@@ -1422,13 +1443,14 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                   <button
                     type="button"
                     className="r-btn-ghost"
-                    onClick={() => openAddCustom(idx)}
+                    onClick={() => openAddCustom(idx, false)}
                   >
                     Add Ingredient +
                   </button>
                 </div>
               </div>
 
+              {/* Quantity */}
               <div className="gof-field col-3">
                 <label className="gof-label">Quantity</label>
                 <input
@@ -1446,6 +1468,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 />
               </div>
 
+              {/* Unit */}
               <div className="gof-field col-3">
                 <label className="gof-label">Unit</label>
                 <select
@@ -1489,193 +1512,283 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     </div>
   );
 
-  const renderManualTab = () => (
+  const renderCombineMode = () => (
     <>
-      <div className="gof-grid">
-        <div className="gof-field col-6">
-          <label className="gof-label">Recipe Name</label>
-          <input
-            type="text"
-            className="gof-input"
-            value={newRecipe.name}
-            onChange={(e) => handleField("name", e.target.value)}
-            placeholder="e.g., Chocolate Chip Cookies"
-          />
-        </div>
-        <div className="gof-field col-6">
-          <label className="gof-label">Units per Batch</label>
-          <input
-            type="number"
-            className="gof-input"
-            value={newRecipe.unitsPerBatch}
-            onChange={(e) =>
-              handleField(
-                "unitsPerBatch",
-                parseInt(e.target.value || "0", 10)
-              )
-            }
-          />
-        </div>
-      </div>
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Select Recipes to Combine
+        </h3>
+        <p className="r-muted">
+          Pick existing recipes to merge. Ingredients with the same name and
+          unit will have their quantities summed.
+        </p>
 
-      {renderIngredientsEditor()}
-    </>
-  );
-
-  const renderCombineTab = () => (
-    <>
-      <div className="gof-grid">
-        <div className="gof-field col-6">
-          <label className="gof-label">Recipe Name</label>
-          <input
-            type="text"
-            className="gof-input"
-            value={newRecipe.name}
-            onChange={(e) => handleField("name", e.target.value)}
-            placeholder="e.g., Dae Mixed Berry Base"
-          />
-        </div>
-        <div className="gof-field col-3">
-          <label className="gof-label">Units per Batch</label>
-          <input
-            type="number"
-            className="gof-input"
-            value={newRecipe.unitsPerBatch}
-            onChange={(e) =>
-              handleField(
-                "unitsPerBatch",
-                parseInt(e.target.value || "0", 10)
-              )
-            }
-          />
-        </div>
-      </div>
-
-      <div className="gof-grid" style={{ marginTop: 16 }}>
-        <div className="gof-field col-4">
-          <label className="gof-label">Combine existing recipes</label>
-          <div className="combine-recipes-list">
-            {(existingRecipes || []).map((r) => (
-              <div
-                key={r.id}
-                className="combine-recipes-item"
-                onClick={() => toggleCombineSelection(r.id)}
-              >
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={combineSelectedIds.includes(r.id)}
-                    onChange={() => toggleCombineSelection(r.id)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <span className="combine-recipes-name">{r.name}</span>
-                </div>
-                <span className="combine-recipes-meta">
-                  {r.ingredients.length} items • {r.unitsPerBatch} upb
+        <div className="combine-recipes-list">
+          {(existingRecipes || []).map((r) => (
+            <div key={r.id} className="combine-recipes-row">
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedRecipeIdsLocal.includes(r.id)}
+                  onChange={() => toggleRecipeSelect(r.id)}
+                />
+                <span className="r-td--name" style={{ fontSize: 13 }}>
+                  {r.name}
                 </span>
+              </label>
+              <span className="r-muted">
+                Units/batch: {r.unitsPerBatch ?? "—"}
+              </span>
+            </div>
+          ))}
+          {(!existingRecipes || existingRecipes.length === 0) && (
+            <div className="r-muted">No recipes available yet.</div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Combined Ingredients (auto)
+        </h3>
+        {combinedBaseIngredients.length === 0 ? (
+          <p className="r-muted">Select recipes above to see combined ingredients.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {combinedBaseIngredients.map((ing) => (
+              <div key={ing.id} className="gof-multi-row">
+                <div className="gof-grid">
+                  <div className="gof-field col-6">
+                    <label className="gof-label">Ingredient</label>
+                    <input
+                      type="text"
+                      className="gof-input"
+                      value={ing.name}
+                      readOnly
+                    />
+                  </div>
+                  <div className="gof-field col-3">
+                    <label className="gof-label">Quantity</label>
+                    <input
+                      type="number"
+                      className="gof-input"
+                      value={ing.quantity}
+                      readOnly
+                    />
+                  </div>
+                  <div className="gof-field col-3">
+                    <label className="gof-label">Unit</label>
+                    <input
+                      type="text"
+                      className="gof-input"
+                      value={ing.unit}
+                      readOnly
+                    />
+                  </div>
+                </div>
               </div>
             ))}
-            {!existingRecipes?.length && (
-              <div className="combine-recipes-item">
-                <span className="combine-recipes-meta">
-                  No existing recipes yet.
-                </span>
-              </div>
-            )}
           </div>
-          <p className="r-muted" style={{ marginTop: 6 }}>
-            Select 2+ recipes to merge their ingredients. Amounts for matching
-            ingredient + unit will be summed.
-          </p>
-          <button
-            type="button"
-            className="gof-multi-add-btn"
-            style={{ marginTop: 8 }}
-            onClick={applyCombinedToIngredients}
-          >
-            Apply selection to ingredients
-          </button>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <h3 className="r-strong" style={{ marginBottom: 4 }}>
+          Additional Ingredients
+        </h3>
+        <p className="r-muted" style={{ marginBottom: 6 }}>
+          Add any extra ingredients to this combined recipe.
+        </p>
+        <div style={{ display: "grid", gap: 8 }}>
+          {extraIngredients.map((ing, idx) => (
+            <div key={ing.id} className="gof-multi-row">
+              <div className="gof-grid">
+                <div className="gof-field col-6">
+                  <label className="gof-label">Ingredient</label>
+                  <Autocomplete
+                    options={ingredients}
+                    value={
+                      ingredients.find((i) => i.name === ing.name) || null
+                    }
+                    onChange={(_, val) =>
+                      handleExtraIngredient(idx, "name", val ? val.name : "")
+                    }
+                    getOptionLabel={(opt) =>
+                      typeof opt === "string" ? opt : opt?.name ?? ""
+                    }
+                    isOptionEqualToValue={(opt, val) =>
+                      (opt?.id ?? opt) === (val?.id ?? val)
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Select an ingredient"
+                      />
+                    )}
+                    disableClearable={false}
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="r-btn-ghost"
+                      onClick={() => openAddCustom(idx, true)}
+                    >
+                      Add Ingredient +
+                    </button>
+                  </div>
+                </div>
+                <div className="gof-field col-3">
+                  <label className="gof-label">Quantity</label>
+                  <input
+                    type="number"
+                    className="gof-input"
+                    placeholder="Qty"
+                    value={ing.quantity}
+                    onChange={(e) =>
+                      handleExtraIngredient(
+                        idx,
+                        "quantity",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
+                  />
+                </div>
+                <div className="gof-field col-3">
+                  <label className="gof-label">Unit</label>
+                  <select
+                    className="gof-select"
+                    value={ing.unit}
+                    onChange={(e) =>
+                      handleExtraIngredient(idx, "unit", e.target.value)
+                    }
+                  >
+                    {UNIT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, textAlign: "right" }}>
+                <button
+                  type="button"
+                  className="r-btn-icon"
+                  onClick={() => removeExtraIngredient(idx)}
+                  title="Remove"
+                >
+                  <DeleteIcon />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="gof-field col-8">
-          {renderIngredientsEditor()}
-        </div>
+        <button
+          type="button"
+          className="gof-multi-add-btn"
+          style={{ marginTop: 10 }}
+          onClick={addExtraIngredientRow}
+        >
+          + Add Extra Ingredient
+        </button>
       </div>
     </>
   );
 
   return (
-    <>
-      <div className="r-modal-dim">
-        <div className="r-modal">
-          <div className="r-mhdr">
-            <h2 className="r-title" style={{ fontSize: 18 }}>
-              Add New Recipe
-            </h2>
-            <button className="r-btn-ghost" onClick={onClose}>
-              <CloseIcon /> Close
-            </button>
-          </div>
-
-          <div className="r-mbody">
-            <div className="gof-tabs">
-              <button
-                type="button"
-                className={`gof-tab ${
-                  activeTab === "manual" ? "active" : ""
-                }`}
-                onClick={() => setActiveTab("manual")}
-              >
-                Manual
-              </button>
-              <button
-                type="button"
-                className={`gof-tab ${
-                  activeTab === "combine" ? "active" : ""
-                }`}
-                onClick={() => setActiveTab("combine")}
-              >
-                Combine Recipes
-              </button>
-            </div>
-
-            {activeTab === "manual" ? renderManualTab() : renderCombineTab()}
-          </div>
-
-          <div className="r-mfooter">
-            <button className="r-btn-ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              className="gof-pill"
-              onClick={openSummary}
-              disabled={saving || !newRecipe.name.trim()}
-            >
-              {saving ? "Creating..." : "Review & Create"}
-            </button>
-          </div>
+    <div className="r-modal-dim">
+      <div className="r-modal">
+        <div className="r-mhdr">
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Add New Recipe
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
 
-        <AddIngredientDialog
-          open={addOpen}
-          onClose={() => {
-            setAddOpen(false);
-            setAddTargetIndex(null);
-          }}
-          onAdd={doAddCustom}
-          adding={adding}
-        />
+        <div className="r-mbody">
+          {/* Tabs */}
+          <div className="tab-switch">
+            <button
+              type="button"
+              className={`tab-pill ${mode === "manual" ? "active" : ""}`}
+              onClick={() => setMode("manual")}
+            >
+              Manual Recipe
+            </button>
+            <button
+              type="button"
+              className={`tab-pill ${mode === "combine" ? "active" : ""}`}
+              onClick={() => setMode("combine")}
+            >
+              Combine Recipes
+            </button>
+          </div>
+
+          {/* Top grid - Nory style */}
+          <div className="gof-grid">
+            <div className="gof-field col-6">
+              <label className="gof-label">Recipe Name</label>
+              <input
+                type="text"
+                className="gof-input"
+                value={newRecipe.name}
+                onChange={(e) => handleField("name", e.target.value)}
+                placeholder="e.g., Chocolate Chip Cookies"
+              />
+            </div>
+            <div className="gof-field col-6">
+              <label className="gof-label">Units per Batch</label>
+              <input
+                type="number"
+                className="gof-input"
+                value={newRecipe.unitsPerBatch}
+                onChange={(e) =>
+                  handleField(
+                    "unitsPerBatch",
+                    parseInt(e.target.value || "0", 10)
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          {mode === "manual" ? renderManualIngredients() : renderCombineMode()}
+        </div>
+
+        <div className="r-mfooter">
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="gof-pill"
+            onClick={handleOpenSummary}
+            disabled={saving}
+          >
+            {saving ? "Creating..." : "Create Recipe"}
+          </button>
+        </div>
       </div>
+
+      <AddIngredientDialog
+        open={addOpen}
+        onClose={() => {
+          setAddOpen(false);
+          setAddTargetIndex(null);
+        }}
+        onAdd={doAddCustom}
+        adding={adding}
+      />
 
       <RecipeSummaryModal
         open={summaryOpen}
-        recipe={summaryRecipe}
-        onChange={handleSummaryChange}
-        onCancel={() => setSummaryOpen(false)}
+        onClose={() => setSummaryOpen(false)}
         onConfirm={handleConfirmSummary}
-        saving={saving}
+        initialRecipe={summaryRecipe}
       />
-    </>
+    </div>
   );
 };
 
