@@ -27,39 +27,94 @@ const UNIT_OPTIONS = [
 ];
 
 /* ---------------- Icons ---------------- */
-const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const Svg = (p) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />
+);
 const EditIcon = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
 );
 const DeleteIcon = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  <Svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
 );
 const MenuIcon = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+  <Svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="18" x2="21" y2="18" />
   </Svg>
 );
 const CloseIcon = (props) => (
-  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  <Svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </Svg>
 );
 const CheckIcon = (props) => (
-  <Svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
     <polyline points="20 6 9 17 4 12" />
   </Svg>
 );
 const PlusIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+  <Svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
   </Svg>
 );
 
-/* ---------------- Scoped styles (kept identical) ---------------- */
+/* ---------------- Scoped styles (kept identical + Nory-style form bits) ---------------- */
 const BrandStyles = () => (
   <style>{`
   .r-wrap { padding: 20px; }
@@ -137,14 +192,7 @@ const BrandStyles = () => (
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
   .r-modal { background:#fff; border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
-  .r-mbody { padding:16px; overflow:auto; }
-  .r-mgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .r-field label { display:block; font-size:13px; color:#64748b; margin-bottom:6px; font-weight:700; }
-  .r-field input, .r-field select, .r-field textarea {
-    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
-  }
-  .r-field input:focus, .r-field select:focus, .r-field textarea:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
-  .r-ing { display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:10px; align-items:center; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:10px; }
+  .r-mbody { padding:16px; overflow:auto; background:#f8fafc; }
   .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Small helpers */
@@ -152,7 +200,92 @@ const BrandStyles = () => (
   .r-badge { background:#ede9fe; color:#7C3AED; border:1px solid #eee; border-radius:999px; padding:4px; display:inline-flex; }
   .r-muted { color:#64748b; font-size:12px; }
   .r-strong { font-weight:900; color:#0f172a; }
-  `}</style>
+
+  /* ===================== Nory-style form bits (copied from Production form) ===================== */
+
+  .gof-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .col-12 { grid-column: span 12; }
+  .col-6 { grid-column: span 6; }
+  .col-4 { grid-column: span 4; }
+  .col-3 { grid-column: span 3; }
+
+  @media (max-width: 900px) {
+    .col-6, .col-4, .col-3 { grid-column: span 12; }
+  }
+
+  .gof-field {
+    display: flex;
+    flex-direction: column;
+  }
+  .gof-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+  .gof-input,
+  .gof-select {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .gof-input:focus,
+  .gof-select:focus {
+    border-color: #7C3AED;
+    box-shadow: 0 0 0 4px rgba(124,58,237,0.18);
+  }
+
+  .gof-multi-row {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #f8fafc;
+  }
+
+  .gof-multi-add-btn {
+    border-radius: 999px;
+    border: 1px dashed #e5e7eb;
+    background: #f1f5f9;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #64748b;
+  }
+
+  .gof-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 12px 18px;
+    border: 0;
+    cursor: pointer;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(180deg, #7C3AED, #5B21B6);
+    box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
+    transition: transform .2s ease;
+  }
+  .gof-pill[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .gof-pill:not([disabled]):hover {
+    transform: scale(1.03);
+    background: linear-gradient(180deg, #5B21B6, #5B21B6);
+  }
+`}</style>
 );
 
 /* ---------------- Recipe Table ---------------- */
@@ -191,14 +324,19 @@ const RecipeTable = ({
         <h2 className="r-title">Recipes</h2>
         <div className="r-actions-right">
           {numSelected > 0 && (
-            <div className="r-flex" style={{ background:"#eef2ff", padding:"6px 10px", borderRadius:10 }}>
+            <div
+              className="r-flex"
+              style={{ background: "#eef2ff", padding: "6px 10px", borderRadius: 10 }}
+            >
               <span className="r-pill">{numSelected} selected</span>
               <button className="r-btn-icon" onClick={onDelete} aria-label="Delete selected">
                 <DeleteIcon />
               </button>
             </div>
           )}
-          <button className="r-btn-add" onClick={onAdd}><PlusIcon /> Add Recipe</button>
+          <button className="r-btn-add" onClick={onAdd}>
+            <PlusIcon /> Add Recipe
+          </button>
         </div>
       </div>
 
@@ -207,8 +345,13 @@ const RecipeTable = ({
           <thead className="r-thead">
             <tr>
               <th className="r-td">
-                <input ref={checkboxRef} className="r-chk" type="checkbox" onChange={handleSelectAll}
-                       checked={rowCount > 0 && numSelected === rowCount} />
+                <input
+                  ref={checkboxRef}
+                  className="r-chk"
+                  type="checkbox"
+                  onChange={handleSelectAll}
+                  checked={rowCount > 0 && numSelected === rowCount}
+                />
               </th>
               <th className="r-td">Recipe</th>
               <th className="r-td">Units per Batch</th>
@@ -231,17 +374,27 @@ const RecipeTable = ({
                 <td className="r-td r-td--name">{r.name}</td>
                 <td className="r-td">{r.unitsPerBatch}</td>
                 <td className="r-td">
-                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "ingredients")}>
+                  <button
+                    className="r-link"
+                    onClick={() => onOpenDrawer(r.id, "ingredients")}
+                  >
                     View ({r.ingredients.length})
                   </button>
                 </td>
                 <td className="r-td">
-                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "quantities")}>
+                  <button
+                    className="r-link"
+                    onClick={() => onOpenDrawer(r.id, "quantities")}
+                  >
                     View Quantities
                   </button>
                 </td>
                 <td className="r-td r-actions">
-                  <button className="r-btn-ghost" onClick={() => onEdit(r)} aria-label={`Edit ${r.name}`}>
+                  <button
+                    className="r-btn-ghost"
+                    onClick={() => onEdit(r)}
+                    aria-label={`Edit ${r.name}`}
+                  >
                     <EditIcon /> Edit
                   </button>
                 </td>
@@ -281,7 +434,8 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
 
   const exportCsv = () => {
     if (!recipe) return;
-    const headers = type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
+    const headers =
+      type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
     const rows = recipe.ingredients.map((ing) =>
       type === "quantities" ? [ing.name, String(ing.quantity), ing.unit] : [ing.name]
     );
@@ -301,25 +455,48 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
       <div className={`r-drawer ${isOpen ? "open" : ""}`}>
         <div className="r-dhdr">
           <div className="r-flex">
-            <span className="r-badge"><MenuIcon /></span>
+            <span className="r-badge">
+              <MenuIcon />
+            </span>
             <div>
-              <h3 className="r-dhdr-title">{type === "ingredients" ? "Ingredients" : "Quantities"}</h3>
+              <h3 className="r-dhdr-title">
+                {type === "ingredients" ? "Ingredients" : "Quantities"}
+              </h3>
               <p className="r-dhdr-sub">{recipe?.name || "No recipe selected"}</p>
             </div>
           </div>
-          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
 
         <div className="r-dbody">
           <div className="r-summary r-flex" style={{ justifyContent: "space-between" }}>
             <div>
-              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>Recipe</div>
+              <div
+                className="r-muted"
+                style={{ textTransform: "uppercase", fontWeight: 800 }}
+              >
+                Recipe
+              </div>
               <div className="r-strong">{recipe?.name || "—"}</div>
-              <div className="r-muted">Units per batch: {recipe?.unitsPerBatch ?? "N/A"}</div>
+              <div className="r-muted">
+                Units per batch: {recipe?.unitsPerBatch ?? "N/A"}
+              </div>
             </div>
             <div className="r-stat">
-              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>Items</div>
-              <div className="r-strong" style={{ color: "#7C3AED", fontSize: 24 }}>{filtered.length}</div>
+              <div
+                className="r-muted"
+                style={{ textTransform: "uppercase", fontWeight: 800 }}
+              >
+                Items
+              </div>
+              <div
+                className="r-strong"
+                style={{ color: "#7C3AED", fontSize: 24 }}
+              >
+                {filtered.length}
+              </div>
             </div>
           </div>
 
@@ -337,10 +514,16 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
             {filtered.map((it, i) => (
               <li key={i} className="r-item">
                 <div className="r-flex">
-                  <span className="r-badge"><CheckIcon /></span>
-                  <span className="r-strong" style={{ fontWeight: 700 }}>{it.name}</span>
+                  <span className="r-badge">
+                    <CheckIcon />
+                  </span>
+                  <span className="r-strong" style={{ fontWeight: 700 }}>
+                    {it.name}
+                  </span>
                 </div>
-                {type === "quantities" && <span className="r-chip">{it.details}</span>}
+                {type === "quantities" && (
+                  <span className="r-chip">{it.details}</span>
+                )}
               </li>
             ))}
             {filtered.length === 0 && (
@@ -355,7 +538,9 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
           <button className="r-btn-ghost" onClick={exportCsv} disabled={!recipe}>
             Export CSV
           </button>
-          <button className="r-btn-primary" onClick={onClose}>Done</button>
+          <button className="r-btn-primary" onClick={onClose}>
+            Done
+          </button>
         </div>
       </div>
     </>
@@ -373,14 +558,26 @@ const useIngredientOptions = (cognitoId, refreshKey = 0) => {
     setLoading(true);
     try {
       const [mRes, cRes] = await Promise.all([
-        fetch(`${API_BASE}/ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
-        fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
+        fetch(
+          `${API_BASE}/ingredients?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
+        ),
+        fetch(
+          `${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(
+            cognitoId
+          )}`
+        ),
       ]);
 
       const m = mRes.ok ? await mRes.json() : [];
       const c = cRes.ok ? await cRes.json() : [];
       setMasterIngredients(Array.isArray(m) ? m : []);
-      setCustomIngredients(Array.isArray(c) ? c.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })) : []);
+      setCustomIngredients(
+        Array.isArray(c)
+          ? c.map((ci) => ({ id: `c-${ci.id}`, name: ci.name }))
+          : []
+      );
     } catch (e) {
       console.error("Ingredient load error:", e);
       setMasterIngredients([]);
@@ -390,7 +587,9 @@ const useIngredientOptions = (cognitoId, refreshKey = 0) => {
     }
   }, [cognitoId]);
 
-  useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
 
   const ingredients = useMemo(
     () => [
@@ -406,11 +605,20 @@ const useIngredientOptions = (cognitoId, refreshKey = 0) => {
 /* ---------------- Add custom ingredient dialog (shared) ---------------- */
 const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   const [name, setName] = useState("");
-  useEffect(() => { if (!open) setName(""); }, [open]);
+  useEffect(() => {
+    if (!open) setName("");
+  }, [open]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth PaperProps={{ sx:{ borderRadius: 14, border: "1px solid #e5e7eb" } }}>
-      <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>Add New Ingredient</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 14, border: "1px solid #e5e7eb" } }}
+    >
+      <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>
+        Add New Ingredient
+      </DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
@@ -418,23 +626,34 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
           label="Ingredient Name"
           fullWidth
           value={name}
-          onChange={(e)=>setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
         />
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} disabled={adding} sx={{ textTransform:"none", fontWeight:700 }}>
+        <Button
+          onClick={onClose}
+          disabled={adding}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
           Cancel
         </Button>
         <Button
-          onClick={()=>onAdd(name)}
+          onClick={() => onAdd(name)}
           disabled={adding || !name.trim()}
           variant="contained"
           sx={{
-            textTransform:"none", fontWeight:800, borderRadius:999, px:3,
-            background:"linear-gradient(180deg, #7C3AED, #5B21B6)",
-            "&:hover":{ background:"#5B21B6" }
+            textTransform: "none",
+            fontWeight: 800,
+            borderRadius: 999,
+            px: 3,
+            background: "linear-gradient(180deg, #7C3AED, #5B21B6)",
+            "&:hover": { background: "#5B21B6" },
           }}
-          startIcon={adding ? <CircularProgress size={18} sx={{ color:"#fff" }} /> : null}
+          startIcon={
+            adding ? (
+              <CircularProgress size={18} sx={{ color: "#fff" }} />
+            ) : null
+          }
         >
           {adding ? "Adding…" : "Add"}
         </Button>
@@ -443,10 +662,13 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   );
 };
 
-/* ---------------- Edit Modal ---------------- */
+/* ---------------- Edit Modal (Nory-style form) ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const { cognitoId } = useAuth();
-  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
+  const { ingredients, reload } = useIngredientOptions(
+    cognitoId,
+    isOpen ? 1 : 0
+  );
 
   const [edited, setEdited] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -473,7 +695,12 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       ...p,
       ingredients: [
         ...(p?.ingredients || []),
-        { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value },
+        {
+          id: `new_${Date.now()}`,
+          name: "",
+          quantity: 0,
+          unit: UNIT_OPTIONS[0].value,
+        },
       ],
     }));
   };
@@ -498,12 +725,17 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       const resp = await fetch(`${API_BASE}/custom-ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
+        body: JSON.stringify({
+          cognito_id: cognitoId,
+          name: name.trim(),
+        }),
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
       // auto-select newly added (name match)
-      const just = (ingredients || []).find(i => i.name?.toLowerCase() === name.trim().toLowerCase());
+      const just = (ingredients || []).find(
+        (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
+      );
       if (just && addTargetIndex != null) {
         handleIngredient(addTargetIndex, "name", just.name);
       }
@@ -521,83 +753,164 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
     <div className="r-modal-dim">
       <div className="r-modal">
         <div className="r-mhdr">
-          <h2 className="r-title" style={{ fontSize: 18 }}>Edit Recipe</h2>
-          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Edit Recipe
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
 
         <div className="r-mbody">
-          <div className="r-mgrid">
-            <div className="r-field">
-              <label>Recipe Name</label>
+          {/* Top grid - Nory style */}
+          <div className="gof-grid">
+            <div className="gof-field col-6">
+              <label className="gof-label">Recipe Name</label>
               <input
                 type="text"
+                className="gof-input"
                 value={edited?.name || ""}
                 onChange={(e) => handleField("name", e.target.value)}
               />
             </div>
-            <div className="r-field">
-              <label>Units per Batch</label>
+            <div className="gof-field col-6">
+              <label className="gof-label">Units per Batch</label>
               <input
                 type="number"
+                className="gof-input"
                 value={edited?.unitsPerBatch ?? 0}
-                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
+                onChange={(e) =>
+                  handleField(
+                    "unitsPerBatch",
+                    parseInt(e.target.value || "0", 10)
+                  )
+                }
               />
             </div>
           </div>
 
-          <div style={{ marginTop: 12 }}>
-            <h3 className="r-strong" style={{ marginBottom: 8 }}>Ingredients</h3>
+          <div style={{ marginTop: 16 }}>
+            <h3 className="r-strong" style={{ marginBottom: 8 }}>
+              Ingredients
+            </h3>
             <div style={{ display: "grid", gap: 8 }}>
               {(edited?.ingredients || []).map((ing, idx) => (
-                <div key={ing.id || idx} className="r-ing">
-                  {/* Ingredient dropdown (same UX as Goods In) */}
-                  <div>
-                    <Autocomplete
-                      options={ingredients}
-                      value={ingredients.find(i => i.name === ing.name) || null}
-                      onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
-                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
-                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
-                      renderInput={(params) => (
-                        <TextField {...params} placeholder="Select an ingredient" />
-                      )}
-                      disableClearable={false}
-                    />
-                    <div style={{ marginTop:8 }}>
-                      <button className="r-btn-ghost" onClick={()=>openAddCustom(idx)}>Add Ingredient +</button>
+                <div key={ing.id || idx} className="gof-multi-row">
+                  <div className="gof-grid">
+                    {/* Ingredient dropdown */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label">
+                        Ingredient
+                      </label>
+                      <Autocomplete
+                        options={ingredients}
+                        value={
+                          ingredients.find((i) => i.name === ing.name) ||
+                          null
+                        }
+                        onChange={(_, val) =>
+                          handleIngredient(idx, "name", val ? val.name : "")
+                        }
+                        getOptionLabel={(opt) =>
+                          typeof opt === "string" ? opt : opt?.name ?? ""
+                        }
+                        isOptionEqualToValue={(opt, val) =>
+                          (opt?.id ?? opt) === (val?.id ?? val)
+                        }
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Select an ingredient"
+                          />
+                        )}
+                        disableClearable={false}
+                      />
+                      <div style={{ marginTop: 8 }}>
+                        <button
+                          type="button"
+                          className="r-btn-ghost"
+                          onClick={() => openAddCustom(idx)}
+                        >
+                          Add Ingredient +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="gof-field col-3">
+                      <label className="gof-label">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        className="gof-input"
+                        placeholder="Quantity"
+                        value={ing.quantity}
+                        onChange={(e) =>
+                          handleIngredient(
+                            idx,
+                            "quantity",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+
+                    {/* Unit */}
+                    <div className="gof-field col-3">
+                      <label className="gof-label">
+                        Unit
+                      </label>
+                      <select
+                        className="gof-select"
+                        value={ing.unit}
+                        onChange={(e) =>
+                          handleIngredient(idx, "unit", e.target.value)
+                        }
+                      >
+                        {UNIT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
-                  <input
-                    type="number"
-                    placeholder="Quantity"
-                    value={ing.quantity}
-                    onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
-                  />
-                  <select
-                    value={ing.unit}
-                    onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
-                  >
-                    {UNIT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <button className="r-btn-icon" onClick={() => removeIngredient(idx)} title="Remove">
-                    <DeleteIcon />
-                  </button>
+                  <div style={{ marginTop: 8, textAlign: "right" }}>
+                    <button
+                      type="button"
+                      className="r-btn-icon"
+                      onClick={() => removeIngredient(idx)}
+                      title="Remove"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredientRow}>
-              <PlusIcon /> Add Ingredient
+            <button
+              type="button"
+              className="gof-multi-add-btn"
+              style={{ marginTop: 10 }}
+              onClick={addIngredientRow}
+            >
+              + Add Ingredient
             </button>
           </div>
         </div>
 
         <div className="r-mfooter">
-          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className={`r-btn-primary ${saving ? "r-btn-disabled" : ""}`} onClick={save} disabled={saving}>
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="gof-pill"
+            onClick={save}
+            disabled={saving}
+          >
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -605,7 +918,10 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
 
       <AddIngredientDialog
         open={addOpen}
-        onClose={()=>{ setAddOpen(false); setAddTargetIndex(null); }}
+        onClose={() => {
+          setAddOpen(false);
+          setAddTargetIndex(null);
+        }}
         onAdd={doAddCustom}
         adding={adding}
       />
@@ -613,15 +929,25 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   );
 };
 
-/* ---------------- Add Recipe Modal (popup form) ---------------- */
+/* ---------------- Add Recipe Modal (popup form, Nory-style) ---------------- */
 const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
   const { cognitoId } = useAuth();
-  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
+  const { ingredients, reload } = useIngredientOptions(
+    cognitoId,
+    isOpen ? 1 : 0
+  );
 
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     unitsPerBatch: 1,
-    ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
+    ingredients: [
+      {
+        id: `new_${Date.now()}`,
+        name: "",
+        quantity: 0,
+        unit: UNIT_OPTIONS[0].value,
+      },
+    ],
   });
   const [saving, setSaving] = useState(false);
 
@@ -635,14 +961,25 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       setNewRecipe({
         name: "",
         unitsPerBatch: 1,
-        ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
+        ingredients: [
+          {
+            id: `new_${Date.now()}`,
+            name: "",
+            quantity: 0,
+            unit: UNIT_OPTIONS[0].value,
+          },
+        ],
       });
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleField = (k, v) => setNewRecipe((p) => ({ ...p, [k]: v }));
+  const handleField = (k, v) =>
+    setNewRecipe((p) => ({
+      ...p,
+      [k]: v,
+    }));
   const handleIngredient = (idx, k, v) => {
     const arr = [...newRecipe.ingredients];
     arr[idx] = { ...arr[idx], [k]: v };
@@ -651,11 +988,22 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
   const addIngredientRow = () => {
     setNewRecipe((p) => ({
       ...p,
-      ingredients: [...p.ingredients, { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
+      ingredients: [
+        ...p.ingredients,
+        {
+          id: `new_${Date.now()}`,
+          name: "",
+          quantity: 0,
+          unit: UNIT_OPTIONS[0].value,
+        },
+      ],
     }));
   };
   const removeIngredient = (idx) => {
-    setNewRecipe((p) => ({ ...p, ingredients: p.ingredients.filter((_, i) => i !== idx) }));
+    setNewRecipe((p) => ({
+      ...p,
+      ingredients: p.ingredients.filter((_, i) => i !== idx),
+    }));
   };
   const create = async () => {
     setSaving(true);
@@ -674,11 +1022,16 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
       const resp = await fetch(`${API_BASE}/custom-ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
+        body: JSON.stringify({
+          cognito_id: cognitoId,
+          name: name.trim(),
+        }),
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
-      const just = (ingredients || []).find(i => i.name?.toLowerCase() === name.trim().toLowerCase());
+      const just = (ingredients || []).find(
+        (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
+      );
       if (just && addTargetIndex != null) {
         handleIngredient(addTargetIndex, "name", just.name);
       }
@@ -696,84 +1049,165 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
     <div className="r-modal-dim">
       <div className="r-modal">
         <div className="r-mhdr">
-          <h2 className="r-title" style={{ fontSize: 18 }}>Add New Recipe</h2>
-          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Add New Recipe
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
 
         <div className="r-mbody">
-          <div className="r-mgrid">
-            <div className="r-field">
-              <label>Recipe Name</label>
+          {/* Top grid - Nory style */}
+          <div className="gof-grid">
+            <div className="gof-field col-6">
+              <label className="gof-label">Recipe Name</label>
               <input
                 type="text"
+                className="gof-input"
                 value={newRecipe.name}
                 onChange={(e) => handleField("name", e.target.value)}
                 placeholder="e.g., Chocolate Chip Cookies"
               />
             </div>
-            <div className="r-field">
-              <label>Units per Batch</label>
+            <div className="gof-field col-6">
+              <label className="gof-label">Units per Batch</label>
               <input
                 type="number"
+                className="gof-input"
                 value={newRecipe.unitsPerBatch}
-                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
+                onChange={(e) =>
+                  handleField(
+                    "unitsPerBatch",
+                    parseInt(e.target.value || "0", 10)
+                  )
+                }
               />
             </div>
           </div>
 
-          <div style={{ marginTop: 12 }}>
-            <h3 className="r-strong" style={{ marginBottom: 8 }}>Ingredients</h3>
+          <div style={{ marginTop: 16 }}>
+            <h3 className="r-strong" style={{ marginBottom: 8 }}>
+              Ingredients
+            </h3>
             <div style={{ display: "grid", gap: 8 }}>
               {newRecipe.ingredients.map((ing, idx) => (
-                <div key={ing.id} className="r-ing">
-                  {/* Ingredient dropdown (same UX as Goods In) */}
-                  <div>
-                    <Autocomplete
-                      options={ingredients}
-                      value={ingredients.find(i => i.name === ing.name) || null}
-                      onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
-                      getOptionLabel={(opt)=> (typeof opt==="string" ? opt : opt?.name ?? "")}
-                      isOptionEqualToValue={(opt,val)=> (opt?.id ?? opt) === (val?.id ?? val)}
-                      renderInput={(params) => (
-                        <TextField {...params} placeholder="Select an ingredient" />
-                      )}
-                      disableClearable={false}
-                    />
-                    <div style={{ marginTop:8 }}>
-                      <button className="r-btn-ghost" onClick={()=>openAddCustom(idx)}>Add Ingredient +</button>
+                <div key={ing.id} className="gof-multi-row">
+                  <div className="gof-grid">
+                    {/* Ingredient dropdown */}
+                    <div className="gof-field col-6">
+                      <label className="gof-label">
+                        Ingredient
+                      </label>
+                      <Autocomplete
+                        options={ingredients}
+                        value={
+                          ingredients.find((i) => i.name === ing.name) ||
+                          null
+                        }
+                        onChange={(_, val) =>
+                          handleIngredient(idx, "name", val ? val.name : "")
+                        }
+                        getOptionLabel={(opt) =>
+                          typeof opt === "string" ? opt : opt?.name ?? ""
+                        }
+                        isOptionEqualToValue={(opt, val) =>
+                          (opt?.id ?? opt) === (val?.id ?? val)
+                        }
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Select an ingredient"
+                          />
+                        )}
+                        disableClearable={false}
+                      />
+                      <div style={{ marginTop: 8 }}>
+                        <button
+                          type="button"
+                          className="r-btn-ghost"
+                          onClick={() => openAddCustom(idx)}
+                        >
+                          Add Ingredient +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="gof-field col-3">
+                      <label className="gof-label">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        className="gof-input"
+                        placeholder="Qty"
+                        value={ing.quantity}
+                        onChange={(e) =>
+                          handleIngredient(
+                            idx,
+                            "quantity",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+
+                    {/* Unit */}
+                    <div className="gof-field col-3">
+                      <label className="gof-label">
+                        Unit
+                      </label>
+                      <select
+                        className="gof-select"
+                        value={ing.unit}
+                        onChange={(e) =>
+                          handleIngredient(idx, "unit", e.target.value)
+                        }
+                      >
+                        {UNIT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
-                  <input
-                    type="number"
-                    placeholder="Qty"
-                    value={ing.quantity}
-                    onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
-                  />
-                  <select
-                    value={ing.unit}
-                    onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
-                  >
-                    {UNIT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <button className="r-btn-icon" onClick={() => removeIngredient(idx)} title="Remove">
-                    <DeleteIcon />
-                  </button>
+                  <div style={{ marginTop: 8, textAlign: "right" }}>
+                    <button
+                      type="button"
+                      className="r-btn-icon"
+                      onClick={() => removeIngredient(idx)}
+                      title="Remove"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <button className="r-btn-ghost" style={{ marginTop: 10 }} onClick={addIngredientRow}>
-              <PlusIcon /> Add Ingredient
+            <button
+              type="button"
+              className="gof-multi-add-btn"
+              style={{ marginTop: 10 }}
+              onClick={addIngredientRow}
+            >
+              + Add Ingredient
             </button>
           </div>
         </div>
 
         <div className="r-mfooter">
-          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="r-btn-primary" onClick={create} disabled={saving}>
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="gof-pill"
+            onClick={create}
+            disabled={saving}
+          >
             {saving ? "Creating..." : "Create Recipe"}
           </button>
         </div>
@@ -781,7 +1215,10 @@ const AddRecipeModal = ({ isOpen, onClose, onSave }) => {
 
       <AddIngredientDialog
         open={addOpen}
-        onClose={()=>{ setAddOpen(false); setAddTargetIndex(null); }}
+        onClose={() => {
+          setAddOpen(false);
+          setAddTargetIndex(null);
+        }}
         onAdd={doAddCustom}
         adding={adding}
       />
@@ -796,19 +1233,52 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
     <div className="r-modal-dim">
       <div className="r-modal" style={{ maxWidth: 420 }}>
         <div className="r-mhdr">
-          <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
-          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Confirm Deletion
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
         <div className="r-mbody" style={{ textAlign: "center" }}>
-          <div className="r-badge" style={{ width: 52, height: 52, alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", border:"none", margin:"0 auto" }}>
+          <div
+            className="r-badge"
+            style={{
+              width: 52,
+              height: 52,
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#fee2e2",
+              color: "#dc2626",
+              border: "none",
+              margin: "0 auto",
+            }}
+          >
             <DeleteIcon />
           </div>
-          <h3 className="r-strong" style={{ marginTop: 10, fontSize:18 }}>Delete {count} recipe{count>1?"s":""}?</h3>
-          <p className="r-muted" style={{ marginTop: 6 }}>This action cannot be undone.</p>
+          <h3
+            className="r-strong"
+            style={{ marginTop: 10, fontSize: 18 }}
+          >
+            Delete {count} recipe{count > 1 ? "s" : ""}?
+          </h3>
+          <p className="r-muted" style={{ marginTop: 6 }}>
+            This action cannot be undone.
+          </p>
         </div>
-        <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
-          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>Delete</button>
+        <div
+          className="r-mfooter"
+          style={{ justifyContent: "flex-end" }}
+        >
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="r-btn-primary r-btn-danger"
+            onClick={onConfirm}
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
@@ -835,7 +1305,9 @@ const Recipes = () => {
   const fetchRecipeData = useCallback(async () => {
     if (!cognitoId) return;
     try {
-      const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
+      const res = await fetch(
+        `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
+      );
       if (!res.ok) throw new Error("Failed to fetch Recipe data");
       const data = await res.json();
 
@@ -892,7 +1364,9 @@ const Recipes = () => {
 
   const handleEdit = async (recipe) => {
     try {
-      const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
+      const url = `${API_BASE}/recipes/${encodeURIComponent(
+        recipe.id
+      )}?cognito_id=${encodeURIComponent(cognitoId)}`;
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipe.id}`);
       const payload = await resp.json();
@@ -926,11 +1400,14 @@ const Recipes = () => {
         units: edited.ingredients.map((i) => i.unit),
         cognito_id: cognitoId,
       };
-      const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(edited.id)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const resp = await fetch(
+        `${API_BASE}/recipes/${encodeURIComponent(edited.id)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       if (!resp.ok) {
         const t = await resp.text().catch(() => "");
         throw new Error(t || `Update failed (${resp.status})`);
@@ -957,7 +1434,10 @@ const Recipes = () => {
         const resp = await fetch(`${API_BASE}/delete-recipe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipeName: rec.name, cognito_id: cognitoId }),
+          body: JSON.stringify({
+            recipeName: rec.name,
+            cognito_id: cognitoId,
+          }),
         });
         if (!resp.ok) console.warn("Delete failed for", rec.name);
       }
