@@ -1,4 +1,3 @@
-// src/scenes/form/ProductionLog/index.jsx
 // Nory-styled Production Log with Single / Multiple tabs
 // + ACTIVE-ingredient inventory precheck & soft deficit warning (can proceed)
 
@@ -271,7 +270,11 @@ function DeficitModal({ open, info, onCancel, onProceed }) {
 // MAIN COMPONENT
 // =====================================================================
 
-export default function ProductionLogForm({ cognitoId, onSubmitted }) {
+export default function ProductionLogForm({
+  cognitoId,
+  onSubmitted,
+  formId = "production-log-form",
+}) {
   // 0 = Single, 1 = Multiple
   const [tabValue, setTabValue] = useState(0);
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -383,6 +386,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   // =====================================================================
   const handleDeficitCheck = useCallback(
     async (values, submitFunc) => {
+      if (loading) return;
+
       if (tabValue === 0 && !values.recipe) {
         submitFunc();
         return;
@@ -503,7 +508,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         setLoading(false);
       }
     },
-    [cognitoId, tabValue]
+    [cognitoId, tabValue, loading]
   );
 
   // =====================================================================
@@ -511,6 +516,8 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
   // =====================================================================
   const handleSingleClick = useCallback(
     (validateForm, values, setTouched, submitForm) => {
+      if (loading) return;
+
       setTouched(
         Object.keys(values).reduce(
           (acc, key) => ({ ...acc, [key]: true }),
@@ -528,7 +535,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
         }
       });
     },
-    [handleDeficitCheck]
+    [handleDeficitCheck, loading]
   );
 
   const handleDeficitProceed = useCallback(() => {
@@ -681,38 +688,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
           font-weight: 600;
           cursor: pointer;
           color: ${brand.subtext};
-        }
-
-        /* Footer area to align submit button bottom-right */
-        .gof-footer {
-          margin-top: 24px;
-          display: flex;
-          justify-content: flex-end;
-        }
-
-        /* Submit pill button */
-        .gof-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border-radius: 999px;
-          padding: 12px 18px;
-          border: 0;
-          cursor: pointer;
-          font-weight: 800;
-          color: #fff;
-          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
-          transition: transform .2s ease;
-        }
-        .gof-pill[disabled] {
-          opacity: 0.6;
-          cursor: not-allowed;
-          transform: none;
-        }
-        .gof-pill:not([disabled]):hover {
-          transform: scale(1.03);
-          background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark});
         }
 
         /* Toast */
@@ -878,6 +853,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
               // TAB 0: SINGLE BATCH FORM
               // =====================================================================
               <form
+                id={formId}
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSingleClick(
@@ -1020,38 +996,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     )}
                   </div>
                 </div>
-
-                {/* Footer with Record Production bottom-right */}
-                <div className="gof-footer">
-                  <button
-                    type="submit"
-                    className="gof-pill"
-                    aria-label="Record production"
-                    disabled={loading || !cognitoId}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 5v14M5 12h14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    {loading ? "Processing..." : "Record Production"}
-                  </button>
-                </div>
               </form>
             ) : (
               // =====================================================================
               // TAB 1: MULTIPLE BATCHES FORM – MULTIPLE RECIPES
               // =====================================================================
               <form
+                id={formId}
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleDeficitCheck(values, formikHandleSubmit);
@@ -1287,32 +1238,6 @@ export default function ProductionLogForm({ cognitoId, onSubmitted }) {
                     </>
                   )}
                 </FieldArray>
-
-                {/* Footer with Record Production bottom-right */}
-                <div className="gof-footer">
-                  <button
-                    type="submit"
-                    className="gof-pill"
-                    aria-label="Record multiple production batches"
-                    disabled={loading || !cognitoId}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M12 5v14M5 12h14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    {loading ? "Processing..." : "Record Production"}
-                  </button>
-                </div>
               </form>
             )}
           </>

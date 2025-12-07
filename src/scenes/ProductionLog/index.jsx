@@ -1,4 +1,3 @@
-// src/scenes/production/ProductionLog.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
@@ -1110,15 +1109,17 @@ export default function ProductionLog() {
                     fetchLogs();
                     setOpenProductionForm(false);
                   }}
+                  formId="production-log-form"
                 />
               </div>
 
-              <div className="r-mfooter">
+              <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
                 <button
-                  className="r-btn-ghost"
-                  onClick={() => setOpenProductionForm(false)}
+                  className="r-btn-primary"
+                  type="submit"
+                  form="production-log-form"
                 >
-                  Close
+                  Record Production
                 </button>
               </div>
             </div>
