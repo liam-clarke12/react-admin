@@ -183,7 +183,7 @@ const BrandStyles = () => (
   }
   .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
   .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
-  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
+  .r-dbody { padding:14px; background:#f1f5s9; overflow:auto; flex:1; }
   .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
   .r-stat { text-align:right; }
   .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
@@ -931,7 +931,7 @@ const RecipeSummaryModal = ({
   );
 };
 
-/* ---------------- Edit Modal (Nory-style form) ---------------- */
+/* ---------------- Edit Modal ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const { cognitoId } = useAuth();
   const { ingredients, reload } = useIngredientOptions(
@@ -944,7 +944,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
 
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addTargetIndex, setAddTargetIndex] = useState(null); // which ingredient row to auto-select into
+  const [addTargetIndex, setAddTargetIndex] = useState(null);
 
   useEffect(() => {
     if (recipe) setEdited(JSON.parse(JSON.stringify(recipe)));
@@ -1001,7 +1001,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
-      // auto-select newly added (name match)
       const just = (ingredients || []).find(
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
@@ -1031,7 +1030,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
         </div>
 
         <div className="r-mbody">
-          {/* Top grid - Nory style */}
           <div className="gof-grid">
             <div className="gof-field col-6">
               <label className="gof-label">Recipe Name</label>
@@ -1066,7 +1064,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
               {(edited?.ingredients || []).map((ing, idx) => (
                 <div key={ing.id || idx} className="gof-multi-row">
                   <div className="gof-grid">
-                    {/* Ingredient dropdown */}
                     <div className="gof-field col-6">
                       <label className="gof-label">Ingredient</label>
                       <Autocomplete
@@ -1103,7 +1100,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                       </div>
                     </div>
 
-                    {/* Quantity */}
                     <div className="gof-field col-3">
                       <label className="gof-label">Quantity</label>
                       <input
@@ -1121,7 +1117,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                       />
                     </div>
 
-                    {/* Unit */}
                     <div className="gof-field col-3">
                       <label className="gof-label">Unit</label>
                       <select
@@ -1246,6 +1241,48 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   }, [isOpen]);
 
+  // Combined ingredients from selected recipes
+  const combinedFromSelection = useMemo(() => {
+    if (!existingRecipes || !combineSelectedIds.length) return [];
+    const map = new Map(); // key: name|unit, value: {name, quantity, unit}
+    for (const rec of existingRecipes) {
+      if (!combineSelectedIds.includes(rec.id)) continue;
+      for (const ing of rec.ingredients || []) {
+        const key = `${ing.name}||${ing.unit}`;
+        const current = map.get(key) || {
+          name: ing.name,
+          quantity: 0,
+          unit: ing.unit,
+        };
+        const qty = parseFloat(ing.quantity) || 0;
+        current.quantity += qty;
+        map.set(key, current);
+      }
+    }
+    return Array.from(map.values()).map((ing, idx) => ({
+      id: `comb_${idx}_${ing.name}`,
+      name: ing.name,
+      quantity: ing.quantity,
+      unit: ing.unit || UNIT_OPTIONS[0].value,
+    }));
+  }, [existingRecipes, combineSelectedIds]);
+
+  // Pre-fill ingredient list when switching to combine tab and first selecting recipes
+  useEffect(() => {
+    if (
+      activeTab === "combine" &&
+      combinedFromSelection.length > 0 &&
+      newRecipe.ingredients.length === 1 &&
+      !newRecipe.ingredients[0].name &&
+      !newRecipe.ingredients[0].quantity
+    ) {
+      setNewRecipe((p) => ({
+        ...p,
+        ingredients: combinedFromSelection,
+      }));
+    }
+  }, [activeTab, combinedFromSelection, newRecipe.ingredients]);
+
   if (!isOpen) return null;
 
   const handleField = (k, v) =>
@@ -1313,50 +1350,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   };
 
-  /* ---------- Combine logic ---------- */
-  const combinedFromSelection = useMemo(() => {
-    if (!existingRecipes || !combineSelectedIds.length) return [];
-    const map = new Map(); // key: name|unit, value: {name, quantity, unit}
-    for (const rec of existingRecipes) {
-      if (!combineSelectedIds.includes(rec.id)) continue;
-      for (const ing of rec.ingredients || []) {
-        const key = `${ing.name}||${ing.unit}`;
-        const current = map.get(key) || {
-          name: ing.name,
-          quantity: 0,
-          unit: ing.unit,
-        };
-        const qty = parseFloat(ing.quantity) || 0;
-        current.quantity += qty;
-        map.set(key, current);
-      }
-    }
-    // preserve insertion order from map
-    return Array.from(map.values()).map((ing, idx) => ({
-      id: `comb_${idx}_${ing.name}`,
-      name: ing.name,
-      quantity: ing.quantity,
-      unit: ing.unit || UNIT_OPTIONS[0].value,
-    }));
-  }, [existingRecipes, combineSelectedIds]);
-
-  // If in combine tab and user has just chosen recipes AND current ingredients are still the single blank row,
-  // hydrate ingredients from combined selection once.
-  useEffect(() => {
-    if (
-      activeTab === "combine" &&
-      combinedFromSelection.length > 0 &&
-      newRecipe.ingredients.length === 1 &&
-      !newRecipe.ingredients[0].name &&
-      !newRecipe.ingredients[0].quantity
-    ) {
-      setNewRecipe((p) => ({
-        ...p,
-        ingredients: combinedFromSelection,
-      }));
-    }
-  }, [activeTab, combinedFromSelection, newRecipe.ingredients]);
-
   const toggleCombineSelection = (id) => {
     setCombineSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -1400,7 +1393,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         {newRecipe.ingredients.map((ing, idx) => (
           <div key={ing.id} className="gof-multi-row">
             <div className="gof-grid">
-              {/* Ingredient dropdown */}
               <div className="gof-field col-6">
                 <label className="gof-label">Ingredient</label>
                 <Autocomplete
@@ -1436,7 +1428,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="gof-field col-3">
                 <label className="gof-label">Quantity</label>
                 <input
@@ -1454,7 +1445,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 />
               </div>
 
-              {/* Unit */}
               <div className="gof-field col-3">
                 <label className="gof-label">Unit</label>
                 <select
@@ -1561,7 +1551,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       </div>
 
       <div className="gof-grid" style={{ marginTop: 16 }}>
-        {/* Left: pick recipes */}
         <div className="gof-field col-4">
           <label className="gof-label">Combine existing recipes</label>
           <div className="combine-recipes-list">
@@ -1607,7 +1596,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
           </button>
         </div>
 
-        {/* Right: ingredient editor using same UI */}
         <div className="gof-field col-8">
           {renderIngredientsEditor()}
         </div>
