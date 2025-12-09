@@ -55,6 +55,13 @@ const BrandStyles = () => (
   .r-btn-danger:hover { background:#b91c1c; }
   .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
 
+  /* Simple toolbar for top-level search */
+  .r-toolbar {
+    background:#fff;
+    padding:12px 16px;
+    border-bottom:1px solid #e5e7eb;
+  }
+
   /* Drawer (shared) */
   .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
   .r-dim.open { opacity:1; pointer-events:auto; }
@@ -296,6 +303,9 @@ const StockUsage = () => {
   const [rows, setRows] = useState([]);          // grouped usage rows shown in table
   const [selectedIds, setSelectedIds] = useState(new Set()); // table selections (group ids)
 
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerHeader, setDrawerHeader] = useState("");
@@ -312,8 +322,24 @@ const StockUsage = () => {
 
   // select-all checkbox ref to render indeterminate
   const selectAllRef = useRef(null);
+
+  // filtered rows based on search
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
+        r.date,
+        r.recipeName,
+        r.batchCode,
+        r.ingredients,
+        r.barcodes,
+      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+    );
+  }, [rows, searchQuery]);
+
   const numSelected = selectedIds.size;
-  const rowCount = rows.length;
+  const rowCount = filteredRows.length;
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -322,7 +348,7 @@ const StockUsage = () => {
   }, [numSelected, rowCount]);
 
   const handleSelectAll = (e) => {
-    if (e.target.checked) setSelectedIds(new Set(rows.map((r) => r.id)));
+    if (e.target.checked) setSelectedIds(new Set(filteredRows.map((r) => r.id)));
     else setSelectedIds(new Set());
   };
   const toggleRow = (id) => {
@@ -459,6 +485,17 @@ const StockUsage = () => {
           </div>
         </div>
 
+        {/* Search toolbar */}
+        <div className="r-toolbar">
+          <input
+            className="r-input"
+            type="text"
+            placeholder="Search by recipe, date, batch code, ingredient..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
         <div className="r-table-wrap">
           <table className="r-table">
             <thead className="r-thead">
@@ -480,7 +517,7 @@ const StockUsage = () => {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {filteredRows.map((r) => (
                 <tr key={r.id} className="r-row">
                   <td className="r-td">
                     <input
@@ -523,7 +560,7 @@ const StockUsage = () => {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {filteredRows.length === 0 && (
                 <tr className="r-row">
                   <td className="r-td" colSpan={6} style={{ textAlign: "center" }}>
                     <span className="r-muted">No stock usage found.</span>

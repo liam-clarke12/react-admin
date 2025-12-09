@@ -341,6 +341,8 @@ const RecipeTable = ({
   setSelectedRecipeIds,
   onDelete,
   onAdd,
+  searchQuery,
+  setSearchQuery,
 }) => {
   const checkboxRef = useRef(null);
   const handleSelectAll = (e) => {
@@ -381,6 +383,17 @@ const RecipeTable = ({
           <button className="r-btn-add" onClick={onAdd}>
             <PlusIcon /> Add Recipe
           </button>
+        </div>
+
+        {/* Search bar (full-width on next row) */}
+        <div style={{ flex: "1 1 100%", marginTop: 8 }}>
+          <input
+            className="r-input"
+            type="text"
+            placeholder="Search by recipe name or ingredient..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
@@ -1868,6 +1881,9 @@ const Recipes = () => {
 
   const [addOpen, setAddOpen] = useState(false);
 
+  // Search state for Recipes list
+  const [searchQuery, setSearchQuery] = useState("");
+
   const fetchRecipeData = useCallback(async () => {
     if (!cognitoId) return;
     try {
@@ -1919,6 +1935,23 @@ const Recipes = () => {
   useEffect(() => {
     fetchRecipeData();
   }, [fetchRecipeData]);
+
+  // Filter recipes by search query (name, unitsPerBatch, ingredients)
+  const filteredRecipes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return recipes;
+
+    return recipes.filter((r) => {
+      const fields = [
+        r.name,
+        r.unitsPerBatch,
+        ...(r.ingredients || []).map((i) => i.name),
+      ];
+      return fields.some((val) =>
+        String(val ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [recipes, searchQuery]);
 
   const handleOpenDrawer = (recipeId, type) => {
     const r = recipes.find((x) => x.id === recipeId);
@@ -2048,13 +2081,15 @@ const Recipes = () => {
       <BrandStyles />
 
       <RecipeTable
-        recipes={recipes}
+        recipes={filteredRecipes}
         onOpenDrawer={handleOpenDrawer}
         onEdit={handleEdit}
         selectedRecipeIds={selectedRecipeIds}
         setSelectedRecipeIds={setSelectedRecipeIds}
         onDelete={() => setDeleteOpen(true)}
         onAdd={() => setAddOpen(true)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
 
       <RecipeDrawer
