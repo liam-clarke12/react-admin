@@ -2747,6 +2747,271 @@ app.put("/api/goods-in/:barCode", async (req, res) => {
   }
 });
 
+
+
+// -----------------MRP-------------------------------------------------------------------------
+
+app.get("/employees/list", async (req, res) => {
+  try {
+    const { cognito_id } = req.query;
+    if (!cognito_id) {
+      return res.status(400).json({ error: "cognito_id is required" });
+    }
+
+    const [rows] = await pool.execute(
+      `
+      SELECT
+        id,
+        cognito_id,
+        full_name,
+        short_name,
+        email,
+        phone,
+        employment_type,
+        status,
+        DATE_FORMAT(start_date, '%Y-%m-%d')      AS start_date,
+        DATE_FORMAT(probation_end, '%Y-%m-%d')   AS probation_end,
+        pay_type,
+        hourly_rate,
+        notes
+      FROM employees
+      WHERE cognito_id = ?
+      ORDER BY full_name ASC, id ASC
+      `,
+      [cognito_id]
+    );
+
+    return res.json(rows);
+  } catch (err) {
+    console.error("[GET /employees/list] error:", err);
+    return res.status(500).json({
+      error: safeErrorMessage(err, "Failed to fetch employees."),
+    });
+  }
+});
+
+app.post("/employees/create", async (req, res) => {
+  try {
+    const {
+      cognito_id,
+      full_name,
+      short_name,
+      email,
+      phone,
+      employment_type,
+      status,
+      start_date,
+      probation_end,
+      pay_type,
+      hourly_rate,
+      notes,
+    } = req.body || {};
+
+    if (!cognito_id || !full_name) {
+      return res
+        .status(400)
+        .json({ error: "cognito_id and full_name are required" });
+    }
+
+    const [result] = await pool.execute(
+      `
+      INSERT INTO employees (
+        cognito_id,
+        full_name,
+        short_name,
+        email,
+        phone,
+        employment_type,
+        status,
+        start_date,
+        probation_end,
+        pay_type,
+        hourly_rate,
+        notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        cognito_id,
+        full_name,
+        short_name || null,
+        email || null,
+        phone || null,
+        employment_type || null,
+        status || "active",
+        start_date || null,
+        probation_end || null,
+        pay_type || null,
+        hourly_rate === null || hourly_rate === undefined ? null : hourly_rate,
+        notes || null,
+      ]
+    );
+
+    const insertedId = result.insertId;
+
+    const [rows] = await pool.execute(
+      `
+      SELECT
+        id,
+        cognito_id,
+        full_name,
+        short_name,
+        email,
+        phone,
+        employment_type,
+        status,
+        DATE_FORMAT(start_date, '%Y-%m-%d')      AS start_date,
+        DATE_FORMAT(probation_end, '%Y-%m-%d')   AS probation_end,
+        pay_type,
+        hourly_rate,
+        notes
+      FROM employees
+      WHERE id = ?
+      `,
+      [insertedId]
+    );
+
+    return res.status(201).json(rows[0] || null);
+  } catch (err) {
+    console.error("[POST /employees/create] error:", err);
+    return res.status(500).json({
+      error: safeErrorMessage(err, "Failed to create employee."),
+    });
+  }
+});
+
+app.put("/employees/:id/update", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      cognito_id,
+      full_name,
+      short_name,
+      email,
+      phone,
+      employment_type,
+      status,
+      start_date,
+      probation_end,
+      pay_type,
+      hourly_rate,
+      notes,
+    } = req.body || {};
+
+    if (!cognito_id) {
+      return res
+        .status(400)
+        .json({ error: "cognito_id is required for update" });
+    }
+
+    const [result] = await pool.execute(
+      `
+      UPDATE employees
+      SET
+        full_name      = ?,
+        short_name     = ?,
+        email          = ?,
+        phone          = ?,
+        employment_type = ?,
+        status         = ?,
+        start_date     = ?,
+        probation_end  = ?,
+        pay_type       = ?,
+        hourly_rate    = ?,
+        notes          = ?
+      WHERE id = ?
+        AND cognito_id = ?
+      `,
+      [
+        full_name || null,
+        short_name || null,
+        email || null,
+        phone || null,
+        employment_type || null,
+        status || "active",
+        start_date || null,
+        probation_end || null,
+        pay_type || null,
+        hourly_rate === null || hourly_rate === undefined ? null : hourly_rate,
+        notes || null,
+        id,
+        cognito_id,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        error: "Employee not found or not owned by this tenant.",
+      });
+    }
+
+    const [rows] = await pool.execute(
+      `
+      SELECT
+        id,
+        cognito_id,
+        full_name,
+        short_name,
+        email,
+        phone,
+        employment_type,
+        status,
+        DATE_FORMAT(start_date, '%Y-%m-%d')      AS start_date,
+        DATE_FORMAT(probation_end, '%Y-%m-%d')   AS probation_end,
+        pay_type,
+        hourly_rate,
+        notes
+      FROM employees
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    return res.json(rows[0] || null);
+  } catch (err) {
+    console.error("[PUT /employees/:id/update] error:", err);
+    return res.status(500).json({
+      error: safeErrorMessage(err, "Failed to update employee."),
+    });
+  }
+});
+
+app.delete("/employees/:id/delete", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cognito_id } = req.query;
+
+    if (!cognito_id) {
+      return res
+        .status(400)
+        .json({ error: "cognito_id is required for delete" });
+    }
+
+    const [result] = await pool.execute(
+      `
+      DELETE FROM employees
+      WHERE id = ?
+        AND cognito_id = ?
+      `,
+      [id, cognito_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        error: "Employee not found or not owned by this tenant.",
+      });
+    }
+
+    return res.json({ deleted: true, id });
+  } catch (err) {
+    console.error("[DELETE /employees/:id/delete] error:", err);
+    return res.status(500).json({
+      error: safeErrorMessage(err, "Failed to delete employee."),
+    });
+  }
+});
+
+
 app.use((req, res) => {
   console.error('404 Not Found:', {
     method: req.method,
