@@ -1,15 +1,9 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-} from "react";
+// src/scenes/HRP/Employees/Employees.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
-
-const DEV_PASSCODE = "210100";
 
 /* ---------------- Shared brand styles (Nory style) ---------------- */
 const BrandStyles = () => (
@@ -100,67 +94,6 @@ const BrandStyles = () => (
   .g-input:focus, .g-select:focus, .g-textarea:focus {
     border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,0.18);
   }
-
-  /* Dev code lock */
-  .lock-wrap {
-    min-height: calc(100vh - 80px);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .lock-card {
-    background:#fff;
-    border-radius:16px;
-    border:1px solid #e5e7eb;
-    box-shadow:0 10px 30px rgba(15,23,42,0.16);
-    padding:20px 22px 18px;
-    max-width:340px;
-    width:100%;
-  }
-  .lock-title {
-    margin:0 0 4px;
-    font-size:18px;
-    font-weight:800;
-    color:#0f172a;
-  }
-  .lock-sub {
-    margin:0 0 14px;
-    font-size:13px;
-    color:#64748b;
-  }
-  .lock-input {
-    width:100%;
-    padding:10px 12px;
-    border-radius:12px;
-    border:1px solid #e5e7eb;
-    font-size:14px;
-    outline:none;
-  }
-  .lock-input:focus {
-    border-color:#7C3AED;
-    box-shadow:0 0 0 4px rgba(124,58,237,0.18);
-  }
-  .lock-error {
-    margin-top:6px;
-    font-size:12px;
-    color:#b91c1c;
-  }
-  .lock-btn {
-    margin-top:12px;
-    width:100%;
-    border:0;
-    border-radius:999px;
-    padding:10px 14px;
-    font-weight:800;
-    font-size:14px;
-    cursor:pointer;
-    color:#fff;
-    background:linear-gradient(180deg, #6366f1, #7C3AED);
-    box-shadow:0 8px 16px rgba(79,70,229,0.25),0 2px 4px rgba(15,23,42,0.08);
-  }
-  .lock-btn:hover {
-    filter:brightness(.96);
-  }
 `}</style>
 );
 
@@ -229,8 +162,9 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
           start_date: "",
           probation_end: "",
           default_role_name: "",
-          hourly_rate: "",
           pay_type: "hourly",
+          hourly_rate: "",
+          salary_amount: "",
           notes: "",
         }
       );
@@ -250,8 +184,6 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
   };
 
   const isSalary = form.pay_type === "salary";
-  const amountLabel = isSalary ? "Annual Salary (€)" : "Hourly Rate (€)";
-  const amountPlaceholder = isSalary ? "e.g. 28000" : "e.g. 15.50";
 
   return (
     <div className="r-modal-dim">
@@ -361,20 +293,29 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
                 onChange={(e) => setField("probation_end", e.target.value)}
               />
             </div>
+
+            {/* Hourly vs Salary input */}
             <div className="g-field col-4">
-              <label className="g-label">{amountLabel}</label>
+              <label className="g-label">
+                {isSalary ? "Annual Salary (€)" : "Hourly Rate (€)"}
+              </label>
               <input
                 className="g-input"
                 type="number"
                 step="0.01"
-                value={form.hourly_rate ?? ""}
-                placeholder={amountPlaceholder}
-                onChange={(e) =>
-                  setField(
-                    "hourly_rate",
-                    e.target.value === "" ? null : parseFloat(e.target.value)
-                  )
+                value={
+                  isSalary
+                    ? form.salary_amount ?? ""
+                    : form.hourly_rate ?? ""
                 }
+                onChange={(e) => {
+                  const v = e.target.value === "" ? "" : parseFloat(e.target.value);
+                  if (isSalary) {
+                    setField("salary_amount", v);
+                  } else {
+                    setField("hourly_rate", v);
+                  }
+                }}
               />
             </div>
 
@@ -456,10 +397,11 @@ const DeleteConfirmModal = ({ open, count, onClose, onConfirm }) => {
 const Employees = () => {
   const { cognitoId } = useAuth();
 
-  const [unlocked, setUnlocked] = useState(false);
+  // --- dev lock ---
+  const [isUnlocked, setIsUnlocked] = useState(false);
   const [codeInput, setCodeInput] = useState("");
-  const [codeError, setCodeError] = useState("");
 
+  // employees state
   const [employees, setEmployees] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [search, setSearch] = useState("");
@@ -472,38 +414,30 @@ const Employees = () => {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  const handleUnlock = (e) => {
-    e.preventDefault();
-    if (codeInput.trim() === DEV_PASSCODE) {
-      setUnlocked(true);
-      setCodeError("");
+  const handleUnlock = () => {
+    if (codeInput === "210100") {
+      setIsUnlocked(true);
+      setCodeInput("");
+      setApiError("");
     } else {
-      setCodeError("Incorrect code. Ask Conor!");
+      setApiError("Incorrect access code.");
     }
   };
 
   const fetchEmployees = useCallback(async () => {
-    if (!cognitoId || !unlocked) return;
+    if (!cognitoId || !isUnlocked) return;
     setLoading(true);
     setApiError("");
     try {
       const res = await fetch(
         `${API_BASE}/employees/list?cognito_id=${encodeURIComponent(cognitoId)}`
       );
-
       if (!res.ok) {
-        let message = `Failed to fetch employees (${res.status})`;
-        try {
-          const data = await res.json();
-          if (data && typeof data.error === "string") {
-            message = data.error;
-          }
-        } catch {
-          // ignore JSON parse errors
-        }
-        throw new Error(message);
+        const txt = await res.text().catch(() => "");
+        throw new Error(
+          txt || `Failed to fetch employees (status ${res.status})`
+        );
       }
-
       const data = await res.json();
       const list = (Array.isArray(data) ? data : []).map((e) => ({
         id: e.id,
@@ -515,19 +449,21 @@ const Employees = () => {
         status: e.status,
         start_date: e.start_date,
         probation_end: e.probation_end,
-        hourly_rate: e.hourly_rate,
         pay_type: e.pay_type,
+        // If pay_type is salary, treat hourly_rate as salary_amount for the UI
+        hourly_rate: e.pay_type === "salary" ? null : e.hourly_rate,
+        salary_amount: e.pay_type === "salary" ? e.hourly_rate : null,
         notes: e.notes,
       }));
       setEmployees(list);
     } catch (err) {
       console.error("[Employees] fetch error:", err);
-      setApiError(err?.message || "Failed to load employees.");
+      setApiError("Could not load employees. Please try again.");
       setEmployees([]);
     } finally {
       setLoading(false);
     }
-  }, [cognitoId, unlocked]);
+  }, [cognitoId, isUnlocked]);
 
   useEffect(() => {
     fetchEmployees();
@@ -537,7 +473,14 @@ const Employees = () => {
     const q = search.trim().toLowerCase();
     if (!q) return employees;
     return employees.filter((e) =>
-      [e.full_name, e.short_name, e.email, e.phone, e.employment_type, e.status]
+      [
+        e.full_name,
+        e.short_name,
+        e.email,
+        e.phone,
+        e.employment_type,
+        e.status,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
@@ -572,6 +515,17 @@ const Employees = () => {
   const saveEmployee = async (form) => {
     if (!cognitoId) return;
     try {
+      const isSalary = form.pay_type === "salary";
+
+      const hourlyOrSalary =
+        isSalary
+          ? form.salary_amount === "" || form.salary_amount == null
+            ? null
+            : Number(form.salary_amount)
+          : form.hourly_rate === "" || form.hourly_rate == null
+          ? null
+          : Number(form.hourly_rate);
+
       const payload = {
         cognito_id: cognitoId,
         full_name: form.full_name,
@@ -582,11 +536,8 @@ const Employees = () => {
         status: form.status,
         start_date: form.start_date || null,
         probation_end: form.probation_end || null,
-        hourly_rate:
-          form.hourly_rate === null || form.hourly_rate === ""
-            ? null
-            : Number(form.hourly_rate),
         pay_type: form.pay_type,
+        hourly_rate: hourlyOrSalary,
         notes: form.notes,
       };
 
@@ -601,16 +552,8 @@ const Employees = () => {
           }
         );
         if (!res.ok) {
-          let message = "Update failed";
-          try {
-            const data = await res.json();
-            if (data && typeof data.error === "string") {
-              message = data.error;
-            }
-          } catch {
-            // ignore
-          }
-          throw new Error(message);
+          const txt = await res.text().catch(() => "");
+          throw new Error(txt || "Update failed");
         }
       } else {
         // create
@@ -620,16 +563,8 @@ const Employees = () => {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          let message = "Create failed";
-          try {
-            const data = await res.json();
-            if (data && typeof data.error === "string") {
-              message = data.error;
-            }
-          } catch {
-            // ignore
-          }
-          throw new Error(message);
+          const txt = await res.text().catch(() => "");
+          throw new Error(txt || "Create failed");
         }
       }
 
@@ -643,6 +578,7 @@ const Employees = () => {
   };
 
   const confirmDelete = async () => {
+    if (!cognitoId) return;
     try {
       const ids = Array.from(selectedIds);
       for (const id of ids) {
@@ -650,21 +586,10 @@ const Employees = () => {
           `${API_BASE}/employees/${encodeURIComponent(
             id
           )}/delete?cognito_id=${encodeURIComponent(cognitoId)}`,
-          {
-            method: "DELETE",
-          }
+          { method: "DELETE" }
         );
         if (!res.ok) {
-          let msg = `Delete failed for employee ${id}`;
-          try {
-            const data = await res.json();
-            if (data && typeof data.error === "string") {
-              msg = data.error;
-            }
-          } catch {
-            // ignore
-          }
-          console.warn(msg);
+          console.warn("Delete failed for employee", id);
         }
       }
       setDeleteOpen(false);
@@ -680,43 +605,46 @@ const Employees = () => {
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
 
-  /* ------------ DEV CODE LOCK SCREEN ------------ */
-  if (!unlocked) {
+  // ---------- DEV LOCK UI ----------
+  if (!isUnlocked) {
     return (
       <div className="r-wrap">
         <BrandStyles />
-        <div className="lock-wrap">
-          <div className="lock-card">
-            <h2 className="lock-title">HRP · Employees</h2>
-            <p className="lock-sub">
-              Developer access only. Enter code to unlock this screen.
-            </p>
-            <form
-              onSubmit={handleUnlock}
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
-            >
-              <input
-                className="lock-input"
-                type="password"
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-                placeholder="Enter dev code"
-              />
-              {codeError && <div className="lock-error">{codeError}</div>}
-              <button type="submit" className="lock-btn">
-                Unlock
-              </button>
-            </form>
-            <p className="r-muted" style={{ marginTop: 10 }}>
-              Hint: It starts with 210...
-            </p>
+        <div className="r-card" style={{ maxWidth: 420, margin: "40px auto" }}>
+          <div className="r-head">
+            <div>
+              <h2 className="r-title">Employees (Dev)</h2>
+              <p className="r-sub">
+                This area is currently locked. Enter the access code to continue.
+              </p>
+            </div>
+          </div>
+          <div style={{ padding: "16px" }}>
+            <label className="g-label">Access Code</label>
+            <input
+              className="g-input"
+              type="password"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              placeholder="Enter dev code"
+            />
+            {apiError && (
+              <p className="r-muted" style={{ color: "#b91c1c", marginTop: 8 }}>
+                {apiError}
+              </p>
+            )}
+          </div>
+          <div className="r-footer" style={{ justifyContent: "flex-end" }}>
+            <button className="r-btn-primary" onClick={handleUnlock}>
+              Unlock
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  /* ------------ MAIN EMPLOYEES UI ------------ */
+  // ---------- MAIN EMPLOYEES UI ----------
   return (
     <div className="r-wrap">
       <BrandStyles />
