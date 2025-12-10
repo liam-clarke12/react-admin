@@ -5,19 +5,27 @@ import { Box, IconButton, Typography, useTheme, Tooltip, Divider } from "@mui/ma
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link } from "react-router-dom";
 import { tokens } from "../../themes";
-import NoCrashOutlinedIcon from '@mui/icons-material/NoCrashOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
-import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+
+import NoCrashOutlinedIcon from "@mui/icons-material/NoCrashOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
+import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import OutdoorGrillOutlinedIcon from '@mui/icons-material/OutdoorGrillOutlined';
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
+import OutdoorGrillOutlinedIcon from "@mui/icons-material/OutdoorGrillOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
-import BakeryDiningOutlinedIcon from '@mui/icons-material/BakeryDiningOutlined';
+import DeliveryDiningOutlinedIcon from "@mui/icons-material/DeliveryDiningOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import BakeryDiningOutlinedIcon from "@mui/icons-material/BakeryDiningOutlined";
+
+// 🔹 New icons for HRP section
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
 
 // ✅ Amplify v6 modular auth API
 import { fetchUserAttributes } from "aws-amplify/auth";
@@ -33,7 +41,7 @@ const brand = {
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
-  hover: "#f1f5f9"
+  hover: "#f1f5f9",
 };
 
 // Single menu item component (keeps selected logic & routing)
@@ -113,7 +121,8 @@ const Sidebar = () => {
   }, []);
 
   const fullName =
-    [profile.firstName, profile.lastName].filter(Boolean).join(" ") || (profileLoading ? "Loading…" : "—");
+    [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
+    (profileLoading ? "Loading…" : "—");
   const subtitle = profileLoading
     ? "Loading…"
     : [profile.jobTitle, profile.company ? `at ${profile.company}` : ""]
@@ -221,12 +230,7 @@ const Sidebar = () => {
               }}
             >
               {!isCollapsed && (
-                <Box
-                  display="flex"
-                  justifyContent="flex-end"
-                  alignItems="center"
-                  ml="8px"
-                >
+                <Box display="flex" justifyContent="flex-end" alignItems="center" ml="8px">
                   <IconButton
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     size="small"
@@ -275,6 +279,7 @@ const Sidebar = () => {
 
             {/* Items */}
             <Box paddingLeft={isCollapsed ? undefined : "8px"}>
+              {/* DASHBOARD */}
               <Item
                 title="Dashboard"
                 to="/dashboard"
@@ -282,7 +287,8 @@ const Sidebar = () => {
                 selected={selected}
                 setSelected={setSelected}
               />
-              {/* Section: Data */}
+
+              {/* Section: MRP */}
               <SectionSeparator label="MRP" />
 
               <Item
@@ -331,6 +337,45 @@ const Sidebar = () => {
                 title="Goods Out"
                 to="/goods_out"
                 icon={<NoCrashOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+
+              {/* Section: HRP */}
+              <SectionSeparator label="HRP" />
+
+              <Item
+                title="Employees"
+                to="/hrp/employees"
+                icon={<PeopleAltOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Roles"
+                to="/hrp/roles"
+                icon={<BadgeOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Skills & Training"
+                to="/hrp/skills"
+                icon={<SchoolOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Roster"
+                to="/hrp/roster"
+                icon={<CalendarMonthOutlinedIcon />}
+                selected={selected}
+                setSelected={setSelected}
+              />
+              <Item
+                title="Leave Requests"
+                to="/hrp/leave"
+                icon={<EventNoteOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
               />
