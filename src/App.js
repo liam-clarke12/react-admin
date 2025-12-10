@@ -41,7 +41,7 @@ import RecipeForm from "./scenes/form/Recipes";
 import ProductionLogForm from "./scenes/form/ProductionLog";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import Employees from "./scenes/HRP/Employees/Employees";
-import { DataProvider } from "./contexts/DataContext";
+import { DataProvider } from "../../../contexts/DataContext";
 import { AuthProvider } from "./contexts/AuthContext";
 
 Amplify.configure(awsExports);
