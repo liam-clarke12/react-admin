@@ -284,6 +284,7 @@ function MainApp() {
             <main className="content">
               <Topbar />
               <Routes>
+                <Route path="/Employees" element={<Employees />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/GoodsIn" element={<GoodsIn />} />
                 <Route path="/GoodsInForm" element={<GoodsInForm />} />

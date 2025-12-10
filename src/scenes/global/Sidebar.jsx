@@ -346,7 +346,7 @@ const Sidebar = () => {
 
               <Item
                 title="Employees"
-                to="/hrp/employees"
+                to="/Employees" // 🔗 matches your existing Route
                 icon={<PeopleAltOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
@@ -384,7 +384,7 @@ const Sidebar = () => {
         </ProSidebar>
       </Box>
 
-      {/* Main Content Area */}
+      {/* Main Content Area / Layout wrapper */}
       <Box
         sx={{
           marginLeft: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
@@ -396,7 +396,7 @@ const Sidebar = () => {
           background: brand.surfaceMuted,
         }}
       >
-        {/* Your main content goes here */}
+        {/* Your main content (routes) should render in your App component, not here */}
       </Box>
     </Box>
   );
