@@ -1,10 +1,5 @@
-
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-} from "react";
+// src/scenes/employees/Employees.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE =
@@ -187,6 +182,8 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
     onSave(form);
   };
 
+  const isSalary = form.pay_type === "salary";
+
   return (
     <div className="r-modal-dim">
       <div className="r-modal">
@@ -278,6 +275,25 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
             </div>
 
             <div className="g-field col-4">
+              <label className="g-label">
+                {isSalary ? "Annual Salary (€)" : "Hourly Rate (€)"}
+              </label>
+              <input
+                className="g-input"
+                type="number"
+                step="0.01"
+                value={form.hourly_rate ?? ""}
+                onChange={(e) =>
+                  setField(
+                    "hourly_rate",
+                    e.target.value === "" ? null : parseFloat(e.target.value)
+                  )
+                }
+                placeholder={isSalary ? "e.g. 32000" : "e.g. 15.50"}
+              />
+            </div>
+
+            <div className="g-field col-4">
               <label className="g-label">Start Date</label>
               <input
                 className="g-input"
@@ -293,18 +309,6 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
                 type="date"
                 value={form.probation_end || ""}
                 onChange={(e) => setField("probation_end", e.target.value)}
-              />
-            </div>
-            <div className="g-field col-4">
-              <label className="g-label">Hourly Rate (€)</label>
-              <input
-                className="g-input"
-                type="number"
-                step="0.01"
-                value={form.hourly_rate ?? ""}
-                onChange={(e) =>
-                  setField("hourly_rate", e.target.value === "" ? null : parseFloat(e.target.value))
-                }
               />
             </div>
 
@@ -386,6 +390,11 @@ const DeleteConfirmModal = ({ open, count, onClose, onConfirm }) => {
 const Employees = () => {
   const { cognitoId } = useAuth();
 
+  // 🔐 Dev-only code lock
+  const [unlocked, setUnlocked] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState("");
+
   const [employees, setEmployees] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [search, setSearch] = useState("");
@@ -398,42 +407,60 @@ const Employees = () => {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  const fetchEmployees = useCallback(async () => {
-    if (!cognitoId) return;
-    setLoading(true);
-    setApiError("");
-    try {
-      const res = await fetch(
-        `${API_BASE}/employees?cognito_id=${encodeURIComponent(cognitoId)}`
-      );
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Failed to fetch employees (${res.status})`);
-      }
-      const data = await res.json();
-      const list = (Array.isArray(data) ? data : []).map((e) => ({
-        id: e.id,
-        full_name: e.full_name,
-        short_name: e.short_name,
-        email: e.email,
-        phone: e.phone,
-        employment_type: e.employment_type,
-        status: e.status,
-        start_date: e.start_date,
-        probation_end: e.probation_end,
-        hourly_rate: e.hourly_rate,
-        pay_type: e.pay_type,
-        notes: e.notes,
-      }));
-      setEmployees(list);
-    } catch (err) {
-      console.error("[Employees] fetch error:", err);
-      setApiError(err?.message || "Failed to load employees.");
-      setEmployees([]);
-    } finally {
-      setLoading(false);
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    if (pin === "210100") {
+      setUnlocked(true);
+      setPinError("");
+    } else {
+      setPinError("Incorrect code. Try again.");
     }
-  }, [cognitoId]);
+  };
+
+  const fetchEmployees = useCallback(
+    async () => {
+      if (!cognitoId || !unlocked) return; // don't hit API until unlocked
+      setLoading(true);
+      setApiError("");
+      try {
+        const res = await fetch(
+          `${API_BASE}/employees?cognito_id=${encodeURIComponent(cognitoId)}`
+        );
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(txt || `Failed to fetch employees (${res.status})`);
+        }
+        const data = await res.json();
+        const list = (Array.isArray(data) ? data : []).map((e) => ({
+          id: e.id,
+          full_name: e.full_name,
+          short_name: e.short_name,
+          email: e.email,
+          phone: e.phone,
+          employment_type: e.employment_type,
+          status: e.status,
+          start_date: e.start_date,
+          probation_end: e.probation_end,
+          hourly_rate: e.hourly_rate,
+          pay_type: e.pay_type,
+          notes: e.notes,
+        }));
+        setEmployees(list);
+      } catch (err) {
+        console.error("[Employees] fetch error:", err);
+        let msg = err?.message || "Failed to load employees.";
+        // Hide raw {"error":"Not found"} etc.
+        if (msg.includes('"error"') || msg.includes("{\"error\"")) {
+          msg = "Employees API endpoint not available yet.";
+        }
+        setApiError(msg);
+        setEmployees([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [cognitoId, unlocked]
+  );
 
   useEffect(() => {
     fetchEmployees();
@@ -505,11 +532,14 @@ const Employees = () => {
 
       if (form.id) {
         // update
-        const res = await fetch(`${API_BASE}/employees/${encodeURIComponent(form.id)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const res = await fetch(
+          `${API_BASE}/employees/${encodeURIComponent(form.id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
         if (!res.ok) {
           const txt = await res.text().catch(() => "");
           throw new Error(txt || "Update failed");
@@ -540,9 +570,12 @@ const Employees = () => {
     try {
       const ids = Array.from(selectedIds);
       for (const id of ids) {
-        const res = await fetch(`${API_BASE}/employees/${encodeURIComponent(id)}`, {
-          method: "DELETE",
-        });
+        const res = await fetch(
+          `${API_BASE}/employees/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE",
+          }
+        );
         if (!res.ok) {
           console.warn("Delete failed for employee", id);
         }
@@ -560,6 +593,57 @@ const Employees = () => {
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
 
+  // 🔐 Dev PIN gate – block page until correct code entered
+  if (!unlocked) {
+    return (
+      <div className="r-wrap">
+        <BrandStyles />
+        <div className="r-card" style={{ maxWidth: 420, margin: "60px auto" }}>
+          <div className="r-head">
+            <div>
+              <h2 className="r-title">Employees (Dev Lock)</h2>
+              <p className="r-sub">
+                This HRP area is currently restricted to developers.
+              </p>
+            </div>
+          </div>
+          <div className="r-mbody" style={{ padding: 16, background: "#f8fafc" }}>
+            <form
+              onSubmit={handleUnlock}
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
+            >
+              <label className="g-label">Enter access code</label>
+              <input
+                className="g-input"
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="6-digit code"
+              />
+              {pinError && (
+                <span className="r-muted" style={{ color: "#b91c1c" }}>
+                  {pinError}
+                </span>
+              )}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}
+              >
+                <button type="submit" className="r-btn-primary">
+                  Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 🔓 Normal Employees UI once unlocked
   return (
     <div className="r-wrap">
       <BrandStyles />
@@ -608,9 +692,7 @@ const Employees = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {loading && (
-            <span className="r-muted">Loading employees…</span>
-          )}
+          {loading && <span className="r-muted">Loading employees…</span>}
           {apiError && !loading && (
             <span className="r-muted" style={{ color: "#b91c1c" }}>
               {apiError}
@@ -662,13 +744,9 @@ const Employees = () => {
                       : "—"}
                   </td>
                   <td className="r-td">
-                    {e.status
-                      ? e.status.replace("_", " ")
-                      : "—"}
+                    {e.status ? e.status.replace("_", " ") : "—"}
                   </td>
-                  <td className="r-td">
-                    {e.start_date || "—"}
-                  </td>
+                  <td className="r-td">{e.start_date || "—"}</td>
                   <td className="r-td">
                     {e.email || "—"}
                     <br />
@@ -686,9 +764,15 @@ const Employees = () => {
               ))}
               {filtered.length === 0 && !loading && (
                 <tr className="r-row">
-                  <td className="r-td" colSpan={7} style={{ textAlign: "center" }}>
+                  <td
+                    className="r-td"
+                    colSpan={7}
+                    style={{ textAlign: "center" }}
+                  >
                     <span className="r-muted">
-                      {search ? "No employees match your search." : "No employees yet."}
+                      {search
+                        ? "No employees match your search."
+                        : "No employees yet."}
                     </span>
                   </td>
                 </tr>
