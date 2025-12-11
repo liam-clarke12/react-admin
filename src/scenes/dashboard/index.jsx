@@ -17,9 +17,7 @@ const DashboardStyles = () => (
       --red: #ef4444; --red-100: #fee2e2; --red-900: #7f1d1d; --red-300: #fca5a5; --yellow: #f59e0b;
       --overlay: rgba(0,0,0,0.2); --overlay-dark: rgba(0,0,0,0.4); --radius-xl: 14px; --radius-full: 999px; --pad: 24px; --gap: 24px;
     }
-    @media (prefers-color-scheme: dark) {
-      :root{ --bg:#111827; --bg-card:#1f2937; --text:#f9fafb; --text-muted:#9ca3af; --text-muted-2:#e5e7eb; --g50:rgba(55,65,81,0.5); --g200:#374151; --g700:#374151; --shadow:0 6px 22px rgba(0,0,0,0.35); --shadow-strong:0 16px 40px rgba(0,0,0,0.55); }
-    }
+
     .dash { min-height: 100vh; background: var(--bg); padding: 24px 16px; }
     .container { max-width: 1120px; margin: 0 auto; }
     .header { margin-bottom: 24px; }
@@ -52,7 +50,6 @@ const DashboardStyles = () => (
     .badge { font-weight: 700; border-radius: var(--radius-full); padding: 6px 12px; font-size: 16px; }
     .badge-green { background: var(--green-100); color: #065f46; }
     .badge-red { background: var(--red-100); color: #b91c1c; }
-    @media (prefers-color-scheme: dark){ .badge-green{ background: var(--green-900); color: var(--green-300);} .badge-red{ background: var(--red-900); color: var(--red-300);} }
 
     .muted-box { background: var(--g50); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
 
@@ -60,14 +57,12 @@ const DashboardStyles = () => (
     .progress-row .name { font-weight: 500; color: var(--text); }
     .progress-row .qty { color: var(--text-muted); }
     .progress { width: 100%; height: 10px; background: var(--g200); border-radius: var(--radius-full); overflow: hidden; }
-    @media (prefers-color-scheme: dark){ .progress{ background: var(--g700); } }
     .bar { height: 100%; border-radius: var(--radius-full); transition: width .3s ease; }
     .bar.green { background: #10b981; } .bar.yellow { background: #f59e0b; } .bar.red { background: #ef4444; }
 
     .chart { width: 100%; height: 290px; }
 
     .veil { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; }
-    @media (prefers-color-scheme: dark){ .veil{ background: var(--overlay-dark); } }
     .veil-box { background: var(--bg-card); color: var(--text); border-radius: var(--radius-xl); box-shadow: var(--shadow-strong); padding: 16px 24px; font-weight: 600; }
   `}</style>
 );
@@ -122,7 +117,7 @@ const DashboardCard = ({ title, icon, children, className = "" }) => (
   </div>
 );
 
-// Expiring ingredients (from ACTIVE inventory)
+// Expiring ingredients
 const ExpiringIngredients = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (list.length === 0) return <div className="list-empty">No ingredients expiring soon. Good job!</div>;
@@ -160,7 +155,7 @@ const ExpiringIngredients = ({ ingredients }) => {
   );
 };
 
-// Ingredient stock bars (normalized; label shows nice display)
+// Ingredient stock bars
 const IngredientStock = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (list.length === 0) return <p className="list-item-sub">No ingredients in stock.</p>;
@@ -188,26 +183,35 @@ const IngredientStock = ({ ingredients }) => {
   );
 };
 
-// Recipe availability tiles (NOW: total units produced this ISO week, per recipe, from production-log/active)
-const RecipeInventory = ({ weeklyRecipeUnits }) => {
-  const entries = Object.entries(weeklyRecipeUnits || {}).sort((a,b) => b[1]-a[1]);
-  if (entries.length === 0) return <p className="list-item-sub">No recipes produced this week.</p>;
+// Recipe stock bars (similar look to IngredientStock)
+const RecipeStock = ({ recipes }) => {
+  const list = Array.isArray(recipes) ? recipes : [];
+  if (list.length === 0) return <p className="list-item-sub">No recipes in stock.</p>;
+
+  const sorted = [...list].sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
 
   return (
-    <div className="list">
-      {entries.map(([name, units]) => (
-        <div key={name} className="muted-box">
-          <span className="name" style={{ color: "var(--text)" }}>{name}</span>
-          <span className={`badge ${units > 0 ? "badge-green" : "badge-red"}`}>
-            x{units}
-          </span>
-        </div>
-      ))}
+    <div className="list" style={{height: 320}}>
+      {sorted.map((rec) => {
+        const pct = Math.max(0, Math.min(100, (rec.stockBase / rec.maxBase) * 100));
+        const color = pct < 25 ? "red" : pct < 50 ? "yellow" : "green";
+        return (
+          <div key={rec.id}>
+            <div className="progress-row">
+              <span className="name">{rec.name}</span>
+              <span className="qty">{rec.display.amount} {rec.display.unit}</span>
+            </div>
+            <div className="progress">
+              <div className={`bar ${color}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
 
-// Weekly usage chart wrapper (NOW: batches per day for current ISO week, from production log)
+// Weekly usage chart
 const WeeklyUsageChart = ({ data }) => (
   <div className="chart">
     <ResponsiveContainer width="100%" height="100%">
@@ -260,10 +264,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   // data
-  const [inventoryRaw, setInventoryRaw] = useState([]);
-  const [prodLogs, setProdLogs] = useState([]);           // full production-log (for batches chart)
-  const [prodLogsActive, setProdLogsActive] = useState([]); // production-log/active (for recipe availability)
-  const [goodsInRaw, setGoodsInRaw] = useState([]);       // kept if you want elsewhere later
+  const [inventoryRaw, setInventoryRaw] = useState([]);    // still fetched if you want it elsewhere
+  const [prodLogs, setProdLogs] = useState([]);            // full production-log (for batches chart)
+  const [prodLogsActive, setProdLogsActive] = useState([]); // production-log/active (for recipe stock)
+  const [goodsInRaw, setGoodsInRaw] = useState([]);        // used for ingredient stock
 
   useEffect(() => {
     if (!cognitoId) return;
@@ -305,35 +309,81 @@ const Dashboard = () => {
     ingredientStockList,
     expiringSoonList,
     weeklyBatchesData,       // ISO week: batches per day
-    weeklyRecipeUnits,       // ISO week: units per recipe (from production-log/active)
+    recipeStockList,         // current units remaining per recipe
   } = useMemo(() => {
-    // --- Active inventory mapping (normalize amounts) ---
-    const mapped = (inventoryRaw || []).map((r, i) => {
-      const name = r.ingredient || "Unknown";
-      const unit = r.unit || "";
-      const group = detectUnitGroup(unit);
-      const stockBase = toBaseAmount(r.totalRemaining, unit); // g or ml (or units)
-      // Display in a nice unit (kg/L if big)
-      const display = formatDisplayAmount(stockBase, group);
+    /* -------------------------------------
+       INVENTORY FROM GOODS-IN (GROUPED)
+       ------------------------------------- */
 
-      // Expiry normalization
+    const aggMap = new Map();
+
+    (goodsInRaw || []).forEach((row) => {
+      const name =
+        row.ingredient ||
+        row.ingredient_name ||
+        row.item ||
+        row.name ||
+        "Unknown";
+
+      const unit =
+        row.unit ||
+        row.uom ||
+        row.measure_unit ||
+        "";
+
+      const group = detectUnitGroup(unit);
+
+      const remainingRaw =
+        row.remaining ??
+        row.remaining_qty ??
+        row.remaining_quantity ??
+        row.totalRemaining ??
+        row.qty_remaining ??
+        row.quantity_remaining ??
+        0;
+
+      const remainingBase = toBaseAmount(remainingRaw, unit);
+
       const rawExpiry =
-        r.expiryDate || r.expiry || r.bestBefore || r.best_before || r.activeExpiry || r.batchExpiry;
+        row.expiryDate ||
+        row.expiry_date ||
+        row.expiry ||
+        row.bestBefore ||
+        row.best_before ||
+        row.batchExpiry;
+
       const d = rawExpiry ? new Date(rawExpiry) : null;
       const expiryDate = d && !Number.isNaN(d.getTime()) ? d : undefined;
 
-      return {
-        id: `${name}-${i}`,
-        name,
-        group,
-        stockBase,        // normalized numeric for math
-        display,          // {amount, unit} for labels
-        expiryDate,
-      };
+      const key = `${name}__${group}`;
+      const existing = aggMap.get(key);
+
+      if (existing) {
+        existing.stockBase += remainingBase;
+        if (expiryDate && (!existing.expiryDate || expiryDate < existing.expiryDate)) {
+          existing.expiryDate = expiryDate;
+        }
+      } else {
+        aggMap.set(key, {
+          id: key,
+          name,
+          group,
+          stockBase: remainingBase,
+          expiryDate,
+          unit,
+        });
+      }
     });
 
-    // Heuristic max per item (in base units) for bar visuals
-    const meanBase = mapped.reduce((s, it) => s + (it.stockBase || 0), 0) / Math.max(mapped.length, 1);
+    const mapped = Array.from(aggMap.values()).map((it) => ({
+      ...it,
+      display: formatDisplayAmount(it.stockBase, it.group),
+    }));
+
+    const meanBase =
+      mapped.reduce((s, it) => s + (it.stockBase || 0), 0) /
+      Math.max(mapped.length, 1);
+
     const ingredientStockList = mapped
       .map((it) => {
         const maxBase = Math.max(it.stockBase, Math.round(meanBase * 1.25), 1);
@@ -341,54 +391,110 @@ const Dashboard = () => {
       })
       .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
 
-    // Expiring soon (next 7 days) — FROM ACTIVE INVENTORY ONLY
     const now = new Date();
-    const soonCut = new Date(startOfISOWeek(now)); // start of week baseline
+    const soonCut = new Date(startOfISOWeek(now));
     soonCut.setDate(soonCut.getDate() + 7);
+
     const expiringSoonList = ingredientStockList
       .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
-      .sort((a, b) => (a.expiryDate?.getTime() || 0) - (b.expiryDate?.getTime() || 0))
+      .sort(
+        (a, b) =>
+          (a.expiryDate?.getTime() || 0) -
+          (b.expiryDate?.getTime() || 0)
+      )
       .slice(0, 30);
 
-    // KPIs
-    const kpiStockoutsCount = ingredientStockList.filter((it) => (it.stockBase || 0) <= 0).length;
+    const kpiStockoutsCount = ingredientStockList.filter(
+      (it) => (it.stockBase || 0) <= 0
+    ).length;
 
-    // Low stock: percentage-based to be unit-agnostic (<= 25% of max)
     const kpiLowStockCount = ingredientStockList.filter((it) => {
       const pct = (it.stockBase / it.maxBase) * 100;
-      return pct <= 25 && it.stockBase > 0; // exclude stockouts from low-stock
+      return pct <= 25 && it.stockBase > 0;
     }).length;
 
-    // --- Weekly batches per day (ISO week) from production-log ---
+    /* -------------------------------------
+       WEEKLY BATCHES (PRODUCTION LOG)
+       ------------------------------------- */
+
     const weekStart = startOfISOWeek(new Date());
     const weekEnd = endOfISOWeek(new Date());
     const withinWeek = (d) => d >= weekStart && d < weekEnd;
 
     const dayMap = new Map(DAYS.map((d) => [d, 0]));
-    let weeklyBatchSum = 0;
 
     (prodLogs || []).forEach((row) => {
-      const d = new Date(row?.date || row?.production_log_date || row?.createdAt || row?.created_at || "");
+      const d = new Date(
+        row?.date ||
+          row?.production_log_date ||
+          row?.createdAt ||
+          row?.created_at ||
+          ""
+      );
       if (Number.isNaN(d.getTime()) || !withinWeek(d)) return;
       const dow = (d.getDay() + 6) % 7; // Mon=0..Sun=6
       const key = DAYS[dow];
-      const batches = Number(row.batchesProduced ?? row.batches ?? row.batch_count ?? 0);
+      const batches = Number(
+        row.batchesProduced ?? row.batches ?? row.batch_count ?? 0
+      );
       dayMap.set(key, (dayMap.get(key) || 0) + batches);
-      weeklyBatchSum += batches;
     });
 
-    const weeklyBatchesData = DAYS.map((day) => ({ day, batches: dayMap.get(day) || 0 }));
-    const kpiRecentProduction = weeklyBatchSum;
+    const weeklyBatchesData = DAYS.map((day) => ({
+      day,
+      batches: dayMap.get(day) || 0,
+    }));
 
-    // --- Weekly recipe units (ISO week) from production-log/active ---
-    const recipeUnits = {};
+    /* -------------------------------------
+       RECIPE STOCK (FROM production-log/active)
+       Using unitsRemaining derived on the server
+       ------------------------------------- */
+
+    const recipeMap = new Map();
+
     (prodLogsActive || []).forEach((row) => {
-      const d = new Date(row?.date || row?.production_log_date || row?.createdAt || row?.created_at || "");
-      if (Number.isNaN(d.getTime()) || !withinWeek(d)) return;
       const name = row.recipe || row.recipe_name || row.product || "Unknown";
-      const units = Number(row.unitsProduced ?? row.units ?? row.output_units ?? 0);
-      recipeUnits[name] = (recipeUnits[name] || 0) + units;
+      if (!name) return;
+
+      const unitsRemRaw =
+        row.unitsRemaining ??
+        row.units_remaining ??
+        row.units_remaining_total ??
+        null;
+
+      const unitsRemaining = Number(unitsRemRaw ?? 0);
+
+      if (unitsRemaining <= 0) return; // skip empty rows
+
+      const current = recipeMap.get(name) || 0;
+      recipeMap.set(name, current + unitsRemaining);
     });
+
+    const recipeArray = Array.from(recipeMap.entries()).map(
+      ([name, totalUnits]) => {
+        const group = UnitGroup.UNITS;
+        const stockBase = totalUnits;
+        const display = formatDisplayAmount(stockBase, group);
+        return {
+          id: name,
+          name,
+          group,
+          stockBase,
+          display,
+        };
+      }
+    );
+
+    const meanRecipeBase =
+      recipeArray.reduce((s, it) => s + (it.stockBase || 0), 0) /
+      Math.max(recipeArray.length, 1);
+
+    const recipeStockList = recipeArray
+      .map((it) => {
+        const maxBase = Math.max(it.stockBase, Math.round(meanRecipeBase * 1.25), 1);
+        return { ...it, maxBase };
+      })
+      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
 
     return {
       kpiStockoutsCount,
@@ -396,9 +502,9 @@ const Dashboard = () => {
       ingredientStockList,
       expiringSoonList,
       weeklyBatchesData,
-      weeklyRecipeUnits: recipeUnits,
+      recipeStockList,
     };
-  }, [inventoryRaw, prodLogs, prodLogsActive]);
+  }, [goodsInRaw, prodLogs, prodLogsActive]);
 
   return (
     <div className="dash">
@@ -417,7 +523,9 @@ const Dashboard = () => {
           <div className="kpi">{kpiLowStockCount}</div>
         </DashboardCard>
         <DashboardCard title="Batches Produced (This Week)">
-          <div className="kpi">{weeklyBatchesData.reduce((s, d) => s + (d.batches || 0), 0)}</div>
+          <div className="kpi">
+            {weeklyBatchesData.reduce((s, d) => s + (d.batches || 0), 0)}
+          </div>
         </DashboardCard>
       </div>
 
@@ -436,8 +544,8 @@ const Dashboard = () => {
             <WeeklyUsageChart data={weeklyBatchesData} />
           </DashboardCard>
 
-          <DashboardCard title="Recipe Availability (Units made this week)">
-            <RecipeInventory weeklyRecipeUnits={weeklyRecipeUnits} />
+          <DashboardCard title="Recipe Availability (Current units remaining)">
+            <RecipeStock recipes={recipeStockList} />
           </DashboardCard>
         </div>
       </div>
