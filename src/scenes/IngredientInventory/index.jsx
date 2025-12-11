@@ -40,6 +40,26 @@ const Styles = () => (
     .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
     .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
 
+    /* Search toolbar */
+    .ii-toolbar {
+      background:#fff;
+      padding:12px 14px;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .ii-input {
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #e5e7eb;
+      border-radius:10px;
+      outline:none;
+      background:#fff;
+      font-size:14px;
+    }
+    .ii-input:focus {
+      border-color:#7C3AED;
+      box-shadow:0 0 0 3px rgba(124,58,237,.18);
+    }
+
     /* Table */
     .ii-table-wrap { overflow:auto; }
     .ii-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
@@ -300,6 +320,7 @@ const IngredientInventory = () => {
   const [rows, setRows] = useState([]);
   const [infoOpen, setInfoOpen] = useState(false);
   const [snack, setSnack] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchActiveInventory = async () => {
@@ -331,13 +352,25 @@ const IngredientInventory = () => {
     fetchActiveInventory();
   }, [cognitoId]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
+        r.ingredient,
+        r.barcode,
+        r.unit,
+      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+    );
+  }, [rows, searchQuery]);
+
   const chartData = useMemo(
     () =>
-      (rows || []).map((r) => ({
+      (filteredRows || []).map((r) => ({
         ingredient: r.ingredient,
         amount: Number(r._numeric) || 0,
       })),
-    [rows]
+    [filteredRows]
   );
 
   const maxAmount = useMemo(
@@ -378,6 +411,18 @@ const IngredientInventory = () => {
               <h3>Active Stock</h3>
               <p>Normalized into g / ml / units</p>
             </div>
+
+            {/* Search toolbar */}
+            <div className="ii-toolbar">
+              <input
+                className="ii-input"
+                type="text"
+                placeholder="Search by ingredient, unit, barcode..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             <div className="ii-table-wrap">
               <table className="ii-table">
                 <thead className="ii-thead">
@@ -395,8 +440,14 @@ const IngredientInventory = () => {
                         No active inventory found.
                       </td>
                     </tr>
+                  ) : filteredRows.length === 0 ? (
+                    <tr className="ii-row">
+                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
+                        No items match your search.
+                      </td>
+                    </tr>
                   ) : (
-                    rows.map((row, index) => (
+                    filteredRows.map((row, index) => (
                       <tr key={row.id || index} className="ii-row">
                         <td className="ii-td ii-td-strong">{row.ingredient}</td>
                         <td className="ii-td">
@@ -458,4 +509,4 @@ const IngredientInventory = () => {
   );
 };
 
-export default IngredientInventory;
+export default IngredientInventory; ;

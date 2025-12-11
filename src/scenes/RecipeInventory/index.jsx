@@ -42,6 +42,26 @@ const Styles = () => (
     .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
     .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
 
+    /* Search toolbar */
+    .ii-toolbar {
+      background:#fff;
+      padding:12px 14px;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .ii-input {
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #e5e7eb;
+      border-radius:10px;
+      outline:none;
+      background:#fff;
+      font-size:14px;
+    }
+    .ii-input:focus {
+      border-color:#7C3AED;
+      box-shadow:0 0 0 3px rgba(124,58,237,.18);
+    }
+
     /* DataGrid to mimic table styling */
     .ii-table-wrap { height: 520px; }
     .ii-dg .MuiDataGrid-columnHeaders {
@@ -157,6 +177,7 @@ const RecipeInventory = () => {
   const { recipeInventory, setRecipeInventory } = useData();
   const [infoOpen, setInfoOpen] = useState(false);
   const [snack, setSnack] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch & aggregate from Production Log -> recipe inventory (units)
   useEffect(() => {
@@ -216,6 +237,19 @@ const RecipeInventory = () => {
     fetchAndProcess();
   }, [cognitoId, setRecipeInventory]);
 
+  // Search / filter rows
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return recipeInventory || [];
+    return (recipeInventory || []).filter((r) =>
+      [
+        r.recipe,
+        r.batchCode,
+        r.unitsInStock,
+      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+    );
+  }, [recipeInventory, searchQuery]);
+
   // DataGrid columns (keeps pagination)
   const columns = useMemo(
     () => [
@@ -246,14 +280,14 @@ const RecipeInventory = () => {
     []
   );
 
-  // Chart data (right card) using recipeInventory
+  // Chart data (right card) using filtered rows so chart follows search
   const chartData = useMemo(
     () =>
-      (recipeInventory || []).map((r) => ({
+      (filteredRows || []).map((r) => ({
         name: r.recipe,
         amount: Number(r.unitsInStock) || 0,
       })),
-    [recipeInventory]
+    [filteredRows]
   );
 
   const maxAmount = useMemo(
@@ -300,9 +334,20 @@ const RecipeInventory = () => {
               <p>Total units in stock by recipe</p>
             </div>
 
+            {/* Search toolbar */}
+            <div className="ii-toolbar">
+              <input
+                className="ii-input"
+                type="text"
+                placeholder="Search by recipe, batch code, units..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             <div className="ii-table-wrap ii-dg">
               <DataGrid
-                rows={recipeInventory}
+                rows={filteredRows}
                 columns={columns}
                 getRowId={(row) => row.id}
                 autoHeight={false}
