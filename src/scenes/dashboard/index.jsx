@@ -117,7 +117,7 @@ const DashboardCard = ({ title, icon, children, className = "" }) => (
   </div>
 );
 
-// Expiring ingredients
+// Expiring ingredients (from ACTIVE inventory)
 const ExpiringIngredients = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (list.length === 0) return <div className="list-empty">No ingredients expiring soon. Good job!</div>;
@@ -155,7 +155,7 @@ const ExpiringIngredients = ({ ingredients }) => {
   );
 };
 
-// Ingredient stock bars
+// Ingredient stock bars (from ingredient-inventory/active, original logic)
 const IngredientStock = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (list.length === 0) return <p className="list-item-sub">No ingredients in stock.</p>;
@@ -183,7 +183,7 @@ const IngredientStock = ({ ingredients }) => {
   );
 };
 
-// Recipe stock bars (similar look to IngredientStock)
+// Recipe stock bars (current units remaining per recipe)
 const RecipeStock = ({ recipes }) => {
   const list = Array.isArray(recipes) ? recipes : [];
   if (list.length === 0) return <p className="list-item-sub">No recipes in stock.</p>;
@@ -264,10 +264,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   // data
-  const [inventoryRaw, setInventoryRaw] = useState([]);    // still fetched if you want it elsewhere
-  const [prodLogs, setProdLogs] = useState([]);            // full production-log (for batches chart)
+  const [inventoryRaw, setInventoryRaw] = useState([]);     // ingredient-inventory/active
+  const [prodLogs, setProdLogs] = useState([]);             // full production-log (for batches chart)
   const [prodLogsActive, setProdLogsActive] = useState([]); // production-log/active (for recipe stock)
-  const [goodsInRaw, setGoodsInRaw] = useState([]);        // used for ingredient stock
+  const [goodsInRaw, setGoodsInRaw] = useState([]);         // goods-in/active (for stockouts KPI)
 
   useEffect(() => {
     if (!cognitoId) return;
@@ -279,7 +279,7 @@ const Dashboard = () => {
           fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`),
           fetch(`${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`),
           fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`),
-          fetch(`${API_BASE}/goods-in?cognito_id=${encodeURIComponent(cognitoId)}`),
+          fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`),
         ]);
         const [invJson, plJson, plaJson, giJson] = await Promise.all([
           invRes.ok ? invRes.json() : [],
@@ -308,14 +308,77 @@ const Dashboard = () => {
     kpiLowStockCount,
     ingredientStockList,
     expiringSoonList,
-    weeklyBatchesData,       // ISO week: batches per day
-    recipeStockList,         // current units remaining per recipe
+    weeklyBatchesData,
+    recipeStockList,
   } = useMemo(() => {
     /* -------------------------------------
-       INVENTORY FROM GOODS-IN (GROUPED)
+       INGREDIENT INVENTORY (original logic)
        ------------------------------------- */
 
-    const aggMap = new Map();
+    const mapped = (inventoryRaw || []).map((r, i) => {
+      const name = r.ingredient || "Unknown";
+      const unit = r.unit || "";
+      const group = detectUnitGroup(unit);
+      const stockBase = toBaseAmount(r.totalRemaining, unit); // g or ml (or units)
+      const display = formatDisplayAmount(stockBase, group);
+
+      const rawExpiry =
+        r.expiryDate ||
+        r.expiry ||
+        r.bestBefore ||
+        r.best_before ||
+        r.activeExpiry ||
+        r.batchExpiry;
+
+      const d = rawExpiry ? new Date(rawExpiry) : null;
+      const expiryDate = d && !Number.isNaN(d.getTime()) ? d : undefined;
+
+      return {
+        id: `${name}-${i}`,
+        name,
+        group,
+        stockBase,
+        display,
+        expiryDate,
+      };
+    });
+
+    const meanBase =
+      mapped.reduce((s, it) => s + (it.stockBase || 0), 0) /
+      Math.max(mapped.length, 1);
+
+    const ingredientStockList = mapped
+      .map((it) => {
+        const maxBase = Math.max(it.stockBase, Math.round(meanBase * 1.25), 1);
+        return { ...it, maxBase };
+      })
+      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
+
+    const now = new Date();
+    const soonCut = new Date(startOfISOWeek(now));
+    soonCut.setDate(soonCut.getDate() + 7);
+
+    const expiringSoonList = ingredientStockList
+      .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
+      .sort(
+        (a, b) =>
+          (a.expiryDate?.getTime() || 0) -
+          (b.expiryDate?.getTime() || 0)
+      )
+      .slice(0, 30);
+
+    // Low stock KPI derived from ingredient-inventory
+    const kpiLowStockCount = ingredientStockList.filter((it) => {
+      const pct = (it.stockBase / it.maxBase) * 100;
+      return pct <= 25 && it.stockBase > 0; // exclude stockouts
+    }).length;
+
+    /* -------------------------------------
+       STOCKOUT KPI FROM goods-in/active
+       Group by ingredient + unit, sum remaining
+       ------------------------------------- */
+
+    const stockoutAggMap = new Map();
 
     (goodsInRaw || []).forEach((row) => {
       const name =
@@ -344,77 +407,26 @@ const Dashboard = () => {
 
       const remainingBase = toBaseAmount(remainingRaw, unit);
 
-      const rawExpiry =
-        row.expiryDate ||
-        row.expiry_date ||
-        row.expiry ||
-        row.bestBefore ||
-        row.best_before ||
-        row.batchExpiry;
-
-      const d = rawExpiry ? new Date(rawExpiry) : null;
-      const expiryDate = d && !Number.isNaN(d.getTime()) ? d : undefined;
-
       const key = `${name}__${group}`;
-      const existing = aggMap.get(key);
+      const existing = stockoutAggMap.get(key);
 
       if (existing) {
         existing.stockBase += remainingBase;
-        if (expiryDate && (!existing.expiryDate || expiryDate < existing.expiryDate)) {
-          existing.expiryDate = expiryDate;
-        }
       } else {
-        aggMap.set(key, {
-          id: key,
+        stockoutAggMap.set(key, {
           name,
           group,
           stockBase: remainingBase,
-          expiryDate,
-          unit,
         });
       }
     });
 
-    const mapped = Array.from(aggMap.values()).map((it) => ({
-      ...it,
-      display: formatDisplayAmount(it.stockBase, it.group),
-    }));
-
-    const meanBase =
-      mapped.reduce((s, it) => s + (it.stockBase || 0), 0) /
-      Math.max(mapped.length, 1);
-
-    const ingredientStockList = mapped
-      .map((it) => {
-        const maxBase = Math.max(it.stockBase, Math.round(meanBase * 1.25), 1);
-        return { ...it, maxBase };
-      })
-      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
-
-    const now = new Date();
-    const soonCut = new Date(startOfISOWeek(now));
-    soonCut.setDate(soonCut.getDate() + 7);
-
-    const expiringSoonList = ingredientStockList
-      .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
-      .sort(
-        (a, b) =>
-          (a.expiryDate?.getTime() || 0) -
-          (b.expiryDate?.getTime() || 0)
-      )
-      .slice(0, 30);
-
-    const kpiStockoutsCount = ingredientStockList.filter(
+    const kpiStockoutsCount = Array.from(stockoutAggMap.values()).filter(
       (it) => (it.stockBase || 0) <= 0
     ).length;
 
-    const kpiLowStockCount = ingredientStockList.filter((it) => {
-      const pct = (it.stockBase / it.maxBase) * 100;
-      return pct <= 25 && it.stockBase > 0;
-    }).length;
-
     /* -------------------------------------
-       WEEKLY BATCHES (PRODUCTION LOG)
+       WEEKLY BATCHES (production-log)
        ------------------------------------- */
 
     const weekStart = startOfISOWeek(new Date());
@@ -446,8 +458,8 @@ const Dashboard = () => {
     }));
 
     /* -------------------------------------
-       RECIPE STOCK (FROM production-log/active)
-       Using unitsRemaining derived on the server
+       RECIPE STOCK (from production-log/active)
+       using unitsRemaining from your route
        ------------------------------------- */
 
     const recipeMap = new Map();
@@ -463,8 +475,7 @@ const Dashboard = () => {
         null;
 
       const unitsRemaining = Number(unitsRemRaw ?? 0);
-
-      if (unitsRemaining <= 0) return; // skip empty rows
+      if (unitsRemaining <= 0) return;
 
       const current = recipeMap.get(name) || 0;
       recipeMap.set(name, current + unitsRemaining);
@@ -504,7 +515,7 @@ const Dashboard = () => {
       weeklyBatchesData,
       recipeStockList,
     };
-  }, [goodsInRaw, prodLogs, prodLogsActive]);
+  }, [inventoryRaw, goodsInRaw, prodLogs, prodLogsActive]);
 
   return (
     <div className="dash">
