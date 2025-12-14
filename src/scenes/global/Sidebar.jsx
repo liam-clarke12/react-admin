@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { Box, IconButton, Typography, useTheme, Tooltip, Divider } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom"; // ⬅️ added useLocation
 import { tokens } from "../../themes";
 
 import NoCrashOutlinedIcon from "@mui/icons-material/NoCrashOutlined";
@@ -81,6 +81,7 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
 const Sidebar = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const location = useLocation(); // ⬅️ current route
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
 
@@ -119,6 +120,32 @@ const Sidebar = () => {
       mounted = false;
     };
   }, []);
+
+  // 🔗 Sync selected item with current path (so /hrp/roles highlights "Roles")
+  useEffect(() => {
+    const path = location.pathname;
+
+    const mapping = {
+      "/dashboard": "Dashboard",
+      "/GoodsIn": "Goods In",
+      "/IngredientsInventory": "Ingredients Inventory",
+      "/recipes": "Recipes",
+      "/stock_inventory": "Stock Inventory",
+      "/daily_production": "Daily Production",
+      "/stock_usage": "Stock Usage",
+      "/goods_out": "Goods Out",
+      "/Employees": "Employees",
+      "/hrp/roles": "Roles",
+      "/hrp/skills": "Skills & Training",
+      "/hrp/roster": "Roster",
+      "/hrp/leave": "Leave Requests",
+    };
+
+    const matchedTitle = mapping[path];
+    if (matchedTitle) {
+      setSelected(matchedTitle);
+    }
+  }, [location.pathname]);
 
   const fullName =
     [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
@@ -211,7 +238,7 @@ const Sidebar = () => {
           "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover": {
             background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
             color: `#fff !important`,
-            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)",
+            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)"
           },
           "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg": {
             color: `#fff !important`,
@@ -346,14 +373,14 @@ const Sidebar = () => {
 
               <Item
                 title="Employees"
-                to="/Employees" // 🔗 matches your existing Route
+                to="/Employees"
                 icon={<PeopleAltOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
               />
               <Item
                 title="Roles"
-                to="/hrp/roles"
+                to="/Roles"
                 icon={<BadgeOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
@@ -396,7 +423,7 @@ const Sidebar = () => {
           background: brand.surfaceMuted,
         }}
       >
-        {/* Your main content (routes) should render in your App component, not here */}
+        {/* Your main content (routes) renders in App.jsx */}
       </Box>
     </Box>
   );
