@@ -22,7 +22,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
