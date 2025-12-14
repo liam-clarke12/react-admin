@@ -2874,11 +2874,10 @@ app.post("/api/employees/create", async (req, res) => {
     return res.status(201).json(rows[0] || null);
   } catch (err) {
     console.error("[POST /api/employees/create] error:", err);
-    // SIMPLE, SAFE ERROR HANDLER (no safeErrorMessage)
     return res.status(500).json({
       error: "Failed to create employee.",
-      // optional: uncomment this while debugging, then remove for production
-      // details: err.message,
+      message: err.message,   // <– TEMP: surface real error
+      code: err.code || null, // <– TEMP: MySQL error code if present
     });
   }
 });
