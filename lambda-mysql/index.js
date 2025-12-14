@@ -2873,9 +2873,12 @@ app.post("/api/employees/create", async (req, res) => {
 
     return res.status(201).json(rows[0] || null);
   } catch (err) {
-    console.error("[POST /employees/create] error:", err);
+    console.error("[POST /api/employees/create] error:", err);
+    // SIMPLE, SAFE ERROR HANDLER (no safeErrorMessage)
     return res.status(500).json({
-      error: safeErrorMessage(err, "Failed to create employee."),
+      error: "Failed to create employee.",
+      // optional: uncomment this while debugging, then remove for production
+      // details: err.message,
     });
   }
 });
