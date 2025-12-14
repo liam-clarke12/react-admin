@@ -2751,7 +2751,7 @@ app.put("/api/goods-in/:barCode", async (req, res) => {
 
 // -----------------MRP-------------------------------------------------------------------------
 
-app.get("/employees/list", async (req, res) => {
+app.get("/api/employees/list", async (req, res) => {
   try {
     const { cognito_id } = req.query;
     if (!cognito_id) {
@@ -2790,7 +2790,7 @@ app.get("/employees/list", async (req, res) => {
   }
 });
 
-app.post("/employees/create", async (req, res) => {
+app.post("/api/employees/create", async (req, res) => {
   try {
     const {
       cognito_id,
@@ -2880,7 +2880,7 @@ app.post("/employees/create", async (req, res) => {
   }
 });
 
-app.put("/employees/:id/update", async (req, res) => {
+app.put("/api/employees/:id/update", async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -2976,7 +2976,7 @@ app.put("/employees/:id/update", async (req, res) => {
   }
 });
 
-app.delete("/employees/:id/delete", async (req, res) => {
+app.delete("/api/employees/:id/delete", async (req, res) => {
   try {
     const { id } = req.params;
     const { cognito_id } = req.query;
