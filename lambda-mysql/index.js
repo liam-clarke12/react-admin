@@ -2758,7 +2758,7 @@ app.get("/api/employees/list", async (req, res) => {
       return res.status(400).json({ error: "cognito_id is required" });
     }
 
-    const [rows] = await pool.execute(
+    const [rows] = await db.promise().query(
       `
       SELECT
         id,
@@ -2783,13 +2783,15 @@ app.get("/api/employees/list", async (req, res) => {
 
     return res.json(rows);
   } catch (err) {
-    console.error("[GET /employees/list] error:", err);
+    console.error("[GET /api/employees/list] error:", err);
     return res.status(500).json({
-      error: safeErrorMessage(err, "Failed to fetch employees."),
+      error: "Failed to fetch employees.",
+      message: err.message,
     });
   }
 });
 
+// CREATE EMPLOYEE
 app.post("/api/employees/create", async (req, res) => {
   try {
     const {
@@ -2813,7 +2815,7 @@ app.post("/api/employees/create", async (req, res) => {
         .json({ error: "cognito_id and full_name are required" });
     }
 
-    const [result] = await pool.execute(
+    const [result] = await db.promise().query(
       `
       INSERT INTO employees (
         cognito_id,
@@ -2849,7 +2851,7 @@ app.post("/api/employees/create", async (req, res) => {
 
     const insertedId = result.insertId;
 
-    const [rows] = await pool.execute(
+    const [rows] = await db.promise().query(
       `
       SELECT
         id,
@@ -2876,12 +2878,12 @@ app.post("/api/employees/create", async (req, res) => {
     console.error("[POST /api/employees/create] error:", err);
     return res.status(500).json({
       error: "Failed to create employee.",
-      message: err.message,   // <– TEMP: surface real error
-      code: err.code || null, // <– TEMP: MySQL error code if present
+      message: err.message,
     });
   }
 });
 
+// UPDATE EMPLOYEE
 app.put("/api/employees/:id/update", async (req, res) => {
   try {
     const { id } = req.params;
@@ -2906,21 +2908,21 @@ app.put("/api/employees/:id/update", async (req, res) => {
         .json({ error: "cognito_id is required for update" });
     }
 
-    const [result] = await pool.execute(
+    const [result] = await db.promise().query(
       `
       UPDATE employees
       SET
-        full_name      = ?,
-        short_name     = ?,
-        email          = ?,
-        phone          = ?,
+        full_name       = ?,
+        short_name      = ?,
+        email           = ?,
+        phone           = ?,
         employment_type = ?,
-        status         = ?,
-        start_date     = ?,
-        probation_end  = ?,
-        pay_type       = ?,
-        hourly_rate    = ?,
-        notes          = ?
+        status          = ?,
+        start_date      = ?,
+        probation_end   = ?,
+        pay_type        = ?,
+        hourly_rate     = ?,
+        notes           = ?
       WHERE id = ?
         AND cognito_id = ?
       `,
@@ -2947,7 +2949,7 @@ app.put("/api/employees/:id/update", async (req, res) => {
       });
     }
 
-    const [rows] = await pool.execute(
+    const [rows] = await db.promise().query(
       `
       SELECT
         id,
@@ -2971,13 +2973,15 @@ app.put("/api/employees/:id/update", async (req, res) => {
 
     return res.json(rows[0] || null);
   } catch (err) {
-    console.error("[PUT /employees/:id/update] error:", err);
+    console.error("[PUT /api/employees/:id/update] error:", err);
     return res.status(500).json({
-      error: safeErrorMessage(err, "Failed to update employee."),
+      error: "Failed to update employee.",
+      message: err.message,
     });
   }
 });
 
+// DELETE EMPLOYEE
 app.delete("/api/employees/:id/delete", async (req, res) => {
   try {
     const { id } = req.params;
@@ -2989,7 +2993,7 @@ app.delete("/api/employees/:id/delete", async (req, res) => {
         .json({ error: "cognito_id is required for delete" });
     }
 
-    const [result] = await pool.execute(
+    const [result] = await db.promise().query(
       `
       DELETE FROM employees
       WHERE id = ?
@@ -3006,9 +3010,10 @@ app.delete("/api/employees/:id/delete", async (req, res) => {
 
     return res.json({ deleted: true, id });
   } catch (err) {
-    console.error("[DELETE /employees/:id/delete] error:", err);
+    console.error("[DELETE /api/employees/:id/delete] error:", err);
     return res.status(500).json({
-      error: safeErrorMessage(err, "Failed to delete employee."),
+      error: "Failed to delete employee.",
+      message: err.message,
     });
   }
 });
