@@ -44,6 +44,7 @@ import Employees from "./scenes/HRP/Employees/Employees";
 import { DataProvider } from "./contexts/DataContext"
 import { AuthProvider } from "./contexts/AuthContext";
 import Roles from "./scenes/HRP/Roles";
+import Roster from "./scenes/HRP/Roster";
 
 Amplify.configure(awsExports);
 
@@ -285,6 +286,7 @@ function MainApp() {
             <main className="content">
               <Topbar />
               <Routes>
+                <Route path="/Roster" element={<Roster />} />
                 <Route path="/Roles" element={<Roles />} />
                 <Route path="/Employees" element={<Employees />} />
                 <Route path="/dashboard" element={<Dashboard />} />

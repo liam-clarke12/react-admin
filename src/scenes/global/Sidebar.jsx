@@ -394,7 +394,7 @@ const Sidebar = () => {
               />
               <Item
                 title="Roster"
-                to="/hrp/roster"
+                to="/Roster"
                 icon={<CalendarMonthOutlinedIcon />}
                 selected={selected}
                 setSelected={setSelected}
