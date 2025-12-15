@@ -531,7 +531,6 @@ const Sidebar = () => {
                   <LockedItem title="Roster" to="/Roster" icon={<CalendarMonthOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
                   <LockedItem title="Employees" to="/Employees" icon={<PeopleAltOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
                   <LockedItem title="Roles" to="/Roles" icon={<BadgeOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
-                  <LockedItem title="Skills & Training" to="/hrp/skills" icon={<SchoolOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
                   <LockedItem title="Leave Requests" to="/hrp/leave" icon={<EventNoteOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
                 </>
               )}
