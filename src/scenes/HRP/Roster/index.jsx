@@ -189,10 +189,11 @@ const Styles = () => (
       min-width:0;
     }
     .r-swatch{
-      width:10px;
-      height:10px;
+      width:12px;
+      height:12px;
       border-radius:999px;
       background: var(--swatch);
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.8), 0 10px 18px rgba(15,23,42,0.20);
       flex:0 0 auto;
     }
     .r-role-name{
@@ -300,26 +301,55 @@ const Styles = () => (
     .r-shifts{
       display:flex;
       flex-direction:column;
-      gap:6px;
+      gap:8px;
     }
 
+    /* 🔥 Stronger, punchier shift blocks */
     .r-shift{
-      border:1px solid #e5e7eb;
-      border-radius:12px;
-      padding:8px 10px;
+      border-radius:14px;
+      padding:10px 12px;
       display:flex;
       justify-content:space-between;
       align-items:flex-start;
       gap:10px;
-      box-shadow:0 8px 16px rgba(15,23,42,0.06);
+      box-shadow: 0 14px 28px rgba(15,23,42,0.16);
+      position:relative;
+      overflow:hidden;
+
+      /* vars provided inline */
       background: var(--bg);
       color: var(--fg);
-      border-color: var(--bd);
+
+      /* thick outline + subtle inner highlight */
+      border: 2px solid var(--bd);
     }
 
-    .r-shift-left{ min-width:0; }
+    /* glossy accent stripe */
+    .r-shift::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: linear-gradient(120deg, rgba(255,255,255,0.35), rgba(255,255,255,0.0) 55%);
+      pointer-events:none;
+      mix-blend-mode: overlay;
+    }
+
+    /* left colour bar for even more pop */
+    .r-shift::after{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:8px;
+      background: var(--bd);
+      opacity:0.95;
+      pointer-events:none;
+    }
+
+    .r-shift-left{ min-width:0; padding-left:2px; }
     .r-shift-role{
-      font-weight:900;
+      font-weight:1000;
       font-size:12px;
       line-height:1.2;
       margin:0;
@@ -327,27 +357,30 @@ const Styles = () => (
       overflow:hidden;
       text-overflow:ellipsis;
       max-width: 160px;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.06);
     }
     .r-shift-time{
-      margin-top:4px;
+      margin-top:5px;
       font-size:11px;
-      font-weight:900;
-      opacity:0.85;
+      font-weight:950;
       white-space:nowrap;
+      opacity:0.95;
     }
 
     .r-icon-btn{
       border:none;
-      background:transparent;
+      background:rgba(255,255,255,0.25);
       cursor:pointer;
-      font-weight:900;
+      font-weight:1000;
       color:inherit;
-      opacity:0.65;
-      padding:0;
+      padding:6px 8px;
       line-height:1;
+      border-radius:999px;
+      opacity:0.9;
+      box-shadow:0 10px 18px rgba(15,23,42,0.16);
       flex:0 0 auto;
     }
-    .r-icon-btn:hover{ opacity:0.95; }
+    .r-icon-btn:hover{ opacity:1; transform: translateY(-1px); }
 
     /* Modal */
     .r-modal-overlay{
@@ -474,7 +507,6 @@ function formatRangeLabel(weekStart) {
 }
 
 function isValidTime(t) {
-  // HTML time input gives "HH:MM"
   return typeof t === "string" && /^\d{2}:\d{2}$/.test(t);
 }
 
@@ -484,36 +516,38 @@ function timeToMinutes(t) {
 }
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
-  return timeToMinutes(aStart) < timeToMinutes(bEnd) &&
-    timeToMinutes(bStart) < timeToMinutes(aEnd);
+  return (
+    timeToMinutes(aStart) < timeToMinutes(bEnd) &&
+    timeToMinutes(bStart) < timeToMinutes(aEnd)
+  );
 }
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-/* ---------------- Roles (edit these) ---------------- */
+/* ---------------- Roles (🔥 more saturated + high-contrast) ---------------- */
 
 const DEFAULT_ROLES = [
   {
     key: "production",
     name: "Production",
-    style: { bg: "#EEF2FF", fg: "#1E1B4B", bd: "#C7D2FE" },
+    style: { bg: "#312E81", fg: "#FFFFFF", bd: "#6366F1" }, // indigo
   },
   {
     key: "packing",
     name: "Packing",
-    style: { bg: "#ECFEFF", fg: "#083344", bd: "#A5F3FC" },
+    style: { bg: "#0F766E", fg: "#FFFFFF", bd: "#2DD4BF" }, // teal
   },
   {
     key: "dispatch",
     name: "Dispatch",
-    style: { bg: "#F1F5F9", fg: "#0F172A", bd: "#E5E7EB" },
+    style: { bg: "#9A3412", fg: "#FFFFFF", bd: "#FB923C" }, // orange
   },
   {
     key: "admin",
     name: "Admin",
-    style: { bg: "#FFF7ED", fg: "#7C2D12", bd: "#FED7AA" },
+    style: { bg: "#86198F", fg: "#FFFFFF", bd: "#F472B6" }, // magenta
   },
 ];
 
@@ -545,7 +579,6 @@ const Roster = () => {
 
   const roles = DEFAULT_ROLES;
 
-  // Load employees once
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -583,8 +616,9 @@ const Roster = () => {
   const getDayShifts = (employeeId, dayIndex) => {
     const empDays = assignments[employeeId] || {};
     const shifts = empDays[dayIndex] || [];
-    // sort by start time
-    return [...shifts].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+    return [...shifts].sort(
+      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
+    );
   };
 
   const openRoleModalForDrop = (employeeId, dayIndex, roleKeyFromDrag) => {
@@ -599,17 +633,11 @@ const Roster = () => {
     });
   };
 
-  const closeModal = () => {
-    setModal((m) => ({ ...m, open: false, error: "" }));
-  };
+  const closeModal = () => setModal((m) => ({ ...m, open: false, error: "" }));
 
   const confirmAddShift = () => {
     const { employeeId, dayIndex, roleKey, start, end } = modal;
 
-    if (!employeeId && employeeId !== 0) {
-      setModal((m) => ({ ...m, error: "Missing employee." }));
-      return;
-    }
     if (dayIndex === null || dayIndex === undefined) {
       setModal((m) => ({ ...m, error: "Missing day." }));
       return;
@@ -627,10 +655,8 @@ const Roster = () => {
       return;
     }
 
-    // prevent overlaps for same person + day
     const existing = getDayShifts(employeeId, dayIndex);
-    const conflict = existing.some((s) => overlaps(start, end, s.start, s.end));
-    if (conflict) {
+    if (existing.some((s) => overlaps(start, end, s.start, s.end))) {
       setModal((m) => ({
         ...m,
         error: "That time overlaps an existing shift for this person on this day.",
@@ -666,8 +692,6 @@ const Roster = () => {
   const goNextWeek = () => setWeekStart((prev) => addDays(prev, 7));
 
   const handleSaveRoster = async () => {
-    // You’ll likely want a backend shape like:
-    // cognito_id, week_start, shifts: [{ employee_id, day_index, role_key, start, end }, ...]
     const flat = [];
     Object.entries(assignments).forEach(([employeeIdStr, daysObj]) => {
       Object.entries(daysObj || {}).forEach(([dayIndexStr, shiftArr]) => {
@@ -717,7 +741,7 @@ const Roster = () => {
       <Styles />
 
       <div className="r-layout">
-        {/* LEFT: Roles + Info */}
+        {/* LEFT: Roles + Team */}
         <div className="r-panel">
           <div className="r-panel-body">
             <div className="r-stack">
@@ -757,8 +781,7 @@ const Roster = () => {
               <div className="r-block">
                 <div className="r-title">Team</div>
                 <p className="r-sub">
-                  Rows are people. Columns are days. Each cell can contain multiple
-                  role blocks (non-overlapping times).
+                  Rows are people. Columns are days. Shifts show strong role colours.
                 </p>
 
                 <div className="r-emp-list">
@@ -778,7 +801,7 @@ const Roster = () => {
           </div>
         </div>
 
-        {/* RIGHT: Roster grid (dominant) */}
+        {/* RIGHT: Roster grid */}
         <div className="r-calendar">
           <div className="r-toolbar">
             <div className="r-toolbar-left">
@@ -820,15 +843,20 @@ const Roster = () => {
             {/* Rows = employees */}
             {employees.map((emp) => (
               <React.Fragment key={emp.id}>
-                {/* Row label */}
                 <div className="r-row-label">
                   <p className="r-row-name">{emp.full_name}</p>
-                  <div className="r-row-sub">Drag roles into cells</div>
+                  <div className="r-row-sub">Drop roles into cells</div>
                 </div>
 
-                {/* Cells per day */}
                 {DAYS.map((_, dayIndex) => {
-                  const shifts = getDayShifts(emp.id, dayIndex);
+                  const shifts = (() => {
+                    const empDays = assignments[emp.id] || {};
+                    const arr = empDays[dayIndex] || [];
+                    return [...arr].sort(
+                      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
+                    );
+                  })();
+
                   const isDropping =
                     dragOverCell &&
                     dragOverCell.employeeId === emp.id &&
@@ -839,14 +867,17 @@ const Roster = () => {
                       key={`${emp.id}-${dayIndex}`}
                       className={"r-cell" + (isDropping ? " r-cell-dropping" : "")}
                       onDragOver={(e) => {
-                        // allow drop for our role payload
                         e.preventDefault();
                         setDragOverCell({ employeeId: emp.id, dayIndex });
                       }}
                       onDragLeave={() => {
                         setTimeout(() => {
                           setDragOverCell((cur) => {
-                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex) {
+                            if (
+                              cur &&
+                              cur.employeeId === emp.id &&
+                              cur.dayIndex === dayIndex
+                            ) {
                               return null;
                             }
                             return cur;
@@ -876,11 +907,11 @@ const Roster = () => {
                       ) : (
                         <div className="r-shifts">
                           {shifts.map((s) => {
-                            const role = getRoleByKey(s.roleKey);
+                            const role = roles.find((r) => r.key === s.roleKey);
                             const style = role?.style || {
-                              bg: "#F1F5F9",
-                              fg: "#0F172A",
-                              bd: "#E5E7EB",
+                              bg: "#0F172A",
+                              fg: "#FFFFFF",
+                              bd: "#111827",
                             };
 
                             return (
@@ -923,7 +954,14 @@ const Roster = () => {
             ))}
 
             {!loadingEmployees && employees.length === 0 && (
-              <div style={{ gridColumn: "1 / -1", padding: 16, color: "#64748b", fontWeight: 800 }}>
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  padding: 16,
+                  color: "#64748b",
+                  fontWeight: 800,
+                }}
+              >
                 No employees found. Add them in HRP → Employees.
               </div>
             )}
@@ -931,19 +969,23 @@ const Roster = () => {
         </div>
       </div>
 
-      {/* Role/time modal */}
+      {/* Modal */}
       {modal.open && (
         <div
           className="r-modal-overlay"
           onMouseDown={(e) => {
-            // click outside to close
             if (e.target?.classList?.contains("r-modal-overlay")) closeModal();
           }}
         >
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Add shift</h3>
-              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
+              <button
+                className="r-icon-btn"
+                type="button"
+                onClick={closeModal}
+                aria-label="Close"
+              >
                 ×
               </button>
             </div>
@@ -1013,7 +1055,11 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
+              <button
+                type="button"
+                className="r-btn r-btn-primary"
+                onClick={confirmAddShift}
+              >
                 Add
               </button>
             </div>
