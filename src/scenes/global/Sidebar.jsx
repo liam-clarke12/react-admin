@@ -1,31 +1,40 @@
 // src/components/Sidebar/index.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import { Box, IconButton, Typography, useTheme, Tooltip, Divider } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Typography,
+  useTheme,
+  Tooltip,
+  Divider,
+} from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
-import { Link, useLocation } from "react-router-dom"; // ⬅️ added useLocation
+import { Link, useLocation } from "react-router-dom";
 import { tokens } from "../../themes";
 
 import NoCrashOutlinedIcon from "@mui/icons-material/NoCrashOutlined";
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
-import OutdoorGrillOutlinedIcon from "@mui/icons-material/OutdoorGrillOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import DeliveryDiningOutlinedIcon from "@mui/icons-material/DeliveryDiningOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import BakeryDiningOutlinedIcon from "@mui/icons-material/BakeryDiningOutlined";
 
-// 🔹 New icons for HRP section
+// HRP icons
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+
+// Section icons + chevrons
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 
 // ✅ Amplify v6 modular auth API
 import { fetchUserAttributes } from "aws-amplify/auth";
@@ -47,7 +56,7 @@ const brand = {
 // Single menu item component (keeps selected logic & routing)
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
+  tokens(theme.palette.mode); // keep existing pattern
   const active = selected === title;
 
   return (
@@ -80,10 +89,15 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
 
 const Sidebar = () => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
-  const location = useLocation(); // ⬅️ current route
+  tokens(theme.palette.mode); // keep existing pattern
+  const location = useLocation();
+
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
+
+  // ✅ Dropdown states
+  const [mrpOpen, setMrpOpen] = useState(true);
+  const [hrpOpen, setHrpOpen] = useState(true);
 
   // 👇 Fetch profile from Cognito
   const [profile, setProfile] = useState({
@@ -102,7 +116,9 @@ const Sidebar = () => {
         if (!mounted) return;
         const firstName =
           attrs?.given_name ||
-          (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(0, -1).join(" ") : "");
+          (attrs?.name
+            ? String(attrs.name).trim().split(/\s+/).slice(0, -1).join(" ")
+            : "");
         const lastName =
           attrs?.family_name ||
           (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(-1)[0] : "");
@@ -121,7 +137,7 @@ const Sidebar = () => {
     };
   }, []);
 
-  // 🔗 Sync selected item with current path (so /hrp/roles highlights "Roles")
+  // 🔗 route → selected title
   useEffect(() => {
     const path = location.pathname;
 
@@ -135,16 +151,42 @@ const Sidebar = () => {
       "/stock_usage": "Stock Usage",
       "/goods_out": "Goods Out",
       "/Employees": "Employees",
+      "/Roles": "Roles",
       "/hrp/roles": "Roles",
       "/hrp/skills": "Skills & Training",
+      "/Roster": "Roster",
       "/hrp/roster": "Roster",
       "/hrp/leave": "Leave Requests",
     };
 
     const matchedTitle = mapping[path];
-    if (matchedTitle) {
-      setSelected(matchedTitle);
-    }
+    if (matchedTitle) setSelected(matchedTitle);
+  }, [location.pathname]);
+
+  // ✅ Auto-open the correct dropdown based on route
+  useEffect(() => {
+    const path = location.pathname;
+
+    const isMrpRoute =
+      path === "/GoodsIn" ||
+      path === "/IngredientsInventory" ||
+      path === "/recipes" ||
+      path === "/stock_inventory" ||
+      path === "/daily_production" ||
+      path === "/stock_usage" ||
+      path === "/goods_out";
+
+    const isHrpRoute =
+      path === "/Employees" ||
+      path === "/Roles" ||
+      path === "/hrp/roles" ||
+      path === "/hrp/skills" ||
+      path === "/Roster" ||
+      path === "/hrp/roster" ||
+      path === "/hrp/leave";
+
+    if (isMrpRoute) setMrpOpen(true);
+    if (isHrpRoute) setHrpOpen(true);
   }, [location.pathname]);
 
   const fullName =
@@ -159,40 +201,98 @@ const Sidebar = () => {
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
 
-  // Section separator component — adapts to collapsed/expanded states
-  const SectionSeparator = ({ label }) => {
-    if (isCollapsed) {
-      // collapsed: small visual tick with tooltip
-      return (
-        <Box display="flex" justifyContent="center" alignItems="center" my={1}>
-          <Tooltip title={label} placement="right">
+  // Section header (dropdown trigger)
+  const SectionHeader = useMemo(() => {
+    return function SectionHeaderInner({
+      label,
+      icon,
+      open,
+      onToggle,
+    }) {
+      const content = (
+        <Box
+          onClick={onToggle}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onToggle();
+          }}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isCollapsed ? "center" : "space-between",
+            gap: 10,
+            px: isCollapsed ? 0 : "14px",
+            mx: isCollapsed ? 0 : "10px",
+            my: 0.5,
+            height: 44,
+            borderRadius: "12px",
+            cursor: "pointer",
+            userSelect: "none",
+            border: `1px solid ${brand.border}`,
+            background: brand.surfaceMuted,
+            "&:hover": { background: brand.hover },
+            outline: "none",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Box
               sx={{
-                width: 28,
-                height: 4,
-                borderRadius: 2,
-                background: brand.hover,
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                display: "grid",
+                placeItems: "center",
                 border: `1px solid ${brand.border}`,
+                background: "#fff",
               }}
-            />
-          </Tooltip>
+            >
+              {icon}
+            </Box>
+
+            {!isCollapsed && (
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  fontSize: 13,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: brand.subtext,
+                }}
+              >
+                {label}
+              </Typography>
+            )}
+          </Box>
+
+          {!isCollapsed && (
+            <Box sx={{ color: brand.subtext, display: "grid", placeItems: "center" }}>
+              {open ? <ExpandMoreRoundedIcon /> : <ChevronRightRoundedIcon />}
+            </Box>
+          )}
         </Box>
       );
-    }
 
-    // expanded: caption + divider
-    return (
-      <Box sx={{ px: "18px", my: 1 }}>
-        <Typography
-          variant="caption"
-          sx={{ color: brand.subtext, display: "block", fontWeight: 700, mb: 1 }}
-        >
-          {label}
-        </Typography>
-        <Divider sx={{ borderColor: brand.border }} />
-      </Box>
-    );
-  };
+      if (isCollapsed) {
+        return (
+          <Box my={1} display="flex" justifyContent="center">
+            <Tooltip title={label} placement="right">
+              <Box>{content}</Box>
+            </Tooltip>
+          </Box>
+        );
+      }
+
+      return (
+        <Box my={1}>
+          {content}
+          <Box sx={{ px: "18px", mt: 1 }}>
+            <Divider sx={{ borderColor: brand.border }} />
+          </Box>
+        </Box>
+      );
+    };
+  }, [isCollapsed]);
 
   return (
     <Box display="flex">
@@ -203,7 +303,6 @@ const Sidebar = () => {
           height: "100vh",
           zIndex: 1000,
 
-          // --- Nory look & react-pro-sidebar overrides ---
           borderRight: `1px solid ${brand.border}`,
           background: brand.surfaceMuted,
 
@@ -238,7 +337,7 @@ const Sidebar = () => {
           "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover": {
             background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
             color: `#fff !important`,
-            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)"
+            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)",
           },
           "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg": {
             color: `#fff !important`,
@@ -257,7 +356,12 @@ const Sidebar = () => {
               }}
             >
               {!isCollapsed && (
-                <Box display="flex" justifyContent="flex-end" alignItems="center" ml="8px">
+                <Box
+                  display="flex"
+                  justifyContent="flex-end"
+                  alignItems="center"
+                  ml="8px"
+                >
                   <IconButton
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     size="small"
@@ -306,7 +410,6 @@ const Sidebar = () => {
 
             {/* Items */}
             <Box paddingLeft={isCollapsed ? undefined : "8px"}>
-              {/* DASHBOARD */}
               <Item
                 title="Dashboard"
                 to="/dashboard"
@@ -315,97 +418,116 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
 
-              {/* Section: MRP */}
-              <SectionSeparator label="MRP" />
-
-              <Item
-                title="Goods In"
-                to="/GoodsIn"
-                icon={<LocalShippingOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Ingredients Inventory"
-                to="/IngredientsInventory"
-                icon={<BakeryDiningOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Recipes"
-                to="/recipes"
-                icon={<DescriptionOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Stock Inventory"
-                to="/stock_inventory"
-                icon={<WarehouseOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Daily Production"
-                to="/daily_production"
-                icon={<AddOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Stock Usage"
-                to="/stock_usage"
-                icon={<InventoryOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Goods Out"
-                to="/goods_out"
-                icon={<NoCrashOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
+              {/* ✅ MRP dropdown */}
+              <SectionHeader
+                label="MRP"
+                icon={<FolderOutlinedIcon fontSize="small" />}
+                open={mrpOpen}
+                onToggle={() => setMrpOpen((v) => !v)}
               />
 
-              {/* Section: HRP */}
-              <SectionSeparator label="HRP" />
+              {mrpOpen && (
+                <>
+                  <Item
+                    title="Goods In"
+                    to="/GoodsIn"
+                    icon={<LocalShippingOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Ingredients Inventory"
+                    to="/IngredientsInventory"
+                    icon={<BakeryDiningOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Recipes"
+                    to="/recipes"
+                    icon={<DescriptionOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Stock Inventory"
+                    to="/stock_inventory"
+                    icon={<WarehouseOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Daily Production"
+                    to="/daily_production"
+                    icon={<AddOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Stock Usage"
+                    to="/stock_usage"
+                    icon={<InventoryOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Goods Out"
+                    to="/goods_out"
+                    icon={<NoCrashOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                </>
+              )}
 
-              <Item
-                title="Employees"
-                to="/Employees"
-                icon={<PeopleAltOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
+              {/* ✅ HRP dropdown */}
+              <SectionHeader
+                label="HRP"
+                icon={<GroupWorkOutlinedIcon fontSize="small" />}
+                open={hrpOpen}
+                onToggle={() => setHrpOpen((v) => !v)}
               />
-              <Item
-                title="Roles"
-                to="/Roles"
-                icon={<BadgeOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Skills & Training"
-                to="/hrp/skills"
-                icon={<SchoolOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Roster"
-                to="/Roster"
-                icon={<CalendarMonthOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
-              <Item
-                title="Leave Requests"
-                to="/hrp/leave"
-                icon={<EventNoteOutlinedIcon />}
-                selected={selected}
-                setSelected={setSelected}
-              />
+
+              {hrpOpen && (
+                <>
+                  {/* ✅ Roster moved to top of HRP */}
+                  <Item
+                    title="Roster"
+                    to="/Roster"
+                    icon={<CalendarMonthOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Employees"
+                    to="/Employees"
+                    icon={<PeopleAltOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Roles"
+                    to="/Roles"
+                    icon={<BadgeOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Skills & Training"
+                    to="/hrp/skills"
+                    icon={<SchoolOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                  <Item
+                    title="Leave Requests"
+                    to="/hrp/leave"
+                    icon={<EventNoteOutlinedIcon />}
+                    selected={selected}
+                    setSelected={setSelected}
+                  />
+                </>
+              )}
             </Box>
           </Menu>
         </ProSidebar>
@@ -416,14 +538,16 @@ const Sidebar = () => {
         sx={{
           marginLeft: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
           padding: isCollapsed ? "0px" : "12px",
-          width: `calc(100% - ${isCollapsed ? COLLAPSED_W : EXPANDED_W}px)`,
+          width: `calc(100% - ${
+            isCollapsed ? COLLAPSED_W : EXPANDED_W
+          }px)`,
           minHeight: "100vh",
           overflowY: "auto",
           position: "relative",
           background: brand.surfaceMuted,
         }}
       >
-        {/* Your main content (routes) renders in App.jsx */}
+        {/* Routes render in App.jsx */}
       </Box>
     </Box>
   );
