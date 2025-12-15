@@ -5,8 +5,8 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Simple, minimal styles (reduced colours) ---------------- */
-const BrandStyles = () => (
+/* ---------------- Simple, minimal styles ---------------- */
+const Styles = () => (
   <style>{`
     .r-page{
       min-height:100vh;
@@ -18,9 +18,9 @@ const BrandStyles = () => (
     .r-layout{
       display:grid;
       gap:14px;
-      grid-template-columns: 220px minmax(0,1fr);
+      grid-template-columns: 260px minmax(0,1fr);
       align-items:start;
-      max-width: 1400px;
+      max-width: 1500px;
       margin:0 auto;
     }
 
@@ -35,81 +35,21 @@ const BrandStyles = () => (
       box-shadow:0 10px 26px rgba(15,23,42,0.08);
       overflow:hidden;
     }
-
     .r-panel-body{ padding:12px; }
 
-    /* Left: Team palette */
-    .r-emp-title{
-      margin:0 0 6px;
+    .r-title{
+      margin:0 0 8px;
       font-size:13px;
-      font-weight:800;
-      letter-spacing:0.02em;
-      color:#111827;
+      font-weight:900;
+      letter-spacing:0.06em;
       text-transform:uppercase;
+      color:#111827;
     }
-    .r-emp-sub{
-      margin:0 0 10px;
+    .r-sub{
+      margin:0 0 12px;
       font-size:12px;
       color:#64748b;
-      line-height:1.35;
-    }
-
-    .r-emp-list{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      max-height: calc(100vh - 130px);
-      overflow:auto;
-      padding-right:4px;
-    }
-
-    .r-emp-chip{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:10px 10px;
-      border-radius:12px;
-      border:1px solid #e5e7eb;
-      background:#ffffff;
-      cursor:grab;
-      user-select:none;
-      transition:transform .08s ease-out, box-shadow .12s ease-out;
-    }
-    .r-emp-chip:hover{
-      box-shadow:0 10px 18px rgba(15,23,42,0.08);
-      transform:translateY(-1px);
-    }
-    .r-emp-chip:active{
-      cursor:grabbing;
-      transform:scale(0.99);
-    }
-    .r-emp-name{
-      font-size:13px;
-      font-weight:700;
-      color:#0f172a;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .r-emp-tag{
-      font-size:11px;
-      font-weight:800;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid #e5e7eb;
-      color:#334155;
-      background:#f8fafc;
-      flex:0 0 auto;
-    }
-
-    /* Right: Calendar takes most of the page */
-    .r-calendar-wrap{
-      background:#fff;
-      border:1px solid #e5e7eb;
-      border-radius:14px;
-      box-shadow:0 10px 26px rgba(15,23,42,0.08);
-      overflow:hidden;
+      line-height:1.4;
     }
 
     .r-toolbar{
@@ -119,12 +59,10 @@ const BrandStyles = () => (
       gap:10px;
       padding:10px 12px;
       border-bottom:1px solid #e5e7eb;
-      background:#ffffff;
+      background:#fff;
       flex-wrap:wrap;
     }
-
-    .r-toolbar-left,
-    .r-toolbar-right{
+    .r-toolbar-left,.r-toolbar-right{
       display:flex;
       gap:8px;
       align-items:center;
@@ -137,7 +75,7 @@ const BrandStyles = () => (
       gap:6px;
       padding:8px 10px;
       font-size:13px;
-      font-weight:800;
+      font-weight:900;
       border-radius:10px;
       border:1px solid #e5e7eb;
       background:#fff;
@@ -150,43 +88,150 @@ const BrandStyles = () => (
       box-shadow:0 10px 18px rgba(15,23,42,0.08);
       transform:translateY(-1px);
     }
-
     .r-btn-primary{
       background:#111827;
       border-color:#111827;
       color:#fff;
     }
-    .r-btn-primary:hover{
-      background:#0b1220;
-      border-color:#0b1220;
-    }
-
-    .r-week-label{
-      font-size:13px;
-      font-weight:800;
-      color:#0f172a;
-    }
+    .r-btn-primary:hover{ background:#0b1220; border-color:#0b1220; }
 
     .r-chip{
       font-size:12px;
-      font-weight:800;
+      font-weight:900;
       padding:6px 10px;
       border-radius:999px;
       background:#f1f5f9;
       border:1px solid #e5e7eb;
       color:#334155;
     }
-
-    /* Calendar grid */
-    .r-cal-grid{
-      display:grid;
-      grid-template-columns: 150px repeat(7, minmax(0, 1fr));
-      font-size:12px;
-      width:100%;
+    .r-week-label{
+      font-size:13px;
+      font-weight:900;
+      color:#0f172a;
     }
 
-    .r-cal-head-cell{
+    /* Left column blocks */
+    .r-block{
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .r-stack{ display:flex; flex-direction:column; gap:10px; }
+
+    .r-emp-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height: 45vh;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .r-emp-chip{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
       padding:10px 10px;
+      border-radius:12px;
+      border:1px solid #e5e7eb;
+      background:#ffffff;
+      user-select:none;
+    }
+    .r-emp-name{
+      font-size:13px;
+      font-weight:800;
+      color:#0f172a;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .r-emp-meta{
+      font-size:11px;
+      font-weight:900;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid #e5e7eb;
+      background:#f8fafc;
+      color:#334155;
+      flex:0 0 auto;
+    }
+
+    .r-role-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .r-role-chip{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid #e5e7eb;
+      background:#fff;
+      cursor:grab;
+      user-select:none;
+      box-shadow:0 8px 16px rgba(15,23,42,0.06);
+      transition:transform .08s ease-out, box-shadow .12s ease-out;
+    }
+    .r-role-chip:hover{
+      box-shadow:0 12px 22px rgba(15,23,42,0.10);
+      transform:translateY(-1px);
+    }
+    .r-role-chip:active{ cursor:grabbing; transform:scale(0.99); }
+
+    .r-role-left{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .r-swatch{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      background: var(--swatch);
+      flex:0 0 auto;
+    }
+    .r-role-name{
+      font-size:13px;
+      font-weight:900;
+      color:#0f172a;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .r-role-hint{
+      font-size:11px;
+      font-weight:900;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid #e5e7eb;
+      background:#f8fafc;
+      color:#334155;
+      flex:0 0 auto;
+    }
+
+    /* Grid (rows=people) */
+    .r-calendar{
+      background:#fff;
+      border:1px solid #e5e7eb;
+      border-radius:14px;
+      box-shadow:0 10px 26px rgba(15,23,42,0.08);
+      overflow:hidden;
+    }
+
+    .r-grid{
+      display:grid;
+      grid-template-columns: 220px repeat(7, minmax(0, 1fr));
+      width:100%;
+      font-size:12px;
+    }
+
+    .r-head{
+      padding:10px;
       background:#f8fafc;
       border-bottom:1px solid #e5e7eb;
       border-right:1px solid #e5e7eb;
@@ -194,120 +239,205 @@ const BrandStyles = () => (
       color:#0f172a;
       text-align:center;
     }
-    .r-cal-head-cell:first-of-type{
-      text-align:left;
-      color:#475569;
-    }
+    .r-head:first-of-type{ text-align:left; color:#475569; }
 
-    .r-cal-day-label{
+    .r-day-label{
       font-size:11px;
       text-transform:uppercase;
       letter-spacing:0.08em;
       color:#64748b;
     }
-    .r-cal-day-date{
+    .r-day-date{
       font-size:13px;
       font-weight:900;
       color:#0f172a;
       margin-top:2px;
     }
 
-    .r-cal-row-label{
-      padding:10px 10px;
+    .r-row-label{
+      padding:10px;
       border-right:1px solid #e5e7eb;
       border-bottom:1px solid #e5e7eb;
-      background:#ffffff;
-      font-weight:900;
-      color:#334155;
+      background:#fff;
     }
-    .r-cal-row-sub{
-      display:block;
+    .r-row-name{
+      font-size:13px;
+      font-weight:900;
+      color:#0f172a;
+      margin:0;
+      line-height:1.2;
+    }
+    .r-row-sub{
+      margin-top:4px;
       font-size:11px;
-      font-weight:700;
       color:#94a3b8;
-      margin-top:2px;
+      font-weight:800;
     }
 
-    .r-cal-slot{
-      min-height:110px; /* more space, calendar feels bigger */
+    .r-cell{
+      min-height:86px;
       padding:8px;
       border-right:1px solid #e5e7eb;
       border-bottom:1px solid #e5e7eb;
-      background:#ffffff;
+      background:#fff;
       transition:box-shadow .12s ease-out, background .12s ease-out;
+      position:relative;
     }
-    .r-cal-slot:hover{
-      background:#fbfdff;
-    }
-    .r-cal-slot-dropping{
+    .r-cell:hover{ background:#fbfdff; }
+    .r-cell-dropping{
       box-shadow: inset 0 0 0 2px #111827;
       background:#f8fafc;
     }
 
-    .r-slot-label{
-      font-size:11px;
-      color:#94a3b8;
-      margin-bottom:6px;
-      font-weight:700;
-    }
-
-    .r-slot-empty{
+    .r-cell-empty{
       font-size:11px;
       color:#cbd5e1;
       font-style:italic;
-      margin-top:18px;
       text-align:center;
+      margin-top:18px;
     }
 
-    .r-slot-badges{
+    .r-shifts{
       display:flex;
-      flex-wrap:wrap;
+      flex-direction:column;
       gap:6px;
     }
 
-    /* Only a few badge colours */
-    .r-slot-badge{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:6px 10px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:800;
+    .r-shift{
       border:1px solid #e5e7eb;
-      box-shadow:0 6px 14px rgba(15,23,42,0.08);
-      max-width: 100%;
+      border-radius:12px;
+      padding:8px 10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      box-shadow:0 8px 16px rgba(15,23,42,0.06);
+      background: var(--bg);
+      color: var(--fg);
+      border-color: var(--bd);
     }
-    .r-slot-badge span{
+
+    .r-shift-left{ min-width:0; }
+    .r-shift-role{
+      font-weight:900;
+      font-size:12px;
+      line-height:1.2;
+      margin:0;
+      white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      white-space:nowrap;
       max-width: 160px;
     }
+    .r-shift-time{
+      margin-top:4px;
+      font-size:11px;
+      font-weight:900;
+      opacity:0.85;
+      white-space:nowrap;
+    }
 
-    .r-badge-a{ background:#eef2ff; color:#1e1b4b; border-color:#c7d2fe; } /* indigo */
-    .r-badge-b{ background:#ecfeff; color:#083344; border-color:#a5f3fc; } /* cyan */
-    .r-badge-c{ background:#f1f5f9; color:#0f172a; border-color:#e5e7eb; } /* slate */
-
-    .r-slot-badge button{
+    .r-icon-btn{
       border:none;
       background:transparent;
       cursor:pointer;
       font-weight:900;
       color:inherit;
-      opacity:0.55;
+      opacity:0.65;
       padding:0;
       line-height:1;
       flex:0 0 auto;
     }
-    .r-slot-badge button:hover{ opacity:0.9; }
+    .r-icon-btn:hover{ opacity:0.95; }
+
+    /* Modal */
+    .r-modal-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(15,23,42,0.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:9999;
+    }
+    .r-modal{
+      width:min(520px, 100%);
+      background:#fff;
+      border-radius:16px;
+      border:1px solid #e5e7eb;
+      box-shadow:0 22px 70px rgba(0,0,0,0.22);
+      overflow:hidden;
+    }
+    .r-modal-hdr{
+      padding:12px 14px;
+      border-bottom:1px solid #e5e7eb;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .r-modal-title{
+      margin:0;
+      font-size:13px;
+      font-weight:1000;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+      color:#111827;
+    }
+    .r-modal-body{
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .r-field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .r-label{
+      font-size:12px;
+      font-weight:900;
+      color:#334155;
+    }
+    .r-input, .r-select{
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:10px 10px;
+      font-size:13px;
+      font-weight:800;
+      color:#0f172a;
+      background:#fff;
+      outline:none;
+    }
+    .r-input:focus, .r-select:focus{
+      box-shadow:0 0 0 3px rgba(17,24,39,0.08);
+      border-color:#cbd5e1;
+    }
+    .r-row{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .r-modal-ftr{
+      padding:12px 14px;
+      border-top:1px solid #e5e7eb;
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      background:#fff;
+    }
+    .r-note{
+      font-size:12px;
+      color:#64748b;
+      line-height:1.35;
+    }
 
     @media (max-width: 900px){
-      .r-cal-grid{ font-size:11px; }
-      .r-cal-slot{ min-height:90px; }
-      .r-cal-head-cell{ padding:8px 6px; }
-      .r-cal-row-label{ padding:8px 6px; }
-      .r-slot-badge span{ max-width: 120px; }
+      .r-grid{ grid-template-columns: 190px repeat(7, minmax(0, 1fr)); }
+      .r-row-label{ padding:8px; }
+      .r-cell{ padding:6px; min-height:78px; }
+      .r-shift-role{ max-width: 120px; }
     }
   `}</style>
 );
@@ -315,12 +445,6 @@ const BrandStyles = () => (
 /* ---------------- Helpers ---------------- */
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const BANDS = [
-  { key: "morning", label: "Morning", hours: "06:00 – 14:00" },
-  { key: "day", label: "Day", hours: "08:00 – 16:00" },
-  { key: "evening", label: "Evening", hours: "12:00 – 20:00" },
-];
 
 function startOfISOWeek(date = new Date()) {
   const d = new Date(date);
@@ -349,26 +473,79 @@ function formatRangeLabel(weekStart) {
   return `${start} – ${end}`;
 }
 
-function badgeClassForEmployee(employeeId) {
-  const n = Math.abs(Number(employeeId || 0)) % 3;
-  if (n === 0) return "r-badge-a";
-  if (n === 1) return "r-badge-b";
-  return "r-badge-c";
+function isValidTime(t) {
+  // HTML time input gives "HH:MM"
+  return typeof t === "string" && /^\d{2}:\d{2}$/.test(t);
 }
 
-/* ---------------- Main Roster Component ---------------- */
+function timeToMinutes(t) {
+  const [hh, mm] = t.split(":").map((x) => Number(x));
+  return hh * 60 + mm;
+}
+
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  return timeToMinutes(aStart) < timeToMinutes(bEnd) &&
+    timeToMinutes(bStart) < timeToMinutes(aEnd);
+}
+
+function uid() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+/* ---------------- Roles (edit these) ---------------- */
+
+const DEFAULT_ROLES = [
+  {
+    key: "production",
+    name: "Production",
+    style: { bg: "#EEF2FF", fg: "#1E1B4B", bd: "#C7D2FE" },
+  },
+  {
+    key: "packing",
+    name: "Packing",
+    style: { bg: "#ECFEFF", fg: "#083344", bd: "#A5F3FC" },
+  },
+  {
+    key: "dispatch",
+    name: "Dispatch",
+    style: { bg: "#F1F5F9", fg: "#0F172A", bd: "#E5E7EB" },
+  },
+  {
+    key: "admin",
+    name: "Admin",
+    style: { bg: "#FFF7ED", fg: "#7C2D12", bd: "#FED7AA" },
+  },
+];
+
+/* ---------------- Main Component ---------------- */
 
 const Roster = () => {
   const { cognitoId } = useAuth();
+
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(new Date()));
 
-  // assignments[dayIndex][bandKey] = [employeeId, ...]
+  // assignments[employeeId][dayIndex] = [{ id, roleKey, start, end }, ...]
   const [assignments, setAssignments] = useState({});
-  const [dragOverSlot, setDragOverSlot] = useState(null); // {dayIndex, bandKey} or null
 
+  const [dragOverCell, setDragOverCell] = useState(null); // {employeeId, dayIndex} or null
+
+  // role drop modal state
+  const [modal, setModal] = useState({
+    open: false,
+    employeeId: null,
+    dayIndex: null,
+    roleKey: DEFAULT_ROLES[0]?.key || "",
+    start: "08:00",
+    end: "16:00",
+    error: "",
+  });
+
+  const roles = DEFAULT_ROLES;
+
+  // Load employees once
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -401,30 +578,87 @@ const Roster = () => {
     return emp?.full_name || `#${id}`;
   };
 
-  const handleShiftDrop = (e, dayIndex, bandKey) => {
-    e.preventDefault();
-    const data = e.dataTransfer.getData("text/plain");
-    if (!data) return;
-    const employeeId = Number(data);
-    if (!employeeId) return;
+  const getRoleByKey = (roleKey) => roles.find((r) => r.key === roleKey);
 
-    setAssignments((prev) => {
-      const day = prev[dayIndex] ? { ...prev[dayIndex] } : {};
-      const bandArr = day[bandKey] ? [...day[bandKey]] : [];
-      if (!bandArr.includes(employeeId)) bandArr.push(employeeId);
-      day[bandKey] = bandArr;
-      return { ...prev, [dayIndex]: day };
-    });
-
-    setDragOverSlot(null);
+  const getDayShifts = (employeeId, dayIndex) => {
+    const empDays = assignments[employeeId] || {};
+    const shifts = empDays[dayIndex] || [];
+    // sort by start time
+    return [...shifts].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
   };
 
-  const handleRemoveFromSlot = (dayIndex, bandKey, employeeId) => {
+  const openRoleModalForDrop = (employeeId, dayIndex, roleKeyFromDrag) => {
+    setModal({
+      open: true,
+      employeeId,
+      dayIndex,
+      roleKey: roleKeyFromDrag || roles[0]?.key || "",
+      start: "08:00",
+      end: "16:00",
+      error: "",
+    });
+  };
+
+  const closeModal = () => {
+    setModal((m) => ({ ...m, open: false, error: "" }));
+  };
+
+  const confirmAddShift = () => {
+    const { employeeId, dayIndex, roleKey, start, end } = modal;
+
+    if (!employeeId && employeeId !== 0) {
+      setModal((m) => ({ ...m, error: "Missing employee." }));
+      return;
+    }
+    if (dayIndex === null || dayIndex === undefined) {
+      setModal((m) => ({ ...m, error: "Missing day." }));
+      return;
+    }
+    if (!roleKey) {
+      setModal((m) => ({ ...m, error: "Choose a role." }));
+      return;
+    }
+    if (!isValidTime(start) || !isValidTime(end)) {
+      setModal((m) => ({ ...m, error: "Please enter valid start/end time." }));
+      return;
+    }
+    if (timeToMinutes(start) >= timeToMinutes(end)) {
+      setModal((m) => ({ ...m, error: "End time must be after start time." }));
+      return;
+    }
+
+    // prevent overlaps for same person + day
+    const existing = getDayShifts(employeeId, dayIndex);
+    const conflict = existing.some((s) => overlaps(start, end, s.start, s.end));
+    if (conflict) {
+      setModal((m) => ({
+        ...m,
+        error: "That time overlaps an existing shift for this person on this day.",
+      }));
+      return;
+    }
+
     setAssignments((prev) => {
-      const day = prev[dayIndex] ? { ...prev[dayIndex] } : {};
-      const bandArr = day[bandKey] ? [...day[bandKey]] : [];
-      day[bandKey] = bandArr.filter((id) => id !== employeeId);
-      return { ...prev, [dayIndex]: day };
+      const next = { ...prev };
+      const empDays = next[employeeId] ? { ...next[employeeId] } : {};
+      const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
+      dayArr.push({ id: uid(), roleKey, start, end });
+      empDays[dayIndex] = dayArr;
+      next[employeeId] = empDays;
+      return next;
+    });
+
+    closeModal();
+  };
+
+  const removeShift = (employeeId, dayIndex, shiftId) => {
+    setAssignments((prev) => {
+      const next = { ...prev };
+      const empDays = next[employeeId] ? { ...next[employeeId] } : {};
+      const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
+      empDays[dayIndex] = dayArr.filter((s) => s.id !== shiftId);
+      next[employeeId] = empDays;
+      return next;
     });
   };
 
@@ -432,16 +666,27 @@ const Roster = () => {
   const goNextWeek = () => setWeekStart((prev) => addDays(prev, 7));
 
   const handleSaveRoster = async () => {
+    // You’ll likely want a backend shape like:
+    // cognito_id, week_start, shifts: [{ employee_id, day_index, role_key, start, end }, ...]
+    const flat = [];
+    Object.entries(assignments).forEach(([employeeIdStr, daysObj]) => {
+      Object.entries(daysObj || {}).forEach(([dayIndexStr, shiftArr]) => {
+        (shiftArr || []).forEach((s) => {
+          flat.push({
+            employee_id: Number(employeeIdStr),
+            day_index: Number(dayIndexStr),
+            role_key: s.roleKey,
+            start: s.start,
+            end: s.end,
+          });
+        });
+      });
+    });
+
     const payload = {
       cognito_id: cognitoId,
       week_start: weekStart.toISOString().slice(0, 10),
-      shifts: Object.entries(assignments).map(([dayIndexStr, bands]) => ({
-        day_index: Number(dayIndexStr), // 0=Mon..6=Sun
-        slots: Object.entries(bands).map(([bandKey, employeeIds]) => ({
-          band_key: bandKey,
-          employees: employeeIds.map((id) => ({ employee_id: id })),
-        })),
-      })),
+      shifts: flat,
     };
 
     console.log("[Roster] Save payload:", payload);
@@ -469,44 +714,72 @@ const Roster = () => {
 
   return (
     <div className="r-page">
-      <BrandStyles />
+      <Styles />
 
       <div className="r-layout">
-        {/* LEFT: Employee palette */}
+        {/* LEFT: Roles + Info */}
         <div className="r-panel">
           <div className="r-panel-body">
-            <h3 className="r-emp-title">Team</h3>
-            <p className="r-emp-sub">
-              Drag an employee into a slot. Keep it simple + consistent.
-            </p>
+            <div className="r-stack">
+              <div className="r-block">
+                <div className="r-title">Roles</div>
+                <p className="r-sub">
+                  Drag a role into a person’s day cell, then set start/finish time.
+                </p>
 
-            <div className="r-emp-list">
-              {loadingEmployees && <span>Loading employees…</span>}
-              {!loadingEmployees && employees.length === 0 && (
-                <span>No employees yet. Add them in HRP → Employees.</span>
-              )}
-
-              {employees.map((emp) => (
-                <div
-                  key={emp.id}
-                  className="r-emp-chip"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", String(emp.id));
-                  }}
-                  title="Drag into calendar"
-                >
-                  <span className="r-emp-name">{emp.full_name}</span>
-                  <span className="r-emp-tag">Drag</span>
+                <div className="r-role-list">
+                  {roles.map((role) => (
+                    <div
+                      key={role.key}
+                      className="r-role-chip"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "application/x-roster-role",
+                          JSON.stringify({ roleKey: role.key })
+                        );
+                      }}
+                      title="Drag into the roster"
+                    >
+                      <div className="r-role-left">
+                        <span
+                          className="r-swatch"
+                          style={{ ["--swatch"]: role.style.bd }}
+                        />
+                        <span className="r-role-name">{role.name}</span>
+                      </div>
+                      <span className="r-role-hint">Drag</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div className="r-block">
+                <div className="r-title">Team</div>
+                <p className="r-sub">
+                  Rows are people. Columns are days. Each cell can contain multiple
+                  role blocks (non-overlapping times).
+                </p>
+
+                <div className="r-emp-list">
+                  {loadingEmployees && <span>Loading employees…</span>}
+                  {!loadingEmployees && employees.length === 0 && (
+                    <span>No employees yet. Add them in HRP → Employees.</span>
+                  )}
+                  {employees.map((emp) => (
+                    <div key={emp.id} className="r-emp-chip">
+                      <span className="r-emp-name">{emp.full_name}</span>
+                      <span className="r-emp-meta">Row</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: Calendar (dominant) */}
-        <div className="r-calendar-wrap">
-          {/* Minimal toolbar (no big header) */}
+        {/* RIGHT: Roster grid (dominant) */}
+        <div className="r-calendar">
           <div className="r-toolbar">
             <div className="r-toolbar-left">
               <button type="button" className="r-btn" onClick={goPrevWeek}>
@@ -516,9 +789,7 @@ const Roster = () => {
                 Next →
               </button>
               <span className="r-chip">
-                {loadingEmployees
-                  ? "Loading…"
-                  : `${employees.length} staff`}
+                {loadingEmployees ? "Loading…" : `${employees.length} staff`}
               </span>
             </div>
 
@@ -536,81 +807,113 @@ const Roster = () => {
             </div>
           </div>
 
-          {/* Calendar grid */}
-          <div className="r-cal-grid">
+          <div className="r-grid">
             {/* Header row */}
-            <div className="r-cal-head-cell">Band / Time</div>
+            <div className="r-head">Person</div>
             {DAYS.map((day, idx) => (
-              <div key={day} className="r-cal-head-cell">
-                <div className="r-cal-day-label">{day}</div>
-                <div className="r-cal-day-date">{formatShort(weekDates[idx])}</div>
+              <div key={day} className="r-head">
+                <div className="r-day-label">{day}</div>
+                <div className="r-day-date">{formatShort(weekDates[idx])}</div>
               </div>
             ))}
 
-            {/* Rows per band */}
-            {BANDS.map((band) => (
-              <React.Fragment key={band.key}>
-                <div className="r-cal-row-label">
-                  {band.label}
-                  <span className="r-cal-row-sub">{band.hours}</span>
+            {/* Rows = employees */}
+            {employees.map((emp) => (
+              <React.Fragment key={emp.id}>
+                {/* Row label */}
+                <div className="r-row-label">
+                  <p className="r-row-name">{emp.full_name}</p>
+                  <div className="r-row-sub">Drag roles into cells</div>
                 </div>
 
-                {DAYS.map((day, dayIndex) => {
-                  const slotEmployees = assignments[dayIndex]?.[band.key] || [];
+                {/* Cells per day */}
+                {DAYS.map((_, dayIndex) => {
+                  const shifts = getDayShifts(emp.id, dayIndex);
                   const isDropping =
-                    dragOverSlot &&
-                    dragOverSlot.dayIndex === dayIndex &&
-                    dragOverSlot.bandKey === band.key;
+                    dragOverCell &&
+                    dragOverCell.employeeId === emp.id &&
+                    dragOverCell.dayIndex === dayIndex;
 
                   return (
                     <div
-                      key={`${band.key}-${day}`}
-                      className={"r-cal-slot" + (isDropping ? " r-cal-slot-dropping" : "")}
+                      key={`${emp.id}-${dayIndex}`}
+                      className={"r-cell" + (isDropping ? " r-cell-dropping" : "")}
                       onDragOver={(e) => {
+                        // allow drop for our role payload
                         e.preventDefault();
-                        setDragOverSlot({ dayIndex, bandKey: band.key });
+                        setDragOverCell({ employeeId: emp.id, dayIndex });
                       }}
                       onDragLeave={() => {
                         setTimeout(() => {
-                          setDragOverSlot((current) => {
-                            if (
-                              current &&
-                              current.dayIndex === dayIndex &&
-                              current.bandKey === band.key
-                            ) {
+                          setDragOverCell((cur) => {
+                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex) {
                               return null;
                             }
-                            return current;
+                            return cur;
                           });
                         }, 30);
                       }}
-                      onDrop={(e) => handleShiftDrop(e, dayIndex, band.key)}
-                    >
-                      <div className="r-slot-label">Drop here</div>
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverCell(null);
 
-                      {slotEmployees.length === 0 ? (
-                        <div className="r-slot-empty">Empty</div>
+                        const raw = e.dataTransfer.getData("application/x-roster-role");
+                        if (!raw) return;
+
+                        try {
+                          const parsed = JSON.parse(raw);
+                          const roleKey = parsed?.roleKey;
+                          if (!roleKey) return;
+                          openRoleModalForDrop(emp.id, dayIndex, roleKey);
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      title="Drop a role here"
+                    >
+                      {shifts.length === 0 ? (
+                        <div className="r-cell-empty">Drop role</div>
                       ) : (
-                        <div className="r-slot-badges">
-                          {slotEmployees.map((empId) => (
-                            <div
-                              key={empId}
-                              className={`r-slot-badge ${badgeClassForEmployee(empId)}`}
-                              title={getEmployeeName(empId)}
-                            >
-                              <span>{getEmployeeName(empId)}</span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveFromSlot(dayIndex, band.key, empId)
-                                }
-                                aria-label="Remove"
-                                title="Remove"
+                        <div className="r-shifts">
+                          {shifts.map((s) => {
+                            const role = getRoleByKey(s.roleKey);
+                            const style = role?.style || {
+                              bg: "#F1F5F9",
+                              fg: "#0F172A",
+                              bd: "#E5E7EB",
+                            };
+
+                            return (
+                              <div
+                                key={s.id}
+                                className="r-shift"
+                                style={{
+                                  ["--bg"]: style.bg,
+                                  ["--fg"]: style.fg,
+                                  ["--bd"]: style.bd,
+                                }}
+                                title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                                <div className="r-shift-left">
+                                  <p className="r-shift-role">
+                                    {role?.name || s.roleKey}
+                                  </p>
+                                  <div className="r-shift-time">
+                                    {s.start} – {s.end}
+                                  </div>
+                                </div>
+                                <button
+                                  className="r-icon-btn"
+                                  type="button"
+                                  onClick={() => removeShift(emp.id, dayIndex, s.id)}
+                                  aria-label="Remove shift"
+                                  title="Remove"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -618,9 +921,105 @@ const Roster = () => {
                 })}
               </React.Fragment>
             ))}
+
+            {!loadingEmployees && employees.length === 0 && (
+              <div style={{ gridColumn: "1 / -1", padding: 16, color: "#64748b", fontWeight: 800 }}>
+                No employees found. Add them in HRP → Employees.
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Role/time modal */}
+      {modal.open && (
+        <div
+          className="r-modal-overlay"
+          onMouseDown={(e) => {
+            // click outside to close
+            if (e.target?.classList?.contains("r-modal-overlay")) closeModal();
+          }}
+        >
+          <div className="r-modal" role="dialog" aria-modal="true">
+            <div className="r-modal-hdr">
+              <h3 className="r-modal-title">Add shift</h3>
+              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
+                ×
+              </button>
+            </div>
+
+            <div className="r-modal-body">
+              <div className="r-note">
+                <strong>{getEmployeeName(modal.employeeId)}</strong> ·{" "}
+                <strong>{DAYS[modal.dayIndex]}</strong> ·{" "}
+                <strong>{formatShort(weekDates[modal.dayIndex])}</strong>
+              </div>
+
+              <div className="r-field">
+                <label className="r-label">Role</label>
+                <select
+                  className="r-select"
+                  value={modal.roleKey}
+                  onChange={(e) =>
+                    setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))
+                  }
+                >
+                  {roles.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="r-row">
+                <div className="r-field">
+                  <label className="r-label">Start</label>
+                  <input
+                    className="r-input"
+                    type="time"
+                    value={modal.start}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, start: e.target.value, error: "" }))
+                    }
+                  />
+                </div>
+                <div className="r-field">
+                  <label className="r-label">Finish</label>
+                  <input
+                    className="r-input"
+                    type="time"
+                    value={modal.end}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, end: e.target.value, error: "" }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {modal.error && (
+                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
+                  {modal.error}
+                </div>
+              )}
+
+              <div className="r-note">
+                Note: shifts for the same person/day can’t overlap. Add another block
+                for split shifts.
+              </div>
+            </div>
+
+            <div className="r-modal-ftr">
+              <button type="button" className="r-btn" onClick={closeModal}>
+                Cancel
+              </button>
+              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
