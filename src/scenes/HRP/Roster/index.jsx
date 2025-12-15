@@ -5,343 +5,309 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Shared brand styles for HRP pages ---------------- */
+/* ---------------- Simple, minimal styles (reduced colours) ---------------- */
 const BrandStyles = () => (
   <style>{`
-    .r-page {
-      padding: 20px;
-      min-height: 100vh;
-      background: radial-gradient(circle at top left, #eef2ff 0, #fdf2ff 40%, #f8fafc 80%);
+    .r-page{
+      min-height:100vh;
+      padding:16px;
+      background:#f6f7fb;
+      color:#0f172a;
     }
 
-    .r-layout {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: 260px minmax(0,1fr);
-      align-items: flex-start;
+    .r-layout{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 220px minmax(0,1fr);
+      align-items:start;
+      max-width: 1400px;
+      margin:0 auto;
     }
 
-    @media (max-width: 1024px) {
-      .r-layout {
-        grid-template-columns: minmax(0,1fr);
-      }
+    @media (max-width: 1024px){
+      .r-layout{ grid-template-columns: minmax(0,1fr); }
     }
 
-    .r-card {
+    .r-panel{
       background:#fff;
       border:1px solid #e5e7eb;
-      border-radius:18px;
-      box-shadow:0 18px 45px rgba(15,23,42,0.16);
+      border-radius:14px;
+      box-shadow:0 10px 26px rgba(15,23,42,0.08);
       overflow:hidden;
     }
 
-    .r-card-soft {
-      background:linear-gradient(135deg,#eef2ff,#f9fafb);
-      border-radius:18px;
-      border:1px solid rgba(148,163,184,0.25);
-      box-shadow:0 10px 30px rgba(129,140,248,0.20);
-      padding:14px 16px 16px;
-    }
+    .r-panel-body{ padding:12px; }
 
-    .r-hdr {
-      padding:16px 20px 14px;
-      border-bottom:1px solid #e5e7eb;
-      display:flex;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      background:linear-gradient(120deg,#4f46e5,#7c3aed,#ec4899);
-      color:#f9fafb;
-    }
-
-    .r-hdr-title {
-      font-size:22px;
-      font-weight:800;
-      margin:0;
-      letter-spacing:0.01em;
-    }
-    .r-hdr-sub {
-      font-size:13px;
-      opacity:0.9;
-      margin:3px 0 0;
-    }
-    .r-hdr-right {
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .r-chip {
-      border-radius:999px;
-      padding:4px 10px;
-      font-size:12px;
-      border:1px solid rgba(191,219,254,0.8);
-      color:#e0f2fe;
-      background:rgba(15,23,42,0.25);
-      backdrop-filter:blur(4px);
-    }
-
-    .r-btn {
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:8px 12px;
-      font-size:13px;
-      font-weight:700;
-      border-radius:999px;
-      border:1px solid transparent;
-      cursor:pointer;
-      background:#fff;
-      color:#0f172a;
-      transition:all .15s ease-out;
-    }
-    .r-btn-primary {
-      background:#f97316;
-      color:#111827;
-      border-color:#fed7aa;
-      box-shadow:0 6px 18px rgba(248,113,113,0.35);
-    }
-    .r-btn-primary:hover {
-      background:#ea580c;
-      transform:translateY(-1px);
-    }
-
-    .r-btn-soft {
-      background:#e0f2fe;
-      border-color:#bfdbfe;
-      color:#0f172a;
-    }
-    .r-btn-soft:hover {
-      background:#dbeafe;
-      transform:translateY(-0.5px);
-    }
-
-    .r-body {
-      padding:16px 20px 20px;
-      background:linear-gradient(180deg,#f9fafb,#eff6ff);
-    }
-
-    .r-toolbar {
-      margin-bottom:12px;
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      justify-content:space-between;
-    }
-    .r-toolbar-left,
-    .r-toolbar-right {
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .r-pill {
-      border-radius:999px;
-      padding:4px 10px;
-      font-size:12px;
-      background:linear-gradient(135deg,#22c55e,#a3e635);
-      color:#052e16;
-      font-weight:700;
-      box-shadow:0 4px 10px rgba(34,197,94,0.35);
-    }
-
-    .r-week-label {
-      font-weight:700;
-      color:#0f172a;
-      font-size:14px;
-    }
-
-    /* Employee palette */
-    .r-emp-title {
-      font-size:14px;
-      font-weight:700;
-      color:#0f172a;
+    /* Left: Team palette */
+    .r-emp-title{
       margin:0 0 6px;
+      font-size:13px;
+      font-weight:800;
+      letter-spacing:0.02em;
+      color:#111827;
+      text-transform:uppercase;
     }
-    .r-emp-sub {
+    .r-emp-sub{
+      margin:0 0 10px;
       font-size:12px;
-      color:#475569;
-      margin:0 0 12px;
+      color:#64748b;
+      line-height:1.35;
     }
 
-    .r-emp-list {
+    .r-emp-list{
       display:flex;
-      flex-wrap:wrap;
-      gap:6px;
-      max-height:520px;
+      flex-direction:column;
+      gap:8px;
+      max-height: calc(100vh - 130px);
       overflow:auto;
       padding-right:4px;
     }
 
-    .r-emp-chip {
+    .r-emp-chip{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid #e5e7eb;
+      background:#ffffff;
+      cursor:grab;
+      user-select:none;
+      transition:transform .08s ease-out, box-shadow .12s ease-out;
+    }
+    .r-emp-chip:hover{
+      box-shadow:0 10px 18px rgba(15,23,42,0.08);
+      transform:translateY(-1px);
+    }
+    .r-emp-chip:active{
+      cursor:grabbing;
+      transform:scale(0.99);
+    }
+    .r-emp-name{
+      font-size:13px;
+      font-weight:700;
+      color:#0f172a;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .r-emp-tag{
+      font-size:11px;
+      font-weight:800;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid #e5e7eb;
+      color:#334155;
+      background:#f8fafc;
+      flex:0 0 auto;
+    }
+
+    /* Right: Calendar takes most of the page */
+    .r-calendar-wrap{
+      background:#fff;
+      border:1px solid #e5e7eb;
+      border-radius:14px;
+      box-shadow:0 10px 26px rgba(15,23,42,0.08);
+      overflow:hidden;
+    }
+
+    .r-toolbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid #e5e7eb;
+      background:#ffffff;
+      flex-wrap:wrap;
+    }
+
+    .r-toolbar-left,
+    .r-toolbar-right{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .r-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:8px 10px;
+      font-size:13px;
+      font-weight:800;
+      border-radius:10px;
+      border:1px solid #e5e7eb;
+      background:#fff;
+      color:#0f172a;
+      cursor:pointer;
+      transition:transform .08s ease-out, box-shadow .12s ease-out, background .12s ease-out;
+    }
+    .r-btn:hover{
+      background:#f8fafc;
+      box-shadow:0 10px 18px rgba(15,23,42,0.08);
+      transform:translateY(-1px);
+    }
+
+    .r-btn-primary{
+      background:#111827;
+      border-color:#111827;
+      color:#fff;
+    }
+    .r-btn-primary:hover{
+      background:#0b1220;
+      border-color:#0b1220;
+    }
+
+    .r-week-label{
+      font-size:13px;
+      font-weight:800;
+      color:#0f172a;
+    }
+
+    .r-chip{
+      font-size:12px;
+      font-weight:800;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#f1f5f9;
+      border:1px solid #e5e7eb;
+      color:#334155;
+    }
+
+    /* Calendar grid */
+    .r-cal-grid{
+      display:grid;
+      grid-template-columns: 150px repeat(7, minmax(0, 1fr));
+      font-size:12px;
+      width:100%;
+    }
+
+    .r-cal-head-cell{
+      padding:10px 10px;
+      background:#f8fafc;
+      border-bottom:1px solid #e5e7eb;
+      border-right:1px solid #e5e7eb;
+      font-weight:900;
+      color:#0f172a;
+      text-align:center;
+    }
+    .r-cal-head-cell:first-of-type{
+      text-align:left;
+      color:#475569;
+    }
+
+    .r-cal-day-label{
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
+      color:#64748b;
+    }
+    .r-cal-day-date{
+      font-size:13px;
+      font-weight:900;
+      color:#0f172a;
+      margin-top:2px;
+    }
+
+    .r-cal-row-label{
+      padding:10px 10px;
+      border-right:1px solid #e5e7eb;
+      border-bottom:1px solid #e5e7eb;
+      background:#ffffff;
+      font-weight:900;
+      color:#334155;
+    }
+    .r-cal-row-sub{
+      display:block;
+      font-size:11px;
+      font-weight:700;
+      color:#94a3b8;
+      margin-top:2px;
+    }
+
+    .r-cal-slot{
+      min-height:110px; /* more space, calendar feels bigger */
+      padding:8px;
+      border-right:1px solid #e5e7eb;
+      border-bottom:1px solid #e5e7eb;
+      background:#ffffff;
+      transition:box-shadow .12s ease-out, background .12s ease-out;
+    }
+    .r-cal-slot:hover{
+      background:#fbfdff;
+    }
+    .r-cal-slot-dropping{
+      box-shadow: inset 0 0 0 2px #111827;
+      background:#f8fafc;
+    }
+
+    .r-slot-label{
+      font-size:11px;
+      color:#94a3b8;
+      margin-bottom:6px;
+      font-weight:700;
+    }
+
+    .r-slot-empty{
+      font-size:11px;
+      color:#cbd5e1;
+      font-style:italic;
+      margin-top:18px;
+      text-align:center;
+    }
+
+    .r-slot-badges{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+
+    /* Only a few badge colours */
+    .r-slot-badge{
       display:inline-flex;
       align-items:center;
       gap:6px;
       padding:6px 10px;
       border-radius:999px;
       font-size:12px;
-      font-weight:600;
-      cursor:grab;
-      border:1px solid rgba(148,163,184,0.7);
-      background:linear-gradient(135deg,#e0f2fe,#f5f3ff);
-      color:#0f172a;
-      box-shadow:0 4px 10px rgba(148,163,184,0.35);
-      user-select:none;
-    }
-    .r-emp-chip span.r-dot {
-      width:8px;
-      height:8px;
-      border-radius:999px;
-      background:linear-gradient(135deg,#22c55e,#a3e635);
-    }
-
-    .r-emp-chip:active {
-      cursor:grabbing;
-      transform:scale(0.97);
-    }
-
-    /* Calendar grid */
-    .r-calendar-wrap {
-      border-radius:16px;
-      overflow:hidden;
+      font-weight:800;
       border:1px solid #e5e7eb;
-      background:#f9fafb;
-      box-shadow:0 10px 28px rgba(148,163,184,0.3);
+      box-shadow:0 6px 14px rgba(15,23,42,0.08);
+      max-width: 100%;
+    }
+    .r-slot-badge span{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: 160px;
     }
 
-    .r-cal-grid {
-      display:grid;
-      grid-template-columns: 150px repeat(7, minmax(0, 1fr));
-      border-collapse:separate;
-      border-spacing:0;
-      font-size:12px;
-    }
+    .r-badge-a{ background:#eef2ff; color:#1e1b4b; border-color:#c7d2fe; } /* indigo */
+    .r-badge-b{ background:#ecfeff; color:#083344; border-color:#a5f3fc; } /* cyan */
+    .r-badge-c{ background:#f1f5f9; color:#0f172a; border-color:#e5e7eb; } /* slate */
 
-    .r-cal-head-cell {
-      padding:10px 10px 8px;
-      background:linear-gradient(135deg,#eef2ff,#e0f2fe);
-      border-bottom:1px solid #d4d4d8;
-      border-right:1px solid #e5e7eb;
-      font-weight:700;
-      color:#0f172a;
-      text-align:center;
-    }
-    .r-cal-head-cell:first-of-type {
-      text-align:left;
-      font-weight:700;
-      color:#4b5563;
-    }
-
-    .r-cal-day-label {
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:0.08em;
-      color:#4b5563;
-    }
-    .r-cal-day-date {
-      font-size:13px;
-      font-weight:700;
-      color:#1f2937;
-      margin-top:2px;
-    }
-
-    .r-cal-row-label {
-      padding:10px 10px;
-      border-right:1px solid #e5e7eb;
-      border-bottom:1px solid #e5e7eb;
-      background:linear-gradient(180deg,#faf5ff,#f9fafb);
-      font-weight:700;
-      color:#4b5563;
-    }
-    .r-cal-row-label span {
-      display:block;
-    }
-    .r-cal-row-sub {
-      font-size:11px;
-      color:#6b7280;
-      margin-top:2px;
-      font-weight:500;
-    }
-
-    .r-cal-slot {
-      min-height:86px;
-      padding:6px 6px 8px;
-      border-right:1px solid #e5e7eb;
-      border-bottom:1px solid #e5e7eb;
-      background:radial-gradient(circle at top left,#f9fafb 0,#eff6ff 45%,#f9fafb 100%);
-      position:relative;
-      transition:background .15s ease-out, box-shadow .15s ease-out, transform .08s ease-out;
-    }
-
-    .r-cal-slot-dropping {
-      background:radial-gradient(circle at top,#e0f2fe 0,#eef2ff 40%,#f9fafb 100%);
-      box-shadow:inset 0 0 0 2px #3b82f6;
-      transform:scale(1.01);
-    }
-
-    .r-slot-label {
-      font-size:11px;
-      color:#9ca3af;
-      margin-bottom:4px;
-    }
-
-    .r-slot-empty {
-      font-size:11px;
-      color:#cbd5f5;
-      font-style:italic;
-      margin-top:14px;
-      text-align:center;
-    }
-
-    .r-slot-badges {
-      display:flex;
-      flex-wrap:wrap;
-      gap:4px;
-    }
-
-    .r-slot-badge {
-      display:inline-flex;
-      align-items:center;
-      gap:4px;
-      padding:4px 8px;
-      border-radius:999px;
-      font-size:11px;
-      font-weight:600;
-      background:linear-gradient(135deg,#a855f7,#f97316);
-      color:#f9fafb;
-      box-shadow:0 4px 10px rgba(129,140,248,0.45);
-      cursor:default;
-    }
-    .r-slot-badge button {
+    .r-slot-badge button{
       border:none;
       background:transparent;
-      color:#fee2e2;
       cursor:pointer;
+      font-weight:900;
+      color:inherit;
+      opacity:0.55;
       padding:0;
       line-height:1;
-      font-size:12px;
+      flex:0 0 auto;
     }
-    .r-slot-badge button:hover {
-      color:#fecaca;
-    }
+    .r-slot-badge button:hover{ opacity:0.9; }
 
-    .r-footnote {
-      margin-top:10px;
-      font-size:12px;
-      color:#6b7280;
-    }
-
-    @media (max-width: 900px) {
-      .r-cal-grid {
-        font-size:11px;
-      }
-      .r-cal-head-cell { padding:8px 6px; }
-      .r-cal-row-label { padding:8px 6px; }
-      .r-cal-slot { min-height:72px; padding:4px; }
+    @media (max-width: 900px){
+      .r-cal-grid{ font-size:11px; }
+      .r-cal-slot{ min-height:90px; }
+      .r-cal-head-cell{ padding:8px 6px; }
+      .r-cal-row-label{ padding:8px 6px; }
+      .r-slot-badge span{ max-width: 120px; }
     }
   `}</style>
 );
@@ -350,7 +316,6 @@ const BrandStyles = () => (
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Fixed time bands for calendar rows
 const BANDS = [
   { key: "morning", label: "Morning", hours: "06:00 – 14:00" },
   { key: "day", label: "Day", hours: "08:00 – 16:00" },
@@ -384,6 +349,13 @@ function formatRangeLabel(weekStart) {
   return `${start} – ${end}`;
 }
 
+function badgeClassForEmployee(employeeId) {
+  const n = Math.abs(Number(employeeId || 0)) % 3;
+  if (n === 0) return "r-badge-a";
+  if (n === 1) return "r-badge-b";
+  return "r-badge-c";
+}
+
 /* ---------------- Main Roster Component ---------------- */
 
 const Roster = () => {
@@ -397,7 +369,6 @@ const Roster = () => {
   const [assignments, setAssignments] = useState({});
   const [dragOverSlot, setDragOverSlot] = useState(null); // {dayIndex, bandKey} or null
 
-  // Load employees once
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -440,9 +411,7 @@ const Roster = () => {
     setAssignments((prev) => {
       const day = prev[dayIndex] ? { ...prev[dayIndex] } : {};
       const bandArr = day[bandKey] ? [...day[bandKey]] : [];
-      if (!bandArr.includes(employeeId)) {
-        bandArr.push(employeeId);
-      }
+      if (!bandArr.includes(employeeId)) bandArr.push(employeeId);
       day[bandKey] = bandArr;
       return { ...prev, [dayIndex]: day };
     });
@@ -454,19 +423,13 @@ const Roster = () => {
     setAssignments((prev) => {
       const day = prev[dayIndex] ? { ...prev[dayIndex] } : {};
       const bandArr = day[bandKey] ? [...day[bandKey]] : [];
-      const nextArr = bandArr.filter((id) => id !== employeeId);
-      day[bandKey] = nextArr;
+      day[bandKey] = bandArr.filter((id) => id !== employeeId);
       return { ...prev, [dayIndex]: day };
     });
   };
 
-  const goPrevWeek = () => {
-    setWeekStart((prev) => addDays(prev, -7));
-  };
-
-  const goNextWeek = () => {
-    setWeekStart((prev) => addDays(prev, 7));
-  };
+  const goPrevWeek = () => setWeekStart((prev) => addDays(prev, -7));
+  const goNextWeek = () => setWeekStart((prev) => addDays(prev, 7));
 
   const handleSaveRoster = async () => {
     const payload = {
@@ -476,9 +439,7 @@ const Roster = () => {
         day_index: Number(dayIndexStr), // 0=Mon..6=Sun
         slots: Object.entries(bands).map(([bandKey, employeeIds]) => ({
           band_key: bandKey,
-          employees: employeeIds.map((id) => ({
-            employee_id: id,
-          })),
+          employees: employeeIds.map((id) => ({ employee_id: id })),
         })),
       })),
     };
@@ -512,201 +473,151 @@ const Roster = () => {
 
       <div className="r-layout">
         {/* LEFT: Employee palette */}
-        <div className="r-card-soft">
-          <h3 className="r-emp-title">Team</h3>
-          <p className="r-emp-sub">
-            Drag an employee into a time slot for the week. You can schedule them on
-            multiple days.
-          </p>
+        <div className="r-panel">
+          <div className="r-panel-body">
+            <h3 className="r-emp-title">Team</h3>
+            <p className="r-emp-sub">
+              Drag an employee into a slot. Keep it simple + consistent.
+            </p>
 
-          <div className="r-emp-list">
-            {loadingEmployees && <span>Loading employees…</span>}
-            {!loadingEmployees && employees.length === 0 && (
-              <span>No employees yet. Add them in HRP → Employees.</span>
-            )}
-            {employees.map((emp) => (
-              <div
-                key={emp.id}
-                className="r-emp-chip"
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("text/plain", String(emp.id));
-                  // to help browsers know it's copy, not move
-                  if (e.dataTransfer.setDragImage) {
-                    // optional custom drag image
-                  }
-                }}
-              >
-                <span className="r-dot" />
-                <span>{emp.full_name}</span>
-              </div>
-            ))}
+            <div className="r-emp-list">
+              {loadingEmployees && <span>Loading employees…</span>}
+              {!loadingEmployees && employees.length === 0 && (
+                <span>No employees yet. Add them in HRP → Employees.</span>
+              )}
+
+              {employees.map((emp) => (
+                <div
+                  key={emp.id}
+                  className="r-emp-chip"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", String(emp.id));
+                  }}
+                  title="Drag into calendar"
+                >
+                  <span className="r-emp-name">{emp.full_name}</span>
+                  <span className="r-emp-tag">Drag</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* RIGHT: Calendar */}
-        <div className="r-card">
-          {/* Header */}
-          <div className="r-hdr">
-            <div>
-              <h1 className="r-hdr-title">Roster Calendar</h1>
-              <p className="r-hdr-sub">
-                Colourful weekly view of who&apos;s in the building and when.
-              </p>
-            </div>
-
-            <div className="r-hdr-right">
+        {/* RIGHT: Calendar (dominant) */}
+        <div className="r-calendar-wrap">
+          {/* Minimal toolbar (no big header) */}
+          <div className="r-toolbar">
+            <div className="r-toolbar-left">
+              <button type="button" className="r-btn" onClick={goPrevWeek}>
+                ← Prev
+              </button>
+              <button type="button" className="r-btn" onClick={goNextWeek}>
+                Next →
+              </button>
               <span className="r-chip">
                 {loadingEmployees
-                  ? "Loading employees…"
-                  : `${employees.length} team member${
-                      employees.length === 1 ? "" : "s"
-                    }`}
+                  ? "Loading…"
+                  : `${employees.length} staff`}
+              </span>
+            </div>
+
+            <div className="r-toolbar-right">
+              <span className="r-week-label">
+                Week of {formatShort(weekStart)} ({formatRangeLabel(weekStart)})
               </span>
               <button
                 type="button"
                 className="r-btn r-btn-primary"
                 onClick={handleSaveRoster}
               >
-                Save Roster
+                Save
               </button>
             </div>
           </div>
 
-          {/* Body */}
-          <div className="r-body">
-            {/* Toolbar: week navigation */}
-            <div className="r-toolbar">
-              <div className="r-toolbar-left">
-                <button
-                  type="button"
-                  className="r-btn r-btn-soft"
-                  onClick={goPrevWeek}
-                >
-                  ← Previous week
-                </button>
-                <button
-                  type="button"
-                  className="r-btn r-btn-soft"
-                  onClick={goNextWeek}
-                >
-                  Next week →
-                </button>
+          {/* Calendar grid */}
+          <div className="r-cal-grid">
+            {/* Header row */}
+            <div className="r-cal-head-cell">Band / Time</div>
+            {DAYS.map((day, idx) => (
+              <div key={day} className="r-cal-head-cell">
+                <div className="r-cal-day-label">{day}</div>
+                <div className="r-cal-day-date">{formatShort(weekDates[idx])}</div>
               </div>
+            ))}
 
-              <div className="r-toolbar-right">
-                <span className="r-week-label">
-                  Week of {formatShort(weekStart)} ({formatRangeLabel(weekStart)})
-                </span>
-                <span className="r-pill">Mon – Sun · Drag & Drop</span>
-              </div>
-            </div>
-
-            {/* Calendar grid */}
-            <div className="r-calendar-wrap">
-              <div className="r-cal-grid">
-                {/* Header row */}
-                <div className="r-cal-head-cell">
-                  Band / Time
+            {/* Rows per band */}
+            {BANDS.map((band) => (
+              <React.Fragment key={band.key}>
+                <div className="r-cal-row-label">
+                  {band.label}
+                  <span className="r-cal-row-sub">{band.hours}</span>
                 </div>
-                {DAYS.map((day, idx) => (
-                  <div key={day} className="r-cal-head-cell">
-                    <div className="r-cal-day-label">{day}</div>
-                    <div className="r-cal-day-date">
-                      {formatShort(weekDates[idx])}
-                    </div>
-                  </div>
-                ))}
 
-                {/* Rows per band */}
-                {BANDS.map((band) => (
-                  <React.Fragment key={band.key}>
-                    {/* Row label */}
-                    <div className="r-cal-row-label">
-                      <span>{band.label}</span>
-                      <span className="r-cal-row-sub">{band.hours}</span>
-                    </div>
+                {DAYS.map((day, dayIndex) => {
+                  const slotEmployees = assignments[dayIndex]?.[band.key] || [];
+                  const isDropping =
+                    dragOverSlot &&
+                    dragOverSlot.dayIndex === dayIndex &&
+                    dragOverSlot.bandKey === band.key;
 
-                    {/* Slots per day */}
-                    {DAYS.map((day, dayIndex) => {
-                      const slotEmployees =
-                        assignments[dayIndex]?.[band.key] || [];
-                      const isDropping =
-                        dragOverSlot &&
-                        dragOverSlot.dayIndex === dayIndex &&
-                        dragOverSlot.bandKey === band.key;
+                  return (
+                    <div
+                      key={`${band.key}-${day}`}
+                      className={"r-cal-slot" + (isDropping ? " r-cal-slot-dropping" : "")}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverSlot({ dayIndex, bandKey: band.key });
+                      }}
+                      onDragLeave={() => {
+                        setTimeout(() => {
+                          setDragOverSlot((current) => {
+                            if (
+                              current &&
+                              current.dayIndex === dayIndex &&
+                              current.bandKey === band.key
+                            ) {
+                              return null;
+                            }
+                            return current;
+                          });
+                        }, 30);
+                      }}
+                      onDrop={(e) => handleShiftDrop(e, dayIndex, band.key)}
+                    >
+                      <div className="r-slot-label">Drop here</div>
 
-                      return (
-                        <div
-                          key={`${band.key}-${day}`}
-                          className={
-                            "r-cal-slot" +
-                            (isDropping ? " r-cal-slot-dropping" : "")
-                          }
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragOverSlot({ dayIndex, bandKey: band.key });
-                          }}
-                          onDragLeave={(e) => {
-                            // leave may fire when hovering children; small delay avoid flicker
-                            setTimeout(() => {
-                              setDragOverSlot((current) => {
-                                if (
-                                  current &&
-                                  current.dayIndex === dayIndex &&
-                                  current.bandKey === band.key
-                                ) {
-                                  return null;
+                      {slotEmployees.length === 0 ? (
+                        <div className="r-slot-empty">Empty</div>
+                      ) : (
+                        <div className="r-slot-badges">
+                          {slotEmployees.map((empId) => (
+                            <div
+                              key={empId}
+                              className={`r-slot-badge ${badgeClassForEmployee(empId)}`}
+                              title={getEmployeeName(empId)}
+                            >
+                              <span>{getEmployeeName(empId)}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveFromSlot(dayIndex, band.key, empId)
                                 }
-                                return current;
-                              });
-                            }, 30);
-                          }}
-                          onDrop={(e) => handleShiftDrop(e, dayIndex, band.key)}
-                        >
-                          <div className="r-slot-label">Drop staff here</div>
-
-                          {slotEmployees.length === 0 ? (
-                            <div className="r-slot-empty">No one assigned</div>
-                          ) : (
-                            <div className="r-slot-badges">
-                              {slotEmployees.map((empId) => (
-                                <div
-                                  key={empId}
-                                  className="r-slot-badge"
-                                  title={getEmployeeName(empId)}
-                                >
-                                  <span>{getEmployeeName(empId)}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveFromSlot(
-                                        dayIndex,
-                                        band.key,
-                                        empId
-                                      )
-                                    }
-                                    aria-label="Remove"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                                aria-label="Remove"
+                                title="Remove"
+                              >
+                                ×
+                              </button>
                             </div>
-                          )}
+                          ))}
                         </div>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-
-            <div className="r-footnote">
-              Tip: keep your time bands consistent (Morning / Day / Evening) so you
-              can later translate this roster into labour cost forecasts and
-              production capacity planning.
-            </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </div>
