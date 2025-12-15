@@ -1,14 +1,7 @@
 // src/components/Sidebar/index.jsx
 import { useEffect, useMemo, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import {
-  Box,
-  IconButton,
-  Typography,
-  useTheme,
-  Tooltip,
-  Divider,
-} from "@mui/material";
+import { Box, IconButton, Typography, useTheme, Tooltip, Divider } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link, useLocation } from "react-router-dom";
 import { tokens } from "../../themes";
@@ -110,7 +103,6 @@ const LockedItem = ({
       active={active}
       style={{ listStyleType: "none" }}
       onClick={(e) => {
-        // react-pro-sidebar passes synthetic; be safe
         if (!unlocked) {
           e?.preventDefault?.();
           requestUnlock();
@@ -142,7 +134,6 @@ const LockedItem = ({
           {title}
         </Typography>
 
-        {/* lock badge (only when locked) */}
         {!unlocked && (
           <Box
             sx={{
@@ -162,7 +153,7 @@ const LockedItem = ({
             title="Locked"
           >
             <LockRoundedIcon sx={{ fontSize: 16 }} />
-            {!unlocked ? "Locked" : ""}
+            Locked
           </Box>
         )}
       </Link>
@@ -178,9 +169,9 @@ const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
 
-  // Dropdown states
-  const [mrpOpen, setMrpOpen] = useState(true);
-  const [hrpOpen, setHrpOpen] = useState(true);
+  // ✅ start CLOSED so user sees nothing until dropdown clicked
+  const [mrpOpen, setMrpOpen] = useState(false);
+  const [hrpOpen, setHrpOpen] = useState(false);
 
   // 🔒 HRP unlocked state (persisted)
   const [hrpUnlocked, setHrpUnlocked] = useState(() => {
@@ -198,7 +189,7 @@ const Sidebar = () => {
       "HRP is under construction.\n\nEnter access code to unlock (dev):"
     );
 
-    if (code === null) return; // cancelled
+    if (code === null) return;
 
     if (String(code).trim() === HRP_ACCESS_CODE) {
       try {
@@ -230,9 +221,7 @@ const Sidebar = () => {
         if (!mounted) return;
         const firstName =
           attrs?.given_name ||
-          (attrs?.name
-            ? String(attrs.name).trim().split(/\s+/).slice(0, -1).join(" ")
-            : "");
+          (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(0, -1).join(" ") : "");
         const lastName =
           attrs?.family_name ||
           (attrs?.name ? String(attrs.name).trim().split(/\s+/).slice(-1)[0] : "");
@@ -265,7 +254,6 @@ const Sidebar = () => {
       "/stock_usage": "Stock Usage",
       "/goods_out": "Goods Out",
 
-      // HRP (routes you already have)
       "/Employees": "Employees",
       "/Roles": "Roles",
       "/hrp/roles": "Roles",
@@ -279,7 +267,8 @@ const Sidebar = () => {
     if (matchedTitle) setSelected(matchedTitle);
   }, [location.pathname]);
 
-  // Auto-open correct dropdown based on route
+  // ✅ keep auto-open ONLY if user is already on that section’s route
+  // (so direct URL still shows the active item)
   useEffect(() => {
     const path = location.pathname;
 
@@ -310,9 +299,8 @@ const Sidebar = () => {
     (profileLoading ? "Loading…" : "—");
   const subtitle = profileLoading
     ? "Loading…"
-    : [profile.jobTitle, profile.company ? `at ${profile.company}` : ""]
-        .filter(Boolean)
-        .join(" ") || "—";
+    : [profile.jobTitle, profile.company ? `at ${profile.company}` : ""].filter(Boolean).join(" ") ||
+      "—";
 
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
@@ -413,19 +401,14 @@ const Sidebar = () => {
           position: "fixed",
           height: "100vh",
           zIndex: 1000,
-
           borderRight: `1px solid ${brand.border}`,
           background: brand.surfaceMuted,
 
-          "& .pro-sidebar-inner": {
-            background: `${brand.surface} !important`,
-            boxShadow: "none",
+          "& .pro-sidebar-inner": { background: `${brand.surface} !important`, boxShadow: "none" },
+          "& .pro-sidebar-layout": { background: "transparent !important" },
+          "& .pro-sidebar > .pro-sidebar-inner > .pro-sidebar-layout .pro-sidebar-header": {
+            border: "none",
           },
-          "& .pro-sidebar-layout": {
-            background: "transparent !important",
-          },
-          "& .pro-sidebar > .pro-sidebar-inner > .pro-sidebar-layout .pro-sidebar-header":
-            { border: "none" },
 
           "& .pro-icon-wrapper": {
             backgroundColor: "transparent !important",
@@ -437,22 +420,19 @@ const Sidebar = () => {
             borderRadius: "12px",
             color: `${brand.text} !important`,
           },
-          "& .pro-inner-item > a": {
-            color: `${brand.text} !important`,
-          },
+          "& .pro-inner-item > a": { color: `${brand.text} !important` },
           "& .pro-inner-item:hover": {
             background: `${brand.hover} !important`,
             color: `${brand.text} !important`,
           },
-          "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover":
-            {
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
-              color: `#fff !important`,
-              boxShadow:
-                "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)",
-            },
-          "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg":
-            { color: `#fff !important` },
+          "& .pro-menu-item.active .pro-inner-item, & .pro-menu-item.active .pro-inner-item:hover": {
+            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}) !important`,
+            color: `#fff !important`,
+            boxShadow: "0 8px 16px rgba(29,78,216,0.20), 0 2px 4px rgba(15,23,42,0.06)",
+          },
+          "& .pro-menu-item.active .pro-icon-wrapper, & .pro-menu-item.active svg": {
+            color: `#fff !important`,
+          },
         }}
       >
         <ProSidebar collapsed={isCollapsed}>
@@ -461,10 +441,7 @@ const Sidebar = () => {
             <MenuItem
               onClick={() => setIsCollapsed(!isCollapsed)}
               icon={<MenuOutlinedIcon />}
-              style={{
-                margin: "10px 10px 16px",
-                color: brand.text,
-              }}
+              style={{ margin: "10px 10px 16px", color: brand.text }}
             >
               {!isCollapsed && (
                 <Box display="flex" justifyContent="flex-end" alignItems="center" ml="8px">
@@ -521,7 +498,7 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
 
-              {/* MRP dropdown */}
+              {/* MRP dropdown (children hidden unless opened) */}
               <SectionHeader
                 label="MRP"
                 icon={<FolderOutlinedIcon fontSize="small" />}
@@ -531,59 +508,17 @@ const Sidebar = () => {
 
               {mrpOpen && (
                 <>
-                  <Item
-                    title="Goods In"
-                    to="/GoodsIn"
-                    icon={<LocalShippingOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Ingredients Inventory"
-                    to="/IngredientsInventory"
-                    icon={<BakeryDiningOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Recipes"
-                    to="/recipes"
-                    icon={<DescriptionOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Stock Inventory"
-                    to="/stock_inventory"
-                    icon={<WarehouseOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Daily Production"
-                    to="/daily_production"
-                    icon={<AddOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Stock Usage"
-                    to="/stock_usage"
-                    icon={<InventoryOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
-                  <Item
-                    title="Goods Out"
-                    to="/goods_out"
-                    icon={<NoCrashOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                  />
+                  <Item title="Goods In" to="/GoodsIn" icon={<LocalShippingOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Ingredients Inventory" to="/IngredientsInventory" icon={<BakeryDiningOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Recipes" to="/recipes" icon={<DescriptionOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Stock Inventory" to="/stock_inventory" icon={<WarehouseOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Daily Production" to="/daily_production" icon={<AddOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Stock Usage" to="/stock_usage" icon={<InventoryOutlinedIcon />} selected={selected} setSelected={setSelected} />
+                  <Item title="Goods Out" to="/goods_out" icon={<NoCrashOutlinedIcon />} selected={selected} setSelected={setSelected} />
                 </>
               )}
 
-              {/* HRP dropdown */}
+              {/* HRP dropdown (children hidden unless opened) */}
               <SectionHeader
                 label="HRP"
                 icon={<GroupWorkOutlinedIcon fontSize="small" />}
@@ -593,52 +528,11 @@ const Sidebar = () => {
 
               {hrpOpen && (
                 <>
-                  {/* 🔒 Locked HRP pages (dev gate) */}
-                  <LockedItem
-                    title="Roster"
-                    to="/Roster"
-                    icon={<CalendarMonthOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                  />
-                  <LockedItem
-                    title="Employees"
-                    to="/Employees"
-                    icon={<PeopleAltOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                  />
-                  <LockedItem
-                    title="Roles"
-                    to="/Roles"
-                    icon={<BadgeOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                  />
-                  <LockedItem
-                    title="Skills & Training"
-                    to="/hrp/skills"
-                    icon={<SchoolOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                  />
-                  <LockedItem
-                    title="Leave Requests"
-                    to="/hrp/leave"
-                    icon={<EventNoteOutlinedIcon />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                  />
+                  <LockedItem title="Roster" to="/Roster" icon={<CalendarMonthOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                  <LockedItem title="Employees" to="/Employees" icon={<PeopleAltOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                  <LockedItem title="Roles" to="/Roles" icon={<BadgeOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                  <LockedItem title="Skills & Training" to="/hrp/skills" icon={<SchoolOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                  <LockedItem title="Leave Requests" to="/hrp/leave" icon={<EventNoteOutlinedIcon />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
                 </>
               )}
             </Box>

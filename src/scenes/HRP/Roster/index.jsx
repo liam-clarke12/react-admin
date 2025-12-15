@@ -302,9 +302,11 @@ const Styles = () => (
       position:relative;
     }
     .r-cell:hover{ background:#fbfdff; }
+
+    /* ✅ when dragging over: use role dot color (bd) */
     .r-cell-dropping{
-      box-shadow: inset 0 0 0 2px #111827;
-      background:#f8fafc;
+      background: var(--drop-bg, #f8fafc);
+      box-shadow: inset 0 0 0 2px var(--drop-bd, #111827);
     }
 
     .r-cell-empty{
@@ -321,43 +323,30 @@ const Styles = () => (
       gap:8px;
     }
 
+    /* ✅ Flat blocks using the exact dot color (bd) */
     .r-shift{
-      border-radius:14px;
+      border-radius:12px;
       padding:10px 12px;
       display:flex;
       justify-content:space-between;
       align-items:flex-start;
       gap:10px;
-      box-shadow: 0 14px 28px rgba(15,23,42,0.16);
       position:relative;
       overflow:hidden;
-      background: var(--bg);
-      color: var(--fg);
-      border: 2px solid var(--bd);
-    }
-    .r-shift::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background: linear-gradient(120deg, rgba(255,255,255,0.35), rgba(255,255,255,0.0) 55%);
-      pointer-events:none;
-      mix-blend-mode: overlay;
-    }
-    .r-shift::after{
-      content:"";
-      position:absolute;
-      left:0;
-      top:0;
-      bottom:0;
-      width:8px;
-      background: var(--bd);
-      opacity:0.95;
-      pointer-events:none;
+
+      background: var(--bd);      /* exact same colour as dot */
+      color: #ffffff;
+
+      border: 1px solid rgba(15,23,42,0.10);
+      box-shadow: 0 10px 18px rgba(15,23,42,0.10);
     }
 
-    .r-shift-left{ min-width:0; padding-left:2px; }
+    /* remove glossy stripe + left bar (no neon/shiny look) */
+    .r-shift::before, .r-shift::after{ content:none !important; }
+
+    .r-shift-left{ min-width:0; }
     .r-shift-role{
-      font-weight:1000;
+      font-weight:950;
       font-size:12px;
       line-height:1.2;
       margin:0;
@@ -365,27 +354,25 @@ const Styles = () => (
       overflow:hidden;
       text-overflow:ellipsis;
       max-width: 160px;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.06);
     }
     .r-shift-time{
       margin-top:5px;
       font-size:11px;
-      font-weight:950;
+      font-weight:800;
       white-space:nowrap;
       opacity:0.95;
     }
 
     .r-icon-btn{
       border:none;
-      background:rgba(255,255,255,0.25);
+      background:rgba(255,255,255,0.22);
       cursor:pointer;
       font-weight:1000;
       color:inherit;
       padding:6px 8px;
       line-height:1;
       border-radius:999px;
-      opacity:0.9;
-      box-shadow:0 10px 18px rgba(15,23,42,0.16);
+      opacity:0.95;
       flex:0 0 auto;
     }
     .r-icon-btn:hover{ opacity:1; transform: translateY(-1px); }
@@ -746,7 +733,7 @@ const Roster = () => {
               <div className="r-block">
                 <div className="r-title">Team</div>
                 <p className="r-sub">
-                  Rows are people. Columns are days. Shifts show strong role colours.
+                  Rows are people. Columns are days. Blocks use the same colour as the role dot.
                 </p>
 
                 <div className="r-emp-list">
@@ -818,13 +805,36 @@ const Roster = () => {
                     dragOverCell.employeeId === emp.id &&
                     dragOverCell.dayIndex === dayIndex;
 
+                  // 👇 if dropping, colour the cell with the role dot colour
+                  const cellDropStyle = isDropping
+                    ? {
+                        ["--drop-bg"]: dragOverCell?.roleBd
+                          ? `${dragOverCell.roleBd}22` // soft tint of dot colour
+                          : "#f8fafc",
+                        ["--drop-bd"]: dragOverCell?.roleBd || "#111827",
+                      }
+                    : undefined;
+
                   return (
                     <div
                       key={`${emp.id}-${dayIndex}`}
                       className={"r-cell" + (isDropping ? " r-cell-dropping" : "")}
+                      style={cellDropStyle}
                       onDragOver={(e) => {
                         e.preventDefault();
-                        setDragOverCell({ employeeId: emp.id, dayIndex });
+                        // read dragged roleKey to find the bd (dot) colour
+                        const raw = e.dataTransfer.getData("application/x-roster-role");
+                        let roleBd = null;
+                        if (raw) {
+                          try {
+                            const parsed = JSON.parse(raw);
+                            const rk = parsed?.roleKey;
+                            roleBd = roles.find((r) => r.key === rk)?.style?.bd || null;
+                          } catch {
+                            // ignore
+                          }
+                        }
+                        setDragOverCell({ employeeId: emp.id, dayIndex, roleBd });
                       }}
                       onDragLeave={() => {
                         setTimeout(() => {
@@ -842,9 +852,8 @@ const Roster = () => {
                       }}
                       onDrop={(e) => {
                         e.preventDefault();
-                        setDragOverCell(null);
-
                         const raw = e.dataTransfer.getData("application/x-roster-role");
+                        setDragOverCell(null);
                         if (!raw) return;
 
                         try {
@@ -864,21 +873,13 @@ const Roster = () => {
                         <div className="r-shifts">
                           {shifts.map((s) => {
                             const role = roles.find((r) => r.key === s.roleKey);
-                            const style = role?.style || {
-                              bg: "#0F172A",
-                              fg: "#FFFFFF",
-                              bd: "#111827",
-                            };
+                            const bd = role?.style?.bd || "#111827";
 
                             return (
                               <div
                                 key={s.id}
                                 className="r-shift"
-                                style={{
-                                  ["--bg"]: style.bg,
-                                  ["--fg"]: style.fg,
-                                  ["--bd"]: style.bd,
-                                }}
+                                style={{ ["--bd"]: bd }}
                                 title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
                                 <div className="r-shift-left">
@@ -992,7 +993,6 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              {/* ✅ Add button is brand purple via r-btn-primary */}
               <button
                 type="button"
                 className="r-btn r-btn-primary"
