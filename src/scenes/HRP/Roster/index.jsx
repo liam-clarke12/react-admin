@@ -8,6 +8,13 @@ const API_BASE =
 /* ---------------- Simple, minimal styles ---------------- */
 const Styles = () => (
   <style>{`
+    :root{
+      /* Dae "nory purple" */
+      --dae-purple:#7C3AED;
+      --dae-purple-dark:#5B21B6;
+      --dae-purple-ring: rgba(124,58,237,0.22);
+    }
+
     .r-page{
       min-height:100vh;
       padding:16px;
@@ -88,12 +95,22 @@ const Styles = () => (
       box-shadow:0 10px 18px rgba(15,23,42,0.08);
       transform:translateY(-1px);
     }
+
+    /* ✅ Brand primary */
     .r-btn-primary{
-      background:#111827;
-      border-color:#111827;
+      background:var(--dae-purple);
+      border-color:var(--dae-purple);
       color:#fff;
+      box-shadow:0 12px 24px rgba(124,58,237,0.22);
     }
-    .r-btn-primary:hover{ background:#0b1220; border-color:#0b1220; }
+    .r-btn-primary:hover{
+      background:var(--dae-purple-dark);
+      border-color:var(--dae-purple-dark);
+    }
+    .r-btn-primary:focus{
+      outline:none;
+      box-shadow:0 0 0 4px var(--dae-purple-ring), 0 12px 24px rgba(124,58,237,0.22);
+    }
 
     .r-chip{
       font-size:12px;
@@ -304,7 +321,6 @@ const Styles = () => (
       gap:8px;
     }
 
-    /* 🔥 Stronger, punchier shift blocks */
     .r-shift{
       border-radius:14px;
       padding:10px 12px;
@@ -315,16 +331,10 @@ const Styles = () => (
       box-shadow: 0 14px 28px rgba(15,23,42,0.16);
       position:relative;
       overflow:hidden;
-
-      /* vars provided inline */
       background: var(--bg);
       color: var(--fg);
-
-      /* thick outline + subtle inner highlight */
       border: 2px solid var(--bd);
     }
-
-    /* glossy accent stripe */
     .r-shift::before{
       content:"";
       position:absolute;
@@ -333,8 +343,6 @@ const Styles = () => (
       pointer-events:none;
       mix-blend-mode: overlay;
     }
-
-    /* left colour bar for even more pop */
     .r-shift::after{
       content:"";
       position:absolute;
@@ -444,8 +452,8 @@ const Styles = () => (
       outline:none;
     }
     .r-input:focus, .r-select:focus{
-      box-shadow:0 0 0 3px rgba(17,24,39,0.08);
-      border-color:#cbd5e1;
+      box-shadow:0 0 0 4px var(--dae-purple-ring);
+      border-color: rgba(124,58,237,0.45);
     }
     .r-row{
       display:grid;
@@ -526,29 +534,13 @@ function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-/* ---------------- Roles (🔥 more saturated + high-contrast) ---------------- */
+/* ---------------- Roles ---------------- */
 
 const DEFAULT_ROLES = [
-  {
-    key: "production",
-    name: "Production",
-    style: { bg: "#312E81", fg: "#FFFFFF", bd: "#6366F1" }, // indigo
-  },
-  {
-    key: "packing",
-    name: "Packing",
-    style: { bg: "#0F766E", fg: "#FFFFFF", bd: "#2DD4BF" }, // teal
-  },
-  {
-    key: "dispatch",
-    name: "Dispatch",
-    style: { bg: "#9A3412", fg: "#FFFFFF", bd: "#FB923C" }, // orange
-  },
-  {
-    key: "admin",
-    name: "Admin",
-    style: { bg: "#86198F", fg: "#FFFFFF", bd: "#F472B6" }, // magenta
-  },
+  { key: "production", name: "Production", style: { bg: "#312E81", fg: "#FFFFFF", bd: "#6366F1" } },
+  { key: "packing", name: "Packing", style: { bg: "#0F766E", fg: "#FFFFFF", bd: "#2DD4BF" } },
+  { key: "dispatch", name: "Dispatch", style: { bg: "#9A3412", fg: "#FFFFFF", bd: "#FB923C" } },
+  { key: "admin", name: "Admin", style: { bg: "#86198F", fg: "#FFFFFF", bd: "#F472B6" } },
 ];
 
 /* ---------------- Main Component ---------------- */
@@ -560,13 +552,9 @@ const Roster = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(new Date()));
-
-  // assignments[employeeId][dayIndex] = [{ id, roleKey, start, end }, ...]
   const [assignments, setAssignments] = useState({});
+  const [dragOverCell, setDragOverCell] = useState(null);
 
-  const [dragOverCell, setDragOverCell] = useState(null); // {employeeId, dayIndex} or null
-
-  // role drop modal state
   const [modal, setModal] = useState({
     open: false,
     employeeId: null,
@@ -610,8 +598,6 @@ const Roster = () => {
     const emp = employees.find((e) => e.id === id);
     return emp?.full_name || `#${id}`;
   };
-
-  const getRoleByKey = (roleKey) => roles.find((r) => r.key === roleKey);
 
   const getDayShifts = (employeeId, dayIndex) => {
     const empDays = assignments[employeeId] || {};
@@ -714,26 +700,6 @@ const Roster = () => {
     };
 
     console.log("[Roster] Save payload:", payload);
-
-    // 🔧 Hook up backend later:
-    /*
-    try {
-      const res = await fetch(`${API_BASE}/roster/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        alert("Error saving roster: " + JSON.stringify(json));
-        return;
-      }
-      alert("Roster saved!");
-    } catch (err) {
-      console.error("[Roster] Save error:", err);
-      alert("Failed to save roster.");
-    }
-    */
   };
 
   return (
@@ -741,7 +707,6 @@ const Roster = () => {
       <Styles />
 
       <div className="r-layout">
-        {/* LEFT: Roles + Team */}
         <div className="r-panel">
           <div className="r-panel-body">
             <div className="r-stack">
@@ -801,7 +766,6 @@ const Roster = () => {
           </div>
         </div>
 
-        {/* RIGHT: Roster grid */}
         <div className="r-calendar">
           <div className="r-toolbar">
             <div className="r-toolbar-left">
@@ -831,7 +795,6 @@ const Roster = () => {
           </div>
 
           <div className="r-grid">
-            {/* Header row */}
             <div className="r-head">Person</div>
             {DAYS.map((day, idx) => (
               <div key={day} className="r-head">
@@ -840,7 +803,6 @@ const Roster = () => {
               </div>
             ))}
 
-            {/* Rows = employees */}
             {employees.map((emp) => (
               <React.Fragment key={emp.id}>
                 <div className="r-row-label">
@@ -849,13 +811,7 @@ const Roster = () => {
                 </div>
 
                 {DAYS.map((_, dayIndex) => {
-                  const shifts = (() => {
-                    const empDays = assignments[emp.id] || {};
-                    const arr = empDays[dayIndex] || [];
-                    return [...arr].sort(
-                      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
-                    );
-                  })();
+                  const shifts = getDayShifts(emp.id, dayIndex);
 
                   const isDropping =
                     dragOverCell &&
@@ -952,24 +908,10 @@ const Roster = () => {
                 })}
               </React.Fragment>
             ))}
-
-            {!loadingEmployees && employees.length === 0 && (
-              <div
-                style={{
-                  gridColumn: "1 / -1",
-                  padding: 16,
-                  color: "#64748b",
-                  fontWeight: 800,
-                }}
-              >
-                No employees found. Add them in HRP → Employees.
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Modal */}
       {modal.open && (
         <div
           className="r-modal-overlay"
@@ -1044,17 +986,13 @@ const Roster = () => {
                   {modal.error}
                 </div>
               )}
-
-              <div className="r-note">
-                Note: shifts for the same person/day can’t overlap. Add another block
-                for split shifts.
-              </div>
             </div>
 
             <div className="r-modal-ftr">
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
+              {/* ✅ Add button is brand purple via r-btn-primary */}
               <button
                 type="button"
                 className="r-btn r-btn-primary"
