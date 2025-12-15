@@ -173,15 +173,9 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
 
   if (!open || !form) return null;
 
-  const setField = (k, v) =>
-    setForm((prev) => ({
-      ...prev,
-      [k]: v,
-    }));
+  const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
 
-  const handleSubmit = () => {
-    onSave(form);
-  };
+  const handleSubmit = () => onSave(form);
 
   const isSalary = form.pay_type === "salary";
 
@@ -294,7 +288,6 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
               />
             </div>
 
-            {/* Hourly vs Salary input */}
             <div className="g-field col-4">
               <label className="g-label">
                 {isSalary ? "Annual Salary (€)" : "Hourly Rate (€)"}
@@ -303,18 +296,11 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
                 className="g-input"
                 type="number"
                 step="0.01"
-                value={
-                  isSalary
-                    ? form.salary_amount ?? ""
-                    : form.hourly_rate ?? ""
-                }
+                value={isSalary ? form.salary_amount ?? "" : form.hourly_rate ?? ""}
                 onChange={(e) => {
                   const v = e.target.value === "" ? "" : parseFloat(e.target.value);
-                  if (isSalary) {
-                    setField("salary_amount", v);
-                  } else {
-                    setField("hourly_rate", v);
-                  }
+                  if (isSalary) setField("salary_amount", v);
+                  else setField("hourly_rate", v);
                 }}
               />
             </div>
@@ -360,7 +346,6 @@ const DeleteConfirmModal = ({ open, count, onClose, onConfirm }) => {
         </div>
         <div className="r-mbody" style={{ textAlign: "center" }}>
           <div
-            className="r-badge"
             style={{
               width: 52,
               height: 52,
@@ -397,10 +382,6 @@ const DeleteConfirmModal = ({ open, count, onClose, onConfirm }) => {
 const Employees = () => {
   const { cognitoId } = useAuth();
 
-  // --- dev lock ---
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [codeInput, setCodeInput] = useState("");
-
   // employees state
   const [employees, setEmployees] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -414,18 +395,8 @@ const Employees = () => {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  const handleUnlock = () => {
-    if (codeInput === "210100") {
-      setIsUnlocked(true);
-      setCodeInput("");
-      setApiError("");
-    } else {
-      setApiError("Incorrect access code.");
-    }
-  };
-
   const fetchEmployees = useCallback(async () => {
-    if (!cognitoId || !isUnlocked) return;
+    if (!cognitoId) return;
     setLoading(true);
     setApiError("");
     try {
@@ -434,9 +405,7 @@ const Employees = () => {
       );
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
-        throw new Error(
-          txt || `Failed to fetch employees (status ${res.status})`
-        );
+        throw new Error(txt || `Failed to fetch employees (status ${res.status})`);
       }
       const data = await res.json();
       const list = (Array.isArray(data) ? data : []).map((e) => ({
@@ -463,7 +432,7 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [cognitoId, isUnlocked]);
+  }, [cognitoId]);
 
   useEffect(() => {
     fetchEmployees();
@@ -495,11 +464,8 @@ const Employees = () => {
   };
 
   const selectAll = (checked) => {
-    if (checked) {
-      setSelectedIds(new Set(filtered.map((e) => e.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
+    if (checked) setSelectedIds(new Set(filtered.map((e) => e.id)));
+    else setSelectedIds(new Set());
   };
 
   const openAddModal = () => {
@@ -517,14 +483,13 @@ const Employees = () => {
     try {
       const isSalary = form.pay_type === "salary";
 
-      const hourlyOrSalary =
-        isSalary
-          ? form.salary_amount === "" || form.salary_amount == null
-            ? null
-            : Number(form.salary_amount)
-          : form.hourly_rate === "" || form.hourly_rate == null
+      const hourlyOrSalary = isSalary
+        ? form.salary_amount === "" || form.salary_amount == null
           ? null
-          : Number(form.hourly_rate);
+          : Number(form.salary_amount)
+        : form.hourly_rate === "" || form.hourly_rate == null
+        ? null
+        : Number(form.hourly_rate);
 
       const payload = {
         cognito_id: cognitoId,
@@ -542,7 +507,6 @@ const Employees = () => {
       };
 
       if (form.id) {
-        // update
         const res = await fetch(
           `${API_BASE}/employees/${encodeURIComponent(form.id)}/update`,
           {
@@ -556,7 +520,6 @@ const Employees = () => {
           throw new Error(txt || "Update failed");
         }
       } else {
-        // create
         const res = await fetch(`${API_BASE}/employees/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -588,9 +551,7 @@ const Employees = () => {
           )}/delete?cognito_id=${encodeURIComponent(cognitoId)}`,
           { method: "DELETE" }
         );
-        if (!res.ok) {
-          console.warn("Delete failed for employee", id);
-        }
+        if (!res.ok) console.warn("Delete failed for employee", id);
       }
       setDeleteOpen(false);
       setSelectedIds(new Set());
@@ -605,46 +566,6 @@ const Employees = () => {
   const allVisibleSelected =
     filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
 
-  // ---------- DEV LOCK UI ----------
-  if (!isUnlocked) {
-    return (
-      <div className="r-wrap">
-        <BrandStyles />
-        <div className="r-card" style={{ maxWidth: 420, margin: "40px auto" }}>
-          <div className="r-head">
-            <div>
-              <h2 className="r-title">Employees (Dev)</h2>
-              <p className="r-sub">
-                This area is currently locked. Enter the access code to continue.
-              </p>
-            </div>
-          </div>
-          <div style={{ padding: "16px" }}>
-            <label className="g-label">Access Code</label>
-            <input
-              className="g-input"
-              type="password"
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              placeholder="Enter dev code"
-            />
-            {apiError && (
-              <p className="r-muted" style={{ color: "#b91c1c", marginTop: 8 }}>
-                {apiError}
-              </p>
-            )}
-          </div>
-          <div className="r-footer" style={{ justifyContent: "flex-end" }}>
-            <button className="r-btn-primary" onClick={handleUnlock}>
-              Unlock
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------- MAIN EMPLOYEES UI ----------
   return (
     <div className="r-wrap">
       <BrandStyles />
@@ -740,9 +661,7 @@ const Employees = () => {
                     ) : null}
                   </td>
                   <td className="r-td">
-                    {e.employment_type
-                      ? e.employment_type.replace("_", " ")
-                      : "—"}
+                    {e.employment_type ? e.employment_type.replace("_", " ") : "—"}
                   </td>
                   <td className="r-td">
                     {e.status ? e.status.replace("_", " ") : "—"}
@@ -754,10 +673,7 @@ const Employees = () => {
                     <span className="r-muted">{e.phone || ""}</span>
                   </td>
                   <td className="r-td r-actions">
-                    <button
-                      className="r-btn-ghost"
-                      onClick={() => openEditModal(e)}
-                    >
+                    <button className="r-btn-ghost" onClick={() => openEditModal(e)}>
                       <EditIcon /> Edit
                     </button>
                   </td>
@@ -765,15 +681,9 @@ const Employees = () => {
               ))}
               {filtered.length === 0 && !loading && (
                 <tr className="r-row">
-                  <td
-                    className="r-td"
-                    colSpan={7}
-                    style={{ textAlign: "center" }}
-                  >
+                  <td className="r-td" colSpan={7} style={{ textAlign: "center" }}>
                     <span className="r-muted">
-                      {search
-                        ? "No employees match your search."
-                        : "No employees yet."}
+                      {search ? "No employees match your search." : "No employees yet."}
                     </span>
                   </td>
                 </tr>
