@@ -3018,6 +3018,359 @@ app.delete("/api/employees/:id/delete", async (req, res) => {
   }
 });
 
+const ROLE_KEY_TO_ROLE_ID = {
+   production: 1,
+   packing: 2,
+   dispatch: 3,
+   admin: 4,
+};
+
+function assertYYYYMMDD(s) {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const err = new Error("Invalid date format. Expected YYYY-MM-DD.");
+    err.statusCode = 400;
+    throw err;
+  }
+  return s;
+}
+
+function addDaysYYYYMMDD(yyyyMmDd, add) {
+  // Parse as UTC midnight to avoid DST surprises
+  const [y, m, d] = yyyyMmDd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + Number(add || 0));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function assertHHMM(s) {
+  if (typeof s !== "string" || !/^\d{2}:\d{2}$/.test(s)) {
+    const err = new Error("Invalid time format. Expected HH:MM.");
+    err.statusCode = 400;
+    throw err;
+  }
+  return s;
+}
+
+function httpError(statusCode, message) {
+  const e = new Error(message);
+  e.statusCode = statusCode;
+  return e;
+}
+
+app.get("/api/week", async (req, res, next) => {
+  try {
+    const cognitoId = String(req.query.cognito_id || "").trim();
+    const weekStart = assertYYYYMMDD(String(req.query.week_start || "").trim());
+
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const weekEnd = addDaysYYYYMMDD(weekStart, 6);
+
+    const data = await withConn(async (conn) => {
+      const [rows] = await conn.execute(
+        `
+        SELECT 
+          rsa.id AS assignment_id,
+          rs.id  AS roster_shift_id,
+          rs.date AS shift_date,
+          rs.area AS area,
+          rs.status AS roster_status,
+          rs.notes AS roster_notes,
+
+          st.id AS shift_template_id,
+          st.name AS template_name,
+          st.start_time AS start_time,
+          st.end_time AS end_time,
+          st.role_id AS role_id,
+
+          rsa.employee_id AS employee_id,
+          rsa.status AS assignment_status,
+          rsa.comment AS assignment_comment,
+          rsa.created_at AS assignment_created_at,
+          rsa.updated_at AS assignment_updated_at
+        FROM roster_shifts rs
+        JOIN employee_shift_assignments rsa
+          ON rsa.roster_shift_id = rs.id
+        JOIN shift_templates st
+          ON st.id = rs.shift_template_id
+        WHERE rs.cognito_id = ?
+          AND rs.date BETWEEN ? AND ?
+        ORDER BY rs.date ASC, st.start_time ASC, rsa.employee_id ASC
+        `,
+        [cognitoId, weekStart, weekEnd]
+      );
+
+      return rows;
+    });
+
+    res.json({
+      cognito_id: cognitoId,
+      week_start: weekStart,
+      week_end: weekEnd,
+      rows: data,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/api/shift", async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const cognitoId = String(body.cognito_id || "").trim();
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const date = assertYYYYMMDD(String(body.date || "").trim());
+    const roleKey = String(body.role_key || "").trim();
+    if (!roleKey) throw httpError(400, "Missing role_key");
+
+    const roleName = String(body.role_name || roleKey).trim();
+    const area = String(body.area || "default").trim();
+    const start = assertHHMM(String(body.start || "").trim());
+    const end = assertHHMM(String(body.end || "").trim());
+    const employeeId = Number(body.employee_id);
+    if (!Number.isFinite(employeeId)) throw httpError(400, "Invalid employee_id");
+
+    const assignmentStatus = String(body.status || "assigned").trim();
+    const comment = body.comment == null ? null : String(body.comment);
+
+    const result = await withConn(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        // 1) Ensure shift_template exists for this pattern
+        const roleId = ROLE_KEY_TO_ROLE_ID[roleKey] ?? null;
+
+        const [tplRows] = await conn.execute(
+          `
+          SELECT id
+          FROM shift_templates
+          WHERE cognito_id = ?
+            AND name = ?
+            AND area = ?
+            AND start_time = ?
+            AND end_time = ?
+          LIMIT 1
+          `,
+          [cognitoId, roleName, area, start, end]
+        );
+
+        let shiftTemplateId = tplRows?.[0]?.id;
+
+        if (!shiftTemplateId) {
+          const [insTpl] = await conn.execute(
+            `
+            INSERT INTO shift_templates
+              (cognito_id, name, role_id, area, start_time, end_time, default_headcount, notes, created_at, updated_at)
+            VALUES
+              (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            `,
+            [
+              cognitoId,
+              roleName,
+              roleId,
+              area,
+              start,
+              end,
+              1,
+              JSON.stringify({ role_key: roleKey }), // dev-friendly
+            ]
+          );
+          shiftTemplateId = insTpl.insertId;
+        }
+
+        // 2) Upsert roster_shifts (unique: cognito_id, date, shift_template_id)
+        const [insRoster] = await conn.execute(
+          `
+          INSERT INTO roster_shifts
+            (cognito_id, date, shift_template_id, area, status, notes, created_at, updated_at)
+          VALUES
+            (?, ?, ?, ?, ?, ?, NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+            area = VALUES(area),
+            status = VALUES(status),
+            notes = VALUES(notes),
+            updated_at = NOW()
+          `,
+          [cognitoId, date, shiftTemplateId, area, "scheduled", null]
+        );
+
+        // If duplicate key, insertId may be 0 depending on driver.
+        // So fetch the roster shift id.
+        const [rsRows] = await conn.execute(
+          `
+          SELECT id
+          FROM roster_shifts
+          WHERE cognito_id = ?
+            AND date = ?
+            AND shift_template_id = ?
+          LIMIT 1
+          `,
+          [cognitoId, date, shiftTemplateId]
+        );
+
+        const rosterShiftId = rsRows?.[0]?.id;
+        if (!rosterShiftId) throw httpError(500, "Failed to resolve roster_shift_id");
+
+        // 3) Upsert employee_shift_assignments (unique: roster_shift_id, employee_id)
+        await conn.execute(
+          `
+          INSERT INTO employee_shift_assignments
+            (roster_shift_id, employee_id, status, comment, created_at, updated_at)
+          VALUES
+            (?, ?, ?, ?, NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+            status = VALUES(status),
+            comment = VALUES(comment),
+            updated_at = NOW()
+          `,
+          [rosterShiftId, employeeId, assignmentStatus, comment]
+        );
+
+        const [aRows] = await conn.execute(
+          `
+          SELECT id
+          FROM employee_shift_assignments
+          WHERE roster_shift_id = ? AND employee_id = ?
+          LIMIT 1
+          `,
+          [rosterShiftId, employeeId]
+        );
+
+        const assignmentId = aRows?.[0]?.id;
+
+        await conn.commit();
+
+        return {
+          assignment_id: assignmentId,
+          roster_shift_id: rosterShiftId,
+          shift_template_id: shiftTemplateId,
+          date,
+          role_key: roleKey,
+          role_name: roleName,
+          area,
+          start,
+          end,
+          employee_id: employeeId,
+          status: assignmentStatus,
+          comment,
+        };
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.put("/api/assignment/:id", async (req, res, next) => {
+  try {
+    const assignmentId = Number(req.params.id);
+    if (!Number.isFinite(assignmentId)) throw httpError(400, "Invalid assignment id");
+
+    const body = req.body || {};
+    const cognitoId = String(body.cognito_id || "").trim();
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const status = body.status == null ? null : String(body.status);
+    const comment = body.comment == null ? null : String(body.comment);
+
+    const updated = await withConn(async (conn) => {
+      // ensure the assignment belongs to that cognito via roster_shifts
+      const [ownRows] = await conn.execute(
+        `
+        SELECT rsa.id
+        FROM employee_shift_assignments rsa
+        JOIN roster_shifts rs ON rs.id = rsa.roster_shift_id
+        WHERE rsa.id = ? AND rs.cognito_id = ?
+        LIMIT 1
+        `,
+        [assignmentId, cognitoId]
+      );
+      if (!ownRows.length) throw httpError(404, "Assignment not found");
+
+      await conn.execute(
+        `
+        UPDATE employee_shift_assignments
+        SET
+          status = COALESCE(?, status),
+          comment = COALESCE(?, comment),
+          updated_at = NOW()
+        WHERE id = ?
+        `,
+        [status, comment, assignmentId]
+      );
+
+      const [rows] = await conn.execute(
+        `SELECT id, roster_shift_id, employee_id, status, comment, updated_at FROM employee_shift_assignments WHERE id = ?`,
+        [assignmentId]
+      );
+
+      return rows[0] || null;
+    });
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete("/api/assignment/:id", async (req, res, next) => {
+  try {
+    const assignmentId = Number(req.params.id);
+    if (!Number.isFinite(assignmentId)) throw httpError(400, "Invalid assignment id");
+
+    const cognitoId = String(req.query.cognito_id || "").trim();
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    await withConn(async (conn) => {
+      await conn.beginTransaction();
+      try {
+        // Find roster_shift_id + ownership
+        const [rows] = await conn.execute(
+          `
+          SELECT rsa.roster_shift_id
+          FROM employee_shift_assignments rsa
+          JOIN roster_shifts rs ON rs.id = rsa.roster_shift_id
+          WHERE rsa.id = ? AND rs.cognito_id = ?
+          LIMIT 1
+          `,
+          [assignmentId, cognitoId]
+        );
+        if (!rows.length) throw httpError(404, "Assignment not found");
+
+        const rosterShiftId = rows[0].roster_shift_id;
+
+        await conn.execute(`DELETE FROM employee_shift_assignments WHERE id = ?`, [assignmentId]);
+
+        // If no more assignments for this roster_shift, delete it
+        const [countRows] = await conn.execute(
+          `SELECT COUNT(*) AS c FROM employee_shift_assignments WHERE roster_shift_id = ?`,
+          [rosterShiftId]
+        );
+        const c = Number(countRows?.[0]?.c || 0);
+        if (c === 0) {
+          await conn.execute(`DELETE FROM roster_shifts WHERE id = ?`, [rosterShiftId]);
+        }
+
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use((req, res) => {
   console.error('404 Not Found:', {
