@@ -69,7 +69,7 @@ app.use((req, res, next) => {
 });
 
 async function withConn(fn) {
-  const conn = await pool.getConnection();
+  const conn = await db.getConnection();
   try {
     return await fn(conn);
   } finally {
