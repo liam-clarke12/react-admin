@@ -68,6 +68,15 @@ app.use((req, res, next) => {
   next();
 });
 
+async function withConn(fn) {
+  const conn = await pool.getConnection();
+  try {
+    return await fn(conn);
+  } finally {
+    conn.release();
+  }
+}
+
 function addCorsHeaders(res, req) {
   try {
     const FRONTEND_ORIGIN = 'https://master.d2fdrxobxyr2je.amplifyapp.com';
