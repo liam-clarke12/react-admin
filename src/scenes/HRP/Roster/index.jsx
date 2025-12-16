@@ -321,7 +321,7 @@ const Roster = () => {
     const role = roles.find((r) => r.key === roleKey);
 
     try {
-      const res = await fetch(`${API_BASE}/api/shift`, {
+      const res = await fetch(`${API_BASE}/shift`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -385,7 +385,7 @@ const Roster = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE}/api/assignment/${encodeURIComponent(
+        `${API_BASE}/assignment/${encodeURIComponent(
           assignmentId
         )}?cognito_id=${encodeURIComponent(cognitoId)}`,
         { method: "DELETE" }
