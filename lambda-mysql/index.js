@@ -23,6 +23,8 @@ const db = mysql.createPool({
   database: "hupes_database"
 });
 
+const pool = db.promise();
+
 // ✅ Test database connection
 db.getConnection((err, conn) => {
   if (err) {
@@ -69,7 +71,7 @@ app.use((req, res, next) => {
 });
 
 async function withConn(fn) {
-  const conn = await db.getConnection();
+  const conn = await pool.getConnection();
   try {
     return await fn(conn);
   } finally {
