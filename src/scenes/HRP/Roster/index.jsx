@@ -181,6 +181,9 @@ const Roster = () => {
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
+  // ✅ employee name filter
+  const [employeeQuery, setEmployeeQuery] = useState("");
+
   // ✅ roles from DB
   const [rolesDb, setRolesDb] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -218,9 +221,7 @@ const Roster = () => {
 
     // if user has no roles yet, keep the UI usable with a default
     if (arr.length === 0) {
-      return [
-        { key: "production", name: "Production", style: { bd: "#6366F1" } },
-      ];
+      return [{ key: "production", name: "Production", style: { bd: "#6366F1" } }];
     }
     return arr;
   }, [rolesDb]);
@@ -238,10 +239,7 @@ const Roster = () => {
 
   // Ensure modal roleKey always valid when roles load/change
   useEffect(() => {
-    setModal((m) => ({
-      ...m,
-      roleKey: m.roleKey || roles[0]?.key || "",
-    }));
+    setModal((m) => ({ ...m, roleKey: m.roleKey || roles[0]?.key || "" }));
   }, [roles]);
 
   const filteredRoles = useMemo(() => {
@@ -253,6 +251,15 @@ const Roster = () => {
       return name.includes(q) || code.includes(q);
     });
   }, [roles, roleQuery]);
+
+  // ✅ filtered employees (used for Team + calendar rows)
+  const filteredEmployees = useMemo(() => {
+    const q = employeeQuery.trim().toLowerCase();
+    if (!q) return employees;
+    return employees.filter((e) =>
+      String(e.full_name || "").toLowerCase().includes(q)
+    );
+  }, [employees, employeeQuery]);
 
   const getEmployeeName = (id) => {
     const emp = employees.find((e) => String(e.id) === String(id));
@@ -283,8 +290,7 @@ const Roster = () => {
         // Prefer role_code from backend (roles.code), else map by template_name, else fallback
         const roleKey =
           (r.role_code && safeRoleKey(r.role_code, r.role_code)) ||
-          (r.template_name &&
-            roles.find((x) => x.name === r.template_name)?.key) ||
+          (r.template_name && roles.find((x) => x.name === r.template_name)?.key) ||
           r.role_key ||
           roles[0]?.key ||
           "production";
@@ -496,7 +502,9 @@ const Roster = () => {
       const next = { ...prev };
       const empDays = next[employeeId] ? { ...next[employeeId] } : {};
       const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
-      empDays[dayIndex] = dayArr.filter((s) => String(s.id) !== String(assignmentId));
+      empDays[dayIndex] = dayArr.filter(
+        (s) => String(s.id) !== String(assignmentId)
+      );
       next[employeeId] = empDays;
       return next;
     });
@@ -529,6 +537,7 @@ const Roster = () => {
         <div className="r-panel">
           <div className="r-panel-body">
             <div className="r-stack">
+              {/* Roles */}
               <div className="r-block">
                 <div className="r-title">Roles</div>
                 <p className="r-sub">
@@ -540,9 +549,7 @@ const Roster = () => {
                   value={roleQuery}
                   onChange={(e) => setRoleQuery(e.target.value)}
                   placeholder={
-                    loadingRoles
-                      ? "Loading roles…"
-                      : `Search roles (${roles.length})…`
+                    loadingRoles ? "Loading roles…" : `Search roles (${roles.length})…`
                   }
                 />
 
@@ -574,7 +581,13 @@ const Roster = () => {
                         <span className="r-role-name">
                           {role.name}
                           {role.code ? (
-                            <span style={{ color: "rgba(15,23,42,0.55)", fontWeight: 900, marginLeft: 8 }}>
+                            <span
+                              style={{
+                                color: "rgba(15,23,42,0.55)",
+                                fontWeight: 900,
+                                marginLeft: 8,
+                              }}
+                            >
                               ({role.code})
                             </span>
                           ) : null}
@@ -586,18 +599,42 @@ const Roster = () => {
                 </div>
               </div>
 
+              {/* Team */}
               <div className="r-block">
                 <div className="r-title">Team</div>
                 <p className="r-sub">
-                  Rows are people. Columns are days. Blocks use the same colour as the role dot.
+                  Rows are people. Columns are days. Blocks use the same colour as
+                  the role dot.
                 </p>
+
+                {/* ✅ employee search */}
+                <input
+                  className="r-role-search"
+                  value={employeeQuery}
+                  onChange={(e) => setEmployeeQuery(e.target.value)}
+                  placeholder={
+                    loadingEmployees
+                      ? "Loading team…"
+                      : `Search team (${employees.length})…`
+                  }
+                />
 
                 <div className="r-emp-list">
                   {loadingEmployees && <span>Loading employees…</span>}
+
                   {!loadingEmployees && employees.length === 0 && (
                     <span>No employees yet. Add them in HRP → Employees.</span>
                   )}
-                  {employees.map((emp) => (
+
+                  {!loadingEmployees &&
+                    employees.length > 0 &&
+                    filteredEmployees.length === 0 && (
+                      <span style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>
+                        No team members match that search.
+                      </span>
+                    )}
+
+                  {filteredEmployees.map((emp) => (
                     <div key={emp.id} className="r-emp-chip">
                       <span className="r-emp-name">{emp.full_name}</span>
                       <span className="r-emp-meta">Row</span>
@@ -620,7 +657,9 @@ const Roster = () => {
                 Next →
               </button>
               <span className="r-chip">
-                {loadingEmployees || loadingWeek ? "Loading…" : `${employees.length} staff`}
+                {loadingEmployees || loadingWeek
+                  ? "Loading…"
+                  : `${filteredEmployees.length}/${employees.length} staff`}
               </span>
             </div>
 
@@ -641,7 +680,8 @@ const Roster = () => {
               </div>
             ))}
 
-            {employees.map((emp) => (
+            {/* ✅ calendar rows filtered by employeeQuery */}
+            {filteredEmployees.map((emp) => (
               <React.Fragment key={emp.id}>
                 <div className="r-row-label">
                   <p className="r-row-name">{emp.full_name}</p>
@@ -678,7 +718,8 @@ const Roster = () => {
                           try {
                             const parsed = JSON.parse(raw);
                             const rk = parsed?.roleKey;
-                            roleBd = roles.find((r) => r.key === rk)?.style?.bd || null;
+                            roleBd =
+                              roles.find((r) => r.key === rk)?.style?.bd || null;
                           } catch {}
                         }
                         setDragOverCell({ employeeId: emp.id, dayIndex, roleBd });
@@ -686,7 +727,11 @@ const Roster = () => {
                       onDragLeave={() => {
                         setTimeout(() => {
                           setDragOverCell((cur) => {
-                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex)
+                            if (
+                              cur &&
+                              cur.employeeId === emp.id &&
+                              cur.dayIndex === dayIndex
+                            )
                               return null;
                             return cur;
                           });
@@ -762,7 +807,12 @@ const Roster = () => {
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Add shift</h3>
-              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
+              <button
+                className="r-icon-btn"
+                type="button"
+                onClick={closeModal}
+                aria-label="Close"
+              >
                 ×
               </button>
             </div>
@@ -779,11 +829,14 @@ const Roster = () => {
                 <select
                   className="r-select"
                   value={modal.roleKey}
-                  onChange={(e) => setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))}
+                  onChange={(e) =>
+                    setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))
+                  }
                 >
                   {roles.map((r) => (
                     <option key={r.id || r.key} value={r.key}>
-                      {r.name}{r.code ? ` (${r.code})` : ""}
+                      {r.name}
+                      {r.code ? ` (${r.code})` : ""}
                     </option>
                   ))}
                 </select>
@@ -796,7 +849,9 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.start}
-                    onChange={(e) => setModal((m) => ({ ...m, start: e.target.value, error: "" }))}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, start: e.target.value, error: "" }))
+                    }
                   />
                 </div>
                 <div className="r-field">
@@ -805,13 +860,18 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.end}
-                    onChange={(e) => setModal((m) => ({ ...m, end: e.target.value, error: "" }))}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, end: e.target.value, error: "" }))
+                    }
                   />
                 </div>
               </div>
 
               {modal.error && (
-                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
+                <div
+                  className="r-note"
+                  style={{ color: "#b91c1c", fontWeight: 900 }}
+                >
                   {modal.error}
                 </div>
               )}
@@ -821,7 +881,11 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
+              <button
+                type="button"
+                className="r-btn r-btn-primary"
+                onClick={confirmAddShift}
+              >
                 Add
               </button>
             </div>
