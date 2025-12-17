@@ -5,7 +5,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Styles (keep yours as-is) ---------------- */
+/* ---------------- Styles (yours, unchanged) ---------------- */
 const Styles = () => (
   <style>{`
     :root{
@@ -93,13 +93,13 @@ const Styles = () => (
   `}</style>
 );
 
-/* ---------------- Helpers ---------------- */
+/* ---------------- Constants + Helpers ---------------- */
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function startOfISOWeek(date = new Date()) {
   const d = new Date(date);
-  const day = (d.getDay() + 6) % 7;
+  const day = (d.getDay() + 6) % 7; // Mon=0..Sun=6
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - day);
   return d;
@@ -128,7 +128,16 @@ function timeToMinutes(t) {
   return hh * 60 + mm;
 }
 function overlaps(aStart, aEnd, bStart, bEnd) {
-  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(bStart) < timeToMinutes(aEnd);
+  return (
+    timeToMinutes(aStart) < timeToMinutes(bEnd) &&
+    timeToMinutes(bStart) < timeToMinutes(aEnd)
+  );
+}
+function toHHMM(x) {
+  if (x == null) return "";
+  const s = String(x);
+  // handles "08:00:00" and "08:00"
+  return s.length >= 5 ? s.slice(0, 5) : s;
 }
 
 /* ---------------- Roles ---------------- */
@@ -143,14 +152,12 @@ const DEFAULT_ROLES = [
 
 const Roster = () => {
   const { cognitoId } = useAuth();
-
   const roles = DEFAULT_ROLES;
 
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
-  // assignments shape:
-  // assignments[employeeId][dayIndex] = [{ id: assignment_id, roleKey, start, end, date }]
+  // assignments[employeeId][dayIndex] = [{ id: assignment_uuid, roleKey, start, end, date, rosterShiftId }]
   const [assignments, setAssignments] = useState({});
 
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(new Date()));
@@ -168,9 +175,14 @@ const Roster = () => {
     error: "",
   });
 
-  const weekDates = useMemo(() => DAYS.map((_, idx) => addDays(weekStart, idx)), [weekStart]);
-
-  const weekStartYYYYMMDD = useMemo(() => weekStart.toISOString().slice(0, 10), [weekStart]);
+  const weekDates = useMemo(
+    () => DAYS.map((_, idx) => addDays(weekStart, idx)),
+    [weekStart]
+  );
+  const weekStartYYYYMMDD = useMemo(
+    () => weekStart.toISOString().slice(0, 10),
+    [weekStart]
+  );
 
   const getEmployeeName = (id) => {
     const emp = employees.find((e) => String(e.id) === String(id));
@@ -180,15 +192,17 @@ const Roster = () => {
   const getDayShifts = (employeeId, dayIndex) => {
     const empDays = assignments?.[employeeId] || {};
     const shifts = empDays?.[dayIndex] || [];
-    return [...shifts].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+    return [...shifts].sort(
+      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
+    );
   };
 
   const rebuildAssignmentsFromWeekRows = useCallback(
     (rows) => {
-      // backend returns rows array (joined)
       const next = {};
+
       (rows || []).forEach((r) => {
-        const employeeId = r.employee_id;
+        const employeeId = r.employee_id; // UUID
         const shiftDate = String(r.shift_date).slice(0, 10);
 
         const dayIndex = weekDates.findIndex(
@@ -196,16 +210,19 @@ const Roster = () => {
         );
         if (dayIndex < 0) return;
 
+        // If backend sends role_code, prefer that; otherwise fall back to template_name mapping
         const roleKey =
-          (r.template_name && roles.find((x) => x.name === r.template_name)?.key) ||
+          (r.role_code && roles.find((x) => x.key === r.role_code)?.key) ||
+          (r.template_name &&
+            roles.find((x) => x.name === r.template_name)?.key) ||
           r.role_key ||
           "production";
 
         const item = {
-          id: r.assignment_id, // IMPORTANT: assignment id (for delete/update)
+          id: r.assignment_id, // UUID (employee_shift_assignments.id)
           roleKey,
-          start: r.start_time,
-          end: r.end_time,
+          start: toHHMM(r.start_time),
+          end: toHHMM(r.end_time),
           date: shiftDate,
           rosterShiftId: r.roster_shift_id,
         };
@@ -248,7 +265,7 @@ const Roster = () => {
     })();
   }, [cognitoId]);
 
-  // Load week roster
+  // Load week roster (✅ correct endpoint)
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -256,10 +273,16 @@ const Roster = () => {
       try {
         setLoadingWeek(true);
         const res = await fetch(
-          `${API_BASE}/api/week?cognito_id=${encodeURIComponent(
+          `${API_BASE}/roster/week?cognito_id=${encodeURIComponent(
             cognitoId
           )}&week_start=${encodeURIComponent(weekStartYYYYMMDD)}`
         );
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(txt || `Failed to load week (${res.status})`);
+        }
+
         const json = await res.json();
         rebuildAssignmentsFromWeekRows(json?.rows || []);
       } catch (err) {
@@ -321,7 +344,8 @@ const Roster = () => {
     const role = roles.find((r) => r.key === roleKey);
 
     try {
-      const res = await fetch(`${API_BASE}/shift`, {
+      // ✅ correct endpoint + UUID employee_id
+      const res = await fetch(`${API_BASE}/roster/shift`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -332,15 +356,17 @@ const Roster = () => {
           area: "default",
           start,
           end,
-          employee_id: Number(employeeId),
-          status: "assigned",
+          employee_id: String(employeeId), // ✅ UUID string
+          status: "planned",
           comment: null,
         }),
       });
+
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(txt || "Create shift failed");
       }
+
       const created = await res.json();
 
       // update UI immediately
@@ -349,14 +375,16 @@ const Roster = () => {
         const empDays = next[employeeId] ? { ...next[employeeId] } : {};
         const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
         dayArr.push({
-          id: created.assignment_id,
+          id: created.assignment_id, // UUID
           roleKey,
           start,
           end,
           date,
           rosterShiftId: created.roster_shift_id,
         });
-        empDays[dayIndex] = dayArr.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+        empDays[dayIndex] = dayArr.sort(
+          (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
+        );
         next[employeeId] = empDays;
         return next;
       });
@@ -372,7 +400,7 @@ const Roster = () => {
     if (!assignmentId) return;
 
     // optimistic UI remove
-    const prevSnapshot = assignments;
+    const snapshot = assignments;
 
     setAssignments((prev) => {
       const next = { ...prev };
@@ -384,20 +412,21 @@ const Roster = () => {
     });
 
     try {
+      // ✅ correct endpoint
       const res = await fetch(
-        `${API_BASE}/assignment/${encodeURIComponent(
+        `${API_BASE}/roster/assignment/${encodeURIComponent(
           assignmentId
         )}?cognito_id=${encodeURIComponent(cognitoId)}`,
         { method: "DELETE" }
       );
+
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(txt || "Delete failed");
       }
     } catch (e) {
       console.error("[Roster] delete error:", e);
-      // rollback
-      setAssignments(prevSnapshot);
+      setAssignments(snapshot);
       alert(e?.message || "Could not delete shift.");
     }
   };
@@ -432,7 +461,10 @@ const Roster = () => {
                       title="Drag into the roster"
                     >
                       <div className="r-role-left">
-                        <span className="r-swatch" style={{ ["--swatch"]: role.style.bd }} />
+                        <span
+                          className="r-swatch"
+                          style={{ ["--swatch"]: role.style.bd }}
+                        />
                         <span className="r-role-name">{role.name}</span>
                       </div>
                       <span className="r-role-hint">Drag</span>
@@ -475,7 +507,9 @@ const Roster = () => {
                 Next →
               </button>
               <span className="r-chip">
-                {loadingEmployees || loadingWeek ? "Loading…" : `${employees.length} staff`}
+                {loadingEmployees || loadingWeek
+                  ? "Loading…"
+                  : `${employees.length} staff`}
               </span>
             </div>
 
@@ -533,7 +567,8 @@ const Roster = () => {
                           try {
                             const parsed = JSON.parse(raw);
                             const rk = parsed?.roleKey;
-                            roleBd = roles.find((r) => r.key === rk)?.style?.bd || null;
+                            roleBd =
+                              roles.find((r) => r.key === rk)?.style?.bd || null;
                           } catch {}
                         }
                         setDragOverCell({ employeeId: emp.id, dayIndex, roleBd });
@@ -541,7 +576,11 @@ const Roster = () => {
                       onDragLeave={() => {
                         setTimeout(() => {
                           setDragOverCell((cur) => {
-                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex)
+                            if (
+                              cur &&
+                              cur.employeeId === emp.id &&
+                              cur.dayIndex === dayIndex
+                            )
                               return null;
                             return cur;
                           });
@@ -578,7 +617,9 @@ const Roster = () => {
                                 title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
                                 <div className="r-shift-left">
-                                  <p className="r-shift-role">{role?.name || s.roleKey}</p>
+                                  <p className="r-shift-role">
+                                    {role?.name || s.roleKey}
+                                  </p>
                                   <div className="r-shift-time">
                                     {s.start} – {s.end}
                                   </div>
@@ -617,7 +658,12 @@ const Roster = () => {
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Add shift</h3>
-              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
+              <button
+                className="r-icon-btn"
+                type="button"
+                onClick={closeModal}
+                aria-label="Close"
+              >
                 ×
               </button>
             </div>
@@ -634,7 +680,13 @@ const Roster = () => {
                 <select
                   className="r-select"
                   value={modal.roleKey}
-                  onChange={(e) => setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))}
+                  onChange={(e) =>
+                    setModal((m) => ({
+                      ...m,
+                      roleKey: e.target.value,
+                      error: "",
+                    }))
+                  }
                 >
                   {roles.map((r) => (
                     <option key={r.key} value={r.key}>
@@ -651,7 +703,9 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.start}
-                    onChange={(e) => setModal((m) => ({ ...m, start: e.target.value, error: "" }))}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, start: e.target.value, error: "" }))
+                    }
                   />
                 </div>
                 <div className="r-field">
@@ -660,7 +714,9 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.end}
-                    onChange={(e) => setModal((m) => ({ ...m, end: e.target.value, error: "" }))}
+                    onChange={(e) =>
+                      setModal((m) => ({ ...m, end: e.target.value, error: "" }))
+                    }
                   />
                 </div>
               </div>
@@ -676,7 +732,11 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
+              <button
+                type="button"
+                className="r-btn r-btn-primary"
+                onClick={confirmAddShift}
+              >
                 Add
               </button>
             </div>
