@@ -3413,6 +3413,166 @@ app.delete("/api/roster/assignment/:id", async (req, res, next) => {
   }
 });
 
+function asBool01(v, fallback = 1) {
+  if (v === true || v === 1 || v === "1" || v === "true") return 1;
+  if (v === false || v === 0 || v === "0" || v === "false") return 0;
+  return fallback;
+}
+
+function cleanStr(v, max = 255) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  return s.slice(0, max);
+}
+
+/**
+ * GET /roles/list?cognito_id=...
+ * Returns roles for that tenant (cognito_id)
+ */
+app.get("/roles/list", async (req, res, next) => {
+  try {
+    const cognitoId = cleanStr(req.query.cognito_id);
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const [rows] = await pool.execute(
+      `
+      SELECT id, cognito_id, name, code, description, is_production_role, created_at, updated_at
+      FROM roles
+      WHERE cognito_id = ?
+      ORDER BY is_production_role DESC, name ASC
+      `,
+      [cognitoId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /roles/create
+ * body: { cognito_id, name, code?, description?, is_production_role? }
+ */
+app.post("/roles/create", async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const cognitoId = cleanStr(body.cognito_id);
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const name = cleanStr(body.name, 100);
+    if (!name) throw httpError(400, "Missing name");
+
+    const code = cleanStr(body.code, 50);
+    const description = cleanStr(body.description, 2000);
+    const isProduction = asBool01(body.is_production_role, 1);
+
+    await pool.execute(
+      `
+      INSERT INTO roles (cognito_id, name, code, description, is_production_role)
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [cognitoId, name, code, description, isProduction]
+    );
+
+    // return the newly created role (latest by created_at for this tenant/name)
+    const [rows] = await pool.execute(
+      `
+      SELECT id, cognito_id, name, code, description, is_production_role, created_at, updated_at
+      FROM roles
+      WHERE cognito_id = ? AND name = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [cognitoId, name]
+    );
+
+    res.status(201).json(rows[0] || { ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PUT /roles/update/:id
+ * body: { cognito_id, name?, code?, description?, is_production_role? }
+ */
+app.put("/roles/update/:id", async (req, res, next) => {
+  try {
+    const roleId = cleanStr(req.params.id, 36);
+    if (!roleId) throw httpError(400, "Missing role id");
+
+    const body = req.body || {};
+    const cognitoId = cleanStr(body.cognito_id);
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    // ownership check
+    const [own] = await pool.execute(
+      `SELECT id FROM roles WHERE id = ? AND cognito_id = ? LIMIT 1`,
+      [roleId, cognitoId]
+    );
+    if (!own.length) throw httpError(404, "Role not found");
+
+    const name = body.name == null ? null : cleanStr(body.name, 100);
+    const code = body.code == null ? null : cleanStr(body.code, 50);
+    const description = body.description == null ? null : cleanStr(body.description, 2000);
+    const isProduction =
+      body.is_production_role == null ? null : asBool01(body.is_production_role, 1);
+
+    await pool.execute(
+      `
+      UPDATE roles
+      SET
+        name = COALESCE(?, name),
+        code = COALESCE(?, code),
+        description = COALESCE(?, description),
+        is_production_role = COALESCE(?, is_production_role),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND cognito_id = ?
+      `,
+      [name, code, description, isProduction, roleId, cognitoId]
+    );
+
+    const [rows] = await pool.execute(
+      `
+      SELECT id, cognito_id, name, code, description, is_production_role, created_at, updated_at
+      FROM roles
+      WHERE id = ? AND cognito_id = ?
+      LIMIT 1
+      `,
+      [roleId, cognitoId]
+    );
+
+    res.json(rows[0] || { ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /roles/delete/:id?cognito_id=...
+ */
+app.delete("/roles/delete/:id", async (req, res, next) => {
+  try {
+    const roleId = cleanStr(req.params.id, 36);
+    if (!roleId) throw httpError(400, "Missing role id");
+
+    const cognitoId = cleanStr(req.query.cognito_id);
+    if (!cognitoId) throw httpError(400, "Missing cognito_id");
+
+    const [result] = await pool.execute(
+      `DELETE FROM roles WHERE id = ? AND cognito_id = ?`,
+      [roleId, cognitoId]
+    );
+
+    if (!result.affectedRows) throw httpError(404, "Role not found");
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use((req, res) => {
   console.error('404 Not Found:', {
     method: req.method,
