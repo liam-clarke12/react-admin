@@ -35,6 +35,24 @@ const Styles = () => (
     .r-emp-chip{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 10px; border-radius:12px; border:1px solid #e5e7eb; background:#ffffff; user-select:none; }
     .r-emp-name{ font-size:13px; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .r-emp-meta{ font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f8fafc; color:#334155; flex:0 0 auto; }
+
+    .r-role-search{
+      width:100%;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:10px 10px;
+      font-size:13px;
+      font-weight:800;
+      color:#0f172a;
+      outline:none;
+      background:#fff;
+      margin-bottom:10px;
+    }
+    .r-role-search:focus{
+      box-shadow:0 0 0 4px var(--dae-purple-ring);
+      border-color: rgba(124,58,237,0.45);
+    }
+
     .r-role-list{ display:flex; flex-direction:column; gap:8px; }
     .r-role-chip{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 10px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:grab; user-select:none; box-shadow:0 8px 16px rgba(15,23,42,0.06); transition:transform .08s ease-out, box-shadow .12s ease-out; }
     .r-role-chip:hover{ box-shadow:0 12px 22px rgba(15,23,42,0.10); transform:translateY(-1px); }
@@ -43,6 +61,7 @@ const Styles = () => (
     .r-swatch{ width:12px; height:12px; border-radius:999px; background: var(--swatch); box-shadow: 0 0 0 3px rgba(255,255,255,0.8), 0 10px 18px rgba(15,23,42,0.20); flex:0 0 auto; }
     .r-role-name{ font-size:13px; font-weight:900; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .r-role-hint{ font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f8fafc; color:#334155; flex:0 0 auto; }
+
     .r-calendar{ background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 10px 26px rgba(15,23,42,0.08); overflow:hidden; }
     .r-grid{ display:grid; grid-template-columns: 220px repeat(7, minmax(0, 1fr)); width:100%; font-size:12px; }
     .r-head{ padding:10px; background:#f8fafc; border-bottom:1px solid #e5e7eb; border-right:1px solid #e5e7eb; font-weight:900; color:#0f172a; text-align:center; }
@@ -136,26 +155,36 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 function toHHMM(x) {
   if (x == null) return "";
   const s = String(x);
-  // handles "08:00:00" and "08:00"
   return s.length >= 5 ? s.slice(0, 5) : s;
 }
-
-/* ---------------- Roles ---------------- */
-const DEFAULT_ROLES = [
-  { key: "production", name: "Production", style: { bd: "#6366F1" } },
-  { key: "packing", name: "Packing", style: { bd: "#2DD4BF" } },
-  { key: "dispatch", name: "Dispatch", style: { bd: "#FB923C" } },
-  { key: "admin", name: "Admin", style: { bd: "#F472B6" } },
-];
+function safeRoleKey(code, name) {
+  const base = String(code || "").trim() || String(name || "").trim();
+  return base
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+}
+function hashColor(str) {
+  const s = String(str || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue} 70% 45%)`;
+}
 
 /* ---------------- Main ---------------- */
 
 const Roster = () => {
   const { cognitoId } = useAuth();
-  const roles = DEFAULT_ROLES;
 
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
+
+  // ✅ roles from DB
+  const [rolesDb, setRolesDb] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [roleQuery, setRoleQuery] = useState("");
 
   // assignments[employeeId][dayIndex] = [{ id: assignment_uuid, roleKey, start, end, date, rosterShiftId }]
   const [assignments, setAssignments] = useState({});
@@ -165,16 +194,6 @@ const Roster = () => {
 
   const [dragOverCell, setDragOverCell] = useState(null);
 
-  const [modal, setModal] = useState({
-    open: false,
-    employeeId: null,
-    dayIndex: null,
-    roleKey: roles[0]?.key || "",
-    start: "08:00",
-    end: "16:00",
-    error: "",
-  });
-
   const weekDates = useMemo(
     () => DAYS.map((_, idx) => addDays(weekStart, idx)),
     [weekStart]
@@ -183,6 +202,57 @@ const Roster = () => {
     () => weekStart.toISOString().slice(0, 10),
     [weekStart]
   );
+
+  // Build roster roles from DB rows
+  const roles = useMemo(() => {
+    const arr = (rolesDb || []).map((r) => {
+      const key = safeRoleKey(r.code, r.name);
+      return {
+        id: r.id,
+        key, // used for drag/drop + saving
+        name: r.name,
+        code: r.code || null,
+        style: { bd: hashColor(r.code || r.name) },
+      };
+    });
+
+    // if user has no roles yet, keep the UI usable with a default
+    if (arr.length === 0) {
+      return [
+        { key: "production", name: "Production", style: { bd: "#6366F1" } },
+      ];
+    }
+    return arr;
+  }, [rolesDb]);
+
+  // Modal state depends on roles
+  const [modal, setModal] = useState({
+    open: false,
+    employeeId: null,
+    dayIndex: null,
+    roleKey: "",
+    start: "08:00",
+    end: "16:00",
+    error: "",
+  });
+
+  // Ensure modal roleKey always valid when roles load/change
+  useEffect(() => {
+    setModal((m) => ({
+      ...m,
+      roleKey: m.roleKey || roles[0]?.key || "",
+    }));
+  }, [roles]);
+
+  const filteredRoles = useMemo(() => {
+    const q = roleQuery.trim().toLowerCase();
+    if (!q) return roles;
+    return roles.filter((r) => {
+      const name = String(r.name || "").toLowerCase();
+      const code = String(r.code || "").toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  }, [roles, roleQuery]);
 
   const getEmployeeName = (id) => {
     const emp = employees.find((e) => String(e.id) === String(id));
@@ -210,16 +280,17 @@ const Roster = () => {
         );
         if (dayIndex < 0) return;
 
-        // If backend sends role_code, prefer that; otherwise fall back to template_name mapping
+        // Prefer role_code from backend (roles.code), else map by template_name, else fallback
         const roleKey =
-          (r.role_code && roles.find((x) => x.key === r.role_code)?.key) ||
+          (r.role_code && safeRoleKey(r.role_code, r.role_code)) ||
           (r.template_name &&
             roles.find((x) => x.name === r.template_name)?.key) ||
           r.role_key ||
+          roles[0]?.key ||
           "production";
 
         const item = {
-          id: r.assignment_id, // UUID (employee_shift_assignments.id)
+          id: r.assignment_id, // UUID
           roleKey,
           start: toHHMM(r.start_time),
           end: toHHMM(r.end_time),
@@ -232,7 +303,6 @@ const Roster = () => {
         next[employeeId][dayIndex].push(item);
       });
 
-      // sort each day
       Object.values(next).forEach((daysObj) => {
         Object.values(daysObj).forEach((arr) => {
           arr.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
@@ -265,7 +335,28 @@ const Roster = () => {
     })();
   }, [cognitoId]);
 
-  // Load week roster (✅ correct endpoint)
+  // ✅ Load roles (from DB)
+  useEffect(() => {
+    if (!cognitoId) return;
+
+    (async () => {
+      try {
+        setLoadingRoles(true);
+        const res = await fetch(
+          `${API_BASE}/roles/list?cognito_id=${encodeURIComponent(cognitoId)}`
+        );
+        const json = await res.json();
+        setRolesDb(Array.isArray(json) ? json : []);
+      } catch (err) {
+        console.error("[Roster] Failed to load roles:", err);
+        setRolesDb([]);
+      } finally {
+        setLoadingRoles(false);
+      }
+    })();
+  }, [cognitoId]);
+
+  // Load week roster
   useEffect(() => {
     if (!cognitoId) return;
 
@@ -344,7 +435,6 @@ const Roster = () => {
     const role = roles.find((r) => r.key === roleKey);
 
     try {
-      // ✅ correct endpoint + UUID employee_id
       const res = await fetch(`${API_BASE}/roster/shift`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -353,10 +443,12 @@ const Roster = () => {
           date,
           role_key: roleKey,
           role_name: role?.name || roleKey,
+          // OPTIONAL: pass role_id if your backend supports it
+          role_id: role?.id || null,
           area: "default",
           start,
           end,
-          employee_id: String(employeeId), // ✅ UUID string
+          employee_id: String(employeeId),
           status: "planned",
           comment: null,
         }),
@@ -369,13 +461,12 @@ const Roster = () => {
 
       const created = await res.json();
 
-      // update UI immediately
       setAssignments((prev) => {
         const next = { ...prev };
         const empDays = next[employeeId] ? { ...next[employeeId] } : {};
         const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
         dayArr.push({
-          id: created.assignment_id, // UUID
+          id: created.assignment_id,
           roleKey,
           start,
           end,
@@ -399,7 +490,6 @@ const Roster = () => {
   const removeShift = async (employeeId, dayIndex, assignmentId) => {
     if (!assignmentId) return;
 
-    // optimistic UI remove
     const snapshot = assignments;
 
     setAssignments((prev) => {
@@ -412,7 +502,6 @@ const Roster = () => {
     });
 
     try {
-      // ✅ correct endpoint
       const res = await fetch(
         `${API_BASE}/roster/assignment/${encodeURIComponent(
           assignmentId
@@ -446,10 +535,27 @@ const Roster = () => {
                   Drag a role into a person’s day cell, then set start/finish time.
                 </p>
 
+                <input
+                  className="r-role-search"
+                  value={roleQuery}
+                  onChange={(e) => setRoleQuery(e.target.value)}
+                  placeholder={
+                    loadingRoles
+                      ? "Loading roles…"
+                      : `Search roles (${roles.length})…`
+                  }
+                />
+
                 <div className="r-role-list">
-                  {roles.map((role) => (
+                  {!loadingRoles && filteredRoles.length === 0 ? (
+                    <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                      No roles match that search.
+                    </div>
+                  ) : null}
+
+                  {filteredRoles.map((role) => (
                     <div
-                      key={role.key}
+                      key={role.id || role.key}
                       className="r-role-chip"
                       draggable
                       onDragStart={(e) => {
@@ -465,7 +571,14 @@ const Roster = () => {
                           className="r-swatch"
                           style={{ ["--swatch"]: role.style.bd }}
                         />
-                        <span className="r-role-name">{role.name}</span>
+                        <span className="r-role-name">
+                          {role.name}
+                          {role.code ? (
+                            <span style={{ color: "rgba(15,23,42,0.55)", fontWeight: 900, marginLeft: 8 }}>
+                              ({role.code})
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                       <span className="r-role-hint">Drag</span>
                     </div>
@@ -507,9 +620,7 @@ const Roster = () => {
                 Next →
               </button>
               <span className="r-chip">
-                {loadingEmployees || loadingWeek
-                  ? "Loading…"
-                  : `${employees.length} staff`}
+                {loadingEmployees || loadingWeek ? "Loading…" : `${employees.length} staff`}
               </span>
             </div>
 
@@ -567,8 +678,7 @@ const Roster = () => {
                           try {
                             const parsed = JSON.parse(raw);
                             const rk = parsed?.roleKey;
-                            roleBd =
-                              roles.find((r) => r.key === rk)?.style?.bd || null;
+                            roleBd = roles.find((r) => r.key === rk)?.style?.bd || null;
                           } catch {}
                         }
                         setDragOverCell({ employeeId: emp.id, dayIndex, roleBd });
@@ -576,11 +686,7 @@ const Roster = () => {
                       onDragLeave={() => {
                         setTimeout(() => {
                           setDragOverCell((cur) => {
-                            if (
-                              cur &&
-                              cur.employeeId === emp.id &&
-                              cur.dayIndex === dayIndex
-                            )
+                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex)
                               return null;
                             return cur;
                           });
@@ -617,9 +723,7 @@ const Roster = () => {
                                 title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
                                 <div className="r-shift-left">
-                                  <p className="r-shift-role">
-                                    {role?.name || s.roleKey}
-                                  </p>
+                                  <p className="r-shift-role">{role?.name || s.roleKey}</p>
                                   <div className="r-shift-time">
                                     {s.start} – {s.end}
                                   </div>
@@ -658,12 +762,7 @@ const Roster = () => {
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Add shift</h3>
-              <button
-                className="r-icon-btn"
-                type="button"
-                onClick={closeModal}
-                aria-label="Close"
-              >
+              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
                 ×
               </button>
             </div>
@@ -680,17 +779,11 @@ const Roster = () => {
                 <select
                   className="r-select"
                   value={modal.roleKey}
-                  onChange={(e) =>
-                    setModal((m) => ({
-                      ...m,
-                      roleKey: e.target.value,
-                      error: "",
-                    }))
-                  }
+                  onChange={(e) => setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))}
                 >
                   {roles.map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {r.name}
+                    <option key={r.id || r.key} value={r.key}>
+                      {r.name}{r.code ? ` (${r.code})` : ""}
                     </option>
                   ))}
                 </select>
@@ -703,9 +796,7 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.start}
-                    onChange={(e) =>
-                      setModal((m) => ({ ...m, start: e.target.value, error: "" }))
-                    }
+                    onChange={(e) => setModal((m) => ({ ...m, start: e.target.value, error: "" }))}
                   />
                 </div>
                 <div className="r-field">
@@ -714,9 +805,7 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.end}
-                    onChange={(e) =>
-                      setModal((m) => ({ ...m, end: e.target.value, error: "" }))
-                    }
+                    onChange={(e) => setModal((m) => ({ ...m, end: e.target.value, error: "" }))}
                   />
                 </div>
               </div>
@@ -732,11 +821,7 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="r-btn r-btn-primary"
-                onClick={confirmAddShift}
-              >
+              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
                 Add
               </button>
             </div>

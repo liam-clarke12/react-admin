@@ -3430,7 +3430,7 @@ function cleanStr(v, max = 255) {
  * GET /roles/list?cognito_id=...
  * Returns roles for that tenant (cognito_id)
  */
-app.get("/roles/list", async (req, res, next) => {
+app.get("/api/roles/list", async (req, res, next) => {
   try {
     const cognitoId = cleanStr(req.query.cognito_id);
     if (!cognitoId) throw httpError(400, "Missing cognito_id");
@@ -3455,7 +3455,7 @@ app.get("/roles/list", async (req, res, next) => {
  * POST /roles/create
  * body: { cognito_id, name, code?, description?, is_production_role? }
  */
-app.post("/roles/create", async (req, res, next) => {
+app.post("/api/roles/create", async (req, res, next) => {
   try {
     const body = req.body || {};
     const cognitoId = cleanStr(body.cognito_id);
@@ -3498,7 +3498,7 @@ app.post("/roles/create", async (req, res, next) => {
  * PUT /roles/update/:id
  * body: { cognito_id, name?, code?, description?, is_production_role? }
  */
-app.put("/roles/update/:id", async (req, res, next) => {
+app.put("/api/roles/update/:id", async (req, res, next) => {
   try {
     const roleId = cleanStr(req.params.id, 36);
     if (!roleId) throw httpError(400, "Missing role id");
@@ -3553,7 +3553,7 @@ app.put("/roles/update/:id", async (req, res, next) => {
 /**
  * DELETE /roles/delete/:id?cognito_id=...
  */
-app.delete("/roles/delete/:id", async (req, res, next) => {
+app.delete("/api/roles/delete/:id", async (req, res, next) => {
   try {
     const roleId = cleanStr(req.params.id, 36);
     if (!roleId) throw httpError(400, "Missing role id");
