@@ -3030,11 +3030,12 @@ app.delete("/api/employees/:id/delete", async (req, res) => {
 });
 
 const ROLE_KEY_TO_ROLE_ID = {
-   production: 1,
-   packing: 2,
-   dispatch: 3,
-   admin: 4,
+  production: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  packing: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  dispatch: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  admin: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
 };
+
 
 function assertYYYYMMDD(s) {
   if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) {
