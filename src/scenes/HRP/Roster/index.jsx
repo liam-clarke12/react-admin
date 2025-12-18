@@ -27,6 +27,7 @@ const Styles = () => (
     .r-btn-primary{ background:var(--dae-purple); border-color:var(--dae-purple); color:#fff; box-shadow:0 12px 24px rgba(124,58,237,0.22); }
     .r-btn-primary:hover{ background:var(--dae-purple-dark); border-color:var(--dae-purple-dark); }
     .r-btn-primary:focus{ outline:none; box-shadow:0 0 0 4px var(--dae-purple-ring), 0 12px 24px rgba(124,58,237,0.22); }
+    .r-btn:disabled{ opacity:0.55; cursor:not-allowed; transform:none; box-shadow:none; }
     .r-chip{ font-size:12px; font-weight:900; padding:6px 10px; border-radius:999px; background:#f1f5f9; border:1px solid #e5e7eb; color:#334155; }
     .r-week-label{ font-size:13px; font-weight:900; color:#0f172a; }
     .r-block{ border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#fff; }
@@ -103,6 +104,10 @@ const Styles = () => (
     .r-row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .r-modal-ftr{ padding:12px 14px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; background:#fff; }
     .r-note{ font-size:12px; color:#64748b; line-height:1.35; }
+    .r-kv{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .r-kv strong{ color:#0f172a; }
+    .r-badge-warn{ background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
+    .r-badge-ok{ background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; }
     @media (max-width: 900px){
       .r-grid{ grid-template-columns: 190px repeat(7, minmax(0, 1fr)); }
       .r-row-label{ padding:8px; }
@@ -236,6 +241,18 @@ const Roster = () => {
     end: "16:00",
     error: "",
   });
+
+  // ✅ Send roster modal
+  const [sendModal, setSendModal] = useState({
+    open: false,
+    sending: false,
+    error: "",
+    results: null, // { sent: [], failed: [] }
+  });
+
+  const closeModal = () => setModal((m) => ({ ...m, open: false, error: "" }));
+  const closeSendModal = () =>
+    setSendModal({ open: false, sending: false, error: "", results: null });
 
   // Ensure modal roleKey always valid when roles load/change
   useEffect(() => {
@@ -406,8 +423,6 @@ const Roster = () => {
     });
   };
 
-  const closeModal = () => setModal((m) => ({ ...m, open: false, error: "" }));
-
   const confirmAddShift = async () => {
     const { employeeId, dayIndex, roleKey, start, end } = modal;
 
@@ -525,6 +540,113 @@ const Roster = () => {
       console.error("[Roster] delete error:", e);
       setAssignments(snapshot);
       alert(e?.message || "Could not delete shift.");
+    }
+  };
+
+  // ✅ Build a per-employee week summary for review + sending
+  const weekRosterSummary = useMemo(() => {
+    const byEmp = [];
+
+    employees.forEach((emp) => {
+      const days = [];
+
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const date = weekDates[dayIndex].toISOString().slice(0, 10);
+        const shifts = getDayShifts(emp.id, dayIndex);
+
+        if (shifts.length > 0) {
+          const pretty = shifts.map((s) => {
+            const role = roles.find((r) => r.key === s.roleKey);
+            return {
+              assignment_id: s.id,
+              role_key: s.roleKey,
+              role_name: role?.name || s.roleKey,
+              start: s.start,
+              end: s.end,
+            };
+          });
+
+          days.push({
+            day_index: dayIndex,
+            day_label: DAYS[dayIndex],
+            date,
+            shifts: pretty,
+          });
+        }
+      }
+
+      if (days.length > 0) {
+        // IMPORTANT: update this if your employee email field differs
+        const email =
+          emp.email || emp.email_address || emp.work_email || emp.personal_email || "";
+
+        byEmp.push({
+          employee_id: String(emp.id),
+          full_name: emp.full_name,
+          email,
+          days,
+        });
+      }
+    });
+
+    return byEmp;
+  }, [employees, weekDates, roles, assignments]);
+
+  const openSendRosterModal = () => {
+    setSendModal({ open: true, sending: false, error: "", results: null });
+  };
+
+  const sendWeekRosterEmails = async () => {
+    try {
+      const rostered = weekRosterSummary;
+
+      if (rostered.length === 0) {
+        setSendModal((m) => ({
+          ...m,
+          sending: false,
+          error: "No rostered employees this week.",
+          results: null,
+        }));
+        return;
+      }
+
+      const missing = rostered.filter((x) => !x.email);
+      if (missing.length > 0) {
+        setSendModal((m) => ({
+          ...m,
+          sending: false,
+          error: `Missing email for: ${missing.map((x) => x.full_name).join(", ")}.`,
+          results: null,
+        }));
+        return;
+      }
+
+      setSendModal((m) => ({ ...m, sending: true, error: "", results: null }));
+
+      const res = await fetch(`${API_BASE}/roster/week/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cognito_id: cognitoId,
+          week_start: weekStartYYYYMMDD,
+          roster: rostered, // backend can re-query, but this helps for MVP
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "Failed to send emails");
+      }
+
+      const json = await res.json();
+      setSendModal((m) => ({ ...m, sending: false, results: json, error: "" }));
+    } catch (e) {
+      setSendModal((m) => ({
+        ...m,
+        sending: false,
+        error: e?.message || "Could not send emails.",
+        results: null,
+      }));
     }
   };
 
@@ -667,6 +789,17 @@ const Roster = () => {
               <span className="r-week-label">
                 Week of {formatShort(weekStart)} ({formatRangeLabel(weekStart)})
               </span>
+
+              <button
+                type="button"
+                className="r-btn r-btn-primary"
+                onClick={openSendRosterModal}
+                disabled={loadingWeek || loadingEmployees}
+                title="Review and email this week’s roster to rostered staff"
+              >
+                Send week roster
+              </button>
+
               <span className="r-chip">{loadingWeek ? "Syncing…" : "Synced"}</span>
             </div>
           </div>
@@ -768,7 +901,9 @@ const Roster = () => {
                                 title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
                                 <div className="r-shift-left">
-                                  <p className="r-shift-role">{role?.name || s.roleKey}</p>
+                                  <p className="r-shift-role">
+                                    {role?.name || s.roleKey}
+                                  </p>
                                   <div className="r-shift-time">
                                     {s.start} – {s.end}
                                   </div>
@@ -796,7 +931,7 @@ const Roster = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Shift Modal */}
       {modal.open && (
         <div
           className="r-modal-overlay"
@@ -868,10 +1003,7 @@ const Roster = () => {
               </div>
 
               {modal.error && (
-                <div
-                  className="r-note"
-                  style={{ color: "#b91c1c", fontWeight: 900 }}
-                >
+                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
                   {modal.error}
                 </div>
               )}
@@ -887,6 +1019,155 @@ const Roster = () => {
                 onClick={confirmAddShift}
               >
                 Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Roster Review Modal */}
+      {sendModal.open && (
+        <div
+          className="r-modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target?.classList?.contains("r-modal-overlay")) closeSendModal();
+          }}
+        >
+          <div className="r-modal" role="dialog" aria-modal="true">
+            <div className="r-modal-hdr">
+              <h3 className="r-modal-title">Send week roster</h3>
+              <button
+                className="r-icon-btn"
+                type="button"
+                onClick={closeSendModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="r-modal-body">
+              <div className="r-note">
+                <div className="r-kv">
+                  <span>
+                    <strong>Week:</strong> {formatRangeLabel(weekStart)}
+                  </span>
+                  <span className="r-chip r-badge-ok">
+                    {weekRosterSummary.length} email(s)
+                  </span>
+                </div>
+              </div>
+
+              {weekRosterSummary.length === 0 ? (
+                <div className="r-note">No one is rostered this week.</div>
+              ) : (
+                <div className="r-stack" style={{ gap: 10 }}>
+                  {weekRosterSummary.map((emp) => (
+                    <div key={emp.employee_id} className="r-block">
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 1000, fontSize: 13 }}>
+                            {emp.full_name}
+                          </div>
+                          <div
+                            style={{
+                              color: emp.email ? "#64748b" : "#b91c1c",
+                              fontWeight: 900,
+                              fontSize: 12,
+                            }}
+                          >
+                            {emp.email || "⚠️ Missing email"}
+                          </div>
+                        </div>
+                        <span className="r-chip">{emp.days.length} day(s)</span>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 10,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        {emp.days.map((d) => (
+                          <div key={d.date} style={{ fontSize: 12 }}>
+                            <div style={{ fontWeight: 1000, marginBottom: 4 }}>
+                              {d.day_label} · {formatShort(d.date)}
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                              }}
+                            >
+                              {d.shifts.map((s) => (
+                                <div
+                                  key={s.assignment_id}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 900 }}>
+                                    {s.role_name}
+                                  </span>
+                                  <span style={{ color: "#475569", fontWeight: 900 }}>
+                                    {s.start}–{s.end}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sendModal.error && (
+                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
+                  {sendModal.error}
+                </div>
+              )}
+
+              {sendModal.results && (
+                <div className="r-note" style={{ fontWeight: 900 }}>
+                  Sent: {sendModal.results?.sent?.length || 0} · Failed:{" "}
+                  {sendModal.results?.failed?.length || 0}
+                </div>
+              )}
+            </div>
+
+            <div className="r-modal-ftr">
+              <button type="button" className="r-btn" onClick={closeSendModal}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="r-btn r-btn-primary"
+                onClick={sendWeekRosterEmails}
+                disabled={
+                  sendModal.sending ||
+                  weekRosterSummary.length === 0 ||
+                  weekRosterSummary.some((x) => !x.email)
+                }
+                title={
+                  weekRosterSummary.some((x) => !x.email)
+                    ? "Add missing emails in HRP → Employees"
+                    : "Send roster to rostered staff"
+                }
+              >
+                {sendModal.sending ? "Sending…" : "Confirm & send"}
               </button>
             </div>
           </div>
