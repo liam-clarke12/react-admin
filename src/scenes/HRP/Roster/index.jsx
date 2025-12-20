@@ -283,6 +283,12 @@ const Roster = () => {
     return emp?.full_name || `#${id}`;
   };
 
+  // ✅ NEW helper: employee title
+  const getEmployeeTitle = (id) => {
+    const emp = employees.find((e) => String(e.id) === String(id));
+    return emp?.title || "";
+  };
+
   const getDayShifts = (employeeId, dayIndex) => {
     const empDays = assignments?.[employeeId] || {};
     const shifts = empDays?.[dayIndex] || [];
@@ -758,7 +764,23 @@ const Roster = () => {
 
                   {filteredEmployees.map((emp) => (
                     <div key={emp.id} className="r-emp-chip">
-                      <span className="r-emp-name">{emp.full_name}</span>
+                      <span className="r-emp-name">
+                        {emp.full_name}
+                        {emp.title ? (
+                          <span
+                            style={{
+                              display: "block",
+                              marginTop: 4,
+                              fontSize: 11,
+                              fontWeight: 900,
+                              color: "#94a3b8",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {emp.title}
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="r-emp-meta">Row</span>
                     </div>
                   ))}
@@ -818,7 +840,9 @@ const Roster = () => {
               <React.Fragment key={emp.id}>
                 <div className="r-row-label">
                   <p className="r-row-name">{emp.full_name}</p>
-                  <div className="r-row-sub">Drop roles into cells</div>
+                  <div className="r-row-sub">
+                    {emp.title ? emp.title : "Drop roles into cells"}
+                  </div>
                 </div>
 
                 {DAYS.map((_, dayIndex) => {
@@ -954,7 +978,14 @@ const Roster = () => {
 
             <div className="r-modal-body">
               <div className="r-note">
-                <strong>{getEmployeeName(modal.employeeId)}</strong> ·{" "}
+                <strong>{getEmployeeName(modal.employeeId)}</strong>
+                {getEmployeeTitle(modal.employeeId) ? (
+                  <span style={{ color: "#64748b", fontWeight: 900 }}>
+                    {" "}
+                    · {getEmployeeTitle(modal.employeeId)}
+                  </span>
+                ) : null}
+                {" · "}
                 <strong>{DAYS[modal.dayIndex]}</strong> ·{" "}
                 <strong>{formatShort(weekDates[modal.dayIndex])}</strong>
               </div>
