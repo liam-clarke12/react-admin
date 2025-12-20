@@ -288,738 +288,752 @@ export default function AccountPage() {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100%",
-        maxWidth: "100%",
-        overflowX: "hidden", // ✅ prevents tiny overflow that shows as a left gutter
-      }}
-    >
-      <Box className="acct-shell">
-        <style>{`
-          .acct-shell{
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-            min-height: 100%;
-            margin: 0;
-            padding: 20px;
-            overflow-x: hidden; /* ✅ extra guard */
-            background:
-              radial-gradient(1000px 500px at 10% -10%, rgba(124,58,237,0.18), transparent 60%),
-              radial-gradient(900px 500px at 90% 0%, rgba(91,33,182,0.14), transparent 60%),
-              linear-gradient(180deg, #f6f7fb, #eef2ff 55%, #f6f7fb);
-          }
+    <Box sx={{ position: "relative", width: "100%" }}>
+      {/* ✅ Full-viewport background layer (covers left gutter created by layout padding) */}
+      <Box className="acct-backdrop" aria-hidden />
 
-          .acct-max{
-            width: 100%;
-            max-width: 1180px;
-            margin: 0 auto;
-          }
+      {/* Page content */}
+      <Box
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          overflowX: "hidden",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <Box className="acct-shell">
+          <style>{`
+            .acct-backdrop{
+              position: fixed;
+              inset: 0;
+              z-index: 0;
+              pointer-events: none;
+              background:
+                radial-gradient(1000px 500px at 10% -10%, rgba(124,58,237,0.18), transparent 60%),
+                radial-gradient(900px 500px at 90% 0%, rgba(91,33,182,0.14), transparent 60%),
+                linear-gradient(180deg, #f6f7fb, #eef2ff 55%, #f6f7fb);
+            }
 
-          .hero{
-            position: relative;
-            border-radius: 22px;
-            overflow: hidden;
-            border: 1px solid ${brand.border};
-            box-shadow: ${brand.shadowLg};
-            background:
-              radial-gradient(900px 420px at 15% 30%, rgba(124,58,237,0.35), rgba(124,58,237,0) 55%),
-              radial-gradient(900px 420px at 85% 40%, rgba(91,33,182,0.28), rgba(91,33,182,0) 60%),
-              linear-gradient(135deg, ${brand.primary}, ${brand.primaryDark});
-          }
+            .acct-shell{
+              width: 100%;
+              max-width: 100%;
+              box-sizing: border-box;
+              margin: 0;
+              padding: 20px;
+              overflow-x: hidden;
+              background: transparent; /* ✅ background moved to backdrop */
+              position: relative;
+              z-index: 1;
+            }
 
-          .hero::after{
-            content:"";
-            position:absolute;
-            inset:-2px;
-            background:
-              radial-gradient(circle at 20% 30%, rgba(255,255,255,0.18), transparent 30%),
-              radial-gradient(circle at 80% 40%, rgba(255,255,255,0.14), transparent 35%),
-              radial-gradient(circle at 40% 85%, rgba(255,255,255,0.10), transparent 40%);
-            pointer-events:none;
-            mix-blend-mode: overlay;
-            opacity: 0.9;
-          }
+            .acct-max{
+              width: 100%;
+              max-width: 1180px;
+              margin: 0 auto;
+            }
 
-          .hero-inner{
-            position: relative;
-            z-index: 1;
-            padding: 18px 18px 16px;
-          }
+            .hero{
+              position: relative;
+              border-radius: 22px;
+              overflow: hidden;
+              border: 1px solid ${brand.border};
+              box-shadow: ${brand.shadowLg};
+              background:
+                radial-gradient(900px 420px at 15% 30%, rgba(124,58,237,0.35), rgba(124,58,237,0) 55%),
+                radial-gradient(900px 420px at 85% 40%, rgba(91,33,182,0.28), rgba(91,33,182,0) 60%),
+                linear-gradient(135deg, ${brand.primary}, ${brand.primaryDark});
+            }
 
-          .hero-top{
-            display:flex;
-            align-items:flex-start;
-            justify-content: space-between;
-            gap: 14px;
-            flex-wrap: wrap;
-          }
+            .hero::after{
+              content:"";
+              position:absolute;
+              inset:-2px;
+              background:
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.18), transparent 30%),
+                radial-gradient(circle at 80% 40%, rgba(255,255,255,0.14), transparent 35%),
+                radial-gradient(circle at 40% 85%, rgba(255,255,255,0.10), transparent 40%);
+              pointer-events:none;
+              mix-blend-mode: overlay;
+              opacity: 0.9;
+            }
 
-          .hero-title{
-            margin:0;
-            font-weight: 950;
-            letter-spacing: -0.02em;
-            color: #fff;
-            line-height: 1.05;
-          }
-          .hero-sub{
-            margin: 6px 0 0;
-            color: rgba(255,255,255,0.86);
-            font-weight: 600;
-          }
+            .hero-inner{
+              position: relative;
+              z-index: 1;
+              padding: 18px 18px 16px;
+            }
 
-          .hero-actions{
-            display:flex;
-            gap: 10px;
-            align-items:center;
-            flex-wrap: wrap;
-          }
+            .hero-top{
+              display:flex;
+              align-items:flex-start;
+              justify-content: space-between;
+              gap: 14px;
+              flex-wrap: wrap;
+            }
 
-          .btn-solid{
-            color:#fff;
-            border-radius: 999px;
-            font-weight: 950;
-            padding: 10px 16px;
-            text-transform:none;
-            background: #0b1220;
-            border: 1px solid rgba(255,255,255,0.16);
-            box-shadow: 0 10px 24px rgba(2,6,23,0.28);
-          }
-          .btn-solid:hover{ background:#0a1020; }
+            .hero-title{
+              margin:0;
+              font-weight: 950;
+              letter-spacing: -0.02em;
+              color: #fff;
+              line-height: 1.05;
+            }
+            .hero-sub{
+              margin: 6px 0 0;
+              color: rgba(255,255,255,0.86);
+              font-weight: 600;
+            }
 
-          .btn-ghost{
-            border: 1px solid rgba(255,255,255,0.35);
-            color: #fff;
-            background: transparent;
-            font-weight: 900;
-            border-radius: 999px;
-            text-transform: none;
-          }
-          .btn-ghost:hover{
-            background: rgba(255,255,255,0.10);
-          }
+            .hero-actions{
+              display:flex;
+              gap: 10px;
+              align-items:center;
+              flex-wrap: wrap;
+            }
 
-          .hero-badges{
-            display:flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 14px;
-            align-items:center;
-          }
+            .btn-solid{
+              color:#fff;
+              border-radius: 999px;
+              font-weight: 950;
+              padding: 10px 16px;
+              text-transform:none;
+              background: #0b1220;
+              border: 1px solid rgba(255,255,255,0.16);
+              box-shadow: 0 10px 24px rgba(2,6,23,0.28);
+            }
+            .btn-solid:hover{ background:#0a1020; }
 
-          .badge{
-            display:flex;
-            gap: 8px;
-            align-items:center;
-            padding: 8px 10px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.16);
-            border: 1px solid rgba(255,255,255,0.22);
-            color: rgba(255,255,255,0.92);
-            font-weight: 800;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-          }
+            .btn-ghost{
+              border: 1px solid rgba(255,255,255,0.35);
+              color: #fff;
+              background: transparent;
+              font-weight: 900;
+              border-radius: 999px;
+              text-transform: none;
+            }
+            .btn-ghost:hover{
+              background: rgba(255,255,255,0.10);
+            }
 
-          .content{
-            margin-top: 16px;
-            display:grid;
-            gap: 14px;
-            grid-template-columns: 360px minmax(0, 1fr);
-            align-items: start;
-          }
+            .hero-badges{
+              display:flex;
+              gap: 10px;
+              flex-wrap: wrap;
+              margin-top: 14px;
+              align-items:center;
+            }
 
-          @media (max-width: 980px){
-            .content{ grid-template-columns: 1fr; }
-          }
+            .badge{
+              display:flex;
+              gap: 8px;
+              align-items:center;
+              padding: 8px 10px;
+              border-radius: 999px;
+              background: rgba(255,255,255,0.16);
+              border: 1px solid rgba(255,255,255,0.22);
+              color: rgba(255,255,255,0.92);
+              font-weight: 800;
+              font-size: 12px;
+              backdrop-filter: blur(10px);
+            }
 
-          .card{
-            border: 1px solid ${brand.border};
-            background: ${brand.surface};
-            border-radius: 20px;
-            box-shadow: ${brand.shadowLg};
-            overflow: hidden;
-            min-width: 0; /* ✅ avoids grid overflow */
-          }
+            .content{
+              margin-top: 16px;
+              display:grid;
+              gap: 14px;
+              grid-template-columns: 360px minmax(0, 1fr);
+              align-items: start;
+            }
 
-          .card-h{
-            display:flex;
-            align-items:center;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 14px 16px;
-            border-bottom: 1px solid ${brand.border};
-            background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
-          }
+            @media (max-width: 980px){
+              .content{ grid-template-columns: 1fr; }
+            }
 
-          .card-title{
-            margin:0;
-            font-weight: 950;
-            color: ${brand.text};
-            letter-spacing: -0.01em;
-          }
-          .card-sub{
-            margin: 2px 0 0;
-            color: ${brand.subtext};
-            font-weight: 650;
-            font-size: 13px;
-          }
+            .card{
+              border: 1px solid ${brand.border};
+              background: ${brand.surface};
+              border-radius: 20px;
+              box-shadow: ${brand.shadowLg};
+              overflow: hidden;
+              min-width: 0;
+            }
 
-          .card-b{ padding: 16px; }
+            .card-h{
+              display:flex;
+              align-items:center;
+              justify-content: space-between;
+              gap: 10px;
+              padding: 14px 16px;
+              border-bottom: 1px solid ${brand.border};
+              background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+            }
 
-          .avatar-wrap{
-            position: relative;
-            width: 128px;
-            margin: 4px auto 0;
-          }
+            .card-title{
+              margin:0;
+              font-weight: 950;
+              color: ${brand.text};
+              letter-spacing: -0.01em;
+            }
+            .card-sub{
+              margin: 2px 0 0;
+              color: ${brand.subtext};
+              font-weight: 650;
+              font-size: 13px;
+            }
 
-          .avatar-ring{
-            border-radius: 999px;
-            padding: 4px;
-            background:
-              radial-gradient(circle at 20% 20%, rgba(255,255,255,0.55), rgba(255,255,255,0) 45%),
-              linear-gradient(135deg, rgba(124,58,237,0.75), rgba(91,33,182,0.75));
-            box-shadow: 0 18px 40px rgba(2,6,23,0.18);
-          }
+            .card-b{ padding: 16px; }
 
-          .avatar-overlay{
-            position:absolute; inset:0;
-            display:grid; place-items:center;
-            background: rgba(248, 250, 252, 0.72);
-            border-radius: 999px;
-            backdrop-filter: blur(6px);
-          }
+            .avatar-wrap{
+              position: relative;
+              width: 128px;
+              margin: 4px auto 0;
+            }
 
-          .upload-btn{
-            position: absolute;
-            bottom: -6px;
-            right: -6px;
-            background: #fff;
-            border: 1px solid ${brand.border};
-            box-shadow: 0 10px 22px rgba(2,6,23,0.12);
-          }
-          .upload-btn:hover{ background: ${brand.surfaceMuted}; }
+            .avatar-ring{
+              border-radius: 999px;
+              padding: 4px;
+              background:
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.55), rgba(255,255,255,0) 45%),
+                linear-gradient(135deg, rgba(124,58,237,0.75), rgba(91,33,182,0.75));
+              box-shadow: 0 18px 40px rgba(2,6,23,0.18);
+            }
 
-          .mini-actions{
-            display:grid;
-            gap: 10px;
-            margin-top: 14px;
-            min-width: 0;
-          }
+            .avatar-overlay{
+              position:absolute; inset:0;
+              display:grid; place-items:center;
+              background: rgba(248, 250, 252, 0.72);
+              border-radius: 999px;
+              backdrop-filter: blur(6px);
+            }
 
-          .side-stat{
-            display:flex;
-            align-items:center;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 12px 12px;
-            border: 1px solid ${brand.border};
-            border-radius: 14px;
-            background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
-            min-width: 0;
-          }
-          .side-stat strong{ color:${brand.text}; font-weight: 950; }
-          .side-stat span{
-            color:${brand.subtext};
-            font-weight: 700;
-            font-size: 13px;
-            overflow:hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            display:block;
-            max-width: 220px;
-          }
+            .upload-btn{
+              position: absolute;
+              bottom: -6px;
+              right: -6px;
+              background: #fff;
+              border: 1px solid ${brand.border};
+              box-shadow: 0 10px 22px rgba(2,6,23,0.12);
+            }
+            .upload-btn:hover{ background: ${brand.surfaceMuted}; }
 
-          .section{
-            padding: 14px 16px;
-            border: 1px solid ${brand.border};
-            border-radius: 18px;
-            background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
-            min-width: 0;
-          }
+            .mini-actions{
+              display:grid;
+              gap: 10px;
+              margin-top: 14px;
+              min-width: 0;
+            }
 
-          .section-h{
-            display:flex;
-            align-items:center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 10px;
-          }
+            .side-stat{
+              display:flex;
+              align-items:center;
+              justify-content: space-between;
+              gap: 10px;
+              padding: 12px 12px;
+              border: 1px solid ${brand.border};
+              border-radius: 14px;
+              background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+              min-width: 0;
+            }
+            .side-stat strong{ color:${brand.text}; font-weight: 950; }
+            .side-stat span{
+              color:${brand.subtext};
+              font-weight: 700;
+              font-size: 13px;
+              overflow:hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              display:block;
+              max-width: 220px;
+            }
 
-          .section-h .kicker{
-            display:flex;
-            align-items:center;
-            gap: 10px;
-            min-width: 0;
-          }
+            .section{
+              padding: 14px 16px;
+              border: 1px solid ${brand.border};
+              border-radius: 18px;
+              background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+              min-width: 0;
+            }
 
-          .k-icon{
-            width: 34px; height: 34px;
-            border-radius: 12px;
-            display:grid; place-items:center;
-            background: rgba(124,58,237,0.12);
-            border: 1px solid rgba(124,58,237,0.22);
-            color: ${brand.primaryDark};
-          }
+            .section-h{
+              display:flex;
+              align-items:center;
+              justify-content: space-between;
+              gap: 12px;
+              margin-bottom: 10px;
+            }
 
-          .input .MuiOutlinedInput-root{
-            border-radius: 14px;
-            background: #fff;
-          }
-          .input .MuiOutlinedInput-notchedOutline{ border-color: ${brand.border}; }
-          .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{ border-color: ${brand.primary}; }
-          .input .MuiOutlinedInput-root.Mui-focused{ box-shadow: 0 0 0 4px ${brand.focusRing}; }
-          .input .MuiInputLabel-root.Mui-focused{ color: ${brand.primaryDark}; font-weight: 800; }
+            .section-h .kicker{
+              display:flex;
+              align-items:center;
+              gap: 10px;
+              min-width: 0;
+            }
 
-          .hint{
-            display:flex;
-            gap: 8px;
-            align-items:flex-start;
-            color: ${brand.subtext};
-            font-weight: 650;
-            font-size: 12.5px;
-            line-height: 1.35;
-            padding: 10px 12px;
-            border-radius: 14px;
-            border: 1px dashed rgba(124,58,237,0.35);
-            background: rgba(124,58,237,0.06);
-            min-width: 0;
-          }
-        `}</style>
+            .k-icon{
+              width: 34px; height: 34px;
+              border-radius: 12px;
+              display:grid; place-items:center;
+              background: rgba(124,58,237,0.12);
+              border: 1px solid rgba(124,58,237,0.22);
+              color: ${brand.primaryDark};
+            }
 
-        {/* --- YOUR EXISTING JSX BELOW (unchanged) --- */}
-        <Box className="acct-max">
-          {/* Hero */}
-          <Box className="hero">
-            <Box className="hero-inner">
-              <Box className="hero-top">
-                <Box>
-                  <Typography className="hero-title" variant="h4">
-                    My Account
-                  </Typography>
-                  <Typography className="hero-sub">
-                    Keep your profile fresh — and make it unmistakably <b>Dae</b>.
-                  </Typography>
-                </Box>
+            .input .MuiOutlinedInput-root{
+              border-radius: 14px;
+              background: #fff;
+            }
+            .input .MuiOutlinedInput-notchedOutline{ border-color: ${brand.border}; }
+            .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{ border-color: ${brand.primary}; }
+            .input .MuiOutlinedInput-root.Mui-focused{ box-shadow: 0 0 0 4px ${brand.focusRing}; }
+            .input .MuiInputLabel-root.Mui-focused{ color: ${brand.primaryDark}; font-weight: 800; }
 
-                <Box className="hero-actions">
-                  {!editMode ? (
-                    <Button onClick={() => setEditMode(true)} startIcon={<EditIcon />} className="btn-solid">
-                      Edit Profile
-                    </Button>
-                  ) : (
-                    <>
-                      <Button onClick={onCancel} startIcon={<CancelIcon />} className="btn-ghost">
-                        Cancel
-                      </Button>
-                      <Button onClick={onSave} startIcon={<SaveIcon />} className="btn-solid">
-                        Save Changes
-                      </Button>
-                    </>
-                  )}
-                </Box>
-              </Box>
+            .hint{
+              display:flex;
+              gap: 8px;
+              align-items:flex-start;
+              color: ${brand.subtext};
+              font-weight: 650;
+              font-size: 12.5px;
+              line-height: 1.35;
+              padding: 10px 12px;
+              border-radius: 14px;
+              border: 1px dashed rgba(124,58,237,0.35);
+              background: rgba(124,58,237,0.06);
+              min-width: 0;
+            }
+          `}</style>
 
-              <Box className="hero-badges">
-                <Box className="badge">
-                  <ShieldOutlinedIcon sx={{ fontSize: 16 }} />
-                  Private avatar storage
-                </Box>
-                <Box className="badge">
-                  <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
-                  Profile shows across the platform
-                </Box>
-                <Box className="badge">
-                  <InfoOutlinedIcon sx={{ fontSize: 16 }} />
-                  Email is read-only
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Main content */}
-          <Box className="content">
-            {/* Left: Identity card */}
-            <Box className="card">
-              <Box className="card-h">
-                <Box>
-                  <Typography className="card-title">Identity</Typography>
-                  <Typography className="card-sub">Avatar + quick actions</Typography>
-                </Box>
-
-                <Chip
-                  label={editMode ? "Editing" : "View mode"}
-                  size="small"
-                  sx={{
-                    fontWeight: 900,
-                    borderRadius: 999,
-                    border: `1px solid ${brand.border}`,
-                    background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
-                    color: editMode ? brand.primaryDark : brand.subtext,
-                  }}
-                />
-              </Box>
-
-              <Box className="card-b">
-                <Box className="avatar-wrap">
-                  <Box className="avatar-ring">
-                    <Avatar
-                      src={avatarUrl || undefined}
-                      alt={fullName}
-                      sx={{
-                        width: 120,
-                        height: 120,
-                        bgcolor: "rgba(255,255,255,0.2)",
-                        color: "#fff",
-                        fontWeight: 950,
-                        border: "1px solid rgba(255,255,255,0.22)",
-                      }}
-                    >
-                      {initialsFromName(form.firstName, form.lastName)}
-                    </Avatar>
+          {/* --- YOUR EXISTING JSX BELOW (unchanged) --- */}
+          <Box className="acct-max">
+            {/* Hero */}
+            <Box className="hero">
+              <Box className="hero-inner">
+                <Box className="hero-top">
+                  <Box>
+                    <Typography className="hero-title" variant="h4">
+                      My Account
+                    </Typography>
+                    <Typography className="hero-sub">
+                      Keep your profile fresh — and make it unmistakably <b>Dae</b>.
+                    </Typography>
                   </Box>
 
-                  {avatarUploading && (
-                    <Box className="avatar-overlay">
-                      <Box display="grid" gap={1} justifyItems="center">
-                        <CircularProgress size={28} />
-                        <Typography variant="caption" sx={{ color: brand.subtext, fontWeight: 800 }}>
-                          Uploading… {avatarProgress}%
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
-
-                  {editMode && (
-                    <Tooltip title="Upload a new avatar">
-                      <IconButton component="label" className="upload-btn">
-                        <UploadIcon />
-                        <input hidden type="file" accept="image/*" onChange={onAvatarUpload} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-
-                <Box textAlign="center" mt={1.5}>
-                  <Typography sx={{ fontWeight: 950, color: brand.text, fontSize: 18, letterSpacing: -0.01 }}>
-                    {fullName}
-                  </Typography>
-                  <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 13 }}>
-                    {form.jobTitle || "—"} {form.company ? `• ${form.company}` : ""}
-                  </Typography>
-                </Box>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Box className="mini-actions">
-                  <Button
-                    onClick={openPwDialog}
-                    startIcon={<KeyOutlinedIcon />}
-                    className="btn-solid"
-                    sx={{ borderRadius: 14, justifyContent: "center" }}
-                  >
-                    Change Password
-                  </Button>
-
-                  <Box className="side-stat">
-                    <Box>
-                      <strong>Email</strong>
-                      <Box mt={0.3}>
-                        <span>{email || "—"}</span>
-                      </Box>
-                    </Box>
-                    <MailOutlineIcon sx={{ color: brand.primaryDark }} />
+                  <Box className="hero-actions">
+                    {!editMode ? (
+                      <Button onClick={() => setEditMode(true)} startIcon={<EditIcon />} className="btn-solid">
+                        Edit Profile
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={onCancel} startIcon={<CancelIcon />} className="btn-ghost">
+                          Cancel
+                        </Button>
+                        <Button onClick={onSave} startIcon={<SaveIcon />} className="btn-solid">
+                          Save Changes
+                        </Button>
+                      </>
+                    )}
                   </Box>
+                </Box>
 
-                  <Box className="hint">
-                    <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
-                    Your avatar is uploaded to private storage and the profile saves the S3 key to your Cognito{" "}
-                    <b>picture</b> attribute.
+                <Box className="hero-badges">
+                  <Box className="badge">
+                    <ShieldOutlinedIcon sx={{ fontSize: 16 }} />
+                    Private avatar storage
+                  </Box>
+                  <Box className="badge">
+                    <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
+                    Profile shows across the platform
+                  </Box>
+                  <Box className="badge">
+                    <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                    Email is read-only
                   </Box>
                 </Box>
               </Box>
             </Box>
 
-            {/* Right: Profile form */}
-            <Box className="card">
-              <Box className="card-h">
-                <Box>
-                  <Typography className="card-title">Profile Details</Typography>
-                  <Typography className="card-sub">Update your details (and they’ll sync everywhere)</Typography>
+            {/* Main content */}
+            <Box className="content">
+              {/* Left: Identity card */}
+              <Box className="card">
+                <Box className="card-h">
+                  <Box>
+                    <Typography className="card-title">Identity</Typography>
+                    <Typography className="card-sub">Avatar + quick actions</Typography>
+                  </Box>
+
+                  <Chip
+                    label={editMode ? "Editing" : "View mode"}
+                    size="small"
+                    sx={{
+                      fontWeight: 900,
+                      borderRadius: 999,
+                      border: `1px solid ${brand.border}`,
+                      background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
+                      color: editMode ? brand.primaryDark : brand.subtext,
+                    }}
+                  />
                 </Box>
-                <Chip
-                  label={editMode ? "Fields unlocked" : "Locked"}
-                  size="small"
-                  sx={{
-                    fontWeight: 900,
-                    borderRadius: 999,
-                    border: `1px solid ${brand.border}`,
-                    background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
-                    color: editMode ? brand.primaryDark : brand.subtext,
-                  }}
-                />
-              </Box>
 
-              <Box className="card-b">
-                <Grid container spacing={2}>
-                  {/* Contact */}
-                  <Grid item xs={12}>
-                    <Box className="section">
-                      <Box className="section-h">
-                        <Box className="kicker">
-                          <Box className="k-icon">
-                            <MailOutlineIcon sx={{ fontSize: 18 }} />
-                          </Box>
-                          <Box>
-                            <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
-                              Contact
-                            </Typography>
-                            <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
-                              Email is fixed to your login
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-
-                      <TextField
-                        label="Email"
-                        fullWidth
-                        value={email}
-                        InputProps={{
-                          readOnly: true,
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <MailOutlineIcon sx={{ color: brand.subtext }} />
-                            </InputAdornment>
-                          ),
+                <Box className="card-b">
+                  <Box className="avatar-wrap">
+                    <Box className="avatar-ring">
+                      <Avatar
+                        src={avatarUrl || undefined}
+                        alt={fullName}
+                        sx={{
+                          width: 120,
+                          height: 120,
+                          bgcolor: "rgba(255,255,255,0.2)",
+                          color: "#fff",
+                          fontWeight: 950,
+                          border: "1px solid rgba(255,255,255,0.22)",
                         }}
-                        className="input"
-                      />
+                      >
+                        {initialsFromName(form.firstName, form.lastName)}
+                      </Avatar>
                     </Box>
-                  </Grid>
 
-                  {/* Personal */}
-                  <Grid item xs={12}>
-                    <Box className="section">
-                      <Box className="section-h">
-                        <Box className="kicker">
-                          <Box className="k-icon">
-                            <PersonOutlineIcon sx={{ fontSize: 18 }} />
-                          </Box>
-                          <Box>
-                            <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
-                              Personal
-                            </Typography>
-                            <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
-                              Your name appears in activity logs and reports
-                            </Typography>
-                          </Box>
+                    {avatarUploading && (
+                      <Box className="avatar-overlay">
+                        <Box display="grid" gap={1} justifyItems="center">
+                          <CircularProgress size={28} />
+                          <Typography variant="caption" sx={{ color: brand.subtext, fontWeight: 800 }}>
+                            Uploading… {avatarProgress}%
+                          </Typography>
                         </Box>
                       </Box>
+                    )}
 
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            label="First Name"
-                            fullWidth
-                            value={form.firstName}
-                            onChange={onChange("firstName")}
-                            InputProps={{
-                              readOnly: !editMode,
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <PersonOutlineIcon sx={{ color: brand.subtext }} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            className="input"
-                          />
-                        </Grid>
+                    {editMode && (
+                      <Tooltip title="Upload a new avatar">
+                        <IconButton component="label" className="upload-btn">
+                          <UploadIcon />
+                          <input hidden type="file" accept="image/*" onChange={onAvatarUpload} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
 
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            label="Last Name"
-                            fullWidth
-                            value={form.lastName}
-                            onChange={onChange("lastName")}
-                            InputProps={{
-                              readOnly: !editMode,
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <PersonOutlineIcon sx={{ color: brand.subtext }} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            className="input"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  </Grid>
+                  <Box textAlign="center" mt={1.5}>
+                    <Typography sx={{ fontWeight: 950, color: brand.text, fontSize: 18, letterSpacing: -0.01 }}>
+                      {fullName}
+                    </Typography>
+                    <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 13 }}>
+                      {form.jobTitle || "—"} {form.company ? `• ${form.company}` : ""}
+                    </Typography>
+                  </Box>
 
-                  {/* Work */}
-                  <Grid item xs={12}>
-                    <Box className="section">
-                      <Box className="section-h">
-                        <Box className="kicker">
-                          <Box className="k-icon">
-                            <BusinessOutlinedIcon sx={{ fontSize: 18 }} />
-                          </Box>
-                          <Box>
-                            <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
-                              Work
-                            </Typography>
-                            <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
-                              Used for permissions, routing, and B2B visibility
-                            </Typography>
-                          </Box>
+                  <Divider sx={{ my: 2 }} />
+
+                  <Box className="mini-actions">
+                    <Button
+                      onClick={openPwDialog}
+                      startIcon={<KeyOutlinedIcon />}
+                      className="btn-solid"
+                      sx={{ borderRadius: 14, justifyContent: "center" }}
+                    >
+                      Change Password
+                    </Button>
+
+                    <Box className="side-stat">
+                      <Box>
+                        <strong>Email</strong>
+                        <Box mt={0.3}>
+                          <span>{email || "—"}</span>
                         </Box>
                       </Box>
-
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            label="Company"
-                            fullWidth
-                            value={form.company}
-                            onChange={onChange("company")}
-                            InputProps={{
-                              readOnly: !editMode,
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <BusinessOutlinedIcon sx={{ color: brand.subtext }} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            className="input"
-                          />
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            label="Job Title"
-                            fullWidth
-                            value={form.jobTitle}
-                            onChange={onChange("jobTitle")}
-                            InputProps={{
-                              readOnly: !editMode,
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <BadgeOutlinedIcon sx={{ color: brand.subtext }} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            className="input"
-                          />
-                        </Grid>
-                      </Grid>
-
-                      <Box mt={2} className="hint">
-                        <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
-                        Tip: if you upload a new avatar, you still need to hit <b>Save Changes</b> to persist the key to
-                        Cognito.
-                      </Box>
+                      <MailOutlineIcon sx={{ color: brand.primaryDark }} />
                     </Box>
+
+                    <Box className="hint">
+                      <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
+                      Your avatar is uploaded to private storage and the profile saves the S3 key to your Cognito{" "}
+                      <b>picture</b> attribute.
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Right: Profile form */}
+              <Box className="card">
+                <Box className="card-h">
+                  <Box>
+                    <Typography className="card-title">Profile Details</Typography>
+                    <Typography className="card-sub">Update your details (and they’ll sync everywhere)</Typography>
+                  </Box>
+                  <Chip
+                    label={editMode ? "Fields unlocked" : "Locked"}
+                    size="small"
+                    sx={{
+                      fontWeight: 900,
+                      borderRadius: 999,
+                      border: `1px solid ${brand.border}`,
+                      background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
+                      color: editMode ? brand.primaryDark : brand.subtext,
+                    }}
+                  />
+                </Box>
+
+                <Box className="card-b">
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Box className="section">
+                        <Box className="section-h">
+                          <Box className="kicker">
+                            <Box className="k-icon">
+                              <MailOutlineIcon sx={{ fontSize: 18 }} />
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                                Contact
+                              </Typography>
+                              <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                                Email is fixed to your login
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        <TextField
+                          label="Email"
+                          fullWidth
+                          value={email}
+                          InputProps={{
+                            readOnly: true,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <MailOutlineIcon sx={{ color: brand.subtext }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Box className="section">
+                        <Box className="section-h">
+                          <Box className="kicker">
+                            <Box className="k-icon">
+                              <PersonOutlineIcon sx={{ fontSize: 18 }} />
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                                Personal
+                              </Typography>
+                              <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                                Your name appears in activity logs and reports
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="First Name"
+                              fullWidth
+                              value={form.firstName}
+                              onChange={onChange("firstName")}
+                              InputProps={{
+                                readOnly: !editMode,
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <PersonOutlineIcon sx={{ color: brand.subtext }} />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              className="input"
+                            />
+                          </Grid>
+
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Last Name"
+                              fullWidth
+                              value={form.lastName}
+                              onChange={onChange("lastName")}
+                              InputProps={{
+                                readOnly: !editMode,
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <PersonOutlineIcon sx={{ color: brand.subtext }} />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              className="input"
+                            />
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Box className="section">
+                        <Box className="section-h">
+                          <Box className="kicker">
+                            <Box className="k-icon">
+                              <BusinessOutlinedIcon sx={{ fontSize: 18 }} />
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                                Work
+                              </Typography>
+                              <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                                Used for permissions, routing, and B2B visibility
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Company"
+                              fullWidth
+                              value={form.company}
+                              onChange={onChange("company")}
+                              InputProps={{
+                                readOnly: !editMode,
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <BusinessOutlinedIcon sx={{ color: brand.subtext }} />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              className="input"
+                            />
+                          </Grid>
+
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Job Title"
+                              fullWidth
+                              value={form.jobTitle}
+                              onChange={onChange("jobTitle")}
+                              InputProps={{
+                                readOnly: !editMode,
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <BadgeOutlinedIcon sx={{ color: brand.subtext }} />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              className="input"
+                            />
+                          </Grid>
+                        </Grid>
+
+                        <Box mt={2} className="hint">
+                          <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
+                          Tip: if you upload a new avatar, you still need to hit <b>Save Changes</b> to persist the key
+                          to Cognito.
+                        </Box>
+                      </Box>
+                    </Grid>
                   </Grid>
-                </Grid>
+                </Box>
               </Box>
             </Box>
-          </Box>
 
-          {/* Change Password Dialog */}
-          <Dialog
-            open={pwOpen}
-            onClose={closePwDialog}
-            PaperProps={{
-              sx: {
-                borderRadius: 18,
-                border: `1px solid ${brand.border}`,
-                boxShadow: brand.shadowLg,
-                overflow: "hidden",
-              },
-            }}
-          >
-            <DialogTitle
-              sx={{
-                fontWeight: 950,
-                color: brand.text,
-                background: `linear-gradient(180deg, #fff, ${brand.surfaceMuted})`,
-                borderBottom: `1px solid ${brand.border}`,
+            {/* Change Password Dialog */}
+            <Dialog
+              open={pwOpen}
+              onClose={closePwDialog}
+              PaperProps={{
+                sx: {
+                  borderRadius: 18,
+                  border: `1px solid ${brand.border}`,
+                  boxShadow: brand.shadowLg,
+                  overflow: "hidden",
+                },
               }}
             >
-              Change Password
-            </DialogTitle>
-
-            <DialogContent sx={{ pt: 2 }}>
-              <Box sx={{ display: "grid", gap: 2, minWidth: { xs: 280, sm: 420 } }}>
-                <TextField
-                  label="Current Password"
-                  type="password"
-                  value={pwForm.current}
-                  onChange={onPwChange("current")}
-                  className="input"
-                  autoFocus
-                />
-                <TextField
-                  label="New Password"
-                  type="password"
-                  value={pwForm.next}
-                  onChange={onPwChange("next")}
-                  className="input"
-                />
-                <TextField
-                  label="Confirm New Password"
-                  type="password"
-                  value={pwForm.confirm}
-                  onChange={onPwChange("confirm")}
-                  className="input"
-                />
-              </Box>
-            </DialogContent>
-
-            <DialogActions sx={{ p: 2, gap: 1 }}>
-              <Button
-                onClick={closePwDialog}
-                disabled={pwBusy}
+              <DialogTitle
                 sx={{
-                  borderRadius: 14,
-                  fontWeight: 900,
-                  textTransform: "none",
-                  border: `1px solid ${brand.border}`,
+                  fontWeight: 950,
                   color: brand.text,
-                  background: "#fff",
-                  "&:hover": { background: brand.surfaceMuted },
+                  background: `linear-gradient(180deg, #fff, ${brand.surfaceMuted})`,
+                  borderBottom: `1px solid ${brand.border}`,
                 }}
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={onChangePassword}
-                disabled={pwBusy}
-                className="btn-solid"
-                sx={{ borderRadius: 14, minWidth: 160 }}
-              >
-                {pwBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Update Password"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                Change Password
+              </DialogTitle>
 
-          {/* Snackbars */}
-          <Snackbar
-            open={snack.open}
-            autoHideDuration={3500}
-            onClose={() => setSnack((s) => ({ ...s, open: false }))}
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <Alert
-              severity={snack.severity}
+              <DialogContent sx={{ pt: 2 }}>
+                <Box sx={{ display: "grid", gap: 2, minWidth: { xs: 280, sm: 420 } }}>
+                  <TextField
+                    label="Current Password"
+                    type="password"
+                    value={pwForm.current}
+                    onChange={onPwChange("current")}
+                    className="input"
+                    autoFocus
+                  />
+                  <TextField
+                    label="New Password"
+                    type="password"
+                    value={pwForm.next}
+                    onChange={onPwChange("next")}
+                    className="input"
+                  />
+                  <TextField
+                    label="Confirm New Password"
+                    type="password"
+                    value={pwForm.confirm}
+                    onChange={onPwChange("confirm")}
+                    className="input"
+                  />
+                </Box>
+              </DialogContent>
+
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button
+                  onClick={closePwDialog}
+                  disabled={pwBusy}
+                  sx={{
+                    borderRadius: 14,
+                    fontWeight: 900,
+                    textTransform: "none",
+                    border: `1px solid ${brand.border}`,
+                    color: brand.text,
+                    background: "#fff",
+                    "&:hover": { background: brand.surfaceMuted },
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={onChangePassword}
+                  disabled={pwBusy}
+                  className="btn-solid"
+                  sx={{ borderRadius: 14, minWidth: 160 }}
+                >
+                  {pwBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Update Password"}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Snackbars */}
+            <Snackbar
+              open={snack.open}
+              autoHideDuration={3500}
               onClose={() => setSnack((s) => ({ ...s, open: false }))}
-              variant="filled"
+              anchorOrigin={{ vertical: "top", horizontal: "right" }}
             >
-              {snack.message}
-            </Alert>
-          </Snackbar>
+              <Alert
+                severity={snack.severity}
+                onClose={() => setSnack((s) => ({ ...s, open: false }))}
+                variant="filled"
+              >
+                {snack.message}
+              </Alert>
+            </Snackbar>
+          </Box>
         </Box>
       </Box>
     </Box>
