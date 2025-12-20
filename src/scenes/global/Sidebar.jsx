@@ -268,7 +268,6 @@ const Sidebar = () => {
   }, [location.pathname]);
 
   // ✅ keep auto-open ONLY if user is already on that section’s route
-  // (so direct URL still shows the active item)
   useEffect(() => {
     const path = location.pathname;
 
@@ -498,7 +497,7 @@ const Sidebar = () => {
                 setSelected={setSelected}
               />
 
-              {/* MRP dropdown (children hidden unless opened) */}
+              {/* MRP dropdown */}
               <SectionHeader
                 label="MRP"
                 icon={<FolderOutlinedIcon fontSize="small" />}
@@ -518,7 +517,7 @@ const Sidebar = () => {
                 </>
               )}
 
-              {/* HRP dropdown (children hidden unless opened) */}
+              {/* HRP dropdown */}
               <SectionHeader
                 label="HRP"
                 icon={<GroupWorkOutlinedIcon fontSize="small" />}
@@ -548,7 +547,11 @@ const Sidebar = () => {
           minHeight: "100vh",
           overflowY: "auto",
           position: "relative",
-          background: brand.surfaceMuted,
+
+          // ✅ KEY FIX:
+          // Make wrapper transparent so pages that paint full-bleed backgrounds
+          // (like AccountPage with a fixed backdrop) can show through the "gutter".
+          background: "transparent",
         }}
       >
         {/* Routes render in App.jsx */}
