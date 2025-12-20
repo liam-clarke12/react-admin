@@ -157,6 +157,7 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
           short_name: "",
           email: "",
           phone: "",
+          title: "", // ✅ NEW
           employment_type: "full_time",
           status: "active",
           start_date: "",
@@ -229,6 +230,18 @@ const EmployeeModal = ({ open, onClose, onSave, initial }) => {
                 type="tel"
                 value={form.phone || ""}
                 onChange={(e) => setField("phone", e.target.value)}
+              />
+            </div>
+
+            {/* ✅ NEW: Title (after Phone) */}
+            <div className="g-field col-6">
+              <label className="g-label">Title</label>
+              <input
+                className="g-input"
+                type="text"
+                value={form.title || ""}
+                onChange={(e) => setField("title", e.target.value)}
+                placeholder="e.g. Operations Manager"
               />
             </div>
 
@@ -414,6 +427,7 @@ const Employees = () => {
         short_name: e.short_name,
         email: e.email,
         phone: e.phone,
+        title: e.title, // ✅ NEW
         employment_type: e.employment_type,
         status: e.status,
         start_date: e.start_date,
@@ -445,6 +459,7 @@ const Employees = () => {
       [
         e.full_name,
         e.short_name,
+        e.title, // ✅ NEW (searchable)
         e.email,
         e.phone,
         e.employment_type,
@@ -497,6 +512,7 @@ const Employees = () => {
         short_name: form.short_name,
         email: form.email,
         phone: form.phone,
+        title: form.title, // ✅ NEW
         employment_type: form.employment_type,
         status: form.status,
         start_date: form.start_date || null,
@@ -610,7 +626,7 @@ const Employees = () => {
           <input
             className="r-input"
             type="text"
-            placeholder="Search by name, email, status…"
+            placeholder="Search by name, title, email, status…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -636,6 +652,8 @@ const Employees = () => {
                   />
                 </th>
                 <th className="r-td">Name</th>
+                {/* ✅ NEW: Title column after Name */}
+                <th className="r-td">Title</th>
                 <th className="r-td">Employment</th>
                 <th className="r-td">Status</th>
                 <th className="r-td">Start Date</th>
@@ -660,6 +678,10 @@ const Employees = () => {
                       <span className="r-muted"> · {e.short_name}</span>
                     ) : null}
                   </td>
+
+                  {/* ✅ NEW: Title cell */}
+                  <td className="r-td">{e.title || "—"}</td>
+
                   <td className="r-td">
                     {e.employment_type ? e.employment_type.replace("_", " ") : "—"}
                   </td>
@@ -681,7 +703,7 @@ const Employees = () => {
               ))}
               {filtered.length === 0 && !loading && (
                 <tr className="r-row">
-                  <td className="r-td" colSpan={7} style={{ textAlign: "center" }}>
+                  <td className="r-td" colSpan={8} style={{ textAlign: "center" }}>
                     <span className="r-muted">
                       {search ? "No employees match your search." : "No employees yet."}
                     </span>
