@@ -1,5 +1,5 @@
 // src/scenes/account/AccountPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -15,12 +15,24 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Divider,
+  Chip,
+  InputAdornment,
+  Tooltip,
 } from "@mui/material";
+
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import UploadIcon from "@mui/icons-material/Upload";
 import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 // Amplify v6 modular APIs
 import {
@@ -41,6 +53,7 @@ const brand = {
   primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  shadowLg: "0 20px 40px rgba(2,6,23,0.12)",
 };
 
 function splitName(full = "") {
@@ -55,6 +68,12 @@ function joinName(first = "", last = "") {
 }
 function isHttpUrl(v = "") {
   return /^https?:\/\//i.test(v);
+}
+function initialsFromName(first = "", last = "", fallback = "U") {
+  const a = (first || "").trim()[0] || "";
+  const b = (last || "").trim()[0] || "";
+  const i = `${a}${b}`.toUpperCase();
+  return i || fallback;
 }
 
 export default function AccountPage() {
@@ -71,8 +90,8 @@ export default function AccountPage() {
   const [email, setEmail] = useState("");
 
   // Avatar states
-  const [avatarUrl, setAvatarUrl] = useState("");   // resolved (signed) URL for <Avatar src>
-  const [avatarKey, setAvatarKey] = useState("");   // S3 key saved into Cognito 'picture'
+  const [avatarUrl, setAvatarUrl] = useState(""); // resolved (signed) URL for <Avatar src>
+  const [avatarKey, setAvatarKey] = useState(""); // S3 key saved into Cognito 'picture'
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
 
@@ -87,13 +106,18 @@ export default function AccountPage() {
   // Feedback
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
+  const fullName = useMemo(
+    () => joinName(form.firstName, form.lastName) || "Your profile",
+    [form.firstName, form.lastName]
+  );
+
   // Helper: resolve a Cognito 'picture' value to a displayable URL
   const resolveAvatarUrl = async (pictureAttr) => {
     if (!pictureAttr) return "";
     if (isHttpUrl(pictureAttr)) return pictureAttr; // already an http(s) URL
     try {
       const { url } = await getUrl({
-        key: pictureAttr,                // S3 key stored in 'picture'
+        key: pictureAttr, // S3 key stored in 'picture'
         options: { level: "private", expiresIn: 60 * 60 }, // 1 hour signed URL
       });
       return url.toString();
@@ -111,6 +135,7 @@ export default function AccountPage() {
         // attrs: { email, name, given_name, family_name, "custom:Company", "custom:jobTitle", picture?, ... }
         const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
         const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
+
         setForm({
           firstName: first || "",
           lastName: last || "",
@@ -139,9 +164,6 @@ export default function AccountPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Optional: enforce max size or types
-    // if (file.size > 3 * 1024 * 1024) { ... }
-
     try {
       setAvatarUploading(true);
       setAvatarProgress(0);
@@ -150,7 +172,7 @@ export default function AccountPage() {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const key = `avatars/${userId}/${Date.now()}-${safeName}`;
 
-      const result = await uploadData({
+      await uploadData({
         key,
         data: file,
         options: {
@@ -162,14 +184,18 @@ export default function AccountPage() {
             }
           },
         },
-      }).result; // await .result to ensure completion
+      }).result;
 
       // Generate a signed URL for immediate preview
       const url = await resolveAvatarUrl(key);
       setAvatarKey(key);
       setAvatarUrl(url);
 
-      setSnack({ open: true, severity: "success", message: "Image uploaded. Click Save to update your profile." });
+      setSnack({
+        open: true,
+        severity: "success",
+        message: "Image uploaded. Click Save to update your profile.",
+      });
     } catch (err) {
       console.error("[AccountPage] Avatar upload failed:", err);
       setSnack({ open: true, severity: "error", message: "Failed to upload image." });
@@ -184,6 +210,7 @@ export default function AccountPage() {
       const attrs = await fetchUserAttributes();
       const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
       const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
+
       setForm({
         firstName: first || "",
         lastName: last || "",
@@ -209,7 +236,11 @@ export default function AccountPage() {
       return setSnack({ open: true, severity: "warning", message: "Last name is required." });
     }
     if (avatarUploading) {
-      return setSnack({ open: true, severity: "info", message: "Please wait for the image to finish uploading." });
+      return setSnack({
+        open: true,
+        severity: "info",
+        message: "Please wait for the image to finish uploading.",
+      });
     }
 
     try {
@@ -220,7 +251,6 @@ export default function AccountPage() {
           name: joinName(form.firstName, form.lastName),
           "custom:Company": form.company || "",
           "custom:jobTitle": form.jobTitle || "",
-          // Save the S3 key to Cognito. (If user never uploaded, leave as-is)
           ...(avatarKey ? { picture: avatarKey } : {}),
         },
       });
@@ -268,8 +298,7 @@ export default function AccountPage() {
       console.error("[AccountPage] Change password failed:", err);
       setPwBusy(false);
       const message =
-        err?.message ||
-        "Failed to change password. Check your current password and try again.";
+        err?.message || "Failed to change password. Check your current password and try again.";
       setSnack({ open: true, severity: "error", message });
     }
   };
@@ -283,260 +312,771 @@ export default function AccountPage() {
   }
 
   return (
-    <Box m="20px">
-      {/* Scoped Nory styles */}
+    <Box className="acct-shell">
+      {/* Fun + premium scoped styles (keeps your brand purple) */}
       <style>{`
-        .acct-card {
+        .acct-shell{
+          min-height: calc(100vh - 40px);
+          padding: 20px;
+          background:
+            radial-gradient(1000px 500px at 10% -10%, rgba(124,58,237,0.18), transparent 60%),
+            radial-gradient(900px 500px at 90% 0%, rgba(91,33,182,0.14), transparent 60%),
+            linear-gradient(180deg, #f6f7fb, #eef2ff 55%, #f6f7fb);
+        }
+
+        .acct-max{
+          max-width: 1180px;
+          margin: 0 auto;
+        }
+
+        .hero{
+          position: relative;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid ${brand.border};
+          box-shadow: ${brand.shadowLg};
+          background:
+            radial-gradient(900px 420px at 15% 30%, rgba(124,58,237,0.35), rgba(124,58,237,0) 55%),
+            radial-gradient(900px 420px at 85% 40%, rgba(91,33,182,0.28), rgba(91,33,182,0) 60%),
+            linear-gradient(135deg, ${brand.primary}, ${brand.primaryDark});
+        }
+
+        .hero::after{
+          content:"";
+          position:absolute;
+          inset:-2px;
+          background:
+            radial-gradient(circle at 20% 30%, rgba(255,255,255,0.18), transparent 30%),
+            radial-gradient(circle at 80% 40%, rgba(255,255,255,0.14), transparent 35%),
+            radial-gradient(circle at 40% 85%, rgba(255,255,255,0.10), transparent 40%);
+          pointer-events:none;
+          mix-blend-mode: overlay;
+          opacity: 0.9;
+        }
+
+        .hero-inner{
+          position: relative;
+          z-index: 1;
+          padding: 18px 18px 16px;
+        }
+
+        .hero-top{
+          display:flex;
+          align-items:flex-start;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .hero-title{
+          margin:0;
+          font-weight: 950;
+          letter-spacing: -0.02em;
+          color: #fff;
+          line-height: 1.05;
+        }
+        .hero-sub{
+          margin: 6px 0 0;
+          color: rgba(255,255,255,0.86);
+          font-weight: 600;
+        }
+
+        .hero-actions{
+          display:flex;
+          gap: 10px;
+          align-items:center;
+          flex-wrap: wrap;
+        }
+
+        .btn-pill{
+          color:#fff;
+          border-radius: 999px;
+          font-weight: 900;
+          padding: 10px 16px;
+          text-transform:none;
+          background: rgba(255,255,255,0.18);
+          border: 1px solid rgba(255,255,255,0.28);
+          backdrop-filter: blur(10px);
+        }
+        .btn-pill:hover{
+          background: rgba(255,255,255,0.22);
+        }
+
+        .btn-solid{
+          color:#fff;
+          border-radius: 999px;
+          font-weight: 950;
+          padding: 10px 16px;
+          text-transform:none;
+          background: #0b1220;
+          border: 1px solid rgba(255,255,255,0.16);
+          box-shadow: 0 10px 24px rgba(2,6,23,0.28);
+        }
+        .btn-solid:hover{ background:#0a1020; }
+
+        .btn-ghost{
+          border: 1px solid rgba(255,255,255,0.35);
+          color: #fff;
+          background: transparent;
+          font-weight: 900;
+          border-radius: 999px;
+          text-transform: none;
+        }
+        .btn-ghost:hover{
+          background: rgba(255,255,255,0.10);
+        }
+
+        .hero-badges{
+          display:flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-top: 14px;
+          align-items:center;
+        }
+
+        .badge{
+          display:flex;
+          gap: 8px;
+          align-items:center;
+          padding: 8px 10px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.16);
+          border: 1px solid rgba(255,255,255,0.22);
+          color: rgba(255,255,255,0.92);
+          font-weight: 800;
+          font-size: 12px;
+          backdrop-filter: blur(10px);
+        }
+
+        .content{
+          margin-top: 16px;
+          display:grid;
+          gap: 14px;
+          grid-template-columns: 360px minmax(0, 1fr);
+          align-items: start;
+        }
+
+        @media (max-width: 980px){
+          .content{ grid-template-columns: 1fr; }
+        }
+
+        .card{
           border: 1px solid ${brand.border};
           background: ${brand.surface};
-          border-radius: 16px;
-          box-shadow: ${brand.shadow};
+          border-radius: 20px;
+          box-shadow: ${brand.shadowLg};
           overflow: hidden;
         }
-        .acct-header {
-          display: flex;
-          align-items: center;
+
+        .card-h{
+          display:flex;
+          align-items:center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 10px;
           padding: 14px 16px;
           border-bottom: 1px solid ${brand.border};
-          background: ${brand.surface};
+          background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
         }
-        .acct-title {
-          margin: 0;
-          font-weight: 900;
+
+        .card-title{
+          margin:0;
+          font-weight: 950;
           color: ${brand.text};
+          letter-spacing: -0.01em;
         }
-        .acct-body {
+        .card-sub{
+          margin: 2px 0 0;
+          color: ${brand.subtext};
+          font-weight: 650;
+          font-size: 13px;
+        }
+
+        .card-b{
           padding: 16px;
-          background: ${brand.surface};
         }
-        .pill {
-          color: #fff;
+
+        .avatar-wrap{
+          position: relative;
+          width: 128px;
+          margin: 4px auto 0;
+        }
+
+        .avatar-ring{
           border-radius: 999px;
-          font-weight: 800;
-          padding: 10px 16px;
-          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
-          text-transform: none;
+          padding: 4px;
+          background:
+            radial-gradient(circle at 20% 20%, rgba(255,255,255,0.55), rgba(255,255,255,0) 45%),
+            linear-gradient(135deg, rgba(124,58,237,0.75), rgba(91,33,182,0.75));
+          box-shadow: 0 18px 40px rgba(2,6,23,0.18);
         }
-        .pill:hover { background: linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark}); }
-        .ghost {
+
+        .avatar-overlay{
+          position:absolute; inset:0;
+          display:grid; place-items:center;
+          background: rgba(248, 250, 252, 0.72);
+          border-radius: 999px;
+          backdrop-filter: blur(6px);
+        }
+
+        .upload-btn{
+          position: absolute;
+          bottom: -6px;
+          right: -6px;
+          background: #fff;
           border: 1px solid ${brand.border};
-          color: ${brand.text};
-          background: ${brand.surface};
-          font-weight: 800;
-          border-radius: 12px;
-          text-transform: none;
+          box-shadow: 0 10px 22px rgba(2,6,23,0.12);
         }
-        .ghost:hover { background: ${brand.surfaceMuted}; }
-        .input .MuiOutlinedInput-root { border-radius: 12px; }
-        .input .MuiOutlinedInput-notchedOutline { border-color: ${brand.border}; }
-        .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline { border-color: ${brand.primary}; }
-        .input .MuiOutlinedInput-root.Mui-focused { box-shadow: 0 0 0 4px ${brand.focusRing}; }
-        .avatar-overlay {
-          position: absolute; inset: 0;
-          display: grid; place-items: center;
-          background: rgba(248, 250, 252, 0.7);
-          border-radius: 999px;
+        .upload-btn:hover{
+          background: ${brand.surfaceMuted};
+        }
+
+        .mini-actions{
+          display:grid;
+          gap: 10px;
+          margin-top: 14px;
+        }
+
+        .side-stat{
+          display:flex;
+          align-items:center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 12px 12px;
+          border: 1px solid ${brand.border};
+          border-radius: 14px;
+          background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+        }
+        .side-stat strong{
+          color:${brand.text};
+          font-weight: 950;
+        }
+        .side-stat span{
+          color:${brand.subtext};
+          font-weight: 700;
+          font-size: 13px;
+        }
+
+        .form-grid{
+          display:grid;
+          gap: 12px;
+        }
+
+        .section{
+          padding: 14px 16px;
+          border: 1px solid ${brand.border};
+          border-radius: 18px;
+          background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+        }
+
+        .section-h{
+          display:flex;
+          align-items:center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+        }
+
+        .section-h .kicker{
+          display:flex;
+          align-items:center;
+          gap: 10px;
+        }
+
+        .k-icon{
+          width: 34px; height: 34px;
+          border-radius: 12px;
+          display:grid; place-items:center;
+          background: rgba(124,58,237,0.12);
+          border: 1px solid rgba(124,58,237,0.22);
+          color: ${brand.primaryDark};
+        }
+
+        .input .MuiOutlinedInput-root{
+          border-radius: 14px;
+          background: #fff;
+        }
+        .input .MuiOutlinedInput-notchedOutline{
+          border-color: ${brand.border};
+        }
+        .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{
+          border-color: ${brand.primary};
+        }
+        .input .MuiOutlinedInput-root.Mui-focused{
+          box-shadow: 0 0 0 4px ${brand.focusRing};
+        }
+        .input .MuiInputLabel-root.Mui-focused{
+          color: ${brand.primaryDark};
+          font-weight: 800;
+        }
+
+        .hint{
+          display:flex;
+          gap: 8px;
+          align-items:flex-start;
+          color: ${brand.subtext};
+          font-weight: 650;
+          font-size: 12.5px;
+          line-height: 1.35;
+          padding: 10px 12px;
+          border-radius: 14px;
+          border: 1px dashed rgba(124,58,237,0.35);
+          background: rgba(124,58,237,0.06);
         }
       `}</style>
 
-      <Box className="acct-card">
-        <Box className="acct-header">
-          <Typography className="acct-title" variant="h5">My Account</Typography>
-          {!editMode ? (
-            <Button onClick={() => setEditMode(true)} startIcon={<EditIcon />} className="pill">
-              Edit Profile
-            </Button>
-          ) : (
-            <Box display="flex" gap={1}>
-              <Button onClick={onCancel} startIcon={<CancelIcon />} className="ghost">
-                Cancel
-              </Button>
-              <Button onClick={onSave} startIcon={<SaveIcon />} className="pill">
-                Save
-              </Button>
+      <Box className="acct-max">
+        {/* Hero */}
+        <Box className="hero">
+          <Box className="hero-inner">
+            <Box className="hero-top">
+              <Box>
+                <Typography className="hero-title" variant="h4">
+                  My Account
+                </Typography>
+                <Typography className="hero-sub">
+                  Keep your profile fresh — and make it unmistakably <b>Dae</b>.
+                </Typography>
+              </Box>
+
+              <Box className="hero-actions">
+                {!editMode ? (
+                  <Button onClick={() => setEditMode(true)} startIcon={<EditIcon />} className="btn-solid">
+                    Edit Profile
+                  </Button>
+                ) : (
+                  <>
+                    <Button onClick={onCancel} startIcon={<CancelIcon />} className="btn-ghost">
+                      Cancel
+                    </Button>
+                    <Button onClick={onSave} startIcon={<SaveIcon />} className="btn-solid">
+                      Save Changes
+                    </Button>
+                  </>
+                )}
+              </Box>
             </Box>
-          )}
+
+            <Box className="hero-badges">
+              <Box className="badge">
+                <ShieldOutlinedIcon sx={{ fontSize: 16 }} />
+                Private avatar storage
+              </Box>
+              <Box className="badge">
+                <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
+                Profile shows across the platform
+              </Box>
+              <Box className="badge">
+                <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                Email is read-only
+              </Box>
+            </Box>
+          </Box>
         </Box>
 
-        <Box className="acct-body">
-          <Grid container spacing={2} alignItems="flex-start">
-            {/* Avatar */}
-            <Grid item xs={12} sm={4} md={3}>
-              <Box position="relative" textAlign="center" sx={{ width: 110, mx: "auto" }}>
-                <Avatar
-                  src={avatarUrl || undefined}
-                  sx={{
-                    width: 110,
-                    height: 110,
-                    m: "auto",
-                    border: `1px solid ${brand.border}`,
-                    boxShadow: brand.shadow,
-                  }}
-                />
+        {/* Main content */}
+        <Box className="content">
+          {/* Left: Identity card */}
+          <Box className="card">
+            <Box className="card-h">
+              <Box>
+                <Typography className="card-title">Identity</Typography>
+                <Typography className="card-sub">Avatar + quick actions</Typography>
+              </Box>
+
+              <Chip
+                label={editMode ? "Editing" : "View mode"}
+                size="small"
+                sx={{
+                  fontWeight: 900,
+                  borderRadius: 999,
+                  border: `1px solid ${brand.border}`,
+                  background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
+                  color: editMode ? brand.primaryDark : brand.subtext,
+                }}
+              />
+            </Box>
+
+            <Box className="card-b">
+              <Box className="avatar-wrap">
+                <Box className="avatar-ring">
+                  <Avatar
+                    src={avatarUrl || undefined}
+                    alt={fullName}
+                    sx={{
+                      width: 120,
+                      height: 120,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "#fff",
+                      fontWeight: 950,
+                      border: "1px solid rgba(255,255,255,0.22)",
+                    }}
+                  >
+                    {initialsFromName(form.firstName, form.lastName)}
+                  </Avatar>
+                </Box>
+
                 {avatarUploading && (
                   <Box className="avatar-overlay">
                     <Box display="grid" gap={1} justifyItems="center">
-                      <CircularProgress size={26} />
-                      <Typography variant="caption" sx={{ color: brand.subtext }}>
+                      <CircularProgress size={28} />
+                      <Typography variant="caption" sx={{ color: brand.subtext, fontWeight: 800 }}>
                         Uploading… {avatarProgress}%
                       </Typography>
                     </Box>
                   </Box>
                 )}
+
                 {editMode && (
-                  <IconButton
-                    component="label"
-                    sx={{
-                      position: "absolute",
-                      bottom: -6,
-                      right: -6,
-                      background: "#f1f5f9",
-                      border: `1px solid ${brand.border}`,
-                      "&:hover": { background: "#e2e8f0" },
-                    }}
-                  >
-                    <UploadIcon />
-                    <input hidden type="file" accept="image/*" onChange={onAvatarUpload} />
-                  </IconButton>
+                  <Tooltip title="Upload a new avatar">
+                    <IconButton component="label" className="upload-btn">
+                      <UploadIcon />
+                      <input hidden type="file" accept="image/*" onChange={onAvatarUpload} />
+                    </IconButton>
+                  </Tooltip>
                 )}
               </Box>
-            </Grid>
 
-            {/* Fields */}
-            <Grid item xs={12} sm={8} md={9} container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Email"
-                  fullWidth
-                  value={email}
-                  InputProps={{ readOnly: true }}
-                  className="input"
-                />
-              </Grid>
+              <Box textAlign="center" mt={1.5}>
+                <Typography sx={{ fontWeight: 950, color: brand.text, fontSize: 18, letterSpacing: -0.01 }}>
+                  {fullName}
+                </Typography>
+                <Typography sx={{ color: brand.subtext, fontWeight: 700, fontSize: 13 }}>
+                  {form.jobTitle || "—"} {form.company ? `• ${form.company}` : ""}
+                </Typography>
+              </Box>
 
-              <Grid item xs={12} md={6} display="flex" alignItems="stretch">
-                <Button onClick={openPwDialog} startIcon={<KeyOutlinedIcon />} className="pill" sx={{ width: "100%" }}>
+              <Divider sx={{ my: 2 }} />
+
+              <Box className="mini-actions">
+                <Button
+                  onClick={openPwDialog}
+                  startIcon={<KeyOutlinedIcon />}
+                  className="btn-solid"
+                  sx={{ borderRadius: 14, justifyContent: "center" }}
+                >
                   Change Password
                 </Button>
-              </Grid>
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="First Name"
-                  fullWidth
-                  value={form.firstName}
-                  onChange={onChange("firstName")}
-                  InputProps={{ readOnly: !editMode }}
-                  className="input"
-                />
-              </Grid>
+                <Box className="side-stat">
+                  <Box>
+                    <strong>Email</strong>
+                    <Box mt={0.3}>
+                      <span>{email || "—"}</span>
+                    </Box>
+                  </Box>
+                  <MailOutlineIcon sx={{ color: brand.primaryDark }} />
+                </Box>
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Last Name"
-                  fullWidth
-                  value={form.lastName}
-                  onChange={onChange("lastName")}
-                  InputProps={{ readOnly: !editMode }}
-                  className="input"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Company"
-                  fullWidth
-                  value={form.company}
-                  onChange={onChange("company")}
-                  InputProps={{ readOnly: !editMode }}
-                  className="input"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Job Title"
-                  fullWidth
-                  value={form.jobTitle}
-                  onChange={onChange("jobTitle")}
-                  InputProps={{ readOnly: !editMode }}
-                  className="input"
-                />
-              </Grid>
-            </Grid>
-          </Grid>
-        </Box>
-      </Box>
-
-      {/* Change Password Dialog */}
-      <Dialog
-        open={pwOpen}
-        onClose={closePwDialog}
-        PaperProps={{
-          sx: {
-            borderRadius: 14,
-            border: `1px solid ${brand.border}`,
-            boxShadow: brand.shadow,
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 900, color: brand.text }}>
-          Change Password
-        </DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          <Box sx={{ display: "grid", gap: 2, minWidth: { xs: 280, sm: 420 } }}>
-            <TextField
-              label="Current Password"
-              type="password"
-              value={pwForm.current}
-              onChange={onPwChange("current")}
-              className="input"
-              autoFocus
-            />
-            <TextField
-              label="New Password"
-              type="password"
-              value={pwForm.next}
-              onChange={onPwChange("next")}
-              className="input"
-            />
-            <TextField
-              label="Confirm New Password"
-              type="password"
-              value={pwForm.confirm}
-              onChange={onPwChange("confirm")}
-              className="input"
-            />
+                <Box className="hint">
+                  <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
+                  Your avatar is uploaded to private storage and the profile saves the S3 key to your Cognito{" "}
+                  <b>picture</b> attribute.
+                </Box>
+              </Box>
+            </Box>
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closePwDialog} className="ghost" disabled={pwBusy}>
-            Cancel
-          </Button>
-          <Button onClick={onChangePassword} className="pill" disabled={pwBusy}>
-            {pwBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Update Password"}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* Snackbars */}
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={3500}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          severity={snack.severity}
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
-          variant="filled"
+          {/* Right: Profile form */}
+          <Box className="card">
+            <Box className="card-h">
+              <Box>
+                <Typography className="card-title">Profile Details</Typography>
+                <Typography className="card-sub">Update your details (and they’ll sync everywhere)</Typography>
+              </Box>
+              <Chip
+                label={editMode ? "Fields unlocked" : "Locked"}
+                size="small"
+                sx={{
+                  fontWeight: 900,
+                  borderRadius: 999,
+                  border: `1px solid ${brand.border}`,
+                  background: editMode ? "rgba(124,58,237,0.12)" : brand.surface,
+                  color: editMode ? brand.primaryDark : brand.subtext,
+                }}
+              />
+            </Box>
+
+            <Box className="card-b">
+              <Grid container spacing={2}>
+                {/* Section: Contact */}
+                <Grid item xs={12}>
+                  <Box className="section">
+                    <Box className="section-h">
+                      <Box className="kicker">
+                        <Box className="k-icon">
+                          <MailOutlineIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                            Contact
+                          </Typography>
+                          <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                            Email is fixed to your login
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <TextField
+                      label="Email"
+                      fullWidth
+                      value={email}
+                      InputProps={{
+                        readOnly: true,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <MailOutlineIcon sx={{ color: brand.subtext }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      className="input"
+                    />
+                  </Box>
+                </Grid>
+
+                {/* Section: Personal */}
+                <Grid item xs={12}>
+                  <Box className="section">
+                    <Box className="section-h">
+                      <Box className="kicker">
+                        <Box className="k-icon">
+                          <PersonOutlineIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                            Personal
+                          </Typography>
+                          <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                            Your name appears in activity logs and reports
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="First Name"
+                          fullWidth
+                          value={form.firstName}
+                          onChange={onChange("firstName")}
+                          InputProps={{
+                            readOnly: !editMode,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <PersonOutlineIcon sx={{ color: brand.subtext }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Last Name"
+                          fullWidth
+                          value={form.lastName}
+                          onChange={onChange("lastName")}
+                          InputProps={{
+                            readOnly: !editMode,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <PersonOutlineIcon sx={{ color: brand.subtext }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Grid>
+
+                {/* Section: Work */}
+                <Grid item xs={12}>
+                  <Box className="section">
+                    <Box className="section-h">
+                      <Box className="kicker">
+                        <Box className="k-icon">
+                          <BusinessOutlinedIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 950, color: brand.text, letterSpacing: -0.01 }}>
+                            Work
+                          </Typography>
+                          <Typography sx={{ color: brand.subtext, fontWeight: 650, fontSize: 13 }}>
+                            Used for permissions, routing, and B2B visibility
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Company"
+                          fullWidth
+                          value={form.company}
+                          onChange={onChange("company")}
+                          InputProps={{
+                            readOnly: !editMode,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <BusinessOutlinedIcon sx={{ color: brand.subtext }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Job Title"
+                          fullWidth
+                          value={form.jobTitle}
+                          onChange={onChange("jobTitle")}
+                          InputProps={{
+                            readOnly: !editMode,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <BadgeOutlinedIcon sx={{ color: brand.subtext }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Box mt={2} className="hint">
+                      <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: brand.primaryDark }} />
+                      Tip: if you upload a new avatar, you still need to hit <b>Save Changes</b> to persist the key to
+                      Cognito.
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Change Password Dialog */}
+        <Dialog
+          open={pwOpen}
+          onClose={closePwDialog}
+          PaperProps={{
+            sx: {
+              borderRadius: 18,
+              border: `1px solid ${brand.border}`,
+              boxShadow: brand.shadowLg,
+              overflow: "hidden",
+            },
+          }}
         >
-          {snack.message}
-        </Alert>
-      </Snackbar>
+          <DialogTitle
+            sx={{
+              fontWeight: 950,
+              color: brand.text,
+              background: `linear-gradient(180deg, #fff, ${brand.surfaceMuted})`,
+              borderBottom: `1px solid ${brand.border}`,
+            }}
+          >
+            Change Password
+          </DialogTitle>
+
+          <DialogContent sx={{ pt: 2 }}>
+            <Box sx={{ display: "grid", gap: 2, minWidth: { xs: 280, sm: 420 } }}>
+              <TextField
+                label="Current Password"
+                type="password"
+                value={pwForm.current}
+                onChange={onPwChange("current")}
+                className="input"
+                autoFocus
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <KeyOutlinedIcon sx={{ color: brand.subtext }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                label="New Password"
+                type="password"
+                value={pwForm.next}
+                onChange={onPwChange("next")}
+                className="input"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <KeyOutlinedIcon sx={{ color: brand.subtext }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                label="Confirm New Password"
+                type="password"
+                value={pwForm.confirm}
+                onChange={onPwChange("confirm")}
+                className="input"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <KeyOutlinedIcon sx={{ color: brand.subtext }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={closePwDialog}
+              disabled={pwBusy}
+              sx={{
+                borderRadius: 14,
+                fontWeight: 900,
+                textTransform: "none",
+                border: `1px solid ${brand.border}`,
+                color: brand.text,
+                background: "#fff",
+                "&:hover": { background: brand.surfaceMuted },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onChangePassword}
+              disabled={pwBusy}
+              className="btn-solid"
+              sx={{ borderRadius: 14, minWidth: 160 }}
+            >
+              {pwBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Update Password"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbars */}
+        <Snackbar
+          open={snack.open}
+          autoHideDuration={3500}
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert
+            severity={snack.severity}
+            onClose={() => setSnack((s) => ({ ...s, open: false }))}
+            variant="filled"
+          >
+            {snack.message}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Box>
   );
 }
