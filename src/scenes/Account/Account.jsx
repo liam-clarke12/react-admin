@@ -291,21 +291,20 @@ export default function AccountPage() {
     <Box
       sx={{
         width: "100%",
-        maxWidth: "none",
-        // This helps if your dashboard layout adds left/right padding to the content wrapper.
-        // It "pulls" the background to the edges without breaking your centered inner content.
-        ml: { xs: 0, md: 0 },
+        maxWidth: "100%",
+        overflowX: "hidden", // ✅ prevents tiny overflow that shows as a left gutter
       }}
     >
-      {/* Full-bleed background + remove left "indent" */}
       <Box className="acct-shell">
         <style>{`
           .acct-shell{
             width: 100%;
-            min-height: calc(100vh - 40px);
-            /* Full-bleed: cancel typical parent padding/margins that cause left whitespace */
+            max-width: 100%;
+            box-sizing: border-box;
+            min-height: 100%;
             margin: 0;
             padding: 20px;
+            overflow-x: hidden; /* ✅ extra guard */
             background:
               radial-gradient(1000px 500px at 10% -10%, rgba(124,58,237,0.18), transparent 60%),
               radial-gradient(900px 500px at 90% 0%, rgba(91,33,182,0.14), transparent 60%),
@@ -441,6 +440,7 @@ export default function AccountPage() {
             border-radius: 20px;
             box-shadow: ${brand.shadowLg};
             overflow: hidden;
+            min-width: 0; /* ✅ avoids grid overflow */
           }
 
           .card-h{
@@ -466,9 +466,7 @@ export default function AccountPage() {
             font-size: 13px;
           }
 
-          .card-b{
-            padding: 16px;
-          }
+          .card-b{ padding: 16px; }
 
           .avatar-wrap{
             position: relative;
@@ -501,14 +499,13 @@ export default function AccountPage() {
             border: 1px solid ${brand.border};
             box-shadow: 0 10px 22px rgba(2,6,23,0.12);
           }
-          .upload-btn:hover{
-            background: ${brand.surfaceMuted};
-          }
+          .upload-btn:hover{ background: ${brand.surfaceMuted}; }
 
           .mini-actions{
             display:grid;
             gap: 10px;
             margin-top: 14px;
+            min-width: 0;
           }
 
           .side-stat{
@@ -520,15 +517,18 @@ export default function AccountPage() {
             border: 1px solid ${brand.border};
             border-radius: 14px;
             background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+            min-width: 0;
           }
-          .side-stat strong{
-            color:${brand.text};
-            font-weight: 950;
-          }
+          .side-stat strong{ color:${brand.text}; font-weight: 950; }
           .side-stat span{
             color:${brand.subtext};
             font-weight: 700;
             font-size: 13px;
+            overflow:hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display:block;
+            max-width: 220px;
           }
 
           .section{
@@ -536,6 +536,7 @@ export default function AccountPage() {
             border: 1px solid ${brand.border};
             border-radius: 18px;
             background: linear-gradient(180deg, #fff, ${brand.surfaceMuted});
+            min-width: 0;
           }
 
           .section-h{
@@ -550,6 +551,7 @@ export default function AccountPage() {
             display:flex;
             align-items:center;
             gap: 10px;
+            min-width: 0;
           }
 
           .k-icon{
@@ -565,19 +567,10 @@ export default function AccountPage() {
             border-radius: 14px;
             background: #fff;
           }
-          .input .MuiOutlinedInput-notchedOutline{
-            border-color: ${brand.border};
-          }
-          .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{
-            border-color: ${brand.primary};
-          }
-          .input .MuiOutlinedInput-root.Mui-focused{
-            box-shadow: 0 0 0 4px ${brand.focusRing};
-          }
-          .input .MuiInputLabel-root.Mui-focused{
-            color: ${brand.primaryDark};
-            font-weight: 800;
-          }
+          .input .MuiOutlinedInput-notchedOutline{ border-color: ${brand.border}; }
+          .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{ border-color: ${brand.primary}; }
+          .input .MuiOutlinedInput-root.Mui-focused{ box-shadow: 0 0 0 4px ${brand.focusRing}; }
+          .input .MuiInputLabel-root.Mui-focused{ color: ${brand.primaryDark}; font-weight: 800; }
 
           .hint{
             display:flex;
@@ -591,9 +584,11 @@ export default function AccountPage() {
             border-radius: 14px;
             border: 1px dashed rgba(124,58,237,0.35);
             background: rgba(124,58,237,0.06);
+            min-width: 0;
           }
         `}</style>
 
+        {/* --- YOUR EXISTING JSX BELOW (unchanged) --- */}
         <Box className="acct-max">
           {/* Hero */}
           <Box className="hero">
@@ -768,6 +763,7 @@ export default function AccountPage() {
 
               <Box className="card-b">
                 <Grid container spacing={2}>
+                  {/* Contact */}
                   <Grid item xs={12}>
                     <Box className="section">
                       <Box className="section-h">
@@ -803,6 +799,7 @@ export default function AccountPage() {
                     </Box>
                   </Grid>
 
+                  {/* Personal */}
                   <Grid item xs={12}>
                     <Box className="section">
                       <Box className="section-h">
@@ -861,6 +858,7 @@ export default function AccountPage() {
                     </Box>
                   </Grid>
 
+                  {/* Work */}
                   <Grid item xs={12}>
                     <Box className="section">
                       <Box className="section-h">
@@ -962,13 +960,6 @@ export default function AccountPage() {
                   onChange={onPwChange("current")}
                   className="input"
                   autoFocus
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <KeyOutlinedIcon sx={{ color: brand.subtext }} />
-                      </InputAdornment>
-                    ),
-                  }}
                 />
                 <TextField
                   label="New Password"
@@ -976,13 +967,6 @@ export default function AccountPage() {
                   value={pwForm.next}
                   onChange={onPwChange("next")}
                   className="input"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <KeyOutlinedIcon sx={{ color: brand.subtext }} />
-                      </InputAdornment>
-                    ),
-                  }}
                 />
                 <TextField
                   label="Confirm New Password"
@@ -990,13 +974,6 @@ export default function AccountPage() {
                   value={pwForm.confirm}
                   onChange={onPwChange("confirm")}
                   className="input"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <KeyOutlinedIcon sx={{ color: brand.subtext }} />
-                      </InputAdornment>
-                    ),
-                  }}
                 />
               </Box>
             </DialogContent>
