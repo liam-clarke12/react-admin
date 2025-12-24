@@ -1,231 +1,274 @@
-"use client"
+// src/components/LandingPage.jsx
+import React from "react";
+import { Box, Button, Typography, Container, Grid, Paper, Stack } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import ScienceIcon from '@mui/icons-material/Science';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
-import { Button } from "@/components/ui/button"
-import { CheckCircle2, Package, TrendingUp, Shield, ChevronRight } from "lucide-react"
-import Link from "next/link"
+const LandingPage = () => {
+  const navigate = useNavigate();
 
-export default function LandingPage() {
+  const handleGetStarted = () => navigate("/login");
+  const handleSignIn = () => navigate("/login");
+  const goHome = () => navigate("/");
+
+  const handleNavClick = (item) => {
+    if (item === "Contact") return navigate("/contact");
+    if (item === "Features") return navigate("/features");
+    if (item === "About") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const brand = {
+    text: "#1e293b",
+    subtext: "#64748b",
+    primary: "#7C3AED", // Nory Purple
+    primaryDark: "#5B21B6",
+    accent: "#10B981", // Fresh Green for "Food/Growth"
+    surface: "#ffffff",
+    surfaceMuted: "#F8FAFC",
+    border: "#f1f5f9",
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary" />
-              <span className="text-xl font-semibold text-foreground">Hupes</span>
-            </Link>
+    <Box sx={{ backgroundColor: brand.surface, minHeight: "100vh" }}>
+      {/* Navbar */}
+      <Box
+        component="nav"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          py: 2,
+          px: { xs: 2, md: 8 },
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(10px)",
+          borderBottom: `1px solid ${brand.border}`,
+        }}
+      >
+        <Box onClick={goHome} sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }}>
+          <Box sx={{ bgcolor: brand.primary, p: 0.8, borderRadius: 1.5, display: "flex" }}>
+            <RestaurantIcon sx={{ color: "white", fontSize: 24 }} />
+          </Box>
+          <Typography sx={{ fontWeight: 800, fontSize: "1.5rem", color: brand.text, letterSpacing: "-0.5px" }}>
+            Hupes
+          </Typography>
+        </Box>
 
-            <nav className="hidden md:flex items-center gap-8">
-              <Link
-                href="/features"
-                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-              >
-                Features
-              </Link>
-              <Link href="/#about" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-                About
-              </Link>
-              <Link
-                href="/contact"
-                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-              >
-                Contact
-              </Link>
-            </nav>
-
-            <Link href="/login">
-              <Button variant="default" className="rounded-full">
-                Sign In
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+        <Stack direction="row" spacing={4} alignItems="center">
+          {["Features", "About", "Contact"].map((item) => (
+            <Typography
+              key={item}
+              onClick={() => handleNavClick(item)}
+              sx={{
+                display: { xs: "none", md: "block" },
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                color: brand.subtext,
+                "&:hover": { color: brand.primary },
+                transition: "0.2s",
+              }}
+            >
+              {item}
+            </Typography>
+          ))}
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={handleSignIn}
+            sx={{
+              borderRadius: "12px",
+              px: 3,
+              py: 1,
+              textTransform: "none",
+              fontWeight: 700,
+              backgroundColor: brand.primary,
+              "&:hover": { backgroundColor: brand.primaryDark },
+            }}
+          >
+            Sign In
+          </Button>
+        </Stack>
+      </Box>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent/5 via-background to-background" />
+      <Container maxWidth="lg" sx={{ pt: { xs: 8, md: 12 }, pb: 10 }}>
+        <Grid container spacing={6} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 1,
+                px: 2,
+                py: 0.5,
+                mb: 3,
+                borderRadius: "20px",
+                bgcolor: "rgba(124, 91, 255, 0.1)",
+                color: brand.primary,
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase" }}>
+                Next-Gen Food ERP
+              </Typography>
+            </Box>
+            <Typography
+              variant="h1"
+              sx={{
+                fontWeight: 900,
+                fontSize: { xs: "2.5rem", md: "4rem" },
+                lineHeight: 1.1,
+                color: brand.text,
+                mb: 3,
+              }}
+            >
+              From <span style={{ color: brand.primary }}>Recipe</span> to <br /> Scale.
+            </Typography>
+            <Typography sx={{ fontSize: "1.15rem", color: brand.subtext, mb: 4, maxWidth: "500px", lineHeight: 1.6 }}>
+              The all-in-one operating system for modern food producers. Automate production logs, 
+              track batch traceability, and eliminate food waste.
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <Button
+                size="large"
+                variant="contained"
+                onClick={handleGetStarted}
+                sx={{
+                  py: 2,
+                  px: 4,
+                  borderRadius: "12px",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  backgroundColor: brand.primary,
+                  textTransform: "none",
+                }}
+              >
+                Start Free Trial
+              </Button>
+              <Button
+                size="large"
+                variant="outlined"
+                sx={{
+                  py: 2,
+                  px: 4,
+                  borderRadius: "12px",
+                  fontWeight: 700,
+                  borderColor: brand.border,
+                  color: brand.text,
+                  textTransform: "none",
+                  "&:hover": { borderColor: brand.primary, bgcolor: "transparent" },
+                }}
+              >
+                Watch Demo
+              </Button>
+            </Stack>
+          </Grid>
 
-        <div className="container relative mx-auto px-4 lg:px-8">
-          <div className="flex flex-col items-center justify-center text-center py-24 md:py-32 lg:py-40">
-            <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-balance mb-6 max-w-5xl">
-              Complete food production platform
-            </h1>
+          <Grid item xs={12} md={6} sx={{ display: { xs: "none", md: "block" } }}>
+            <Box sx={{ position: "relative" }}>
+              <Box
+                component="img"
+                src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80"
+                alt="Food Production"
+                sx={{
+                  width: "100%",
+                  borderRadius: "24px",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                  transform: "rotate(-2deg)",
+                }}
+              />
+              <Paper
+                sx={{
+                  position: "absolute",
+                  bottom: -20,
+                  left: -20,
+                  p: 3,
+                  borderRadius: "16px",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <TrendingDownIcon sx={{ color: brand.accent, fontSize: 40 }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>-24%</Typography>
+                  <Typography variant="body2" sx={{ color: brand.subtext }}>Ingredient Waste</Typography>
+                </Box>
+              </Paper>
+            </Box>
+          </Grid>
+        </Grid>
+      </Container>
 
-            <p className="text-lg md:text-xl text-muted-foreground text-balance max-w-2xl mb-10">
-              Streamline operations from ingredient sourcing to final delivery. Ensure compliance, optimize yield, and
-              scale confidently.
-            </p>
+      {/* Value Props */}
+      <Box sx={{ bgcolor: brand.surfaceMuted, py: 12 }}>
+        <Container>
+          <Box sx={{ textAlign: "center", mb: 8 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, color: brand.text }}>
+              Built for high-growth food brands
+            </Typography>
+            <Typography sx={{ color: brand.subtext }}>Everything you need to move from commercial kitchen to retail shelves.</Typography>
+          </Box>
+          
+          <Grid container spacing={4}>
+            {[
+              { 
+                title: "Batch Traceability", 
+                desc: "Instant recall readiness. Track every ingredient from supplier to finished product.",
+                icon: <AssignmentTurnedInIcon />,
+                color: "#7C3AED" 
+              },
+              { 
+                title: "Smart Formulation", 
+                desc: "Auto-calculate nutritional values and COGS as you tweak your recipes.",
+                icon: <ScienceIcon />,
+                color: "#10B981" 
+              },
+              { 
+                title: "Real-time Inventory", 
+                desc: "Smart alerts for low-shelf-life items. Never run out of your hero ingredients.",
+                icon: <RestaurantIcon />,
+                color: "#F59E0B" 
+              },
+            ].map((feature, idx) => (
+              <Grid item xs={12} md={4} key={idx}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    height: "100%",
+                    borderRadius: "20px",
+                    border: `1px solid ${brand.border}`,
+                    transition: "0.3s",
+                    "&:hover": { transform: "translateY(-8px)", boxShadow: "0 12px 24px rgba(0,0,0,0.05)" }
+                  }}
+                >
+                  <Box sx={{ color: feature.color, mb: 2 }}>
+                    {React.cloneElement(feature.icon, { sx: { fontSize: 40 } })}
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{feature.title}</Typography>
+                  <Typography sx={{ color: brand.subtext, lineHeight: 1.6 }}>{feature.desc}</Typography>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/login">
-                <Button size="lg" className="rounded-full text-base px-8">
-                  Get Started
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/contact">
-                <Button size="lg" variant="outline" className="rounded-full text-base px-8 bg-transparent">
-                  Request Demo
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Simple Footer */}
+      <Box sx={{ py: 6, textAlign: "center", borderTop: `1px solid ${brand.border}` }}>
+        <Typography variant="body2" sx={{ color: brand.subtext }}>
+          © {new Date().getFullYear()} Hupes Technologies. Built for the future of food.
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
 
-      {/* Features Section */}
-      <section id="about" className="py-24 md:py-32">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-balance mb-4">
-              Built for modern food production
-            </h2>
-            <p className="text-lg text-muted-foreground text-balance max-w-2xl mx-auto">
-              Everything you need to manage your facility end-to-end
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="group relative">
-              <div className="absolute -inset-px bg-gradient-to-b from-accent/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-card border border-border rounded-2xl p-8 h-full">
-                <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/10">
-                  <Package className="h-6 w-6 text-accent" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3">Ingredient Traceability</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Track every ingredient from supplier to finished product. Full chain of custody with lot tracking and
-                  expiration management.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="group relative">
-              <div className="absolute -inset-px bg-gradient-to-b from-accent/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-card border border-border rounded-2xl p-8 h-full">
-                <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/10">
-                  <TrendingUp className="h-6 w-6 text-accent" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3">Production Analytics</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Real-time dashboards showing yield efficiency, batch performance, and resource utilization across all
-                  production lines.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="group relative">
-              <div className="absolute -inset-px bg-gradient-to-b from-accent/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-card border border-border rounded-2xl p-8 h-full">
-                <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/10">
-                  <Shield className="h-6 w-6 text-accent" />
-                </div>
-                <h3 className="text-xl font-semibold mb-3">Compliance Management</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Automated documentation for FDA, HACCP, and SQF standards. Built-in audit trails and certification
-                  tracking.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="py-24 md:py-32 bg-muted/30">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6 text-balance">Scale operations without complexity</h2>
-              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                Our platform grows with your business, from single facilities to multi-site operations across
-                continents.
-              </p>
-
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-accent flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold mb-1">Recipe Management</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Version-controlled formulations with automatic scaling and substitution rules
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-accent flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold mb-1">Quality Control</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Automated testing workflows with statistical process control and trend analysis
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-accent flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold mb-1">Inventory Optimization</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Smart reordering with demand forecasting and supplier performance tracking
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-tr from-accent/10 to-transparent rounded-3xl" />
-              <div className="relative aspect-[4/3] rounded-3xl overflow-hidden border border-border bg-card">
-                <img src="/images/image.png" alt="Production Dashboard" className="w-full h-full object-cover" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-24 md:py-32">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-balance">
-              Ready to transform your production?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-10 text-balance">
-              Join food manufacturers who trust Hupes for their operations
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/login">
-                <Button size="lg" className="rounded-full text-base px-8">
-                  Start Free Trial
-                </Button>
-              </Link>
-              <Link href="/contact">
-                <Button size="lg" variant="outline" className="rounded-full text-base px-8 bg-transparent">
-                  Talk to Sales
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50">
-        <div className="container mx-auto px-4 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-primary" />
-              <span className="font-semibold text-foreground">Hupes</span>
-            </div>
-            <p className="text-sm text-muted-foreground">© 2025 Hupes. Streamlining food production worldwide.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
-  )
-}
+export default LandingPage;
