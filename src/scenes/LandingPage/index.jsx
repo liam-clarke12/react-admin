@@ -2,10 +2,11 @@
 import React from "react";
 import { Box, Button, Typography, Container, Grid, Paper, Stack } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import RestaurantIcon from '@mui/icons-material/Restaurant';
+// Removed RestaurantIcon since we are using your image
 import ScienceIcon from '@mui/icons-material/Science';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import RestaurantIcon from '@mui/icons-material/Restaurant'; // Kept for the feature card
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ const LandingPage = () => {
     subtext: "#64748b",
     primary: "#7C3AED", // Nory Purple
     primaryDark: "#5B21B6",
-    accent: "#10B981", // Fresh Green for "Food/Growth"
+    accent: "#10B981", // Fresh Green
     surface: "#ffffff",
     surfaceMuted: "#F8FAFC",
     border: "#f1f5f9",
@@ -50,11 +51,35 @@ const LandingPage = () => {
           borderBottom: `1px solid ${brand.border}`,
         }}
       >
-        <Box onClick={goHome} sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }}>
-          <Box sx={{ bgcolor: brand.primary, p: 0.8, borderRadius: 1.5, display: "flex" }}>
-            <RestaurantIcon sx={{ color: "white", fontSize: 24 }} />
-          </Box>
-          <Typography sx={{ fontWeight: 800, fontSize: "1.5rem", color: brand.text, letterSpacing: "-0.5px" }}>
+        {/* Logo Section */}
+        <Box 
+          onClick={goHome} 
+          sx={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 1.5, 
+            cursor: "pointer",
+            userSelect: "none"
+          }}
+        >
+          {/* Logo Image */}
+          <img
+            src="/user.png"
+            alt="Hupes Logo"
+            style={{ 
+                height: 40, // Adjusted height to match the text size better
+                width: "auto",
+                objectFit: "contain"
+            }}
+          />
+          <Typography 
+            sx={{ 
+                fontWeight: 800, 
+                fontSize: "1.5rem", 
+                color: brand.text, 
+                letterSpacing: "-0.5px" 
+            }}
+          >
             Hupes
           </Typography>
         </Box>
