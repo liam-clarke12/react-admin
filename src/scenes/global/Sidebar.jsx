@@ -1,13 +1,7 @@
 // src/components/Sidebar/index.jsx
 import { useEffect, useMemo, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import {
-  Box,
-  IconButton,
-  Typography,
-  useTheme,
-  Avatar,
-} from "@mui/material";
+import { Box, IconButton, Typography, useTheme, Avatar } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link, useLocation } from "react-router-dom";
 import { tokens } from "../../themes";
@@ -43,7 +37,9 @@ const getBrand = (isDark) => ({
   surface: isDark ? "#0b1220" : "#ffffff",
   surfaceMuted: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
   primary: "#7C3AED",
-  primaryLight: isDark ? "rgba(124, 58, 237, 0.18)" : "rgba(124, 58, 237, 0.08)",
+  primaryLight: isDark
+    ? "rgba(124, 58, 237, 0.18)"
+    : "rgba(124, 58, 237, 0.08)",
   hover: isDark ? "rgba(124,58,237,0.14)" : "#f1f5f9",
   icon: isDark ? "#cbd5e1" : "#334155",
 });
@@ -143,10 +139,14 @@ const Sidebar = () => {
 
   const brand = useMemo(() => getBrand(isDark), [isDark]);
 
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  // ✅ start expanded
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const [selected, setSelected] = useState("Dashboard");
-  const [mrpOpen, setMrpOpen] = useState(false);
-  const [hrpOpen, setHrpOpen] = useState(false);
+
+  // ✅ start open on app load
+  const [mrpOpen, setMrpOpen] = useState(true);
+  const [hrpOpen, setHrpOpen] = useState(true);
 
   const [hrpUnlocked, setHrpUnlocked] = useState(() => {
     try {
@@ -229,6 +229,7 @@ const Sidebar = () => {
     };
     if (mapping[path]) setSelected(mapping[path]);
 
+    // if user lands inside a section route, keep section open
     const isMrp = [
       "/GoodsIn",
       "/IngredientsInventory",
@@ -313,6 +314,12 @@ const Sidebar = () => {
           transition: "background 0.25s ease, border 0.25s ease, width 0.3s ease",
           "& .pro-sidebar-inner": { background: `${brand.surface} !important` },
 
+          // ✅ remove circles around icons (iconShape="square" + override wrapper)
+          "& .pro-icon-wrapper": {
+            backgroundColor: "transparent !important",
+            borderRadius: "0 !important",
+          },
+
           // keep pro-sidebar content aligned with dark mode colors
           "& .pro-menu-item": { transition: "all 0.2s" },
           "& .pro-menu-item.active": {
@@ -336,221 +343,225 @@ const Sidebar = () => {
           "& .pro-icon-wrapper svg": { color: `${brand.icon} !important` },
         }}
       >
-        <ProSidebar collapsed={isCollapsed}>
-          <Box
-            sx={{
-              p: 2,
-              mb: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: isCollapsed ? "center" : "space-between",
-            }}
-          >
-            {!isCollapsed && (
-              <Typography
-                sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}
-              >
-                Hupes
-              </Typography>
-            )}
-            <IconButton
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              sx={{
-                color: brand.subtext,
-                borderRadius: "12px",
-                "&:hover": { bgcolor: brand.hover },
-              }}
-            >
-              <MenuOpenRoundedIcon
-                sx={{
-                  color: brand.subtext,
-                  transform: isCollapsed ? "rotate(180deg)" : "none",
-                  transition: "0.3s",
-                }}
-              />
-            </IconButton>
-          </Box>
-
-          <Menu iconShape="circle">
-            <Item
-              title="Dashboard"
-              to="/dashboard"
-              icon={<HomeOutlinedIcon sx={{ fontSize: 20 }} />}
-              selected={selected}
-              setSelected={setSelected}
-              brand={brand}
-            />
-
-            <SectionHeader
-              label="MRP"
-              icon={<FolderOutlinedIcon sx={{ fontSize: 18 }} />}
-              open={mrpOpen}
-              onToggle={() => setMrpOpen(!mrpOpen)}
-            />
-            {(mrpOpen || isCollapsed) && (
-              <Box sx={{ display: isCollapsed ? "none" : "block" }}>
-                <Item
-                  title="Goods In"
-                  to="/GoodsIn"
-                  icon={<LocalShippingOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Ingredients Inventory"
-                  to="/IngredientsInventory"
-                  icon={<BakeryDiningOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Recipes"
-                  to="/recipes"
-                  icon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Stock Inventory"
-                  to="/stock_inventory"
-                  icon={<WarehouseOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Daily Production"
-                  to="/daily_production"
-                  icon={<AddOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Stock Usage"
-                  to="/stock_usage"
-                  icon={<InventoryOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-                <Item
-                  title="Goods Out"
-                  to="/goods_out"
-                  icon={<NoCrashOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  brand={brand}
-                />
-              </Box>
-            )}
-
-            <SectionHeader
-              label="HRP"
-              icon={<GroupWorkOutlinedIcon sx={{ fontSize: 18 }} />}
-              open={hrpOpen}
-              onToggle={() => setHrpOpen(!hrpOpen)}
-            />
-            {(hrpOpen || isCollapsed) && (
-              <Box sx={{ display: isCollapsed ? "none" : "block" }}>
-                <LockedItem
-                  title="Roster"
-                  to="/Roster"
-                  icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  unlocked={hrpUnlocked}
-                  requestUnlock={requestHrpUnlock}
-                  brand={brand}
-                />
-                <LockedItem
-                  title="Employees"
-                  to="/Employees"
-                  icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  unlocked={hrpUnlocked}
-                  requestUnlock={requestHrpUnlock}
-                  brand={brand}
-                />
-                <LockedItem
-                  title="Roles"
-                  to="/Roles"
-                  icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  unlocked={hrpUnlocked}
-                  requestUnlock={requestHrpUnlock}
-                  brand={brand}
-                />
-                <LockedItem
-                  title="Leave Requests"
-                  to="/hrp/leave"
-                  icon={<EventNoteOutlinedIcon sx={{ fontSize: 18 }} />}
-                  selected={selected}
-                  setSelected={setSelected}
-                  unlocked={hrpUnlocked}
-                  requestUnlock={requestHrpUnlock}
-                  brand={brand}
-                />
-              </Box>
-            )}
-          </Menu>
-
-          {!isCollapsed && (
+        {/* ✅ Use a flex column wrapper so footer stays at bottom */}
+        <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+          <ProSidebar collapsed={isCollapsed}>
+            {/* Header */}
             <Box
               sx={{
-                position: "absolute",
-                bottom: 20,
-                left: 16,
-                right: 16,
-                p: 1.5,
-                borderRadius: "12px",
-                border: `1px solid ${brand.border}`,
-                bgcolor: brand.surfaceMuted,
+                p: 2,
+                mb: 1,
                 display: "flex",
                 alignItems: "center",
-                gap: 1.5,
+                justifyContent: isCollapsed ? "center" : "space-between",
               }}
             >
-              <Avatar
+              {!isCollapsed && (
+                <Typography
+                  sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}
+                >
+                  Hupes
+                </Typography>
+              )}
+              <IconButton
+                onClick={() => setIsCollapsed(!isCollapsed)}
                 sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: brand.primary,
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
+                  color: brand.subtext,
+                  borderRadius: "12px",
+                  "&:hover": { bgcolor: brand.hover },
                 }}
               >
-                {profile.firstName ? profile.firstName[0] : "U"}
-              </Avatar>
-              <Box sx={{ overflow: "hidden" }}>
-                <Typography
+                <MenuOpenRoundedIcon
                   sx={{
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    color: brand.text,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {profile.firstName} {profile.lastName}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: "0.7rem",
                     color: brand.subtext,
-                    whiteSpace: "nowrap",
+                    transform: isCollapsed ? "rotate(180deg)" : "none",
+                    transition: "0.3s",
+                  }}
+                />
+              </IconButton>
+            </Box>
+
+            {/* Menu */}
+            <Menu iconShape="square">
+              <Item
+                title="Dashboard"
+                to="/dashboard"
+                icon={<HomeOutlinedIcon sx={{ fontSize: 20 }} />}
+                selected={selected}
+                setSelected={setSelected}
+                brand={brand}
+              />
+
+              <SectionHeader
+                label="MRP"
+                icon={<FolderOutlinedIcon sx={{ fontSize: 18 }} />}
+                open={mrpOpen}
+                onToggle={() => setMrpOpen(!mrpOpen)}
+              />
+              {(mrpOpen || isCollapsed) && (
+                <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+                  <Item
+                    title="Goods In"
+                    to="/GoodsIn"
+                    icon={<LocalShippingOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Ingredients Inventory"
+                    to="/IngredientsInventory"
+                    icon={<BakeryDiningOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Recipes"
+                    to="/recipes"
+                    icon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Stock Inventory"
+                    to="/stock_inventory"
+                    icon={<WarehouseOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Daily Production"
+                    to="/daily_production"
+                    icon={<AddOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Stock Usage"
+                    to="/stock_usage"
+                    icon={<InventoryOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                  <Item
+                    title="Goods Out"
+                    to="/goods_out"
+                    icon={<NoCrashOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    brand={brand}
+                  />
+                </Box>
+              )}
+
+              <SectionHeader
+                label="HRP"
+                icon={<GroupWorkOutlinedIcon sx={{ fontSize: 18 }} />}
+                open={hrpOpen}
+                onToggle={() => setHrpOpen(!hrpOpen)}
+              />
+              {(hrpOpen || isCollapsed) && (
+                <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+                  <LockedItem
+                    title="Roster"
+                    to="/Roster"
+                    icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    unlocked={hrpUnlocked}
+                    requestUnlock={requestHrpUnlock}
+                    brand={brand}
+                  />
+                  <LockedItem
+                    title="Employees"
+                    to="/Employees"
+                    icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    unlocked={hrpUnlocked}
+                    requestUnlock={requestHrpUnlock}
+                    brand={brand}
+                  />
+                  <LockedItem
+                    title="Roles"
+                    to="/Roles"
+                    icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    unlocked={hrpUnlocked}
+                    requestUnlock={requestHrpUnlock}
+                    brand={brand}
+                  />
+                  <LockedItem
+                    title="Leave Requests"
+                    to="/hrp/leave"
+                    icon={<EventNoteOutlinedIcon sx={{ fontSize: 18 }} />}
+                    selected={selected}
+                    setSelected={setSelected}
+                    unlocked={hrpUnlocked}
+                    requestUnlock={requestHrpUnlock}
+                    brand={brand}
+                  />
+                </Box>
+              )}
+            </Menu>
+          </ProSidebar>
+
+          {/* ✅ Proper footer that always stays at bottom of sidebar */}
+          {!isCollapsed && (
+            <Box sx={{ mt: "auto", px: 2, pb: 2 }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: "12px",
+                  border: `1px solid ${brand.border}`,
+                  bgcolor: brand.surfaceMuted,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: brand.primary,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
                   }}
                 >
-                  {profile.jobTitle || "Admin"}
-                </Typography>
+                  {profile.firstName ? profile.firstName[0] : "U"}
+                </Avatar>
+                <Box sx={{ overflow: "hidden" }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      color: brand.text,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {profile.firstName} {profile.lastName}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.7rem",
+                      color: brand.subtext,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {profile.jobTitle || "Admin"}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           )}
-        </ProSidebar>
+        </Box>
       </Box>
 
       <Box
