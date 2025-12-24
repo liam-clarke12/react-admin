@@ -52,37 +52,36 @@ const LandingPage = () => {
         }}
       >
         {/* Logo Section */}
-        <Box 
-          onClick={goHome} 
-          sx={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: 1.5, 
-            cursor: "pointer",
-            userSelect: "none"
-          }}
-        >
-          {/* Logo Image */}
-          <img
-            src="/user.png"
-            alt="Hupes Logo"
-            style={{ 
-                height: 40, // Adjusted height to match the text size better
-                width: "auto",
-                objectFit: "contain"
-            }}
-          />
-          <Typography 
-            sx={{ 
-                fontWeight: 800, 
-                fontSize: "1.5rem", 
-                color: brand.text, 
-                letterSpacing: "-0.5px" 
-            }}
+        <Box
+          onClick={goHome}
+            role="button"
+            aria-label="Go to home"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              cursor: "pointer",
+              userSelect: "none",
+              "&:hover .brand-text": { color: brand.primaryDark },
+              }}
           >
-            Hupes
-          </Typography>
-        </Box>
+              <Typography
+                className="brand-text"
+                sx={{
+                  fontWeight: "bold",
+                  fontSize: "1.25rem",
+                  color: brand.text,
+                  transition: "color .15s ease",
+                }}
+              >
+                Hupes
+                </Typography>
+                <img
+                    src="/user.png"
+                    alt="Logo"
+                    style={{ height: 40, marginRight: 8, pointerEvents: "none" }}
+                  />
+                </Box>
 
         <Stack direction="row" spacing={4} alignItems="center">
           {["Features", "About", "Contact"].map((item) => (
