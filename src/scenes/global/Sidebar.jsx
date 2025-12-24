@@ -195,7 +195,7 @@ const Sidebar = () => {
             </Box>
           </Box>
         )}
-      </Sidebar>
+      </ProSidebar>
     </Box>
   );
 };
