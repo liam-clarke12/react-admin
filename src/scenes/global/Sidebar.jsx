@@ -141,7 +141,7 @@ const Sidebar = () => {
         const lastName = attrs?.family_name || (attrs?.name ? String(attrs.name).split(" ").pop() : "");
         setProfile({ firstName, lastName, jobTitle: attrs?.["custom:jobTitle"] || "", company: attrs?.["custom:Company"] || "" });
       } catch (e) {
-        setProfile({ firstName: "", lastName: "", jobTitle: "User", company: "" });
+        setProfile({ firstName: "", lastName: "User", jobTitle: "Admin", company: "" });
       } finally {
         if (mounted) setProfileLoading(false);
       }
@@ -189,7 +189,7 @@ const Sidebar = () => {
         </Box>
       );
     };
-  }, [isCollapsed, brand]); // Added brand as dependency
+  }, [isCollapsed, brand]);
 
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
@@ -248,7 +248,8 @@ const Sidebar = () => {
           <Box sx={{ flexGrow: 1, overflowY: "auto", overflowX: "hidden", 
             "&::-webkit-scrollbar": { width: "4px" },
             "&::-webkit-scrollbar-thumb": { backgroundColor: "transparent" },
-            "&:hover::-webkit-scrollbar-thumb": { backgroundColor: mode === "dark" ? "#475569" : "#e2e8f0" }
+            // FIXED: Changed mode to theme.palette.mode to fix the 'no-undef' error
+            "&:hover::-webkit-scrollbar-thumb": { backgroundColor: theme.palette.mode === "dark" ? "#475569" : "#e2e8f0" }
           }}>
             <Menu iconShape="circle">
               <Item title="Dashboard" to="/dashboard" icon={<HomeOutlinedIcon sx={{ fontSize: 20 }} />} selected={selected} setSelected={setSelected} brand={brand} />
