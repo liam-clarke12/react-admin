@@ -10,64 +10,40 @@ import {
   Snackbar,
   Alert,
   Paper,
+  Stack,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  // Nory purple
+  text: "#1e293b",
+  subtext: "#64748b",
   primary: "#7C3AED",
   primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  accent: "#10B981",
+  surface: "#ffffff",
+  surfaceMuted: "#F8FAFC",
+  border: "#f1f5f9",
 };
 
-// ✅ Where messages should go
 const CONTACT_EMAIL = "euhupes@gmail.com";
-// Optional backend endpoint if you add one later (SES/Lambda, API Gateway, etc.)
-const CONTACT_ENDPOINT =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_CONTACT_ENDPOINT) ||
-  process.env.REACT_APP_CONTACT_ENDPOINT ||
-  "";
 
 const ContactPage = () => {
   const navigate = useNavigate();
-
-  // form state
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    company: "",
-    message: "",
-  });
+  const [form, setForm] = useState({ name: "", email: "", company: "", message: "" });
   const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
-  const handleSignIn = () => navigate("/login");
   const goHome = () => navigate("/");
-
-  // Match LandingPage behavior for header nav
+  const handleSignIn = () => navigate("/login");
+  
   const handleNavClick = (item) => {
-    if (item === "Contact") {
-      navigate("/contact");
-      return;
-    }
-    if (item === "Features") {
-      // simple jump to features on landing
-      navigate("/features");
-      return;
-    }
-    if (item === "About") {
-      navigate("/");
-      return;
-    }
+    if (item === "Features") navigate("/features");
+    if (item === "About") navigate("/");
+    if (item === "Contact") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const validate = () => {
@@ -80,358 +56,219 @@ const ContactPage = () => {
     return Object.keys(e).length === 0;
   };
 
-  const onChange = (field) => (evt) => {
-    setForm((f) => ({ ...f, [field]: evt.target.value }));
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
-
-  const handleSubmit = async (evt) => {
+  const handleSubmit = (evt) => {
     evt.preventDefault();
     if (!validate()) return;
 
-    // Prepare common payload
-    const payload = {
-      name: form.name.trim(),
-      email: form.email.trim(),
-      company: form.company.trim(),
-      message: form.message.trim(),
-      page: window.location.href,
-      timestamp: new Date().toISOString(),
-    };
-
-    // If you configure a backend endpoint that sends email (SES, etc.), this will use it.
-    if (CONTACT_ENDPOINT) {
-      try {
-        const res = await fetch(CONTACT_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setSnack({ open: true, severity: "success", message: "Thanks! We’ll be in touch shortly." });
-        setForm({ name: "", email: "", company: "", message: "" });
-        return;
-      } catch (err) {
-        console.warn("[Contact] Direct send failed, falling back to mailto:", err);
-        // falls through to mailto
-      }
-    }
-
-    // Fallback: open user's mail client with a filled draft to CONTACT_EMAIL
+    // Construct the mailto link
     const subject = `Contact from ${form.name}${form.company ? " (" + form.company + ")" : ""}`;
     const body = `Name: ${form.name}
 Email: ${form.email}
-Company: ${form.company || "-"}
+Company: ${form.company || "Not provided"}
 
+Message:
 ${form.message}`;
-    const mailto = `mailto:${encodeURIComponent(CONTACT_EMAIL)}?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
 
-    try {
-      window.location.href = mailto;
-    } catch {}
-    setSnack({ open: true, severity: "success", message: "Thanks! We’ll be in touch shortly." });
+    const mailto = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Trigger redirect
+    window.location.href = mailto;
+
+    // Show feedback and reset form
+    setSnack({ 
+      open: true, 
+      severity: "success", 
+      message: "Opening your email client..." 
+    });
     setForm({ name: "", email: "", company: "", message: "" });
   };
 
   return (
-    <Box sx={{ fontFamily: "Roboto, sans-serif" }}>
-      {/* Header (matches Landing) */}
+    <Box sx={{ backgroundColor: brand.surface, minHeight: "100vh", fontFamily: "Inter, sans-serif" }}>
+      
+      {/* --- NAVBAR --- */}
       <Box
+        component="nav"
         sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          py: 2,
-          px: 4,
-          backgroundColor: "#fff",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          py: 2, px: { xs: 2, md: 8 }, position: "sticky", top: 0, zIndex: 1000,
+          backgroundColor: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(10px)",
           borderBottom: `1px solid ${brand.border}`,
         }}
       >
-        {/* Logo & Brand Name (clickable → landing page) */}
-        <Box
-          onClick={goHome}
-          role="button"
-          aria-label="Go to home"
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            cursor: "pointer",
-            userSelect: "none",
-            "&:hover .brand-text": { color: brand.primaryDark },
-          }}
-        >
-          <Typography
-            className="brand-text"
-            sx={{
-              fontWeight: "bold",
-              fontSize: "1.25rem",
-              color: brand.text,
-              transition: "color .15s ease",
-            }}
-          >
+        <Box onClick={goHome} sx={{ display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer" }}>
+          <img src="/user.png" alt="Logo" style={{ height: 40 }} />
+          <Typography sx={{ fontWeight: 800, fontSize: "1.5rem", color: brand.text, letterSpacing: "-0.5px" }}>
             Hupes
           </Typography>
-          <img src="/user.png" alt="Logo" style={{ height: 40, marginRight: 8, pointerEvents: "none" }} />
         </Box>
 
-        {/* Navigation + Sign In */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+        <Stack direction="row" spacing={4} alignItems="center">
           {["Features", "About", "Contact"].map((item) => (
             <Typography
               key={item}
               onClick={() => handleNavClick(item)}
               sx={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                color: brand.primary,
-                "&:hover": { color: brand.primaryDark },
-                transition: "color .15s ease",
+                display: { xs: "none", md: "block" },
+                cursor: "pointer", fontWeight: 600, fontSize: "0.95rem",
+                color: item === "Contact" ? brand.primary : brand.subtext,
+                "&:hover": { color: brand.primary }, transition: "0.2s",
               }}
-              title={item}
             >
               {item}
             </Typography>
           ))}
           <Button
-            variant="contained"
+            variant="contained" disableElevation onClick={handleSignIn}
             sx={{
-              borderRadius: "999px",
-              px: 2.5,
-              fontWeight: 600,
-              backgroundColor: brand.primary,
+              borderRadius: "12px", px: 3, py: 1, textTransform: "none",
+              fontWeight: 700, backgroundColor: brand.primary,
               "&:hover": { backgroundColor: brand.primaryDark },
-              textTransform: "none",
             }}
-            onClick={handleSignIn}
           >
             Sign In
           </Button>
-        </Box>
+        </Stack>
       </Box>
 
-      {/* Hero / Split */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "46% 1fr" },
-          minHeight: "80vh",
-          background:
-            "radial-gradient(800px 400px at 80% -20%, #ffe4ea 0%, rgba(255,228,234,0) 60%), linear-gradient(180deg, #fff 0%, #f8fafc 100%)",
-        }}
-      >
-        {/* Left: Intro + contact info cards */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            px: { xs: 3, md: 8 },
-            py: { xs: 6, md: 0 },
-          }}
-        >
-          <Typography
-            variant="h2"
-            sx={{
-              fontWeight: 900,
-              mb: 2,
-              lineHeight: 1.15,
-              color: brand.text,
-              fontSize: { xs: "2rem", md: "2.6rem" },
-            }}
-          >
-            Let’s talk.
-          </Typography>
-          <Typography sx={{ mb: 4, color: brand.subtext, fontSize: 16 }}>
-            Questions about inventory, production, or onboarding? Drop us a line and we’ll get back
-            to you within one business day.
-          </Typography>
+      {/* --- CONTENT SECTION --- */}
+      <Box sx={{ bgcolor: brand.surfaceMuted, py: { xs: 8, md: 12 }, borderBottom: `1px solid ${brand.border}` }}>
+        <Container maxWidth="lg">
+          <Grid container spacing={8} alignItems="center">
+            
+            {/* Left Column: Info */}
+            <Grid item xs={12} md={5}>
+              <Box sx={{ display: "inline-flex", p: 1, px: 2, mb: 2, bgcolor: "rgba(124, 58, 237, 0.1)", borderRadius: "20px", color: brand.primary }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase" }}>Get in Touch</Typography>
+              </Box>
+              <Typography variant="h2" sx={{ fontWeight: 900, color: brand.text, mb: 3, fontSize: { xs: "2.5rem", md: "3.5rem" }, lineHeight: 1.1 }}>
+                Let’s talk <span style={{ color: brand.primary }}>production</span>.
+              </Typography>
+              <Typography sx={{ color: brand.subtext, fontSize: "1.1rem", mb: 6, lineHeight: 1.6 }}>
+                Have questions about scaling your food brand? Our experts are ready to help you optimize your inventory and traceability.
+              </Typography>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
+              <Stack spacing={4}>
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+                  <Box sx={{ bgcolor: "white", p: 1.5, borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)", color: brand.primary }}>
+                    <EmailOutlinedIcon />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, color: brand.text }}>Email us</Typography>
+                    <Typography sx={{ color: brand.subtext }}>{CONTACT_EMAIL}</Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+                  <Box sx={{ bgcolor: "white", p: 1.5, borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)", color: brand.primary }}>
+                    <AccessTimeOutlinedIcon />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, color: brand.text }}>Support Hours</Typography>
+                    <Typography sx={{ color: brand.subtext }}>Monday – Friday<br />9:00 – 17:00 (GMT)</Typography>
+                  </Box>
+                </Box>
+              </Stack>
+            </Grid>
+
+            {/* Right Column: Form */}
+            <Grid item xs={12} md={7}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: { xs: 4, md: 6 }, 
+                  borderRadius: "32px", 
                   border: `1px solid ${brand.border}`,
-                  background: brand.surface,
-                  boxShadow: brand.shadow,
-                  height: "100%",
+                  boxShadow: "0 24px 48px rgba(0,0,0,0.04)",
+                  bgcolor: "white"
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <EmailOutlinedIcon sx={{ color: brand.primary }} />
-                  <Typography sx={{ fontWeight: 800, color: brand.text }}>Email</Typography>
-                </Box>
-                <Typography sx={{ color: brand.subtext, mt: 1 }}>
-                  <a
-                    href={`mailto:${CONTACT_EMAIL}`}
-                    style={{ color: brand.primary, textDecoration: "none", fontWeight: 700 }}
-                  >
-                    {CONTACT_EMAIL}
-                  </a>
-                </Typography>
+                <form onSubmit={handleSubmit}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, ml: 0.5 }}>Your Name</Typography>
+                      <TextField
+                        fullWidth placeholder="John Doe"
+                        value={form.name}
+                        onChange={(e) => setForm({...form, name: e.target.value})}
+                        error={!!errors.name} helperText={errors.name}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: brand.surfaceMuted }}}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, ml: 0.5 }}>Work Email</Typography>
+                      <TextField
+                        fullWidth placeholder="john@company.com"
+                        value={form.email}
+                        onChange={(e) => setForm({...form, email: e.target.value})}
+                        error={!!errors.email} helperText={errors.email}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: brand.surfaceMuted }}}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, ml: 0.5 }}>Company (Optional)</Typography>
+                      <TextField
+                        fullWidth placeholder="Your Food Brand"
+                        value={form.company}
+                        onChange={(e) => setForm({...form, company: e.target.value})}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: brand.surfaceMuted }}}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, ml: 0.5 }}>Message</Typography>
+                      <TextField
+                        fullWidth multiline rows={4} placeholder="Tell us about your production needs..."
+                        value={form.message}
+                        onChange={(e) => setForm({...form, message: e.target.value})}
+                        error={!!errors.message} helperText={errors.message}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: brand.surfaceMuted }}}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button
+                        fullWidth type="submit" variant="contained" size="large"
+                        startIcon={<SendOutlinedIcon />}
+                        sx={{
+                          py: 2, borderRadius: "12px", fontWeight: 700, textTransform: "none",
+                          fontSize: "1rem", bgcolor: brand.primary, 
+                          "&:hover": { bgcolor: brand.primaryDark, boxShadow: "0 8px 20px rgba(124, 58, 237, 0.3)" }
+                        }}
+                      >
+                        Send Email
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </form>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  border: `1px solid ${brand.border}`,
-                  background: brand.surface,
-                  boxShadow: brand.shadow,
-                  height: "100%",
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <AccessTimeOutlinedIcon sx={{ color: brand.primary }} />
-                  <Typography sx={{ fontWeight: 800, color: brand.text }}>Hours</Typography>
-                </Box>
-                <Typography sx={{ color: brand.subtext, mt: 1 }}>
-                  Mon–Fri · 9:00–17:00 (GMT)
-                </Typography>
-              </Paper>
-            </Grid>
-            {/* 🗑️ Address card removed as requested */}
           </Grid>
-        </Box>
-
-        {/* Right: Contact form card */}
-        <Box
-          sx={{
-            display: "grid",
-            placeItems: "center",
-            px: { xs: 3, md: 4 },
-            py: { xs: 6, md: 0 },
-          }}
-        >
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{
-              width: "100%",
-              maxWidth: 560,
-              p: 3,
-              borderRadius: 2,
-              border: `1px solid ${brand.border}`,
-              background: brand.surface,
-              boxShadow: brand.shadow,
-            }}
-          >
-            <Typography sx={{ fontWeight: 800, color: brand.text, mb: 2 }}>
-              Send us a message
-            </Typography>
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Your Name"
-                  fullWidth
-                  value={form.name}
-                  onChange={onChange("name")}
-                  error={Boolean(errors.name)}
-                  helperText={errors.name}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 2 },
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: brand.border },
-                    "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: brand.primary },
-                    "& .Mui-focused": { boxShadow: `0 0 0 4px ${brand.focusRing}` },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Email"
-                  fullWidth
-                  value={form.email}
-                  onChange={onChange("email")}
-                  error={Boolean(errors.email)}
-                  helperText={errors.email}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 2 },
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: brand.border },
-                    "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: brand.primary },
-                    "& .Mui-focused": { boxShadow: `0 0 0 4px ${brand.focusRing}` },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Company (optional)"
-                  fullWidth
-                  value={form.company}
-                  onChange={onChange("company")}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 2 },
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: brand.border },
-                    "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: brand.primary },
-                    "& .Mui-focused": { boxShadow: `0 0 0 4px ${brand.focusRing}` },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Message"
-                  fullWidth
-                  multiline
-                  minRows={5}
-                  value={form.message}
-                  onChange={onChange("message")}
-                  error={Boolean(errors.message)}
-                  helperText={errors.message}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 2 },
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: brand.border },
-                    "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: brand.primary },
-                    "& .Mui-focused": { boxShadow: `0 0 0 4px ${brand.focusRing}` },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} display="flex" justifyContent="flex-end">
-                <Button
-                  type="submit"
-                  startIcon={<SendOutlinedIcon />}
-                  variant="contained"
-                  sx={{
-                    borderRadius: "999px",
-                    px: 3,
-                    fontWeight: 800,
-                    textTransform: "none",
-                    background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                    boxShadow: "0 8px 16px rgba(124,58,237,0.18), 0 2px 4px rgba(16,24,40,0.06)",
-                    "&:hover": {
-                      background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
-                    },
-                  }}
-                >
-                  Send
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
-        </Box>
+        </Container>
       </Box>
 
-      {/* Footer bar (brand color) */}
-      <Box sx={{ height: 60, backgroundColor: brand.primary }} />
+      {/* --- FOOTER TRUST LOGOS --- */}
+      <Container sx={{ py: 6 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={4} justifyContent="center" alignItems="center">
+          {["Secure SSL Encryption", "Fast Response Time", "Dedicated Support"].map((text) => (
+            <Box key={text} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <CheckCircleIcon sx={{ color: brand.accent, fontSize: 20 }} />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: brand.subtext }}>{text}</Typography>
+            </Box>
+          ))}
+        </Stack>
+      </Container>
 
-      {/* Snackbar */}
+      {/* Simple Footer Text */}
+      <Box sx={{ py: 4, textAlign: "center", borderTop: `1px solid ${brand.border}` }}>
+        <Typography variant="body2" sx={{ color: brand.subtext }}>
+          © {new Date().getFullYear()} Hupes Technologies. All rights reserved.
+        </Typography>
+      </Box>
+
       <Snackbar
-        open={snack.open}
-        autoHideDuration={3000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        open={snack.open} autoHideDuration={4000}
+        onClose={() => setSnack({ ...snack, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          severity={snack.severity}
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
-          variant="filled"
-        >
+        <Alert severity={snack.severity} variant="filled" sx={{ borderRadius: "12px" }}>
           {snack.message}
         </Alert>
       </Snackbar>
