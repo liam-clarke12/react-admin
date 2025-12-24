@@ -18,7 +18,7 @@ const LandingPage = () => {
   const handleNavClick = (item) => {
     if (item === "Contact") return navigate("/contact");
     if (item === "Features") return navigate("/features");
-    if (item === "About") window.scrollTo({ top: 0, behavior: "smooth" });
+    if (item === "About") return navigate("/about");
   };
 
   const brand = {

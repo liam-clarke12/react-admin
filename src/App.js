@@ -21,8 +21,10 @@ import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box }
 
 // Public pages
 import LandingPage from "./scenes/LandingPage";
-import ContactPage from "./scenes/ContactPage";   // <-- index.jsx inside /scenes/ContactPage
-import FeaturesPage from "./scenes/FeaturePage";  // <-- index.jsx inside /scenes/FeaturePage
+import ContactPage from "./scenes/ContactPage";
+import FeaturesPage from "./scenes/FeaturePage";
+import AboutPage from "./scenes/AboutPage";
+
 
 // Protected app pages
 import AccountPage from "./scenes/Account/Account";
@@ -428,6 +430,7 @@ function App() {
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginScreen />} />
+          <Route path="/about" element={<AboutPage />} />
 
           {/* Protected app */}
           <Route path="/*" element={<ProtectedApp />} />

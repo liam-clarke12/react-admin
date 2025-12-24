@@ -42,7 +42,7 @@ const ContactPage = () => {
   
   const handleNavClick = (item) => {
     if (item === "Features") navigate("/features");
-    if (item === "About") navigate("/");
+    if (item === "About") navigate("/about")
     if (item === "Contact") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 

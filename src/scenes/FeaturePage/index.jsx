@@ -71,7 +71,7 @@ const FeaturesPage = () => {
   const handleSignIn = () => navigate("/login");
   const handleNavClick = (item) => {
     if (item === "Contact") navigate("/contact");
-    if (item === "About") navigate("/");
+    if (item === "About") navigate("/about");
     if (item === "Features") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
