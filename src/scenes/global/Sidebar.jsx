@@ -1,27 +1,31 @@
 // src/components/Sidebar/index.jsx
 import { useEffect, useMemo, useState } from "react";
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import { Box, IconButton, Typography, Tooltip, Divider, Avatar } from "@mui/material";
+import { Box, IconButton, Typography, useTheme, Tooltip, Divider, Avatar } from "@mui/material";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Link, useLocation } from "react-router-dom";
+import { tokens } from "../../themes";
 
 // Icons
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
-import LocalShippingRoundedIcon from "@mui/icons-material/LocalShippingRounded";
-import BakeryDiningRoundedIcon from "@mui/icons-material/BakeryDiningRounded";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
-import WarehouseRoundedIcon from "@mui/icons-material/WarehouseRounded";
-import AddCircleRoundedIcon from "@mui/icons-material/AddCircleRounded";
-import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
-import LocalPizzaRoundedIcon from "@mui/icons-material/LocalPizzaRounded";
-import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
-import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
-import MenuOpenRoundedIcon from "@mui/icons-material/MenuOpenRounded";
+import NoCrashOutlinedIcon from "@mui/icons-material/NoCrashOutlined";
+import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
+import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
+import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import BakeryDiningOutlinedIcon from "@mui/icons-material/BakeryDiningOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
-import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
-import KeyboardArrowRightRoundedIcon from '@mui/icons-material/KeyboardArrowRightRounded';
+import MenuOpenRoundedIcon from "@mui/icons-material/MenuOpenRounded";
 
 import { fetchUserAttributes } from "aws-amplify/auth";
 
@@ -30,24 +34,27 @@ const brand = {
   subtext: "#64748b",
   border: "#f1f5f9",
   surface: "#ffffff",
+  surfaceMuted: "#f8fafc",
   primary: "#7C3AED",
   primaryLight: "rgba(124, 58, 237, 0.08)",
-  hover: "#f8fafc",
+  hover: "#f1f5f9",
 };
 
 const HRP_ACCESS_CODE = "210100";
 const HRP_UNLOCK_KEY = "dae_hrp_unlocked_dev";
 
-const Item = ({ title, to, icon, selected, setSelected, isCollapsed }) => {
+/* ---------------- Sub-Components ---------------- */
+
+const Item = ({ title, to, icon, selected, setSelected }) => {
   const active = selected === title;
   return (
     <MenuItem
       active={active}
+      style={{ listStyleType: "none", margin: "2px 12px" }}
       onClick={() => setSelected(title)}
       icon={icon}
-      style={{ listStyleType: "none", margin: "2px 12px" }}
     >
-      <Link to={to} style={{ textDecoration: "none", color: active ? brand.primary : brand.text }}>
+      <Link to={to} style={{ textDecoration: "none", width: "100%", color: active ? brand.primary : brand.text }}>
         <Typography sx={{ fontWeight: active ? 700 : 500, fontSize: "0.85rem" }}>
           {title}
         </Typography>
@@ -56,133 +63,210 @@ const Item = ({ title, to, icon, selected, setSelected, isCollapsed }) => {
   );
 };
 
+const LockedItem = ({ title, to, icon, selected, setSelected, unlocked, requestUnlock }) => {
+  const active = selected === title;
+  return (
+    <MenuItem
+      active={active}
+      style={{ listStyleType: "none", margin: "2px 12px" }}
+      onClick={(e) => {
+        if (!unlocked) {
+          e?.preventDefault?.();
+          requestUnlock();
+          return;
+        }
+        setSelected(title);
+      }}
+      icon={icon}
+    >
+      <Link
+        to={unlocked ? to : "#"}
+        style={{
+          textDecoration: "none",
+          width: "100%",
+          color: active ? brand.primary : brand.text,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography sx={{ fontWeight: active ? 700 : 500, fontSize: "0.85rem" }}>
+          {title}
+        </Typography>
+        {!unlocked && <LockRoundedIcon sx={{ fontSize: 14, color: brand.subtext, opacity: 0.5 }} />}
+      </Link>
+    </MenuItem>
+  );
+};
+
 const Sidebar = () => {
+  const theme = useTheme();
+  tokens(theme.palette.mode);
   const location = useLocation();
+
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selected, setSelected] = useState("Dashboard");
   const [mrpOpen, setMrpOpen] = useState(false);
   const [hrpOpen, setHrpOpen] = useState(false);
-  const [hrpUnlocked, setHrpUnlocked] = useState(() => localStorage.getItem(HRP_UNLOCK_KEY) === "true");
 
-  // User Profile State
-  const [profile, setProfile] = useState({ firstName: "", lastName: "", jobTitle: "" });
+  const [hrpUnlocked, setHrpUnlocked] = useState(() => {
+    try { return localStorage.getItem(HRP_UNLOCK_KEY) === "true"; } catch { return false; }
+  });
+
+  const requestHrpUnlock = () => {
+    if (hrpUnlocked) return;
+    const code = window.prompt("HRP is under construction.\n\nEnter access code to unlock (dev):");
+    if (code === null) return;
+    if (String(code).trim() === HRP_ACCESS_CODE) {
+      try { localStorage.setItem(HRP_UNLOCK_KEY, "true"); } catch {}
+      setHrpUnlocked(true);
+      window.alert("✅ HRP unlocked (dev).");
+    } else {
+      window.alert("🚧 Coming soon / under construction.\n\nIncorrect code.");
+    }
+  };
+
+  const [profile, setProfile] = useState({ firstName: "", lastName: "", jobTitle: "", company: "" });
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const attrs = await fetchUserAttributes();
-        setProfile({
-          firstName: attrs?.given_name || "",
-          lastName: attrs?.family_name || "",
-          jobTitle: attrs?.["custom:jobTitle"] || "Admin"
-        });
-      } catch (e) { console.warn(e); }
+        if (!mounted) return;
+        const firstName = attrs?.given_name || (attrs?.name ? String(attrs.name).split(" ")[0] : "");
+        const lastName = attrs?.family_name || (attrs?.name ? String(attrs.name).split(" ").pop() : "");
+        setProfile({ firstName, lastName, jobTitle: attrs?.["custom:jobTitle"] || "", company: attrs?.["custom:Company"] || "" });
+      } catch (e) {
+        setProfile({ firstName: "", lastName: "", jobTitle: "User", company: "" });
+      } finally {
+        if (mounted) setProfileLoading(false);
+      }
     })();
+    return () => { mounted = false; };
   }, []);
 
-  // Update selection based on path
   useEffect(() => {
     const path = location.pathname;
+    const mapping = {
+      "/dashboard": "Dashboard", "/GoodsIn": "Goods In", "/IngredientsInventory": "Ingredients Inventory",
+      "/recipes": "Recipes", "/stock_inventory": "Stock Inventory", "/daily_production": "Daily Production",
+      "/stock_usage": "Stock Usage", "/goods_out": "Goods Out", "/Employees": "Employees",
+      "/Roles": "Roles", "/hrp/roles": "Roles", "/hrp/skills": "Skills & Training",
+      "/Roster": "Roster", "/hrp/roster": "Roster", "/hrp/leave": "Leave Requests",
+    };
+    if (mapping[path]) setSelected(mapping[path]);
+
     const isMrp = ["/GoodsIn", "/IngredientsInventory", "/recipes", "/stock_inventory", "/daily_production", "/stock_usage", "/goods_out"].includes(path);
-    const isHrp = ["/Employees", "/Roles", "/hrp/leave", "/Roster"].includes(path);
+    const isHrp = ["/Employees", "/Roles", "/hrp/roles", "/hrp/skills", "/Roster", "/hrp/roster", "/hrp/leave"].includes(path);
     if (isMrp) setMrpOpen(true);
     if (isHrp) setHrpOpen(true);
   }, [location.pathname]);
 
-  const SectionHeader = ({ label, icon, open, onToggle }) => (
-    <Box
-      onClick={onToggle}
-      sx={{
-        display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between",
-        px: 2, py: 1.2, mx: 1.5, mt: 1, cursor: "pointer", borderRadius: "8px",
-        "&:hover": { bgcolor: brand.hover }
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-        {icon}
-        {!isCollapsed && (
-          <Typography sx={{ fontWeight: 700, fontSize: "0.75rem", color: brand.subtext, letterSpacing: "0.05rem" }}>
-            {label}
-          </Typography>
-        )}
-      </Box>
-      {!isCollapsed && (open ? <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: brand.subtext }} /> : <KeyboardArrowRightRoundedIcon sx={{ fontSize: 18, color: brand.subtext }} />)}
-    </Box>
-  );
+  const SectionHeader = useMemo(() => {
+    return function Inner({ label, icon, open, onToggle }) {
+      return (
+        <Box
+          onClick={onToggle}
+          sx={{
+            display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between",
+            px: 2, py: 1.2, mx: 1.5, mt: 1, cursor: "pointer", borderRadius: "8px",
+            "&:hover": { bgcolor: brand.hover }
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ color: brand.subtext, display: "flex" }}>{icon}</Box>
+            {!isCollapsed && (
+              <Typography sx={{ fontWeight: 700, fontSize: "0.7rem", color: brand.subtext, letterSpacing: "0.05rem", textTransform: "uppercase" }}>
+                {label}
+              </Typography>
+            )}
+          </Box>
+          {!isCollapsed && (open ? <ExpandMoreRoundedIcon sx={{ fontSize: 16, color: brand.subtext }} /> : <ChevronRightRoundedIcon sx={{ fontSize: 16, color: brand.subtext }} />)}
+        </Box>
+      );
+    };
+  }, [isCollapsed]);
+
+  const COLLAPSED_W = 80;
+  const EXPANDED_W = 260;
 
   return (
-    <Box sx={{
-      "& .pro-sidebar-inner": { background: `${brand.surface} !important` },
-      "& .pro-sidebar": { borderRight: `1px solid ${brand.border}` },
-      "& .pro-menu-item": { transition: "all 0.2s" },
-      "& .pro-menu-item.active": {
-        backgroundColor: `${brand.primaryLight} !important`,
-        borderRadius: "8px",
-        "& svg": { color: `${brand.primary} !important` },
-        "&:before": { content: '""', position: "absolute", left: -12, height: "60%", width: "4px", bgcolor: brand.primary, borderRadius: "0 4px 4px 0" }
-      },
-      "& .pro-inner-item:hover": { background: "transparent !important" },
-    }}>
-      <ProSidebar collapsed={isCollapsed} width={260} collapsedWidth={80} style={{ position: "fixed", height: "100vh" }}>
-        
-        {/* Header / Logo */}
-        <Box sx={{ p: 2, mb: 2, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between" }}>
-          {!isCollapsed && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-               <Box sx={{ width: 32, height: 32, bgcolor: brand.primary, borderRadius: "8px", display: "grid", placeItems: "center" }}>
-                  <LocalPizzaRoundedIcon sx={{ color: "#fff", fontSize: 20 }} />
-               </Box>
-               <Typography sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem" }}>Hupes</Typography>
-            </Box>
-          )}
-          <IconButton onClick={() => setIsCollapsed(!isCollapsed)}>
-            <MenuOpenRoundedIcon sx={{ transform: isCollapsed ? "rotate(180deg)" : "none", transition: "0.3s" }} />
-          </IconButton>
-        </Box>
-
-        <Menu iconShape="circle">
-          <Item title="Dashboard" to="/dashboard" icon={<HomeRoundedIcon sx={{ fontSize: 20 }} />} selected={selected} setSelected={setSelected} isCollapsed={isCollapsed} />
-          
-          <Divider sx={{ my: 2, mx: 3, borderColor: brand.border }} />
-
-          <SectionHeader label="PRODUCTION" icon={<WarehouseRoundedIcon sx={{ fontSize: 18, color: brand.subtext }} />} open={mrpOpen} onToggle={() => setMrpOpen(!mrpOpen)} />
-          {mrpOpen && !isCollapsed && (
-            <Box sx={{ pl: 1 }}>
-              <Item title="Goods In" to="/GoodsIn" icon={<LocalShippingRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Inventory" to="/IngredientsInventory" icon={<BakeryDiningRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Recipes" to="/recipes" icon={<DescriptionRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Production" to="/daily_production" icon={<AddCircleRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Usage" to="/stock_usage" icon={<Inventory2RoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-            </Box>
-          )}
-
-          <SectionHeader label="PEOPLE" icon={<PeopleAltRoundedIcon sx={{ fontSize: 18, color: brand.subtext }} />} open={hrpOpen} onToggle={() => setHrpOpen(!hrpOpen)} />
-          {hrpOpen && !isCollapsed && (
-            <Box sx={{ pl: 1 }}>
-              <Item title="Roster" to="/Roster" icon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Leave" to="/hrp/leave" icon={<EventNoteRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-              <Item title="Employees" to="/Employees" icon={<BadgeRoundedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
-            </Box>
-          )}
-        </Menu>
-
-        {/* Footer Profile */}
-        {!isCollapsed && (
-          <Box sx={{ position: "absolute", bottom: 20, left: 20, right: 20, p: 1.5, borderRadius: "12px", border: `1px solid ${brand.border}`, display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Avatar sx={{ width: 36, height: 36, bgcolor: brand.primary, fontWeight: 700, fontSize: "0.8rem" }}>
-                {profile.firstName[0]}{profile.lastName[0]}
-            </Avatar>
-            <Box sx={{ overflow: "hidden" }}>
-                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: brand.text, whiteSpace: "nowrap" }}>
-                    {profile.firstName} {profile.lastName}
-                </Typography>
-                <Typography sx={{ fontSize: "0.7rem", color: brand.subtext, whiteSpace: "nowrap" }}>
-                    {profile.jobTitle}
-                </Typography>
-            </Box>
+    <Box display="flex">
+      <Box
+        sx={{
+          width: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
+          position: "fixed", height: "100vh", zIndex: 1000,
+          borderRight: `1px solid ${brand.border}`,
+          background: brand.surface,
+          "& .pro-sidebar-inner": { background: `${brand.surface} !important` },
+          "& .pro-menu-item": { transition: "all 0.2s" },
+          "& .pro-menu-item.active": {
+            backgroundColor: `${brand.primaryLight} !important`,
+            borderRadius: "8px",
+            "& svg": { color: `${brand.primary} !important` },
+            "&:before": { content: '""', position: "absolute", left: -12, height: "64%", width: "4px", bgcolor: brand.primary, borderRadius: "0 4px 4px 0" }
+          },
+          "& .pro-inner-item:hover": { background: "transparent !important" },
+        }}
+      >
+        <ProSidebar collapsed={isCollapsed}>
+          <Box sx={{ p: 2, mb: 1, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between" }}>
+            {!isCollapsed && (
+              <Typography sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}>Hupes</Typography>
+            )}
+            <IconButton onClick={() => setIsCollapsed(!isCollapsed)}>
+              <MenuOpenRoundedIcon sx={{ transform: isCollapsed ? "rotate(180deg)" : "none", transition: "0.3s" }} />
+            </IconButton>
           </Box>
-        )}
-      </ProSidebar>
+
+          <Menu iconShape="circle">
+            <Item title="Dashboard" to="/dashboard" icon={<HomeOutlinedIcon sx={{ fontSize: 20 }} />} selected={selected} setSelected={setSelected} />
+            
+            <SectionHeader label="MRP" icon={<FolderOutlinedIcon sx={{ fontSize: 18 }} />} open={mrpOpen} onToggle={() => setMrpOpen(!mrpOpen)} />
+            {(mrpOpen || isCollapsed) && (
+              <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+                <Item title="Goods In" to="/GoodsIn" icon={<LocalShippingOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Ingredients Inventory" to="/IngredientsInventory" icon={<BakeryDiningOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Recipes" to="/recipes" icon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Stock Inventory" to="/stock_inventory" icon={<WarehouseOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Daily Production" to="/daily_production" icon={<AddOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Stock Usage" to="/stock_usage" icon={<InventoryOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+                <Item title="Goods Out" to="/goods_out" icon={<NoCrashOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} />
+              </Box>
+            )}
+
+            <SectionHeader label="HRP" icon={<GroupWorkOutlinedIcon sx={{ fontSize: 18 }} />} open={hrpOpen} onToggle={() => setHrpOpen(!hrpOpen)} />
+            {(hrpOpen || isCollapsed) && (
+              <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+                <LockedItem title="Roster" to="/Roster" icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                <LockedItem title="Employees" to="/Employees" icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                <LockedItem title="Roles" to="/Roles" icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+                <LockedItem title="Leave Requests" to="/hrp/leave" icon={<EventNoteOutlinedIcon sx={{ fontSize: 18 }} />} selected={selected} setSelected={setSelected} unlocked={hrpUnlocked} requestUnlock={requestHrpUnlock} />
+              </Box>
+            )}
+          </Menu>
+
+          {!isCollapsed && (
+            <Box sx={{ position: "absolute", bottom: 20, left: 16, right: 16, p: 1.5, borderRadius: "12px", border: `1px solid ${brand.border}`, bgcolor: brand.surfaceMuted, display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: brand.primary, fontSize: "0.75rem", fontWeight: 700 }}>
+                {profile.firstName ? profile.firstName[0] : "U"}
+              </Avatar>
+              <Box sx={{ overflow: "hidden" }}>
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: brand.text, whiteSpace: "nowrap" }}>{profile.firstName} {profile.lastName}</Typography>
+                <Typography sx={{ fontSize: "0.7rem", color: brand.subtext, whiteSpace: "nowrap" }}>{profile.jobTitle || "Admin"}</Typography>
+              </Box>
+            </Box>
+          )}
+        </ProSidebar>
+      </Box>
+
+      <Box sx={{ 
+        marginLeft: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`, 
+        width: `calc(100% - ${isCollapsed ? COLLAPSED_W : EXPANDED_W}px)`,
+        minHeight: "100vh", background: "transparent", transition: "margin 0.3s"
+      }} />
     </Box>
   );
 };
