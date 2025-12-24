@@ -1,11 +1,9 @@
 // src/components/Topbar/index.jsx
-
 import {
   Box,
   IconButton,
   Popover,
   Typography,
-  MenuItem,
   Dialog,
   DialogActions,
   DialogContent,
@@ -25,16 +23,16 @@ import {
   Stack,
   Badge,
   Tooltip,
+  InputAdornment
 } from "@mui/material";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
-import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import ArrowCircleRightOutlinedIcon from "@mui/icons-material/ArrowCircleRightOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
+import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import LogoutIcon from "@mui/icons-material/Logout";
+import SettingsIcon from "@mui/icons-material/Settings";
+import PersonIcon from "@mui/icons-material/Person";
+import SupportIcon from "@mui/icons-material/SupportAgent";
+import KeyboardCommandKeyIcon from '@mui/icons-material/KeyboardCommandKey';
 
 import { useState, useEffect } from "react";
 import { useData } from "../../contexts/DataContext";
@@ -42,16 +40,14 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 const brand = {
-  text: "#0f172a",
-  subtext: "#334155",
-  border: "#e5e7eb",
-  surface: "#ffffff",
-  surfaceMuted: "#f8fafc",
-  red: "#dc2626",
+  text: "#1e293b",
+  subtext: "#64748b",
+  border: "#f1f5f9",
+  surface: "rgba(255, 255, 255, 0.8)",
   primary: "#7C3AED",
   primaryDark: "#5B21B6",
-  focusRing: "rgba(124,58,237,0.18)",
-  shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
+  focusRing: "rgba(124, 58, 237, 0.12)",
+  shadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
 };
 
 const pageOptions = [
@@ -70,7 +66,6 @@ const pageOptions = [
 const filterOptions = createFilterOptions({
   matchFrom: "start",
   stringify: (option) => option.label,
-  trim: true,
 });
 
 export default function Topbar() {
@@ -78,528 +73,234 @@ export default function Topbar() {
   const { cognitoId, signOut } = useAuth();
   const navigate = useNavigate();
 
-  // Autocomplete / search
   const [inputValue, setInputValue] = useState("");
-
-  // Notifications
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem("notifications");
       return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   });
   const [notifAnchor, setNotifAnchor] = useState(null);
-
-  // Profile
   const [profileAnchor, setProfileAnchor] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-
-  // UI state
   const [snack, setSnack] = useState({ open: false, severity: "info", message: "" });
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    // Maintain a set of seen barcodes so we only add fresh notifications
     const seen = new Set(notifications.map((n) => n.barcode));
     const check = () => {
       const now = new Date();
-      const expired =
-        Array.isArray(goodsInRows) && goodsInRows.length
-          ? goodsInRows.filter((r) => r && r.expiryDate && new Date(r.expiryDate) < now)
-          : [];
-      // keep only notifications that still match an expired row
+      const expired = Array.isArray(goodsInRows) ? goodsInRows.filter((r) => r?.expiryDate && new Date(r.expiryDate) < now) : [];
       const still = notifications.filter((n) => expired.some((r) => r.barCode === n.barcode));
-      const fresh = expired
-        .filter((r) => r && r.barCode && !seen.has(r.barCode))
-        .map((r) => ({
-          message: `Your ${r.ingredient || "ingredient"} (${r.barCode}) has expired!`,
-          barcode: r.barCode,
-        }));
+      const fresh = expired.filter((r) => r?.barCode && !seen.has(r.barCode)).map((r) => ({
+        message: `${r.ingredient} expired`,
+        barcode: r.barCode,
+      }));
       if (fresh.length || still.length !== notifications.length) {
         const updated = [...still, ...fresh];
         setNotifications(updated);
-        try {
-          localStorage.setItem("notifications", JSON.stringify(updated));
-        } catch {}
+        localStorage.setItem("notifications", JSON.stringify(updated));
       }
     };
-
-    // run once + poll (poll is fine for small apps)
     check();
-    const id = setInterval(check, 5000);
+    const id = setInterval(check, 10000);
     return () => clearInterval(id);
-  }, [goodsInRows]); // deliberately not including notifications to avoid tight loops
-
-  // Notification handlers
-  const handleNotifClick = (e) => setNotifAnchor(e.currentTarget);
-  const handleCloseNotif = () => setNotifAnchor(null);
-
-  const handleNotificationClick = (barcode) => {
-    // navigate to GoodsIn and pass focusBar in location.state
-    try {
-      navigate("/GoodsIn", { state: { focusBar: barcode } });
-    } catch {
-      // fallback to pathname only
-      window.location.href = "/GoodsIn";
-    }
-    // clear notifications visually (we already persisted to localStorage)
-    setNotifications([]);
-    try {
-      localStorage.setItem("notifications", JSON.stringify([]));
-    } catch {}
-    handleCloseNotif();
-  };
-
-  // Profile / logout
-  const handleProfileClick = (e) => setProfileAnchor(e.currentTarget);
-  const handleCloseProfile = () => setProfileAnchor(null);
-  const handleLogoutClick = () => setLogoutDialogOpen(true);
+  }, [goodsInRows]);
 
   const handleConfirmLogout = async () => {
-    setLogoutDialogOpen(false);
-    setProfileAnchor(null);
     setLoggingOut(true);
     try {
-      if (typeof signOut === "function") await signOut();
-      setSnack({ open: true, severity: "success", message: "Logged out successfully" });
+      await signOut();
+      navigate("/login");
     } catch (err) {
-      console.error("signOut failed", err);
-      setSnack({ open: true, severity: "warning", message: "Logout encountered an error" });
-    } finally {
-      // best-effort cleanup
-      try {
-        localStorage.removeItem("notifications");
-        localStorage.removeItem("amplify-authenticator");
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith("CognitoIdentityServiceProvider") || k.startsWith("aws-amplify")) {
-            localStorage.removeItem(k);
-          }
-        });
-      } catch {}
-      // navigate to login
-      try {
-        navigate("/login");
-      } catch {}
-      try {
-        window.location.replace("/login");
-      } catch {
-        window.location.href = "/login";
-      }
-      setLoggingOut(false);
-    }
-  };
-
-  const handleEnterKey = (currentValue) => {
-    const match = pageOptions.find((o) => o.label.toLowerCase() === currentValue.toLowerCase());
-    if (match) navigate(match.path);
+      setSnack({ open: true, severity: "error", message: "Logout failed" });
+    } finally { setLoggingOut(false); }
   };
 
   const userInitials = (id) => {
-    if (!id) return null;
-    try {
-      const parts = String(id).split(/[^A-Za-z0-9]+/).filter(Boolean);
-      if (parts.length === 0) return String(id).slice(0, 2).toUpperCase();
-      if (parts.length === 1) return String(parts[0]).slice(0, 2).toUpperCase();
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    } catch {
-      return null;
-    }
+    if (!id) return "?";
+    return String(id).slice(0, 2).toUpperCase();
   };
 
   return (
     <Box
       sx={{
-        px: 2,
-        py: 1.5,
-        background: brand.surfaceMuted,
-        position: "sticky",
-        top: 0,
-        zIndex: (t) => t.zIndex.appBar,
+        position: "sticky", top: 0, zIndex: 1100, px: 3, py: 1.5,
+        backgroundColor: brand.surface,
+        backdropFilter: "blur(12px)",
+        borderBottom: "1px solid",
+        borderColor: "rgba(229, 231, 235, 0.5)",
       }}
     >
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{
-          px: 2,
-          py: 1.5,
-          border: `1px solid ${brand.border}`,
-          borderRadius: 14,
-          background: brand.surface,
-          boxShadow: brand.shadow,
-        }}
-      >
-        {/* Search / page autocomplete */}
-        <Box sx={{ width: { xs: "100%", sm: 380, md: 440 }, mr: 2 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        
+        {/* Left Side: Brand/Context Info */}
+        <Box sx={{ display: { xs: "none", md: "block" } }}>
+           <Typography sx={{ fontWeight: 700, color: brand.text, fontSize: "0.9rem" }}>
+             Hupes Production
+           </Typography>
+        </Box>
+
+        {/* Center: SaaS Command Search */}
+        <Box sx={{ width: { xs: "60%", sm: 400 }, position: "relative" }}>
           <Autocomplete
             freeSolo
             options={pageOptions}
-            filterOptions={(opts, state) =>
-              state.inputValue.trim().length > 0 ? filterOptions(opts, state) : []
-            }
-            getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt.label)}
-            inputValue={inputValue}
             onInputChange={(_, value) => setInputValue(value)}
-            onChange={(_, selected) => {
-              if (selected?.path) navigate(selected.path);
-            }}
-            renderInput={(params) => {
-              // merge params.InputProps safely so we don't clobber adornments
-              const InputProps = { ...(params.InputProps || {}) };
-              return (
-                <TextField
-                  {...params}
-                  variant="outlined"
-                  placeholder="Go to page…"
-                  size="small"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleEnterKey(inputValue);
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 12,
-                      background: "#fff",
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: brand.border,
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: brand.primary,
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: brand.primary,
-                      },
-                      "&.Mui-focused": {
-                        boxShadow: `0 0 0 6px ${brand.focusRing}`,
-                      },
-                    },
-                    "& .MuiInputBase-input": { py: 1.2 },
-                    width: "100%",
-                  }}
-                  InputProps={{
-                    ...InputProps,
-                    endAdornment: (
-                      <>
-                        {InputProps.endAdornment}
-                        <IconButton
-                          onClick={() => handleEnterKey(inputValue)}
-                          edge="end"
-                          size="small"
-                          aria-label="Go"
-                          sx={{
-                            ml: 0.5,
-                            borderRadius: 999,
-                            color: "#fff",
-                            background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                            boxShadow:
-                              "0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06)",
-                            "&:hover": {
-                              background: `linear-gradient(180deg, ${brand.primaryDark}, ${brand.primaryDark})`,
-                            },
-                            width: 32,
-                            height: 32,
-                          }}
-                        >
-                          <SearchIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </>
-                    ),
-                  }}
-                />
-              );
-            }}
+            onChange={(_, sel) => sel?.path && navigate(sel.path)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search command..."
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: brand.subtext, fontSize: 18 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <Box sx={{ 
+                        display: { xs: "none", sm: "flex" }, 
+                        alignItems: "center", gap: 0.5, px: 1, py: 0.2, 
+                        bgcolor: brand.border, borderRadius: 1.5, opacity: 0.6 
+                    }}>
+                        <KeyboardCommandKeyIcon sx={{ fontSize: 12 }} />
+                        <Typography sx={{ fontSize: 10, fontWeight: 700 }}>K</Typography>
+                    </Box>
+                  )
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    bgcolor: "rgba(248, 250, 252, 0.8)",
+                    transition: "0.2s",
+                    "& fieldset": { borderColor: brand.border },
+                    "&:hover fieldset": { borderColor: brand.primary },
+                    "&.Mui-focused": {
+                        bgcolor: "#fff",
+                        boxShadow: `0 0 0 4px ${brand.focusRing}`
+                    }
+                  }
+                }}
+              />
+            )}
           />
         </Box>
 
-        {/* Top-right icons */}
-        <Box display="flex" alignItems="center" gap={1}>
-          <Tooltip title={notifications.length ? `${notifications.length} notifications` : "No notifications"}>
-            <IconButton
-              onClick={handleNotifClick}
-              sx={{
-                position: "relative",
-                background: "#f1f5f9",
-                border: `1px solid ${brand.border}`,
-                borderRadius: 999,
-                width: 44,
-                height: 44,
-                "&:hover": { background: "#e2e8f0" },
-              }}
-              aria-label="Notifications"
+        {/* Right Side: Actions */}
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Tooltip title="Notifications">
+            <IconButton 
+              onClick={(e) => setNotifAnchor(e.currentTarget)}
+              sx={{ color: brand.subtext, "&:hover": { color: brand.primary, bgcolor: brand.focusRing } }}
             >
-              <Badge
-                badgeContent={notifications.length}
-                color="error"
-                overlap="circular"
-                anchorOrigin={{ vertical: "top", horizontal: "right" }}
-              >
-                <NotificationsOutlinedIcon sx={{ color: brand.text }} />
+              <Badge badgeContent={notifications.length} color="error" variant="dot">
+                <NotificationsNoneIcon />
               </Badge>
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Account">
-            <IconButton
-              onClick={handleProfileClick}
-              sx={{
-                background: "#f1f5f9",
-                border: `1px solid ${brand.border}`,
-                borderRadius: 999,
-                width: 44,
-                height: 44,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                "&:hover": { background: "#e2e8f0" },
-                p: 0.5,
-              }}
-              aria-label="Account"
-            >
-              {/* visible Avatar: brand-colored background and white content for contrast */}
-              {cognitoId ? (
-                <Avatar sx={{ bgcolor: brand.primary, color: "#fff", width: 30, height: 30, fontWeight: 800 }}>
-                  {userInitials(cognitoId) || <PersonOutlinedIcon />}
-                </Avatar>
-              ) : (
-                <Avatar sx={{ bgcolor: "#fff", color: brand.primary, width: 30, height: 30 }}>
-                  <PersonOutlinedIcon />
-                </Avatar>
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
+          <Divider orientation="vertical" flexItem sx={{ height: 24, alignSelf: "center" }} />
+
+          <Box 
+            onClick={(e) => setProfileAnchor(e.currentTarget)}
+            sx={{ 
+                display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer", 
+                pl: 1, pr: 0.5, py: 0.5, borderRadius: "99px",
+                "&:hover": { bgcolor: brand.border }
+            }}
+          >
+            <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" } }}>
+                <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: brand.text, lineHeight: 1 }}>
+                    Production Mgr
+                </Typography>
+                <Typography sx={{ fontSize: "0.7rem", color: brand.subtext }}>
+                    Active
+                </Typography>
+            </Box>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: brand.primary, fontSize: "0.8rem", fontWeight: 700 }}>
+              {userInitials(cognitoId)}
+            </Avatar>
+          </Box>
+        </Stack>
       </Box>
 
-      {/* Notification popover */}
+      {/* --- POPOVERS --- */}
+
+      {/* Notifications Popover */}
       <Popover
         open={Boolean(notifAnchor)}
         anchorEl={notifAnchor}
-        onClose={handleCloseNotif}
+        onClose={() => setNotifAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: {
-              width: 360,
-              borderRadius: 14,
-              border: `1px solid ${brand.border}`,
-              boxShadow: "0 18px 36px rgba(15,23,42,0.12)",
-              overflow: "hidden",
-            },
-          },
-        }}
+        slotProps={{ paper: { sx: { width: 320, mt: 1.5, borderRadius: "16px", boxShadow: brand.shadow, border: `1px solid ${brand.border}` } } }}
       >
-        <Box>
-          <Box
-            sx={{
-              background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-              color: "#fff",
-              px: 3,
-              py: 2,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Notifications
-            </Typography>
-            <IconButton size="small" onClick={handleCloseNotif} sx={{ color: "#fff" }}>
-              <ArrowCircleRightOutlinedIcon />
-            </IconButton>
-          </Box>
-
-          <Box p={2} sx={{ maxHeight: 320, overflowY: "auto", background: brand.surface }}>
-            {notifications.length === 0 ? (
-              <Typography variant="body2" sx={{ color: brand.subtext }}>
-                You have no notifications
-              </Typography>
-            ) : (
-              <List disablePadding>
-                {notifications.map((n, i) => {
-                  const key = n.barcode || `${i}`;
-                  return (
-                    <Box key={key} sx={{ mb: i < notifications.length - 1 ? 1 : 0 }}>
-                      <ListItemButton
-                        onClick={() => handleNotificationClick(n.barcode)}
-                        sx={{
-                          borderRadius: 2,
-                          px: 1,
-                          py: 1,
-                          "&:hover": { background: brand.surfaceMuted },
-                        }}
-                        aria-label={`Notification ${i + 1}`}
-                      >
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: "#fff", color: brand.primary, width: 36, height: 36 }}>
-                            <NotificationsOutlinedIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography sx={{ color: brand.text, fontWeight: 700 }}>
-                              {n.message}
-                            </Typography>
-                          }
-                          secondary={
-                            n.barcode ? (
-                              <Typography variant="caption" sx={{ color: brand.subtext }}>
-                                Barcode: {n.barcode}
-                              </Typography>
-                            ) : null
-                          }
-                        />
-                        <IconButton edge="end" onClick={() => handleNotificationClick(n.barcode)} sx={{ color: brand.primary }}>
-                          <ArrowCircleRightOutlinedIcon />
-                        </IconButton>
-                      </ListItemButton>
-                      {i < notifications.length - 1 && <Divider sx={{ borderColor: brand.border }} />}
-                    </Box>
-                  );
-                })}
-              </List>
-            )}
-          </Box>
+        <Box sx={{ p: 2, bgcolor: brand.surfaceMuted }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Activity</Typography>
         </Box>
+        <List sx={{ p: 1 }}>
+          {notifications.length === 0 ? (
+            <Typography sx={{ p: 2, fontSize: "0.85rem", color: brand.subtext, textAlign: "center" }}>No new alerts</Typography>
+          ) : (
+            notifications.map((n, i) => (
+              <ListItemButton key={i} onClick={() => { navigate("/GoodsIn", { state: { focusBar: n.barcode } }); setNotifAnchor(null); }} sx={{ borderRadius: "8px" }}>
+                <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: "rgba(220, 38, 38, 0.1)", color: "#dc2626" }}><NotificationsNoneIcon fontSize="small" /></Avatar>
+                </ListItemAvatar>
+                <ListItemText primary={n.message} primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} secondary={n.barcode} />
+              </ListItemButton>
+            ))
+          )}
+        </List>
       </Popover>
 
-      {/* Profile popover */}
+      {/* Profile Popover */}
       <Popover
         open={Boolean(profileAnchor)}
         anchorEl={profileAnchor}
-        onClose={handleCloseProfile}
+        onClose={() => setProfileAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: {
-              width: 300,
-              borderRadius: 14,
-              border: `1px solid ${brand.border}`,
-              boxShadow: "0 18px 36px rgba(15,23,42,0.12)",
-              overflow: "hidden",
-            },
-          },
-        }}
+        slotProps={{ paper: { sx: { width: 240, mt: 1.5, borderRadius: "16px", boxShadow: brand.shadow, border: `1px solid ${brand.border}` } } }}
       >
-        <Box>
-          <Box sx={{ px: 3, py: 2, background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`, color: "#fff" }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.12)", color: "#fff", width: 56, height: 56 }}>
-                {userInitials(cognitoId) || <PersonOutlinedIcon />}
-              </Avatar>
-              <Box>
-                <Typography sx={{ fontWeight: 800 }}>{cognitoId ? "Account" : "Guest"}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.9)" }}>
-                  {cognitoId ? `${String(cognitoId).slice(0, 24)}${String(cognitoId).length > 24 ? "…" : ""}` : "Not signed in"}
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          <Box p={2} sx={{ background: brand.surface }}>
-            <List disablePadding>
-              <ListItemButton
-                onClick={() => {
-                  handleCloseProfile();
-                  navigate("/account");
-                }}
-                sx={{ borderRadius: 1 }}
-              >
-                <AccountCircleOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
-                <Typography>Account</Typography>
-              </ListItemButton>
-
-              <ListItemButton
-                onClick={() => {
-                  handleCloseProfile();
-                  navigate("/settings");
-                }}
-                sx={{ mt: 1, borderRadius: 1 }}
-              >
-                <SettingsOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
-                <Typography>Settings</Typography>
-              </ListItemButton>
-
-              <ListItemButton
-                onClick={() => {
-                  handleCloseProfile();
-                  navigate("/support");
-                }}
-                sx={{ mt: 1, borderRadius: 1 }}
-              >
-                <SupportAgentOutlinedIcon fontSize="small" sx={{ mr: 1, color: brand.primary }} />
-                <Typography>Support</Typography>
-              </ListItemButton>
-            </List>
-          </Box>
-
-          <Divider sx={{ borderColor: brand.border }} />
-
-          <Box sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", background: brand.surface }}>
-            <Button
-              onClick={() => {
-                handleCloseProfile();
-                navigate("/account");
-              }}
-              sx={{
-                textTransform: "none",
-                borderRadius: 999,
-                px: 2,
-                border: `1px solid ${brand.border}`,
-              }}
-            >
-              View account
-            </Button>
-
-            <Button
-              onClick={() => {
-                handleCloseProfile();
-                setLogoutDialogOpen(true);
-              }}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-                borderRadius: 999,
-                px: 2,
-                color: "#fff",
-                background: `linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark})`,
-                "&:hover": { background: brand.primaryDark },
-              }}
-            >
-              Logout
-            </Button>
-          </Box>
+        <Box sx={{ p: 1 }}>
+            <MenuItem onClick={() => { navigate("/account"); setProfileAnchor(null); }} sx={{ borderRadius: "8px", py: 1 }}>
+                <PersonIcon sx={{ mr: 1.5, fontSize: 20, color: brand.subtext }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Profile</Typography>
+            </MenuItem>
+            <MenuItem onClick={() => { navigate("/settings"); setProfileAnchor(null); }} sx={{ borderRadius: "8px", py: 1 }}>
+                <SettingsIcon sx={{ mr: 1.5, fontSize: 20, color: brand.subtext }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Settings</Typography>
+            </MenuItem>
+            <MenuItem onClick={() => { navigate("/support"); setProfileAnchor(null); }} sx={{ borderRadius: "8px", py: 1 }}>
+                <SupportIcon sx={{ mr: 1.5, fontSize: 20, color: brand.subtext }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Support</Typography>
+            </MenuItem>
+            <Divider sx={{ my: 1 }} />
+            <MenuItem onClick={() => setLogoutDialogOpen(true)} sx={{ borderRadius: "8px", py: 1, color: "error.main" }}>
+                <LogoutIcon sx={{ mr: 1.5, fontSize: 20 }} />
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>Logout</Typography>
+            </MenuItem>
         </Box>
       </Popover>
 
-      {/* Logout confirmation */}
-      <Dialog
-        open={logoutDialogOpen}
-        onClose={() => setLogoutDialogOpen(false)}
-        PaperProps={{
-          sx: { borderRadius: 14, border: `1px solid ${brand.border}`, boxShadow: brand.shadow },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: brand.text }}>Confirm Logout</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: brand.subtext }}>Are you sure you want to log out?</DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setLogoutDialogOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }} disabled={loggingOut}>Cancel</Button>
-          <Button onClick={handleConfirmLogout} color="error" sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2 }} disabled={loggingOut} startIcon={loggingOut ? <CircularProgress size={18} /> : null}>
-            {loggingOut ? "Logging out…" : "Logout"}
+      {/* Logout Dialog */}
+      <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)} PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>Signing out?</DialogTitle>
+        <DialogContent><DialogContentText>You will need to log back in to manage your kitchen production.</DialogContentText></DialogContent>
+        <DialogActions sx={{ pb: 2, px: 3 }}>
+          <Button onClick={() => setLogoutDialogOpen(false)} sx={{ textTransform: "none", color: brand.subtext }}>Stay logged in</Button>
+          <Button 
+            variant="contained" 
+            disableElevation 
+            onClick={handleConfirmLogout} 
+            sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", borderRadius: "10px", px: 3 }}
+          >
+            Logout
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar open={snack.open} autoHideDuration={3500} onClose={() => setSnack((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
-        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
-          {snack.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
