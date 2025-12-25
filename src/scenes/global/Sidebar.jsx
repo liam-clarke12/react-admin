@@ -301,6 +301,10 @@ const Sidebar = () => {
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
 
+  // ✅ NEW: when collapsed, show all page icons if section is open
+  const showMrpItems = mrpOpen || !isCollapsed;
+  const showHrpItems = hrpOpen || !isCollapsed;
+
   return (
     <Box display="flex">
       <Box
@@ -314,13 +318,12 @@ const Sidebar = () => {
           transition: "background 0.25s ease, border 0.25s ease, width 0.3s ease",
           "& .pro-sidebar-inner": { background: `${brand.surface} !important` },
 
-          // ✅ remove circles around icons (iconShape="square" + override wrapper)
+          // ✅ remove circles around icons
           "& .pro-icon-wrapper": {
             backgroundColor: "transparent !important",
             borderRadius: "0 !important",
           },
 
-          // keep pro-sidebar content aligned with dark mode colors
           "& .pro-menu-item": { transition: "all 0.2s" },
           "& .pro-menu-item.active": {
             backgroundColor: `${brand.primaryLight} !important`,
@@ -338,12 +341,10 @@ const Sidebar = () => {
           },
           "& .pro-inner-item:hover": { background: "transparent !important" },
 
-          // icon + text default colors
           "& .pro-item-content": { color: `${brand.text} !important` },
           "& .pro-icon-wrapper svg": { color: `${brand.icon} !important` },
         }}
       >
-        {/* ✅ Use a flex column wrapper so footer stays at bottom */}
         <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
           <ProSidebar collapsed={isCollapsed}>
             {/* Header */}
@@ -398,8 +399,10 @@ const Sidebar = () => {
                 open={mrpOpen}
                 onToggle={() => setMrpOpen(!mrpOpen)}
               />
-              {(mrpOpen || isCollapsed) && (
-                <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+
+              {/* ✅ CHANGED: when collapsed, if MRP is open => show items (icons) */}
+              {showMrpItems && (
+                <Box sx={{ display: isCollapsed ? "block" : "block" }}>
                   <Item
                     title="Goods In"
                     to="/GoodsIn"
@@ -465,8 +468,10 @@ const Sidebar = () => {
                 open={hrpOpen}
                 onToggle={() => setHrpOpen(!hrpOpen)}
               />
-              {(hrpOpen || isCollapsed) && (
-                <Box sx={{ display: isCollapsed ? "none" : "block" }}>
+
+              {/* ✅ CHANGED: when collapsed, if HRP is open => show items (icons) */}
+              {showHrpItems && (
+                <Box sx={{ display: isCollapsed ? "block" : "block" }}>
                   <LockedItem
                     title="Roster"
                     to="/Roster"
@@ -512,7 +517,7 @@ const Sidebar = () => {
             </Menu>
           </ProSidebar>
 
-          {/* ✅ Proper footer that always stays at bottom of sidebar */}
+          {/* Footer (only when expanded) */}
           {!isCollapsed && (
             <Box sx={{ mt: "auto", px: 2, pb: 2 }}>
               <Box
