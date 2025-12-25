@@ -2,10 +2,41 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
-/* ===================== Scoped Styles ===================== */
-const Styles = () => (
+/* =====================
+   Scoped Styles + Dark mode
+   (implemented same way as Dashboard: isDark -> CSS vars)
+   ===================== */
+const Styles = ({ isDark }) => (
   <style>{`
-    .ii-page { background:#f1f5f9; min-height:100vh; color:#0f172a; }
+    :root{
+      /* Theme tokens */
+      --bg: ${isDark ? "#0b1220" : "#f1f5f9"};
+      --bg-card: ${isDark ? "#0f172a" : "#ffffff"};
+      --text: ${isDark ? "#e5e7eb" : "#0f172a"};
+      --text-muted: ${isDark ? "#94a3b8" : "#334155"};
+      --text-soft: ${isDark ? "#cbd5e1" : "#64748b"};
+
+      --border: ${isDark ? "rgba(148,163,184,0.18)" : "#e5e7eb"};
+      --thead-bg: ${isDark ? "rgba(255,255,255,0.04)" : "#fbfcfd"};
+      --row-even: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
+      --row-odd: ${isDark ? "rgba(255,255,255,0.01)" : "#ffffff"};
+      --row-hover: ${isDark ? "rgba(124,58,237,0.18)" : "#f4f1ff"};
+
+      --input-bg: ${isDark ? "rgba(2,6,23,0.35)" : "#ffffff"};
+      --chip-bg: ${isDark ? "rgba(255,255,255,0.06)" : "#f8fafc"};
+
+      --shadow: ${isDark
+        ? "0 4px 18px rgba(0,0,0,0.45)"
+        : "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)"};
+
+      --purple: #7C3AED;
+      --purple-dark: #5B21B6;
+      --purple-ring: rgba(124,58,237,0.22);
+
+      --overlay: ${isDark ? "rgba(0,0,0,.62)" : "rgba(0,0,0,.48)"};
+    }
+
+    .ii-page { background:var(--bg); min-height:100vh; color:var(--text); transition: background .25s ease, color .25s ease; }
     .ii-wrap { max-width:1200px; margin:0 auto; padding:16px; }
 
     /* Header */
@@ -13,19 +44,20 @@ const Styles = () => (
     .ii-hgroup { display:flex; align-items:center; gap:12px; }
     .ii-logo {
       width:52px; height:52px; border-radius:12px;
-      background: linear-gradient(180deg, #7C3AED, #5B21B6);
+      background: linear-gradient(180deg, var(--purple), var(--purple-dark));
       box-shadow:0 8px 20px rgba(124,58,237,0.12);
       display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:18px;
     }
-    .ii-title { margin:0; font-weight:800; font-size:20px; }
-    .ii-sub { margin:0; color:#334155; font-size:12px; }
+    .ii-title { margin:0; font-weight:800; font-size:20px; color:var(--text); }
+    .ii-sub { margin:0; color:var(--text-muted); font-size:12px; }
     .ii-iconbtn {
       width:40px; height:40px; border-radius:999px;
-      border:1px solid #e5e7eb; background:#ffffff; cursor:pointer;
+      border:1px solid var(--border); background:var(--bg-card); cursor:pointer;
       display:flex; align-items:center; justify-content:center;
-      transition: background .15s ease, transform .08s ease;
+      transition: background .15s ease, transform .08s ease, border .15s ease;
+      color: var(--text);
     }
-    .ii-iconbtn:hover { background:#f1f5f9; transform: translateY(-1px); }
+    .ii-iconbtn:hover { background:${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"}; transform: translateY(-1px); }
 
     /* Grid */
     .ii-grid { display:grid; grid-template-columns: 1.6fr 1fr; gap:16px; }
@@ -33,30 +65,34 @@ const Styles = () => (
 
     /* Cards */
     .ii-card {
-      background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden;
-      box-shadow:0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08);
+      background:var(--bg-card); border:1px solid var(--border); border-radius:16px; overflow:hidden;
+      box-shadow: var(--shadow);
+      transition: background .25s ease, border .25s ease, box-shadow .25s ease;
     }
-    .ii-card-head { padding:12px 14px; border-bottom:1px solid #e5e7eb; background:#ffffff; }
-    .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
-    .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+    .ii-card-head { padding:12px 14px; border-bottom:1px solid var(--border); background:var(--bg-card); }
+    .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; color:var(--text); }
+    .ii-card-head p { margin:2px 0 0; font-size:12px; color:var(--text-muted); }
 
     /* Search toolbar */
     .ii-toolbar {
-      background:#fff;
+      background:var(--bg-card);
       padding:12px 14px;
-      border-bottom:1px solid #e5e7eb;
+      border-bottom:1px solid var(--border);
     }
     .ii-input {
       width:100%;
       padding:10px 12px;
-      border:1px solid #e5e7eb;
+      border:1px solid var(--border);
       border-radius:10px;
       outline:none;
-      background:#fff;
+      background: var(--input-bg);
+      color: var(--text);
       font-size:14px;
+      transition: border .15s ease, box-shadow .15s ease, background .15s ease;
     }
+    .ii-input::placeholder { color: ${isDark ? "rgba(203,213,225,0.65)" : "#94a3b8"}; }
     .ii-input:focus {
-      border-color:#7C3AED;
+      border-color: var(--purple);
       box-shadow:0 0 0 3px rgba(124,58,237,.18);
     }
 
@@ -65,47 +101,51 @@ const Styles = () => (
     .ii-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
     .ii-thead th {
       text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.02em;
-      background:#fbfcfd; color:#334155; padding:10px 12px; border-bottom:1px solid #e5e7eb; font-weight:800;
+      background:var(--thead-bg); color:var(--text-muted); padding:10px 12px; border-bottom:1px solid var(--border); font-weight:800;
       position:sticky; top:0; z-index:1;
     }
-    .ii-row { border-bottom:1px solid #e5e7eb; }
-    .ii-row:nth-child(odd) { background:#ffffff; }
-    .ii-row:nth-child(even) { background:#f8fafc; }
-    .ii-row:hover { background:#f4f1ff; }
-    .ii-td { padding:12px; }
-    .ii-td-strong { font-weight:700; color:#0f172a; white-space:nowrap; }
+    .ii-row { border-bottom:1px solid var(--border); }
+    .ii-row:nth-child(odd) { background:var(--row-odd); }
+    .ii-row:nth-child(even) { background:var(--row-even); }
+    .ii-row:hover { background:var(--row-hover); }
+    .ii-td { padding:12px; color: var(--text); }
+    .ii-td-strong { font-weight:700; color:var(--text); white-space:nowrap; }
     .ii-chip {
       display:inline-flex; align-items:center; padding:4px 8px; border-radius:8px;
-      border:1px solid #e5e7eb; background:#f8fafc; font-weight:700; color:#0f172a; font-size:12px;
+      border:1px solid var(--border); background:var(--chip-bg); font-weight:700; color:var(--text); font-size:12px;
     }
     .ii-badge {
       display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700;
-      background:#f9f5ff; color:#7C3AED; border:1px solid #eee;
+      background:${isDark ? "rgba(124,58,237,0.15)" : "#f9f5ff"};
+      color:${isDark ? "#c4b5fd" : "var(--purple)"};
+      border:1px solid var(--border);
     }
 
     /* Modal */
     .ii-dim {
-      position:fixed; inset:0; background:rgba(0,0,0,.48);
+      position:fixed; inset:0; background:var(--overlay);
       display:flex; align-items:center; justify-content:center; z-index:50;
       animation: ii-fade .18s ease-out forwards;
+      backdrop-filter: blur(2px);
     }
     .ii-modal {
-      width:min(540px, 92vw); background:#fff; border:1px solid #e5e7eb; border-radius:14px;
-      box-shadow:0 10px 30px rgba(2,6,23,.22); overflow:hidden;
+      width:min(540px, 92vw); background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+      box-shadow:0 10px 30px rgba(2,6,23,.42); overflow:hidden;
       animation: ii-slide .22s ease-out forwards;
+      color: var(--text);
     }
-    .ii-mhead { padding:12px 14px; border-bottom:1px solid #e5e7eb; }
-    .ii-mhead h4 { margin:0; font-weight:800; }
-    .ii-mbody { padding:14px; color:#334155; }
-    .ii-mfoot { padding:12px 14px; border-top:1px solid #e5e7eb; text-align:right; }
+    .ii-mhead { padding:12px 14px; border-bottom:1px solid var(--border); }
+    .ii-mhead h4 { margin:0; font-weight:800; color: var(--text); }
+    .ii-mbody { padding:14px; color:var(--text-muted); }
+    .ii-mfoot { padding:12px 14px; border-top:1px solid var(--border); text-align:right; }
     .ii-btn {
       display:inline-flex; align-items:center; gap:8px; border:0; border-radius:10px; cursor:pointer;
       font-weight:800; padding:10px 14px;
     }
-    .ii-btn-ghost { background:#fff; border:1px solid #e5e7eb; color:#0f172a; }
-    .ii-btn-ghost:hover { background:#f1f5f9; }
-    .ii-btn-primary { color:#fff; background: linear-gradient(180deg, #7C3AED, #5B21B6); }
-    .ii-btn-primary:hover { background: linear-gradient(180deg, #5B21B6, #5B21B6); }
+    .ii-btn-ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+    .ii-btn-ghost:hover { background:${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"}; }
+    .ii-btn-primary { color:#fff; background: linear-gradient(180deg, var(--purple), var(--purple-dark)); }
+    .ii-btn-primary:hover { background: linear-gradient(180deg, var(--purple-dark), var(--purple-dark)); }
 
     /* Snackbar */
     .ii-snack {
@@ -120,25 +160,25 @@ const Styles = () => (
     .ii-chart-body { flex:1; min-height:380px; display:flex; gap:10px; padding:8px 12px 12px; align-items:flex-end; overflow:auto; }
     .ii-bar {
       width:36px; min-width:36px; border-radius:8px 8px 0 0;
-      background: linear-gradient(180deg, #8b5cf6, #5B21B6);
+      background: linear-gradient(180deg, #8b5cf6, var(--purple-dark));
       box-shadow: 0 6px 14px rgba(124,58,237,.18);
       position:relative; display:flex; align-items:flex-end; justify-content:center;
       transition: transform .12s ease;
     }
     .ii-bar:hover { transform: translateY(-2px); }
     .ii-bar-value {
-      position:absolute; top:-24px; font-size:11px; font-weight:800; color:#5B21B6;
-      background:#fff; border:1px solid #e5e7eb; padding:2px 6px; border-radius:999px; white-space:nowrap;
+      position:absolute; top:-24px; font-size:11px; font-weight:800; color:${isDark ? "#e9d5ff" : "var(--purple-dark)"};
+      background:var(--bg-card); border:1px solid var(--border); padding:2px 6px; border-radius:999px; white-space:nowrap;
       transform: translateY(-2px);
     }
     .ii-bar-label {
-      margin-top:6px; font-size:11px; color:#334155; max-width:60px; text-align:center;
+      margin-top:6px; font-size:11px; color:var(--text-muted); max-width:60px; text-align:center;
       word-break:break-word;
       display:block;
     }
-    .ii-chart-head { padding:8px 12px; border-bottom:1px solid #e5e7eb; }
-    .ii-chart-head h4 { margin:0; font-weight:800; font-size:14px; }
-    .ii-chart-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+    .ii-chart-head { padding:8px 12px; border-bottom:1px solid var(--border); background:var(--bg-card); }
+    .ii-chart-head h4 { margin:0; font-weight:800; font-size:14px; color:var(--text); }
+    .ii-chart-head p { margin:2px 0 0; font-size:12px; color:var(--text-muted); }
 
     /* keyframes */
     @keyframes ii-fade { from { opacity:0 } to { opacity:1 } }
@@ -153,11 +193,41 @@ const API_BASE =
 
 // Fallback mock so UI still renders if API fails
 const mockData = [
-  { ingredient: "All-Purpose Flour", unit: "kg", totalRemaining: 25, barcode: "FL-AP-123", date: "2023-10-26" },
-  { ingredient: "Granulated Sugar", unit: "kg", totalRemaining: 50, barcode: "SUG-GR-456", date: "2023-10-25" },
-  { ingredient: "Unsalted Butter", unit: "kg", stockOnHand: 10, barcode: "BUT-UN-789", date: "2023-10-27" },
-  { ingredient: "Large Eggs", unit: "units", totalRemaining: 144, barcode: "EGG-LG-101", date: "2023-10-24" },
-  { ingredient: "Baking Soda", unit: "g", totalRemaining: 500, barcode: "SOD-BK-112", date: "2023-10-20" },
+  {
+    ingredient: "All-Purpose Flour",
+    unit: "kg",
+    totalRemaining: 25,
+    barcode: "FL-AP-123",
+    date: "2023-10-26",
+  },
+  {
+    ingredient: "Granulated Sugar",
+    unit: "kg",
+    totalRemaining: 50,
+    barcode: "SUG-GR-456",
+    date: "2023-10-25",
+  },
+  {
+    ingredient: "Unsalted Butter",
+    unit: "kg",
+    stockOnHand: 10,
+    barcode: "BUT-UN-789",
+    date: "2023-10-27",
+  },
+  {
+    ingredient: "Large Eggs",
+    unit: "units",
+    totalRemaining: 144,
+    barcode: "EGG-LG-101",
+    date: "2023-10-24",
+  },
+  {
+    ingredient: "Baking Soda",
+    unit: "g",
+    totalRemaining: 500,
+    barcode: "SOD-BK-112",
+    date: "2023-10-20",
+  },
   { ingredient: "Milk", unit: "L", totalRemaining: 12, barcode: "MLK-WH-113", date: "2023-10-26" },
   { ingredient: "All-Purpose Flour", unit: "g", totalRemaining: 5000, barcode: "FL-AP-124", date: "2023-10-28" },
   { ingredient: "Milk", unit: "ml", totalRemaining: 2000, barcode: "MLK-WH-114", date: "2023-10-28" },
@@ -168,9 +238,12 @@ const detectUnitTypeAndFactor = (rawUnit) => {
   if (!u) return { type: "units", base: "units", factor: 1 };
   if (u.includes("kg") || u.includes("kilogram")) return { type: "mass", base: "g", factor: 1000 };
   if (u.includes("g") || u.includes("gram")) return { type: "mass", base: "g", factor: 1 };
-  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter")) return { type: "volume", base: "ml", factor: 1000 };
-  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre")) return { type: "volume", base: "ml", factor: 1 };
-  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("piece")) return { type: "units", base: "units", factor: 1 };
+  if ((u.includes("l") && !u.includes("ml")) || u.includes("litre") || u.includes("liter"))
+    return { type: "volume", base: "ml", factor: 1000 };
+  if (u.includes("ml") || u.includes("milliliter") || u.includes("millilitre"))
+    return { type: "volume", base: "ml", factor: 1 };
+  if (u.includes("unit") || u.includes("each") || u.includes("pcs") || u.includes("piece"))
+    return { type: "units", base: "units", factor: 1 };
   return { type: "units", base: "units", factor: 1 };
 };
 
@@ -226,7 +299,9 @@ const InfoModal = ({ open, onClose }) => {
           cannot be edited directly.
         </div>
         <div className="ii-mfoot">
-          <button className="ii-btn ii-btn-ghost" onClick={onClose}>Close</button>
+          <button className="ii-btn ii-btn-ghost" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -234,8 +309,18 @@ const InfoModal = ({ open, onClose }) => {
 };
 
 /* ===================== Simple inline icons (self-contained) ===================== */
-const InfoIcon = ({ size = 20, color = "#334155" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const InfoIcon = ({ size = 20, color = "currentColor" }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="12" y1="16" x2="12" y2="12"></line>
     <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -279,13 +364,21 @@ function processInventory(data) {
           };
         } else {
           groups[altKey].totalBase += baseAmount;
-          if (r?.date && (!groups[altKey].latestDate || new Date(r.date) > new Date(groups[altKey].latestDate))) {
+          if (
+            r?.date &&
+            (!groups[altKey].latestDate ||
+              new Date(r.date) > new Date(groups[altKey].latestDate))
+          ) {
             groups[altKey].latestDate = r.date;
           }
         }
       } else {
         groups[key].totalBase += baseAmount;
-        if (r?.date && (!groups[key].latestDate || new Date(r.date) > new Date(groups[key].latestDate))) {
+        if (
+          r?.date &&
+          (!groups[key].latestDate ||
+            new Date(r.date) > new Date(groups[key].latestDate))
+        ) {
           groups[key].latestDate = r.date;
         }
         if (!groups[key].sampleBarcode && (r?.activeBarcode || r?.barcode)) {
@@ -296,7 +389,10 @@ function processInventory(data) {
   });
 
   const processed = Object.values(groups).map((g, i) => {
-    const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup(g.type, g.totalBase);
+    const { displayValue, displayUnit, numericForChart } = formatDisplayForGroup(
+      g.type,
+      g.totalBase
+    );
     return {
       id: g.sampleId ?? `${g.ingredient}-${i}`,
       ingredient: g.ingredient,
@@ -317,6 +413,19 @@ const IngredientInventory = () => {
   // 1) Get from useAuth (your request)
   const { cognitoId } = useAuth() || {};
 
+  // theme sync with Topbar (same as Dashboard)
+  const [isDark, setIsDark] = useState(
+    () => localStorage.getItem("theme-mode") === "dark"
+  );
+
+  useEffect(() => {
+    const onThemeChanged = () => {
+      setIsDark(localStorage.getItem("theme-mode") === "dark");
+    };
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   const [rows, setRows] = useState([]);
   const [infoOpen, setInfoOpen] = useState(false);
   const [snack, setSnack] = useState("");
@@ -334,7 +443,9 @@ const IngredientInventory = () => {
           return;
         }
 
-        const url = `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cid)}`;
+        const url = `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+          cid
+        )}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
         const data = await res.json();
@@ -356,11 +467,9 @@ const IngredientInventory = () => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [
-        r.ingredient,
-        r.barcode,
-        r.unit,
-      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+      [r.ingredient, r.barcode, r.unit].some((field) =>
+        String(field ?? "").toLowerCase().includes(q)
+      )
     );
   }, [rows, searchQuery]);
 
@@ -380,13 +489,15 @@ const IngredientInventory = () => {
 
   return (
     <div className="ii-page">
-      <Styles />
+      <Styles isDark={isDark} />
 
       <div className="ii-wrap">
         {/* Header */}
         <div className="ii-header">
           <div className="ii-hgroup">
-            <div className="ii-logo" aria-label="Inventory">Inv</div>
+            <div className="ii-logo" aria-label="Inventory">
+              Inv
+            </div>
             <div>
               <h1 className="ii-title">Ingredient Inventory</h1>
               <p className="ii-sub">Read-only aggregates of active Goods-In lots</p>
@@ -436,13 +547,21 @@ const IngredientInventory = () => {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr className="ii-row">
-                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
+                      <td
+                        className="ii-td"
+                        colSpan={4}
+                        style={{ textAlign: "center", color: "var(--text-soft)" }}
+                      >
                         No active inventory found.
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
                     <tr className="ii-row">
-                      <td className="ii-td" colSpan={4} style={{ textAlign: "center", color: "#64748b" }}>
+                      <td
+                        className="ii-td"
+                        colSpan={4}
+                        style={{ textAlign: "center", color: "var(--text-soft)" }}
+                      >
                         No items match your search.
                       </td>
                     </tr>
@@ -452,7 +571,9 @@ const IngredientInventory = () => {
                         <td className="ii-td ii-td-strong">{row.ingredient}</td>
                         <td className="ii-td">
                           <span className="ii-chip">
-                            {Number.isFinite(row.unitsInStock) ? row.unitsInStock.toLocaleString() : String(row.unitsInStock)}
+                            {Number.isFinite(row.unitsInStock)
+                              ? row.unitsInStock.toLocaleString()
+                              : String(row.unitsInStock)}
                           </span>
                         </td>
                         <td className="ii-td">{row.unit}</td>
@@ -477,15 +598,27 @@ const IngredientInventory = () => {
             <div className="ii-chart">
               <div className="ii-chart-body">
                 {chartData.length === 0 ? (
-                  <div style={{ margin:'auto', color:'#64748b' }}>No data for chart.</div>
+                  <div style={{ margin: "auto", color: "var(--text-soft)" }}>
+                    No data for chart.
+                  </div>
                 ) : (
                   chartData.map((d, i) => {
-                    const pct = maxAmount > 0 ? (d.amount / maxAmount) : 0;
+                    const pct = maxAmount > 0 ? d.amount / maxAmount : 0;
                     const h = Math.max(6, Math.round(pct * 300)); // up to 300px tall
                     return (
-                      <div className="ii-bar-wrap" key={`${d.ingredient}-${i}`} style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                      <div
+                        className="ii-bar-wrap"
+                        key={`${d.ingredient}-${i}`}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                        }}
+                      >
                         <div className="ii-bar" style={{ height: `${h}px` }}>
-                          <div className="ii-bar-value">{Number(d.amount).toLocaleString()}</div>
+                          <div className="ii-bar-value">
+                            {Number(d.amount).toLocaleString()}
+                          </div>
                         </div>
                         <span className="ii-bar-label">{d.ingredient}</span>
                       </div>
@@ -501,7 +634,10 @@ const IngredientInventory = () => {
       {/* Info modal & snackbar */}
       <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
       {snack && (
-        <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
+        <div
+          className="ii-snack"
+          onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}
+        >
           {snack}
         </div>
       )}
@@ -509,4 +645,4 @@ const IngredientInventory = () => {
   );
 };
 
-export default IngredientInventory; ;
+export default IngredientInventory;

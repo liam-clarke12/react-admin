@@ -15,7 +15,8 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 /* ---------------- Unit options (local) ---------------- */
 const UNIT_OPTIONS = [
@@ -28,7 +29,12 @@ const UNIT_OPTIONS = [
 
 /* ---------------- Icons ---------------- */
 const Svg = (p) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    {...p}
+  />
 );
 const EditIcon = (props) => (
   <Svg
@@ -114,20 +120,41 @@ const PlusIcon = (props) => (
   </Svg>
 );
 
-/* ---------------- Scoped styles (kept identical + Nory-style form bits) ---------------- */
-const BrandStyles = () => (
+/* =====================
+   Dark mode styles (same pattern as Dashboard/Inventory)
+   - reads localStorage theme-mode
+   - listens for window "themeChanged"
+   ===================== */
+const BrandStyles = ({ isDark }) => (
   <style>{`
-  .r-wrap { padding: 20px; }
-  .r-card {
-    background:#fff; border:1px solid #e5e7eb; border-radius:16px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
-    overflow:hidden;
+  :root{
+    --bg: ${isDark ? "#0b1220" : "#f1f5f9"};
+    --card: ${isDark ? "#0f172a" : "#ffffff"};
+    --text: ${isDark ? "#e5e7eb" : "#0f172a"};
+    --text-muted: ${isDark ? "#94a3b8" : "#64748b"};
+    --text-soft: ${isDark ? "#cbd5e1" : "#334155"};
+    --border: ${isDark ? "rgba(148,163,184,0.18)" : "#e5e7eb"};
+    --thead: ${isDark ? "rgba(255,255,255,0.04)" : "#f8fafc"};
+    --row-hover: ${isDark ? "rgba(124,58,237,0.18)" : "#f4f1ff"};
+    --chip: ${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"};
+    --input-bg: ${isDark ? "rgba(2,6,23,0.35)" : "#ffffff"};
+    --shadow: ${isDark ? "0 4px 18px rgba(0,0,0,0.45)" : "0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08)"};
+    --overlay: ${isDark ? "rgba(0,0,0,.62)" : "rgba(0,0,0,.45)"};
   }
-  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
-  .r-title { margin:0; font-weight:800; color:#0f172a; font-size:18px; }
+
+  .r-wrap { padding: 20px; min-height: 100vh; background: var(--bg); color: var(--text); transition: background .25s ease, color .25s ease; }
+
+  .r-card {
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    transition: background .25s ease, border .25s ease, box-shadow .25s ease;
+  }
+  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+  .r-title { margin:0; font-weight:800; color:var(--text); font-size:18px; }
   .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
   .r-btn-icon { border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626; }
-  .r-btn-icon:hover { background:#fee2e2; }
+  .r-btn-icon:hover { background:${isDark ? "rgba(239,68,68,0.15)" : "#fee2e2"}; }
 
   .r-actions-right { display:flex; align-items:center; gap:10px; }
   .r-btn-add {
@@ -138,22 +165,22 @@ const BrandStyles = () => (
   .r-btn-add:hover { filter:brightness(.95); }
 
   .r-table-wrap { overflow:auto; }
-  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
-  .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
-  .r-thead th { padding:12px; text-align:left; }
-  .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
-  .r-row:hover { background:#f4f1ff; }
-  .r-td { padding:12px; }
-  .r-td--name { font-weight:800; color:#0f172a; white-space:nowrap; }
+  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:var(--text-soft); }
+  .r-thead { background:var(--thead); text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:var(--text-muted); }
+  .r-thead th { padding:12px; text-align:left; border-bottom:1px solid var(--border); }
+  .r-row { border-bottom:1px solid var(--border); transition: background .15s ease; }
+  .r-row:hover { background:var(--row-hover); }
+  .r-td { padding:12px; color:var(--text-soft); }
+  .r-td--name { font-weight:800; color:var(--text); white-space:nowrap; }
   .r-actions { text-align:center; }
   .r-chk { width:16px; height:16px; }
   .r-link { color:#7C3AED; font-weight:700; background:transparent; border:0; cursor:pointer; }
   .r-link:hover { color:#5B21B6; text-decoration:underline; }
   .r-btn-ghost {
     display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
-    color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
+    color:var(--text); border:1px solid var(--border); border-radius:10px; background:${isDark ? "rgba(255,255,255,0.04)" : "#fff"}; cursor:pointer;
   }
-  .r-btn-ghost:hover { background:#f4f1ff; }
+  .r-btn-ghost:hover { background:${isDark ? "rgba(255,255,255,0.06)" : "#f4f1ff"}; }
   .r-btn-primary {
     padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
     box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
@@ -161,14 +188,15 @@ const BrandStyles = () => (
   .r-btn-primary:hover { background:#5B21B6; }
   .r-btn-danger { background:#dc2626; }
   .r-btn-danger:hover { background:#b91c1c; }
-  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+  .r-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; background:var(--card); }
 
   /* Drawer */
-  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
+  .r-dim { position:fixed; inset:0; background:var(--overlay); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; backdrop-filter: blur(2px); }
   .r-dim.open { opacity:1; pointer-events:auto; }
   .r-drawer {
-    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px; background:#fff; box-shadow:-8px 0 24px rgba(2,6,23,.18);
+    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px; background:var(--card); box-shadow:-8px 0 24px rgba(2,6,23,.30);
     transform:translateX(100%); transition:transform .25s ease; z-index:50; display:flex; flex-direction:column;
+    border-left:1px solid var(--border);
   }
   .r-drawer.open { transform:translateX(0); }
   .r-dhdr {
@@ -176,90 +204,73 @@ const BrandStyles = () => (
   }
   .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
   .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
-  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
-  .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
+  .r-dbody { padding:14px; background:${isDark ? "rgba(255,255,255,0.03)" : "#f1f5f9"}; overflow:auto; flex:1; }
+  .r-summary { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; box-shadow:${isDark ? "0 1px 2px rgba(0,0,0,0.35)" : "0 1px 2px rgba(16,24,40,0.06)"}; margin-bottom:10px; }
   .r-stat { text-align:right; }
-  .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
+  .r-filter { position:sticky; top:0; padding:8px 0; background:${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; }
   .r-input {
-    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none;
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; outline:none;
+    background: var(--input-bg); color: var(--text);
   }
+  .r-input::placeholder { color: ${isDark ? "rgba(203,213,225,0.65)" : "#94a3b8"}; }
   .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
   .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
-  .r-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
-  .r-chip { font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; padding:4px 8px; border-radius:999px; }
+  .r-item { display:flex; align-items:center; justify-content:space-between; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+  .r-chip { font-size:12px; font-weight:800; background:var(--chip); color:var(--text-soft); padding:4px 8px; border-radius:999px; border:1px solid var(--border); }
 
   /* Modal (shared) */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;}
-  .r-modal { background:#fff; border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.22); display:flex; flex-direction:column; }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
-  .r-mbody { padding:16px; overflow:auto; background:#f8fafc; }
-  .r-mfooter { padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px; }
+  .r-modal-dim { position:fixed; inset:0; background:${isDark ? "rgba(0,0,0,.72)" : "rgba(0,0,0,.55)"}; display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; backdrop-filter: blur(2px);}
+  .r-modal { background:var(--card); border-radius:14px; width:100%; max-width:640px; max-height:90vh; overflow:hidden; box-shadow:0 10px 30px rgba(2,6,23,.42); display:flex; flex-direction:column; border:1px solid var(--border); }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .r-mbody { padding:16px; overflow:auto; background:${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"}; }
+  .r-mfooter { padding:12px 16px; border-top:1px solid var(--border); background:${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"}; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Small helpers */
   .r-flex { display:flex; align-items:center; gap:10px; }
-  .r-badge { background:#ede9fe; color:#7C3AED; border:1px solid #eee; border-radius:999px; padding:4px; display:inline-flex; }
-  .r-muted { color:#64748b; font-size:12px; }
-  .r-strong { font-weight:900; color:#0f172a; }
+  .r-badge { background:${isDark ? "rgba(124,58,237,0.15)" : "#ede9fe"}; color:${isDark ? "#c4b5fd" : "#7C3AED"}; border:1px solid var(--border); border-radius:999px; padding:4px; display:inline-flex; }
+  .r-muted { color:var(--text-muted); font-size:12px; }
+  .r-strong { font-weight:900; color:var(--text); }
 
-  /* ===================== Nory-style form bits (copied from Production form) ===================== */
-
-  .gof-grid {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 20px;
-  }
+  /* ===================== Nory-style form bits ===================== */
+  .gof-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 20px; }
   .col-12 { grid-column: span 12; }
   .col-6 { grid-column: span 6; }
   .col-4 { grid-column: span 4; }
   .col-3 { grid-column: span 3; }
+  @media (max-width: 900px) { .col-6, .col-4, .col-3 { grid-column: span 12; } }
 
-  @media (max-width: 900px) {
-    .col-6, .col-4, .col-3 { grid-column: span 12; }
-  }
-
-  .gof-field {
-    display: flex;
-    flex-direction: column;
-  }
-  .gof-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 6px;
-  }
-  .gof-input,
-  .gof-select {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+  .gof-field { display: flex; flex-direction: column; }
+  .gof-label { font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 6px; }
+  .gof-input, .gof-select {
+    background: ${isDark ? "rgba(2,6,23,0.35)" : "#f8fafc"};
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px 14px;
     font-size: 14px;
     outline: none;
-    transition: border-color .15s ease, box-shadow .15s ease;
+    color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
-  .gof-input:focus,
-  .gof-select:focus {
-    border-color: #7C3AED;
-    box-shadow: 0 0 0 4px rgba(124,58,237,0.18);
-  }
+  .gof-input::placeholder { color: ${isDark ? "rgba(203,213,225,0.65)" : "#94a3b8"}; }
+  .gof-input:focus, .gof-select:focus { border-color: #7C3AED; box-shadow: 0 0 0 4px rgba(124,58,237,0.18); }
 
   .gof-multi-row {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px;
     margin-bottom: 12px;
-    background: #f8fafc;
+    background: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
   }
 
   .gof-multi-add-btn {
     border-radius: 999px;
-    border: 1px dashed #e5e7eb;
-    background: #f1f5f9;
+    border: 1px dashed var(--border);
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"};
     padding: 6px 12px;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    color: #64748b;
+    color: var(--text-muted);
   }
 
   .gof-pill {
@@ -276,43 +287,27 @@ const BrandStyles = () => (
     box-shadow: 0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06);
     transition: transform .2s ease;
   }
-  .gof-pill[disabled] {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-  }
-  .gof-pill:not([disabled]):hover {
-    transform: scale(1.03);
-    background: linear-gradient(180deg, #5B21B6, #5B21B6);
-  }
+  .gof-pill[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .gof-pill:not([disabled]):hover { transform: scale(1.03); background: linear-gradient(180deg, #5B21B6, #5B21B6); }
 
   /* Tabs for Add Recipe modal */
-  .tab-switch {
-    display:flex;
-    gap:8px;
-    margin-bottom:16px;
-  }
+  .tab-switch { display:flex; gap:8px; margin-bottom:16px; }
   .tab-pill {
-    padding:6px 12px;
-    border-radius:999px;
-    border:1px solid #e5e7eb;
-    background:#fff;
-    font-size:13px;
-    cursor:pointer;
-    font-weight:600;
-    color:#64748b;
+    padding:6px 12px; border-radius:999px; border:1px solid var(--border);
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
+    font-size:13px; cursor:pointer; font-weight:600; color: var(--text-muted);
   }
   .tab-pill.active {
-    background:#ede9fe;
-    color:#5B21B6;
-    border-color:#c4b5fd;
+    background:${isDark ? "rgba(124,58,237,0.20)" : "#ede9fe"};
+    color:${isDark ? "#ddd6fe" : "#5B21B6"};
+    border-color:${isDark ? "rgba(196,181,253,0.35)" : "#c4b5fd"};
   }
 
   /* Simple recipe list for combine tab */
   .combine-recipes-list {
     border-radius:12px;
-    border:1px solid #e5e7eb;
-    background:#fff;
+    border:1px solid var(--border);
+    background: var(--card);
     padding:10px;
     max-height:220px;
     overflow:auto;
@@ -323,12 +318,11 @@ const BrandStyles = () => (
     align-items:center;
     justify-content:space-between;
     padding:6px 4px;
-    border-bottom:1px solid #f1f5f9;
+    border-bottom:1px solid ${isDark ? "rgba(148,163,184,0.12)" : "#f1f5f9"};
     font-size:13px;
+    color: var(--text-soft);
   }
-  .combine-recipes-row:last-child {
-    border-bottom:none;
-  }
+  .combine-recipes-row:last-child { border-bottom:none; }
 `}</style>
 );
 
@@ -372,7 +366,12 @@ const RecipeTable = ({
           {numSelected > 0 && (
             <div
               className="r-flex"
-              style={{ background: "#eef2ff", padding: "6px 10px", borderRadius: 10 }}
+              style={{
+                background: "rgba(99,102,241,0.12)",
+                border: "1px solid var(--border)",
+                padding: "6px 10px",
+                borderRadius: 10,
+              }}
             >
               <span className="r-pill">{numSelected} selected</span>
               <button className="r-btn-icon" onClick={onDelete} aria-label="Delete selected">
@@ -431,18 +430,12 @@ const RecipeTable = ({
                 <td className="r-td r-td--name">{r.name}</td>
                 <td className="r-td">{r.unitsPerBatch}</td>
                 <td className="r-td">
-                  <button
-                    className="r-link"
-                    onClick={() => onOpenDrawer(r.id, "ingredients")}
-                  >
+                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "ingredients")}>
                     View ({r.ingredients.length})
                   </button>
                 </td>
                 <td className="r-td">
-                  <button
-                    className="r-link"
-                    onClick={() => onOpenDrawer(r.id, "quantities")}
-                  >
+                  <button className="r-link" onClick={() => onOpenDrawer(r.id, "quantities")}>
                     View Quantities
                   </button>
                 </td>
@@ -491,8 +484,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
 
   const exportCsv = () => {
     if (!recipe) return;
-    const headers =
-      type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
+    const headers = type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
     const rows = recipe.ingredients.map((ing) =>
       type === "quantities" ? [ing.name, String(ing.quantity), ing.unit] : [ing.name]
     );
@@ -516,9 +508,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
               <MenuIcon />
             </span>
             <div>
-              <h3 className="r-dhdr-title">
-                {type === "ingredients" ? "Ingredients" : "Quantities"}
-              </h3>
+              <h3 className="r-dhdr-title">{type === "ingredients" ? "Ingredients" : "Quantities"}</h3>
               <p className="r-dhdr-sub">{recipe?.name || "No recipe selected"}</p>
             </div>
           </div>
@@ -530,28 +520,17 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
         <div className="r-dbody">
           <div className="r-summary r-flex" style={{ justifyContent: "space-between" }}>
             <div>
-              <div
-                className="r-muted"
-                style={{ textTransform: "uppercase", fontWeight: 800 }}
-              >
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>
                 Recipe
               </div>
               <div className="r-strong">{recipe?.name || "—"}</div>
-              <div className="r-muted">
-                Units per batch: {recipe?.unitsPerBatch ?? "N/A"}
-              </div>
+              <div className="r-muted">Units per batch: {recipe?.unitsPerBatch ?? "N/A"}</div>
             </div>
             <div className="r-stat">
-              <div
-                className="r-muted"
-                style={{ textTransform: "uppercase", fontWeight: 800 }}
-              >
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>
                 Items
               </div>
-              <div
-                className="r-strong"
-                style={{ color: "#7C3AED", fontSize: 24 }}
-              >
+              <div className="r-strong" style={{ color: "#7C3AED", fontSize: 24 }}>
                 {filtered.length}
               </div>
             </div>
@@ -578,9 +557,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
                     {it.name}
                   </span>
                 </div>
-                {type === "quantities" && (
-                  <span className="r-chip">{it.details}</span>
-                )}
+                {type === "quantities" && <span className="r-chip">{it.details}</span>}
               </li>
             ))}
             {filtered.length === 0 && (
@@ -615,25 +592,15 @@ const useIngredientOptions = (cognitoId, refreshKey = 0) => {
     setLoading(true);
     try {
       const [mRes, cRes] = await Promise.all([
-        fetch(
-          `${API_BASE}/ingredients?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
-        ),
-        fetch(
-          `${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}`
-        ),
+        fetch(`${API_BASE}/ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
+        fetch(`${API_BASE}/custom-ingredients?cognito_id=${encodeURIComponent(cognitoId)}`),
       ]);
 
       const m = mRes.ok ? await mRes.json() : [];
       const c = cRes.ok ? await cRes.json() : [];
       setMasterIngredients(Array.isArray(m) ? m : []);
       setCustomIngredients(
-        Array.isArray(c)
-          ? c.map((ci) => ({ id: `c-${ci.id}`, name: ci.name }))
-          : []
+        Array.isArray(c) ? c.map((ci) => ({ id: `c-${ci.id}`, name: ci.name })) : []
       );
     } catch (e) {
       console.error("Ingredient load error:", e);
@@ -671,9 +638,16 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
       open={open}
       onClose={onClose}
       fullWidth
-      PaperProps={{ sx: { borderRadius: 14, border: "1px solid #e5e7eb" } }}
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          border: "1px solid var(--border)",
+          backgroundColor: "var(--card)",
+          color: "var(--text)",
+        },
+      }}
     >
-      <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>
+      <DialogTitle sx={{ fontWeight: 800, color: "var(--text)" }}>
         Add New Ingredient
       </DialogTitle>
       <DialogContent>
@@ -684,14 +658,18 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
           fullWidth
           value={name}
           onChange={(e) => setName(e.target.value)}
+          InputLabelProps={{ sx: { color: "var(--text-muted)" } }}
+          InputProps={{
+            sx: {
+              color: "var(--text)",
+              backgroundColor: "var(--input-bg)",
+              borderRadius: 2,
+            },
+          }}
         />
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button
-          onClick={onClose}
-          disabled={adding}
-          sx={{ textTransform: "none", fontWeight: 700 }}
-        >
+        <Button onClick={onClose} disabled={adding} sx={{ textTransform: "none", fontWeight: 700 }}>
           Cancel
         </Button>
         <Button
@@ -706,11 +684,7 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
             background: "linear-gradient(180deg, #7C3AED, #5B21B6)",
             "&:hover": { background: "#5B21B6" },
           }}
-          startIcon={
-            adding ? (
-              <CircularProgress size={18} sx={{ color: "#fff" }} />
-            ) : null
-          }
+          startIcon={adding ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : null}
         >
           {adding ? "Adding…" : "Add"}
         </Button>
@@ -725,18 +699,13 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
 
   useEffect(() => {
     if (open && initialRecipe) {
-      // deep clone
       setDraft(JSON.parse(JSON.stringify(initialRecipe)));
     }
   }, [open, initialRecipe]);
 
   if (!open || !draft) return null;
 
-  const handleField = (k, v) =>
-    setDraft((p) => ({
-      ...p,
-      [k]: v,
-    }));
+  const handleField = (k, v) => setDraft((p) => ({ ...p, [k]: v }));
 
   const handleIngredient = (idx, k, v) => {
     const arr = [...(draft.ingredients || [])];
@@ -749,12 +718,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
       ...p,
       ingredients: [
         ...(p.ingredients || []),
-        {
-          id: `sum_${Date.now()}`,
-          name: "",
-          quantity: 0,
-          unit: UNIT_OPTIONS[0].value,
-        },
+        { id: `sum_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value },
       ],
     }));
   };
@@ -764,10 +728,6 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
       ...p,
       ingredients: p.ingredients.filter((_, i) => i !== idx),
     }));
-  };
-
-  const handleConfirm = () => {
-    onConfirm(draft);
   };
 
   return (
@@ -802,12 +762,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                 type="number"
                 className="gof-input"
                 value={draft.unitsPerBatch}
-                onChange={(e) =>
-                  handleField(
-                    "unitsPerBatch",
-                    parseInt(e.target.value || "0", 10)
-                  )
-                }
+                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
               />
             </div>
           </div>
@@ -826,9 +781,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                         type="text"
                         className="gof-input"
                         value={ing.name}
-                        onChange={(e) =>
-                          handleIngredient(idx, "name", e.target.value)
-                        }
+                        onChange={(e) => handleIngredient(idx, "name", e.target.value)}
                       />
                     </div>
                     <div className="gof-field col-3">
@@ -838,11 +791,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                         className="gof-input"
                         value={ing.quantity}
                         onChange={(e) =>
-                          handleIngredient(
-                            idx,
-                            "quantity",
-                            parseFloat(e.target.value) || 0
-                          )
+                          handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)
                         }
                       />
                     </div>
@@ -851,9 +800,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                       <select
                         className="gof-select"
                         value={ing.unit}
-                        onChange={(e) =>
-                          handleIngredient(idx, "unit", e.target.value)
-                        }
+                        onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
                       >
                         {UNIT_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -891,7 +838,7 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
           <button className="r-btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="gof-pill" onClick={handleConfirm}>
+          <button className="gof-pill" onClick={() => onConfirm(draft)}>
             Confirm & Create
           </button>
         </div>
@@ -903,17 +850,14 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
 /* ---------------- Edit Modal (Nory-style form) ---------------- */
 const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
   const { cognitoId } = useAuth();
-  const { ingredients, reload } = useIngredientOptions(
-    cognitoId,
-    isOpen ? 1 : 0
-  );
+  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
 
   const [edited, setEdited] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [addTargetIndex, setAddTargetIndex] = useState(null); // which ingredient row to auto-select into
+  const [addTargetIndex, setAddTargetIndex] = useState(null);
 
   useEffect(() => {
     if (recipe) setEdited(JSON.parse(JSON.stringify(recipe)));
@@ -933,12 +877,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       ...p,
       ingredients: [
         ...(p?.ingredients || []),
-        {
-          id: `new_${Date.now()}`,
-          name: "",
-          quantity: 0,
-          unit: UNIT_OPTIONS[0].value,
-        },
+        { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value },
       ],
     }));
   };
@@ -963,14 +902,10 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       const resp = await fetch(`${API_BASE}/custom-ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cognito_id: cognitoId,
-          name: name.trim(),
-        }),
+        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
-      // auto-select newly added (name match)
       const just = (ingredients || []).find(
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
@@ -1000,7 +935,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
         </div>
 
         <div className="r-mbody">
-          {/* Top grid - Nory style */}
           <div className="gof-grid">
             <div className="gof-field col-6">
               <label className="gof-label">Recipe Name</label>
@@ -1017,12 +951,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                 type="number"
                 className="gof-input"
                 value={edited?.unitsPerBatch ?? 0}
-                onChange={(e) =>
-                  handleField(
-                    "unitsPerBatch",
-                    parseInt(e.target.value || "0", 10)
-                  )
-                }
+                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
               />
             </div>
           </div>
@@ -1035,76 +964,53 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
               {(edited?.ingredients || []).map((ing, idx) => (
                 <div key={ing.id || idx} className="gof-multi-row">
                   <div className="gof-grid">
-                    {/* Ingredient dropdown */}
                     <div className="gof-field col-6">
-                      <label className="gof-label">
-                        Ingredient
-                      </label>
+                      <label className="gof-label">Ingredient</label>
                       <Autocomplete
                         options={ingredients}
-                        value={
-                          ingredients.find((i) => i.name === ing.name) ||
-                          null
-                        }
-                        onChange={(_, val) =>
-                          handleIngredient(idx, "name", val ? val.name : "")
-                        }
-                        getOptionLabel={(opt) =>
-                          typeof opt === "string" ? opt : opt?.name ?? ""
-                        }
-                        isOptionEqualToValue={(opt, val) =>
-                          (opt?.id ?? opt) === (val?.id ?? val)
-                        }
+                        value={ingredients.find((i) => i.name === ing.name) || null}
+                        onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
+                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                        isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                         renderInput={(params) => (
                           <TextField
                             {...params}
                             placeholder="Select an ingredient"
+                            InputLabelProps={{ sx: { color: "var(--text-muted)" } }}
+                            InputProps={{
+                              ...params.InputProps,
+                              sx: { color: "var(--text)", backgroundColor: "var(--input-bg)", borderRadius: 2 },
+                            }}
                           />
                         )}
                         disableClearable={false}
                       />
                       <div style={{ marginTop: 8 }}>
-                        <button
-                          type="button"
-                          className="r-btn-ghost"
-                          onClick={() => openAddCustom(idx)}
-                        >
+                        <button type="button" className="r-btn-ghost" onClick={() => openAddCustom(idx)}>
                           Add Ingredient +
                         </button>
                       </div>
                     </div>
 
-                    {/* Quantity */}
                     <div className="gof-field col-3">
-                      <label className="gof-label">
-                        Quantity
-                      </label>
+                      <label className="gof-label">Quantity</label>
                       <input
                         type="number"
                         className="gof-input"
                         placeholder="Quantity"
                         value={ing.quantity}
                         onChange={(e) =>
-                          handleIngredient(
-                            idx,
-                            "quantity",
-                            parseFloat(e.target.value) || 0
-                          )
+                          handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)
                         }
                       />
                     </div>
 
-                    {/* Unit */}
                     <div className="gof-field col-3">
-                      <label className="gof-label">
-                        Unit
-                      </label>
+                      <label className="gof-label">Unit</label>
                       <select
                         className="gof-select"
                         value={ing.unit}
-                        onChange={(e) =>
-                          handleIngredient(idx, "unit", e.target.value)
-                        }
+                        onChange={(e) => handleIngredient(idx, "unit", e.target.value)}
                       >
                         {UNIT_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -1144,11 +1050,7 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
           <button className="r-btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="gof-pill"
-            onClick={save}
-            disabled={saving}
-          >
+          <button className="gof-pill" onClick={save} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -1170,24 +1072,14 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
 /* ---------------- Add Recipe Modal (popup form, Nory-style + combine tab) ---------------- */
 const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const { cognitoId } = useAuth();
-  const { ingredients, reload } = useIngredientOptions(
-    cognitoId,
-    isOpen ? 1 : 0
-  );
+  const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
 
   const [mode, setMode] = useState("manual"); // "manual" | "combine"
 
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     unitsPerBatch: 1,
-    ingredients: [
-      {
-        id: `new_${Date.now()}`,
-        name: "",
-        quantity: 0,
-        unit: UNIT_OPTIONS[0].value,
-      },
-    ],
+    ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
   });
 
   const [saving, setSaving] = useState(false);
@@ -1196,29 +1088,19 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const [adding, setAdding] = useState(false);
   const [addTargetIndex, setAddTargetIndex] = useState(null);
 
-  // For combine tab
   const [selectedRecipeIdsLocal, setSelectedRecipeIdsLocal] = useState([]);
   const [extraIngredients, setExtraIngredients] = useState([]);
 
-  // Summary modal state
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryRecipe, setSummaryRecipe] = useState(null);
 
-  // Reset when closing
   useEffect(() => {
     if (!isOpen) {
       setMode("manual");
       setNewRecipe({
         name: "",
         unitsPerBatch: 1,
-        ingredients: [
-          {
-            id: `new_${Date.now()}`,
-            name: "",
-            quantity: 0,
-            unit: UNIT_OPTIONS[0].value,
-          },
-        ],
+        ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
       });
       setSelectedRecipeIdsLocal([]);
       setExtraIngredients([]);
@@ -1229,13 +1111,8 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
 
   if (!isOpen) return null;
 
-  const handleField = (k, v) =>
-    setNewRecipe((p) => ({
-      ...p,
-      [k]: v,
-    }));
+  const handleField = (k, v) => setNewRecipe((p) => ({ ...p, [k]: v }));
 
-  /* ------- Manual ingredient handlers ------- */
   const handleIngredient = (idx, k, v) => {
     const arr = [...newRecipe.ingredients];
     arr[idx] = { ...arr[idx], [k]: v };
@@ -1244,25 +1121,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const addIngredientRow = () => {
     setNewRecipe((p) => ({
       ...p,
-      ingredients: [
-        ...p.ingredients,
-        {
-          id: `new_${Date.now()}`,
-          name: "",
-          quantity: 0,
-          unit: UNIT_OPTIONS[0].value,
-        },
-      ],
+      ingredients: [...p.ingredients, { id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
     }));
   };
   const removeIngredient = (idx) => {
-    setNewRecipe((p) => ({
-      ...p,
-      ingredients: p.ingredients.filter((_, i) => i !== idx),
-    }));
+    setNewRecipe((p) => ({ ...p, ingredients: p.ingredients.filter((_, i) => i !== idx) }));
   };
 
-  /* ------- Extra ingredients for combine mode ------- */
   const handleExtraIngredient = (idx, k, v) => {
     const arr = [...extraIngredients];
     arr[idx] = { ...arr[idx], [k]: v };
@@ -1271,19 +1136,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const addExtraIngredientRow = () => {
     setExtraIngredients((prev) => [
       ...prev,
-      {
-        id: `extra_${Date.now()}`,
-        name: "",
-        quantity: 0,
-        unit: UNIT_OPTIONS[0].value,
-      },
+      { id: `extra_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value },
     ]);
   };
   const removeExtraIngredient = (idx) => {
     setExtraIngredients((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  /* ------- Add custom ingredient dialog ------- */
   const openAddCustom = (index, isExtra = false) => {
     setAddTargetIndex({ index, isExtra });
     setAddOpen(true);
@@ -1296,23 +1155,15 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       const resp = await fetch(`${API_BASE}/custom-ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cognito_id: cognitoId,
-          name: name.trim(),
-        }),
+        body: JSON.stringify({ cognito_id: cognitoId, name: name.trim() }),
       });
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
-      const just = (ingredients || []).find(
-        (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
-      );
+      const just = (ingredients || []).find((i) => i.name?.toLowerCase() === name.trim().toLowerCase());
       if (just && addTargetIndex != null) {
         const { index, isExtra } = addTargetIndex;
-        if (isExtra) {
-          handleExtraIngredient(index, "name", just.name);
-        } else {
-          handleIngredient(index, "name", just.name);
-        }
+        if (isExtra) handleExtraIngredient(index, "name", just.name);
+        else handleIngredient(index, "name", just.name);
       }
       setAddOpen(false);
       setAddTargetIndex(null);
@@ -1324,10 +1175,9 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   };
 
-  /* ------- Combine existing recipes (no hooks here) ------- */
   const combinedBaseIngredients = (() => {
     const selectedSet = new Set(selectedRecipeIdsLocal);
-    const map = new Map(); // key: name::unit → { name, unit, quantity }
+    const map = new Map();
 
     (existingRecipes || []).forEach((rec) => {
       if (!selectedSet.has(rec.id)) return;
@@ -1335,27 +1185,20 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         if (!ing.name) return;
         const unitVal = ing.unit || "";
         const key = `${ing.name}::${unitVal}`;
-        const prev =
-          map.get(key) || { name: ing.name, unit: unitVal, quantity: 0 };
+        const prev = map.get(key) || { name: ing.name, unit: unitVal, quantity: 0 };
         const qty = parseFloat(ing.quantity) || 0;
         prev.quantity += qty;
         map.set(key, prev);
       });
     });
 
-    return Array.from(map.values()).map((it, idx) => ({
-      id: `combo_${idx}`,
-      ...it,
-    }));
+    return Array.from(map.values()).map((it, idx) => ({ id: `combo_${idx}`, ...it }));
   })();
 
   const toggleRecipeSelect = (id) => {
-    setSelectedRecipeIdsLocal((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedRecipeIdsLocal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  /* ------- Merge ingredients for summary ------- */
   const mergeIngredients = (arrays) => {
     const map = new Map();
     arrays
@@ -1377,18 +1220,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     return Array.from(map.values());
   };
 
-  /* ------- Open summary (used for both modes) ------- */
   const handleOpenSummary = () => {
     let candidateIngredients = [];
 
     if (mode === "manual") {
       candidateIngredients = mergeIngredients([newRecipe.ingredients]);
     } else {
-      // combine: base from selected recipes + extra ingredients
-      candidateIngredients = mergeIngredients([
-        combinedBaseIngredients,
-        extraIngredients,
-      ]);
+      candidateIngredients = mergeIngredients([combinedBaseIngredients, extraIngredients]);
     }
 
     if (!newRecipe.name.trim()) {
@@ -1417,7 +1255,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     setSaving(false);
   };
 
-  /* ------- Render sections ------- */
   const renderManualIngredients = () => (
     <div style={{ marginTop: 16 }}>
       <h3 className="r-strong" style={{ marginBottom: 8 }}>
@@ -1427,43 +1264,34 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         {newRecipe.ingredients.map((ing, idx) => (
           <div key={ing.id} className="gof-multi-row">
             <div className="gof-grid">
-              {/* Ingredient dropdown */}
               <div className="gof-field col-6">
                 <label className="gof-label">Ingredient</label>
                 <Autocomplete
                   options={ingredients}
-                  value={
-                    ingredients.find((i) => i.name === ing.name) || null
-                  }
-                  onChange={(_, val) =>
-                    handleIngredient(idx, "name", val ? val.name : "")
-                  }
-                  getOptionLabel={(opt) =>
-                    typeof opt === "string" ? opt : opt?.name ?? ""
-                  }
-                  isOptionEqualToValue={(opt, val) =>
-                    (opt?.id ?? opt) === (val?.id ?? val)
-                  }
+                  value={ingredients.find((i) => i.name === ing.name) || null}
+                  onChange={(_, val) => handleIngredient(idx, "name", val ? val.name : "")}
+                  getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                  isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       placeholder="Select an ingredient"
+                      InputLabelProps={{ sx: { color: "var(--text-muted)" } }}
+                      InputProps={{
+                        ...params.InputProps,
+                        sx: { color: "var(--text)", backgroundColor: "var(--input-bg)", borderRadius: 2 },
+                      }}
                     />
                   )}
                   disableClearable={false}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className="r-btn-ghost"
-                    onClick={() => openAddCustom(idx, false)}
-                  >
+                  <button type="button" className="r-btn-ghost" onClick={() => openAddCustom(idx, false)}>
                     Add Ingredient +
                   </button>
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="gof-field col-3">
                 <label className="gof-label">Quantity</label>
                 <input
@@ -1471,26 +1299,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                   className="gof-input"
                   placeholder="Qty"
                   value={ing.quantity}
-                  onChange={(e) =>
-                    handleIngredient(
-                      idx,
-                      "quantity",
-                      parseFloat(e.target.value) || 0
-                    )
-                  }
+                  onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
                 />
               </div>
 
-              {/* Unit */}
               <div className="gof-field col-3">
                 <label className="gof-label">Unit</label>
-                <select
-                  className="gof-select"
-                  value={ing.unit}
-                  onChange={(e) =>
-                    handleIngredient(idx, "unit", e.target.value)
-                  }
-                >
+                <select className="gof-select" value={ing.unit} onChange={(e) => handleIngredient(idx, "unit", e.target.value)}>
                   {UNIT_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -1501,12 +1316,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
             </div>
 
             <div style={{ marginTop: 8, textAlign: "right" }}>
-              <button
-                type="button"
-                className="r-btn-icon"
-                onClick={() => removeIngredient(idx)}
-                title="Remove"
-              >
+              <button type="button" className="r-btn-icon" onClick={() => removeIngredient(idx)} title="Remove">
                 <DeleteIcon />
               </button>
             </div>
@@ -1514,12 +1324,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         ))}
       </div>
 
-      <button
-        type="button"
-        className="gof-multi-add-btn"
-        style={{ marginTop: 10 }}
-        onClick={addIngredientRow}
-      >
+      <button type="button" className="gof-multi-add-btn" style={{ marginTop: 10 }} onClick={addIngredientRow}>
         + Add Ingredient
       </button>
     </div>
@@ -1532,8 +1337,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
           Select Recipes to Combine
         </h3>
         <p className="r-muted">
-          Pick existing recipes to merge. Ingredients with the same name and
-          unit will have their quantities summed.
+          Pick existing recipes to merge. Ingredients with the same name and unit will have their quantities summed.
         </p>
 
         <div className="combine-recipes-list">
@@ -1549,14 +1353,10 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                   {r.name}
                 </span>
               </label>
-              <span className="r-muted">
-                Units/batch: {r.unitsPerBatch ?? "—"}
-              </span>
+              <span className="r-muted">Units/batch: {r.unitsPerBatch ?? "—"}</span>
             </div>
           ))}
-          {(!existingRecipes || existingRecipes.length === 0) && (
-            <div className="r-muted">No recipes available yet.</div>
-          )}
+          {(!existingRecipes || existingRecipes.length === 0) && <div className="r-muted">No recipes available yet.</div>}
         </div>
       </div>
 
@@ -1573,30 +1373,15 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 <div className="gof-grid">
                   <div className="gof-field col-6">
                     <label className="gof-label">Ingredient</label>
-                    <input
-                      type="text"
-                      className="gof-input"
-                      value={ing.name}
-                      readOnly
-                    />
+                    <input type="text" className="gof-input" value={ing.name} readOnly />
                   </div>
                   <div className="gof-field col-3">
                     <label className="gof-label">Quantity</label>
-                    <input
-                      type="number"
-                      className="gof-input"
-                      value={ing.quantity}
-                      readOnly
-                    />
+                    <input type="number" className="gof-input" value={ing.quantity} readOnly />
                   </div>
                   <div className="gof-field col-3">
                     <label className="gof-label">Unit</label>
-                    <input
-                      type="text"
-                      className="gof-input"
-                      value={ing.unit}
-                      readOnly
-                    />
+                    <input type="text" className="gof-input" value={ing.unit} readOnly />
                   </div>
                 </div>
               </div>
@@ -1620,32 +1405,25 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                   <label className="gof-label">Ingredient</label>
                   <Autocomplete
                     options={ingredients}
-                    value={
-                      ingredients.find((i) => i.name === ing.name) || null
-                    }
-                    onChange={(_, val) =>
-                      handleExtraIngredient(idx, "name", val ? val.name : "")
-                    }
-                    getOptionLabel={(opt) =>
-                      typeof opt === "string" ? opt : opt?.name ?? ""
-                    }
-                    isOptionEqualToValue={(opt, val) =>
-                      (opt?.id ?? opt) === (val?.id ?? val)
-                    }
+                    value={ingredients.find((i) => i.name === ing.name) || null}
+                    onChange={(_, val) => handleExtraIngredient(idx, "name", val ? val.name : "")}
+                    getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
+                    isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         placeholder="Select an ingredient"
+                        InputLabelProps={{ sx: { color: "var(--text-muted)" } }}
+                        InputProps={{
+                          ...params.InputProps,
+                          sx: { color: "var(--text)", backgroundColor: "var(--input-bg)", borderRadius: 2 },
+                        }}
                       />
                     )}
                     disableClearable={false}
                   />
                   <div style={{ marginTop: 8 }}>
-                    <button
-                      type="button"
-                      className="r-btn-ghost"
-                      onClick={() => openAddCustom(idx, true)}
-                    >
+                    <button type="button" className="r-btn-ghost" onClick={() => openAddCustom(idx, true)}>
                       Add Ingredient +
                     </button>
                   </div>
@@ -1657,24 +1435,12 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                     className="gof-input"
                     placeholder="Qty"
                     value={ing.quantity}
-                    onChange={(e) =>
-                      handleExtraIngredient(
-                        idx,
-                        "quantity",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
+                    onChange={(e) => handleExtraIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
                   />
                 </div>
                 <div className="gof-field col-3">
                   <label className="gof-label">Unit</label>
-                  <select
-                    className="gof-select"
-                    value={ing.unit}
-                    onChange={(e) =>
-                      handleExtraIngredient(idx, "unit", e.target.value)
-                    }
-                  >
+                  <select className="gof-select" value={ing.unit} onChange={(e) => handleExtraIngredient(idx, "unit", e.target.value)}>
                     {UNIT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
@@ -1684,12 +1450,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 </div>
               </div>
               <div style={{ marginTop: 8, textAlign: "right" }}>
-                <button
-                  type="button"
-                  className="r-btn-icon"
-                  onClick={() => removeExtraIngredient(idx)}
-                  title="Remove"
-                >
+                <button type="button" className="r-btn-icon" onClick={() => removeExtraIngredient(idx)} title="Remove">
                   <DeleteIcon />
                 </button>
               </div>
@@ -1697,12 +1458,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
           ))}
         </div>
 
-        <button
-          type="button"
-          className="gof-multi-add-btn"
-          style={{ marginTop: 10 }}
-          onClick={addExtraIngredientRow}
-        >
+        <button type="button" className="gof-multi-add-btn" style={{ marginTop: 10 }} onClick={addExtraIngredientRow}>
           + Add Extra Ingredient
         </button>
       </div>
@@ -1722,7 +1478,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
         </div>
 
         <div className="r-mbody">
-          {/* Tabs */}
           <div className="tab-switch">
             <button
               type="button"
@@ -1740,7 +1495,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
             </button>
           </div>
 
-          {/* Top grid - Nory style */}
           <div className="gof-grid">
             <div className="gof-field col-6">
               <label className="gof-label">Recipe Name</label>
@@ -1758,12 +1512,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                 type="number"
                 className="gof-input"
                 value={newRecipe.unitsPerBatch}
-                onChange={(e) =>
-                  handleField(
-                    "unitsPerBatch",
-                    parseInt(e.target.value || "0", 10)
-                  )
-                }
+                onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
               />
             </div>
           </div>
@@ -1775,11 +1524,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
           <button className="r-btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="gof-pill"
-            onClick={handleOpenSummary}
-            disabled={saving}
-          >
+          <button className="gof-pill" onClick={handleOpenSummary} disabled={saving}>
             {saving ? "Creating..." : "Create Recipe"}
           </button>
         </div>
@@ -1827,35 +1572,26 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
               height: 52,
               alignItems: "center",
               justifyContent: "center",
-              background: "#fee2e2",
-              color: "#dc2626",
+              background: "rgba(239,68,68,0.15)",
+              color: "#ef4444",
               border: "none",
               margin: "0 auto",
             }}
           >
             <DeleteIcon />
           </div>
-          <h3
-            className="r-strong"
-            style={{ marginTop: 10, fontSize: 18 }}
-          >
+          <h3 className="r-strong" style={{ marginTop: 10, fontSize: 18 }}>
             Delete {count} recipe{count > 1 ? "s" : ""}?
           </h3>
           <p className="r-muted" style={{ marginTop: 6 }}>
             This action cannot be undone.
           </p>
         </div>
-        <div
-          className="r-mfooter"
-          style={{ justifyContent: "flex-end" }}
-        >
+        <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
           <button className="r-btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="r-btn-primary r-btn-danger"
-            onClick={onConfirm}
-          >
+          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>
             Delete
           </button>
         </div>
@@ -1868,6 +1604,19 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
 const Recipes = () => {
   const { cognitoId } = useAuth();
   const { setRows } = useData();
+
+  // theme sync with Topbar (same as Dashboard)
+  const [isDark, setIsDark] = useState(
+    () => localStorage.getItem("theme-mode") === "dark"
+  );
+
+  useEffect(() => {
+    const onThemeChanged = () => {
+      setIsDark(localStorage.getItem("theme-mode") === "dark");
+    };
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
 
   const [recipes, setRecipes] = useState([]);
   const [selectedRecipeIds, setSelectedRecipeIds] = useState(new Set());
@@ -1936,20 +1685,13 @@ const Recipes = () => {
     fetchRecipeData();
   }, [fetchRecipeData]);
 
-  // Filter recipes by search query (name, unitsPerBatch, ingredients)
   const filteredRecipes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return recipes;
 
     return recipes.filter((r) => {
-      const fields = [
-        r.name,
-        r.unitsPerBatch,
-        ...(r.ingredients || []).map((i) => i.name),
-      ];
-      return fields.some((val) =>
-        String(val ?? "").toLowerCase().includes(q)
-      );
+      const fields = [r.name, r.unitsPerBatch, ...(r.ingredients || []).map((i) => i.name)];
+      return fields.some((val) => String(val ?? "").toLowerCase().includes(q));
     });
   }, [recipes, searchQuery]);
 
@@ -1963,9 +1705,7 @@ const Recipes = () => {
 
   const handleEdit = async (recipe) => {
     try {
-      const url = `${API_BASE}/recipes/${encodeURIComponent(
-        recipe.id
-      )}?cognito_id=${encodeURIComponent(cognitoId)}`;
+      const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipe.id}`);
       const payload = await resp.json();
@@ -1999,14 +1739,11 @@ const Recipes = () => {
         units: edited.ingredients.map((i) => i.unit),
         cognito_id: cognitoId,
       };
-      const resp = await fetch(
-        `${API_BASE}/recipes/${encodeURIComponent(edited.id)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(edited.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!resp.ok) {
         const t = await resp.text().catch(() => "");
         throw new Error(t || `Update failed (${resp.status})`);
@@ -2033,10 +1770,7 @@ const Recipes = () => {
         const resp = await fetch(`${API_BASE}/delete-recipe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipeName: rec.name,
-            cognito_id: cognitoId,
-          }),
+          body: JSON.stringify({ recipeName: rec.name, cognito_id: cognitoId }),
         });
         if (!resp.ok) console.warn("Delete failed for", rec.name);
       }
@@ -2078,7 +1812,7 @@ const Recipes = () => {
 
   return (
     <div className="r-wrap">
-      <BrandStyles />
+      <BrandStyles isDark={isDark} />
 
       <RecipeTable
         recipes={filteredRecipes}

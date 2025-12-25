@@ -49,6 +49,7 @@ const BrandStyles = ({ isDark }) => (
     border-radius:16px;
     box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
     overflow: visible;
+    color: var(--text2);
   }
   .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
   .r-title { margin:0; font-weight:900; color: var(--text); font-size:20px; }
@@ -105,6 +106,7 @@ const BrandStyles = ({ isDark }) => (
     border-radius:12px;
     box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"});
     display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    color: var(--text2);
   }
   .r-input {
     min-width:260px; flex:1; padding:10px 12px;
@@ -127,6 +129,7 @@ const BrandStyles = ({ isDark }) => (
     border-top:1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between;
     background: var(--card2);
+    color: var(--text2);
   }
   .r-muted { color: var(--muted); font-size:12px; }
 
@@ -140,13 +143,15 @@ const BrandStyles = ({ isDark }) => (
     border-radius:16px;
     box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
     padding:16px;
+    color: var(--text2); /* ✅ ensures side cards inherit correct text in dark mode */
   }
+  .gi-card strong { color: var(--text); } /* ✅ values now flip correctly in dark mode */
 
   /* Modal shell */
   .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
   .r-modal { background: var(--card); border-radius:14px; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow: var(--shadow); display:flex; flex-direction:column; z-index:10000; border: 1px solid var(--border); }
   .r-mhdr { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow:auto; background: var(--card); }
+  .r-mbody { padding:16px; overflow:auto; background: var(--card); color: var(--text2); }
   .r-mfooter { padding:12px 16px; border-top:1px solid var(--border); background: ${isDark ? "rgba(255,255,255,0.02)" : "#f8fafc"}; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Add Good form bits in modal */
@@ -167,7 +172,7 @@ const BrandStyles = ({ isDark }) => (
   .ag-input::placeholder { color: ${isDark ? "rgba(148,163,184,0.8)" : "#94a3b8"}; }
   .ag-input:focus, .ag-select:focus { border-color: var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
 
-  .ag-row { border:1px solid var(--border); border-radius:12px; padding:12px; background: var(--card); }
+  .ag-row { border:1px solid var(--border); border-radius:12px; padding:12px; background: var(--card); color: var(--text2); }
   .ag-row:nth-child(odd){ background: ${isDark ? "rgba(255,255,255,0.02)" : "#f8fafc"}; }
 
   /* Segmented toggle */
@@ -315,7 +320,8 @@ const SmallBarList = ({ data = [], isDark }) => {
               <span style={{ fontSize: 12, color: isDark ? "#94a3b8" : "#64748b" }}>
                 {d.ingredient}
               </span>
-              <span style={{ fontSize: 12, fontWeight: 800 }}>
+              {/* ✅ ensure value text flips in dark mode */}
+              <span style={{ fontSize: 12, fontWeight: 800, color: isDark ? "#e5e7eb" : "#0f172a" }}>
                 {d.amount} {d.unit}
               </span>
             </div>
@@ -1371,7 +1377,14 @@ export default function GoodsIn() {
                 >
                   <DeleteIcon />
                 </div>
-                <h3 style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a", marginTop: 10, fontSize: 18 }}>
+                <h3
+                  style={{
+                    fontWeight: 900,
+                    color: isDark ? "#e5e7eb" : "#0f172a",
+                    marginTop: 10,
+                    fontSize: 18,
+                  }}
+                >
                   Delete {numSelected} record{numSelected > 1 ? "s" : ""}?
                 </h3>
                 <p className="r-muted" style={{ marginTop: 6 }}>
@@ -1437,8 +1450,12 @@ export default function GoodsIn() {
                       <label className="ag-label">Ingredient</label>
                       <Autocomplete
                         options={ingredients}
-                        value={ingredients.find((i) => String(i.id) === String(single.ingredient)) || null}
-                        onChange={(_, val) => setSingle((s) => ({ ...s, ingredient: val ? val.id : "" }))}
+                        value={
+                          ingredients.find((i) => String(i.id) === String(single.ingredient)) || null
+                        }
+                        onChange={(_, val) =>
+                          setSingle((s) => ({ ...s, ingredient: val ? val.id : "" }))
+                        }
                         getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
                         isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                         loading={loadingMaster || loadingCustom}
@@ -1476,7 +1493,9 @@ export default function GoodsIn() {
                         className="ag-input"
                         type="text"
                         value={single.invoiceNumber}
-                        onChange={(e) => setSingle((s) => ({ ...s, invoiceNumber: e.target.value }))}
+                        onChange={(e) =>
+                          setSingle((s) => ({ ...s, invoiceNumber: e.target.value }))
+                        }
                       />
                     </div>
 
@@ -1496,7 +1515,9 @@ export default function GoodsIn() {
                         className="ag-input"
                         type="number"
                         value={single.stockReceived}
-                        onChange={(e) => setSingle((s) => ({ ...s, stockReceived: e.target.value }))}
+                        onChange={(e) =>
+                          setSingle((s) => ({ ...s, stockReceived: e.target.value }))
+                        }
                       />
                     </div>
 
@@ -1573,7 +1594,9 @@ export default function GoodsIn() {
                               value={it.date}
                               onChange={(e) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, date: e.target.value } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, date: e.target.value } : v
+                                  )
                                 )
                               }
                             />
@@ -1583,14 +1606,23 @@ export default function GoodsIn() {
                             <label className="ag-label">Ingredient</label>
                             <Autocomplete
                               options={ingredients}
-                              value={ingredients.find((i) => String(i.id) === String(it.ingredient)) || null}
+                              value={
+                                ingredients.find((i) => String(i.id) === String(it.ingredient)) ||
+                                null
+                              }
                               onChange={(_, val) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, ingredient: val ? val.id : "" } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, ingredient: val ? val.id : "" } : v
+                                  )
                                 )
                               }
-                              getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
-                              isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
+                              getOptionLabel={(opt) =>
+                                typeof opt === "string" ? opt : opt?.name ?? ""
+                              }
+                              isOptionEqualToValue={(opt, val) =>
+                                (opt?.id ?? opt) === (val?.id ?? val)
+                              }
                               loading={loadingMaster || loadingCustom}
                               slotProps={{ popper: { sx: { zIndex: 10020 } } }}
                               componentsProps={{ popper: { sx: { zIndex: 10020 } } }}
@@ -1602,7 +1634,9 @@ export default function GoodsIn() {
                                     ...params.InputProps,
                                     endAdornment: (
                                       <>
-                                        {(loadingMaster || loadingCustom) && <CircularProgress size={18} />}
+                                        {(loadingMaster || loadingCustom) && (
+                                          <CircularProgress size={18} />
+                                        )}
                                         {params.InputProps.endAdornment}
                                       </>
                                     ),
@@ -1644,7 +1678,9 @@ export default function GoodsIn() {
                               value={it.supplier}
                               onChange={(e) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, supplier: e.target.value } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, supplier: e.target.value } : v
+                                  )
                                 )
                               }
                             />
@@ -1673,7 +1709,9 @@ export default function GoodsIn() {
                               value={it.unit}
                               onChange={(e) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, unit: e.target.value } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, unit: e.target.value } : v
+                                  )
                                 )
                               }
                             >
@@ -1693,7 +1731,9 @@ export default function GoodsIn() {
                               value={it.barCode}
                               onChange={(e) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, barCode: e.target.value } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, barCode: e.target.value } : v
+                                  )
                                 )
                               }
                             />
@@ -1707,7 +1747,9 @@ export default function GoodsIn() {
                               value={it.expiryDate}
                               onChange={(e) =>
                                 setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, expiryDate: e.target.value } : v))
+                                  arr.map((v, i) =>
+                                    i === idx ? { ...v, expiryDate: e.target.value } : v
+                                  )
                                 )
                               }
                             />
