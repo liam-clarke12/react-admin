@@ -219,7 +219,25 @@ const BrandStyles = ({ isDark }) => (
   /* DataGrid */
   .dg-wrap { height: 70vh; min-width: 750px; }
   .dg-wrap .MuiDataGrid-root { border:0; background: transparent; color: var(--text2); }
-  .dg-wrap .MuiDataGrid-columnHeaders{ background: var(--thead); border-bottom:1px solid var(--border); color: var(--muted); font-weight:900; text-transform:uppercase; letter-spacing:.03em; font-size:12px; }
+
+  /* ===== FIX: FORCE HEADER ROW TO FOLLOW DARK MODE ===== */
+  .dg-wrap .MuiDataGrid-columnHeaders,
+  .dg-wrap .MuiDataGrid-columnHeadersInner,
+  .dg-wrap .MuiDataGrid-columnHeader,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainer{
+    background: var(--thead) !important;
+  }
+  .dg-wrap .MuiDataGrid-columnHeaders{
+    border-bottom:1px solid var(--border) !important;
+  }
+  .dg-wrap .MuiDataGrid-columnHeaderTitle,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
+  .dg-wrap .MuiDataGrid-sortIcon,
+  .dg-wrap .MuiDataGrid-menuIcon,
+  .dg-wrap .MuiDataGrid-iconButtonContainer{
+    color: var(--muted) !important;
+  }
+
   .dg-wrap .MuiDataGrid-cell{ border-bottom:1px solid var(--border); }
   .dg-wrap .MuiCheckbox-root, .dg-wrap .MuiSvgIcon-root{ color: ${isDark ? "#cbd5e1" : "#334155"}; }
 
@@ -317,7 +335,8 @@ const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
               marginBottom: "16px",
             }}
           >
-            You’re trying to send out more <strong>{recipe}</strong> units than are currently available.
+            You’re trying to send out more <strong>{recipe}</strong> units than are currently
+            available.
           </p>
 
           <div
@@ -487,7 +506,6 @@ const normalizeRowPairs = (row) => {
 
   if (Array.isArray(qty)) {
     return qty.map((u, i) => ({ code: `Batch ${i + 1}`, units: Number(u) || 0 }));
-    // (rare fallback)
   }
 
   return [];
@@ -584,9 +602,7 @@ export default function GoodsOut() {
     if (!cognitoId) return setFatalMsg("Missing cognito_id.");
 
     try {
-      const res = await fetch(
-        `${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`
-      );
+      const res = await fetch(`${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`);
       if (!res.ok) throw new Error("Failed to fetch goods out");
 
       const raw = await res.json();
@@ -603,8 +619,7 @@ export default function GoodsOut() {
             0
         );
 
-        const recipe =
-          r.recipe ?? r.recipe_name ?? r.product ?? r.product_name ?? "Unknown";
+        const recipe = r.recipe ?? r.recipe_name ?? r.product ?? r.product_name ?? "Unknown";
 
         const recipients = r.recipients ?? r.customer ?? r.client ?? r.destination ?? "";
 
@@ -673,7 +688,6 @@ export default function GoodsOut() {
   const handleSubmitBatch = async (values, helpers) => {
     const items = values.items || [];
 
-    // aggregate needs
     const needMap = {};
     items.forEach((item) => {
       const r = item.recipe?.trim();
@@ -681,7 +695,6 @@ export default function GoodsOut() {
       needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0);
     });
 
-    // HARD precheck
     for (const [recipe, need] of Object.entries(needMap)) {
       const have = await fetchAvailableUnits(recipe);
       if (need > have) {
@@ -729,7 +742,6 @@ export default function GoodsOut() {
     return createPortal(
       <div className="go-modal-dim" onClick={() => setFormOpen(false)}>
         <div className="go-modal" onClick={(e) => e.stopPropagation()}>
-          {/* HEADER */}
           <div className="go-mhdr">
             <h3 style={{ margin: 0, fontWeight: 900, color: "var(--text)" }}>Add Goods Out</h3>
             <button className="r-btn-ghost" onClick={() => setFormOpen(false)}>
@@ -737,9 +749,7 @@ export default function GoodsOut() {
             </button>
           </div>
 
-          {/* BODY */}
           <div className="go-mbody">
-            {/* Tabs */}
             <div className="go-tabs">
               <button
                 type="button"
@@ -757,7 +767,6 @@ export default function GoodsOut() {
               </button>
             </div>
 
-            {/* ===================== SINGLE FORM ===================== */}
             {formView === "single" && (
               <Formik
                 initialValues={{
@@ -772,7 +781,6 @@ export default function GoodsOut() {
                 {({ handleSubmit, values, errors, touched, handleChange, handleBlur }) => (
                   <form onSubmit={handleSubmit}>
                     <div className="go-grid">
-                      {/* Date */}
                       <div className="go-field col-6">
                         <label className="go-label">Date</label>
                         <input
@@ -786,7 +794,6 @@ export default function GoodsOut() {
                         {touched.date && errors.date && <div className="go-error">{errors.date}</div>}
                       </div>
 
-                      {/* Recipe */}
                       <div className="go-field col-6">
                         <label className="go-label">Recipe</label>
                         <select
@@ -807,7 +814,6 @@ export default function GoodsOut() {
                         {touched.recipe && errors.recipe && <div className="go-error">{errors.recipe}</div>}
                       </div>
 
-                      {/* Units */}
                       <div className="go-field col-12">
                         <label className="go-label">Amount of Units</label>
                         <input
@@ -823,7 +829,6 @@ export default function GoodsOut() {
                         )}
                       </div>
 
-                      {/* Recipients */}
                       <div className="go-field col-12">
                         <label className="go-label">Recipient</label>
                         <input
@@ -840,7 +845,6 @@ export default function GoodsOut() {
                       </div>
                     </div>
 
-                    {/* FOOTER */}
                     <div className="go-mfooter">
                       <button type="button" className="r-btn-ghost" onClick={() => setFormOpen(false)}>
                         Cancel
@@ -854,7 +858,6 @@ export default function GoodsOut() {
               </Formik>
             )}
 
-            {/* ===================== MULTIPLE FORM ===================== */}
             {formView === "multiple" && (
               <Formik
                 initialValues={{
@@ -892,7 +895,6 @@ export default function GoodsOut() {
                                 </div>
 
                                 <div className="go-grid">
-                                  {/* Date */}
                                   <div className="go-field col-6">
                                     <label className="go-label">Date</label>
                                     <input
@@ -907,7 +909,6 @@ export default function GoodsOut() {
                                     )}
                                   </div>
 
-                                  {/* Recipe */}
                                   <div className="go-field col-6">
                                     <label className="go-label">Recipe</label>
                                     <select
@@ -930,7 +931,6 @@ export default function GoodsOut() {
                                     )}
                                   </div>
 
-                                  {/* Units */}
                                   <div className="go-field col-12">
                                     <label className="go-label">Amount of Units</label>
                                     <input
@@ -946,7 +946,6 @@ export default function GoodsOut() {
                                     )}
                                   </div>
 
-                                  {/* Recipients */}
                                   <div className="go-field col-12">
                                     <label className="go-label">Recipient</label>
                                     <input
@@ -981,7 +980,6 @@ export default function GoodsOut() {
                             + Add another row
                           </button>
 
-                          {/* FOOTER */}
                           <div className="go-mfooter">
                             <button type="button" className="r-btn-ghost" onClick={() => setFormOpen(false)}>
                               Cancel
@@ -1058,12 +1056,7 @@ export default function GoodsOut() {
     () => [
       { field: "date", headerName: "Date", flex: 1 },
       { field: "recipe", headerName: "Recipe Name", flex: 1 },
-      {
-        field: "stockAmount",
-        headerName: "Units Out",
-        type: "number",
-        flex: 1,
-      },
+      { field: "stockAmount", headerName: "Units Out", type: "number", flex: 1 },
       {
         field: "batchcodes",
         headerName: "Batchcodes",
@@ -1093,9 +1086,7 @@ export default function GoodsOut() {
     let rows = [...goodsOut];
 
     if (q) {
-      rows = rows.filter((r) =>
-        Object.values(r).some((v) => String(v).toLowerCase().includes(q))
-      );
+      rows = rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(q)));
     }
 
     const dir = sortBy.dir === "asc" ? 1 : -1;
@@ -1130,10 +1121,8 @@ export default function GoodsOut() {
     <div className="r-wrap">
       <BrandStyles isDark={isDark} />
 
-      {/* Form modal */}
       {renderFormModal()}
 
-      {/* Hard block modal */}
       <HardBlockModal
         open={blockOpen}
         recipe={blockInfo.recipe}
@@ -1143,12 +1132,10 @@ export default function GoodsOut() {
         isDark={isDark}
       />
 
-      {/* Toast */}
       <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
         Goods Out recorded successfully!
       </Toast>
 
-      {/* Errors */}
       {fatalMsg && (
         <div
           className="r-card"
@@ -1164,12 +1151,9 @@ export default function GoodsOut() {
         </div>
       )}
 
-      {/* Layout */}
       <div className="gi-layout">
-        {/* MAIN TABLE */}
         <div className="gi-main">
           <div className="r-card">
-            {/* Header */}
             <div className="r-head">
               <div>
                 <h2 className="r-title">Goods Out</h2>
@@ -1197,7 +1181,6 @@ export default function GoodsOut() {
               </div>
             </div>
 
-            {/* Toolbar */}
             <div className="r-toolbar">
               <input
                 className="r-input"
@@ -1229,7 +1212,6 @@ export default function GoodsOut() {
               </select>
             </div>
 
-            {/* DataGrid */}
             <div className="r-toolbar-gap dg-wrap">
               <DataGrid
                 rows={visibleRows}
@@ -1238,18 +1220,30 @@ export default function GoodsOut() {
                 checkboxSelection
                 disableRowSelectionOnClick
                 rowSelectionModel={selectedRows}
-                onRowSelectionModelChange={(m) => setSelectedRows((Array.isArray(m) ? m : []).map(String))}
+                onRowSelectionModelChange={(m) =>
+                  setSelectedRows((Array.isArray(m) ? m : []).map(String))
+                }
                 hideFooter
                 sx={{
                   border: 0,
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
                   "& .MuiDataGrid-virtualScroller": { background: "transparent" },
-                  "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${isDark ? "#1f2a44" : "#e5e7eb"}` },
+                  "& .MuiDataGrid-footerContainer": {
+                    borderTop: `1px solid ${isDark ? "#1f2a44" : "#e5e7eb"}`,
+                  },
+
+                  /* Belt + braces: set header bg + text via sx too */
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "var(--thead)",
+                    color: "var(--muted)",
+                    borderBottom: "1px solid var(--border)",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": { color: "var(--muted)", fontWeight: 900 },
+                  "& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIcon": { color: "var(--muted)" },
                 }}
               />
             </div>
 
-            {/* Footer */}
             <div className="r-footer">
               <span className="r-muted">
                 Showing {filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}–
@@ -1257,7 +1251,11 @@ export default function GoodsOut() {
               </span>
 
               <div className="r-flex">
-                <button className="r-btn-ghost" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                <button
+                  className="r-btn-ghost"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
                   Prev
                 </button>
 
@@ -1291,7 +1289,6 @@ export default function GoodsOut() {
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR */}
         <aside className="gi-side">
           <div className="r-card stat-card stat-accent">
             <p className="stat-title">Total Units Out</p>
@@ -1316,13 +1313,14 @@ export default function GoodsOut() {
         </aside>
       </div>
 
-      {/* DELETE CONFIRM MODAL */}
       {deleteOpen && selectedRows.length > 0 && (
         <Portal>
           <div className="go-modal-dim" onClick={() => setDeleteOpen(false)}>
             <div className="go-modal" onClick={(e) => e.stopPropagation()}>
               <div className="go-mhdr">
-                <h3 style={{ margin: 0, fontWeight: 900, color: "var(--text)" }}>Confirm Deletion</h3>
+                <h3 style={{ margin: 0, fontWeight: 900, color: "var(--text)" }}>
+                  Confirm Deletion
+                </h3>
                 <button className="r-btn-ghost" onClick={() => setDeleteOpen(false)}>
                   Close
                 </button>
@@ -1350,7 +1348,9 @@ export default function GoodsOut() {
                   Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
                 </h3>
 
-                <p style={{ color: "var(--muted)", fontSize: 13, fontWeight: 700 }}>This is a soft delete.</p>
+                <p style={{ color: "var(--muted)", fontSize: 13, fontWeight: 700 }}>
+                  This is a soft delete.
+                </p>
               </div>
 
               <div className="go-mfooter">
@@ -1366,7 +1366,6 @@ export default function GoodsOut() {
         </Portal>
       )}
 
-      {/* BATCHCODE DRAWER */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -1382,7 +1381,6 @@ export default function GoodsOut() {
           },
         }}
       >
-        {/* HEADER */}
         <Box
           sx={{
             background: "linear-gradient(180deg,#7C3AED,#5B21B6)",
@@ -1410,7 +1408,6 @@ export default function GoodsOut() {
           </IconButton>
         </Box>
 
-        {/* CONTENT */}
         <Box sx={{ p: 2 }}>
           <Card
             variant="outlined"

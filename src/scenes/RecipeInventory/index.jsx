@@ -95,15 +95,7 @@ const Styles = ({ isDark }) => (
 
     /* DataGrid to mimic table styling */
     .ii-table-wrap { height: 520px; }
-    .ii-dg .MuiDataGrid-columnHeaders {
-      background:var(--thead);
-      color:var(--muted);
-      border-bottom:1px solid var(--border);
-      font-weight:800;
-      text-transform:uppercase;
-      letter-spacing:.02em;
-      font-size:12px;
-    }
+
     .ii-dg .MuiDataGrid-cell {
       border-bottom:1px solid var(--border);
       font-size:14px;
@@ -116,6 +108,24 @@ const Styles = ({ isDark }) => (
       border-top:1px solid var(--border);
       background:var(--card2);
       color: var(--text2);
+    }
+
+    /* === FORCE DataGrid header dark mode (wins vs MUI injected styles) === */
+    .ii-dg .MuiDataGrid-columnHeaders,
+    .ii-dg .MuiDataGrid-columnHeadersInner,
+    .ii-dg .MuiDataGrid-columnHeader,
+    .ii-dg .MuiDataGrid-columnHeaderTitleContainer {
+      background: var(--thead) !important;
+    }
+    .ii-dg .MuiDataGrid-columnHeaders {
+      border-bottom: 1px solid var(--border) !important;
+    }
+    .ii-dg .MuiDataGrid-columnHeaderTitle,
+    .ii-dg .MuiDataGrid-columnHeaderTitleContainerContent,
+    .ii-dg .MuiDataGrid-sortIcon,
+    .ii-dg .MuiDataGrid-menuIcon,
+    .ii-dg .MuiDataGrid-iconButtonContainer {
+      color: var(--muted) !important;
     }
 
     /* Chips / badges */
@@ -226,7 +236,7 @@ const Styles = ({ isDark }) => (
 );
 
 /* ===================== Info Modal (same UX) ===================== */
-const InfoModal = ({ open, onClose, isDark }) => {
+const InfoModal = ({ open, onClose }) => {
   if (!open) return null;
   return (
     <div className="ii-dim" onClick={onClose}>
@@ -235,9 +245,9 @@ const InfoModal = ({ open, onClose, isDark }) => {
           <h4>About this table</h4>
         </div>
         <div className="ii-mbody">
-          These rows are read-only aggregates built from your active Production Log. To change
-          units in stock, add, delete or edit entries in the <strong>Production Log</strong> screen.
-          This view summarizes recipe inventory and cannot be edited directly.
+          These rows are read-only aggregates built from your active Production Log. To change units in stock, add,
+          delete or edit entries in the <strong>Production Log</strong> screen. This view summarizes recipe inventory
+          and cannot be edited directly.
         </div>
         <div className="ii-mfoot">
           <button className="ii-btn ii-btn-ghost" onClick={onClose}>
@@ -250,8 +260,7 @@ const InfoModal = ({ open, onClose, isDark }) => {
 };
 
 /* ===================== Component ===================== */
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const RecipeInventory = () => {
   // Theme (sync with Topbar)
@@ -273,35 +282,27 @@ const RecipeInventory = () => {
     const fetchAndProcess = async () => {
       try {
         if (!cognitoId) {
-          // still render an empty table gracefully
           setRecipeInventory([]);
           setSnack("No Cognito ID found.");
           return;
         }
 
-        const url = `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
-          cognitoId
-        )}`;
+        const url = `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
         const data = await res.json();
         const list = Array.isArray(data) ? data : [];
 
-        // Filter active lots with positive batchRemaining (units), subtract waste
         const filtered = list.filter((row) => Number(row.batchRemaining) > 0);
 
         const grouped = filtered.reduce((acc, row) => {
           const rec = row.recipe || "Unknown";
-          const rem = Number(row.batchRemaining) || 0; // stored units
+          const rem = Number(row.batchRemaining) || 0;
           const waste = Number(row.units_of_waste) || 0;
           const available = Math.max(0, rem - waste);
 
           if (!acc[rec]) {
-            acc[rec] = {
-              recipe: rec,
-              totalUnits: available,
-              batchCode: row.batchCode,
-            };
+            acc[rec] = { recipe: rec, totalUnits: available, batchCode: row.batchCode };
           } else {
             acc[rec].totalUnits += available;
           }
@@ -331,13 +332,11 @@ const RecipeInventory = () => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return recipeInventory || [];
     return (recipeInventory || []).filter((r) =>
-      [r.recipe, r.batchCode, r.unitsInStock].some((field) =>
-        String(field ?? "").toLowerCase().includes(q)
-      )
+      [r.recipe, r.batchCode, r.unitsInStock].some((field) => String(field ?? "").toLowerCase().includes(q))
     );
   }, [recipeInventory, searchQuery]);
 
-  // DataGrid columns (keeps pagination)
+  // DataGrid columns
   const columns = useMemo(
     () => [
       { field: "recipe", headerName: "Recipe", flex: 1, minWidth: 180 },
@@ -347,9 +346,7 @@ const RecipeInventory = () => {
         type: "number",
         flex: 0.6,
         minWidth: 150,
-        renderCell: (params) => (
-          <span className="ii-chip">{Number(params.value ?? 0).toLocaleString()}</span>
-        ),
+        renderCell: (params) => <span className="ii-chip">{Number(params.value ?? 0).toLocaleString()}</span>,
         sortComparator: (a, b) => Number(a) - Number(b),
       },
       {
@@ -363,7 +360,7 @@ const RecipeInventory = () => {
     []
   );
 
-  // Chart data (right card) using filtered rows so chart follows search
+  // Chart data
   const chartData = useMemo(
     () =>
       (filteredRows || []).map((r) => ({
@@ -380,7 +377,6 @@ const RecipeInventory = () => {
       <Styles isDark={isDark} />
 
       <div className="ii-wrap">
-        {/* Header — identical structure */}
         <div className="ii-header">
           <div className="ii-hgroup">
             <div className="ii-logo" aria-label="Recipe Inventory">
@@ -398,7 +394,6 @@ const RecipeInventory = () => {
             aria-label="About this table"
             title="About this table"
           >
-            {/* Simple “i” icon to avoid extra deps */}
             <svg
               width="20"
               height="20"
@@ -417,7 +412,6 @@ const RecipeInventory = () => {
           </button>
         </div>
 
-        {/* Grid: table left (DataGrid w/ pagination), chart right */}
         <div className="ii-grid">
           {/* Table Card */}
           <div className="ii-card">
@@ -426,7 +420,6 @@ const RecipeInventory = () => {
               <p>Total units in stock by recipe</p>
             </div>
 
-            {/* Search toolbar */}
             <div className="ii-toolbar">
               <input
                 className="ii-input"
@@ -459,6 +452,15 @@ const RecipeInventory = () => {
                     color: isDark ? "#94a3b8" : "#64748b",
                     background: "transparent",
                   },
+
+                  /* Belt + braces: force header bg in sx too */
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "var(--thead)",
+                    color: "var(--muted)",
+                    borderBottom: "1px solid var(--border)",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": { color: "var(--muted)", fontWeight: 900 },
+                  "& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIcon": { color: "var(--muted)" },
                 }}
               />
             </div>
@@ -474,13 +476,11 @@ const RecipeInventory = () => {
             <div className="ii-chart">
               <div className="ii-chart-body">
                 {chartData.length === 0 ? (
-                  <div style={{ margin: "auto", color: isDark ? "#94a3b8" : "#64748b" }}>
-                    No data for chart.
-                  </div>
+                  <div style={{ margin: "auto", color: isDark ? "#94a3b8" : "#64748b" }}>No data for chart.</div>
                 ) : (
                   chartData.map((d, i) => {
                     const pct = maxAmount > 0 ? d.amount / maxAmount : 0;
-                    const h = Math.max(6, Math.round(pct * 300)); // up to ~300px
+                    const h = Math.max(6, Math.round(pct * 300));
                     return (
                       <div
                         className="ii-bar-wrap"
@@ -501,8 +501,7 @@ const RecipeInventory = () => {
         </div>
       </div>
 
-      {/* Info modal & snackbar */}
-      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} isDark={isDark} />
+      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
       {snack && (
         <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
           {snack}

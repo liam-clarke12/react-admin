@@ -8,6 +8,13 @@ import { useAuth } from "../../contexts/AuthContext";
    Brand Styles (identical to Goods In) + sidebar cards + DARK MODE
    - Reads localStorage "theme-mode" = "dark"
    - Listens for window "themeChanged" event (same as other pages)
+
+   FIXES APPLIED:
+   1) DataGrid header forced to follow dark mode via stronger selectors + !important.
+   2) Modal form dropdown stacking fixed:
+      - modal containers now use consistent, very high z-index
+      - MUI Popover/Menu/Popper forced above modal
+      - common portal roots (MuiModal/MuiDialog/MuiDrawer) also forced above
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
@@ -117,7 +124,13 @@ const BrandStyles = ({ isDark }) => (
   .gi-side{ width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:16px; }
 
   /* Modal shell */
-  .r-modal-dim{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:200000 !important; padding:16px;}
+  .r-modal-dim{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:200000 !important;
+    padding:16px;
+  }
   .r-modal{
     background:var(--card);
     border:1px solid var(--border);
@@ -128,7 +141,8 @@ const BrandStyles = ({ isDark }) => (
     overflow:hidden;
     box-shadow:0 10px 30px rgba(0,0,0,${isDark ? "0.45" : "0.22"});
     display:flex; flex-direction:column;
-    z-index:10000; position:relative;
+    z-index:200001 !important;
+    position:relative;
   }
   .r-mhdr{ padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background: var(--card2); }
   .r-mbody{
@@ -145,6 +159,7 @@ const BrandStyles = ({ isDark }) => (
   .ag-grid{ display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0, 1fr)); overflow:visible !important; }
   .ag-field{ grid-column: span 2; }
   .ag-field-1{ grid-column: span 1; }
+  .ag-field-2{ grid-column: span 2; }
   .ag-field-4{ grid-column: span 4; }
   .ag-label{ font-size:12px; color:var(--muted); font-weight:900; margin-bottom:6px; display:block; }
   .ag-input, .ag-select{
@@ -157,20 +172,37 @@ const BrandStyles = ({ isDark }) => (
     color:var(--text);
   }
   .ag-input:focus, .ag-select:focus{ border-color:var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
-  .ag-select, .ag-input, select{ z-index:200002 !important; position:relative; }
 
-  /* DataGrid look-alike row striping + hover */
+  /* Ensure native selects / inputs inside modal aren't clipped */
+  .ag-select, .ag-input, select{ position:relative; z-index:200005 !important; }
+
+  /* DataGrid */
   .dg-wrap{ height: 70vh; min-width: 750px; }
   .dg-wrap .MuiDataGrid-root{ border:0; font-size:14px; color:var(--text2); background: transparent; }
+
+  /* ===== FIX: FORCE HEADER ROW TO FOLLOW DARK MODE (strong selectors + !important) ===== */
+  .dg-wrap .MuiDataGrid-columnHeaders,
+  .dg-wrap .MuiDataGrid-columnHeadersInner,
+  .dg-wrap .MuiDataGrid-columnHeader,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainer,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent{
+    background: var(--thead) !important;
+  }
   .dg-wrap .MuiDataGrid-columnHeaders{
-    background: var(--thead);
-    border-bottom:1px solid var(--border);
-    color: var(--muted);
-    font-weight:900;
+    border-bottom:1px solid var(--border) !important;
+  }
+  .dg-wrap .MuiDataGrid-columnHeaderTitle,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
+  .dg-wrap .MuiDataGrid-sortIcon,
+  .dg-wrap .MuiDataGrid-menuIcon,
+  .dg-wrap .MuiDataGrid-iconButtonContainer{
+    color: var(--muted) !important;
+    font-weight:900 !important;
     text-transform:uppercase;
     letter-spacing:.03em;
     font-size:12px;
   }
+
   .dg-wrap .MuiDataGrid-cell{ border-bottom:1px solid var(--border); }
   .dg-wrap .MuiDataGrid-row:nth-of-type(odd){ background: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"}; }
   .dg-wrap .MuiDataGrid-row:nth-of-type(even){ background: ${isDark ? "rgba(255,255,255,0.01)" : "#f8fafc"}; }
@@ -199,14 +231,22 @@ const BrandStyles = ({ isDark }) => (
   .stat-sub{ font-size:12px; color:var(--muted); }
   .stat-accent{ border:1px dashed var(--accentBorder); background: var(--accentBg); }
 
-  /* Force MUI dropdowns above modal */
+  /* ===== FIX: FORCE MUI dropdowns above modal (portal stacking) ===== */
   .MuiPopover-root,
   .MuiPopover-root .MuiPaper-root,
   .MuiMenu-root,
   .MuiMenu-paper,
-  .MuiPopper-root{
-    z-index: 300000 !important;
-    position: absolute !important;
+  .MuiPopper-root,
+  .MuiAutocomplete-popper,
+  .MuiPickersPopper-root{
+    z-index: 400000 !important;
+  }
+
+  /* If any MUI modal/dialog/drawer exists, keep it above app shell */
+  .MuiModal-root,
+  .MuiDialog-root,
+  .MuiDrawer-root{
+    z-index: 350000 !important;
   }
 `}</style>
 );
@@ -214,12 +254,28 @@ const BrandStyles = ({ isDark }) => (
 /* Icons (match Goods In) */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
 );
 const DeleteIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
@@ -320,9 +376,7 @@ export default function ProductionLog() {
       return;
     }
     try {
-      const res = await fetch(
-        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`
-      );
+      const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
       if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
       const data = await res.json();
       if (!Array.isArray(data)) {
@@ -372,37 +426,10 @@ export default function ProductionLog() {
     () => [
       { field: "date", headerName: "Date", flex: 1 },
       { field: "recipe", headerName: "Recipe Name", flex: 1 },
-      {
-        field: "batchesProduced",
-        headerName: "Batches Produced",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsOfWaste",
-        headerName: "Units of Waste",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "unitsRemaining",
-        headerName: "Units Remaining",
-        type: "number",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
-      {
-        field: "producerName",
-        headerName: "Produced by",
-        flex: 1,
-        align: "left",
-        headerAlign: "left",
-      },
+      { field: "batchesProduced", headerName: "Batches Produced", type: "number", flex: 1, align: "left", headerAlign: "left" },
+      { field: "unitsOfWaste", headerName: "Units of Waste", type: "number", flex: 1, align: "left", headerAlign: "left" },
+      { field: "unitsRemaining", headerName: "Units Remaining", type: "number", flex: 1, align: "left", headerAlign: "left" },
+      { field: "producerName", headerName: "Produced by", flex: 1, align: "left", headerAlign: "left" },
       { field: "batchCode", headerName: "Batch Code", flex: 1 },
       {
         field: "actions",
@@ -433,9 +460,7 @@ export default function ProductionLog() {
     const q = searchQuery.trim().toLowerCase();
     let rows = [...productionLogs];
     if (q) {
-      rows = rows.filter((r) =>
-        Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))
-      );
+      rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
     }
     const dir = sortBy.dir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
@@ -477,9 +502,7 @@ export default function ProductionLog() {
     const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
     const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
     const unitsRemaining = toNumber(updatedRow.unitsRemaining);
-    const batchRemaining = toNumber(
-      updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? unitsRemaining + unitsOfWaste
-    );
+    const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? unitsRemaining + unitsOfWaste);
 
     const payload = {
       date: dateYmd,
@@ -522,7 +545,7 @@ export default function ProductionLog() {
         batchesProduced: toNumber(editingRow.batchesProduced),
         unitsOfWaste: toNumber(editingRow.unitsOfWaste),
         unitsRemaining: toNumber(editingRow.unitsRemaining),
-        batchRemaining: toNumber(editingRow.batchRemaining ?? editingRow.unitsRemaining + editingRow.unitsOfWaste),
+        batchRemaining: toNumber(editingRow.batchRemaining ?? (toNumber(editingRow.unitsRemaining) + toNumber(editingRow.unitsOfWaste))),
         producerName: editingRow.producerName ?? "",
       };
 
@@ -618,7 +641,6 @@ export default function ProductionLog() {
         {/* MAIN TABLE */}
         <div className="gi-main">
           <div className="r-card">
-            {/* Header */}
             <div className="r-head">
               <div>
                 <h2 className="r-title">Production Log</h2>
@@ -652,7 +674,6 @@ export default function ProductionLog() {
               </div>
             </div>
 
-            {/* Toolbar */}
             <div className="r-toolbar">
               <input
                 className="r-input"
@@ -685,7 +706,6 @@ export default function ProductionLog() {
               )}
             </div>
 
-            {/* DataGrid */}
             <div className="r-toolbar-gap dg-wrap">
               <DataGrid
                 rows={visibleRows}
@@ -697,7 +717,7 @@ export default function ProductionLog() {
                   const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
                   setSelectedRows(arr);
                 }}
-                disableSelectionOnClick
+                disableRowSelectionOnClick
                 hideFooter
                 onCellDoubleClick={(params) => {
                   setEditingRow(params.row);
@@ -706,12 +726,28 @@ export default function ProductionLog() {
                 sx={{
                   border: 0,
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
-                  "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${isDark ? "#1f2a44" : "#e5e7eb"}` },
+                  "& .MuiDataGrid-footerContainer": {
+                    borderTop: `1px solid ${isDark ? "#1f2a44" : "#e5e7eb"}`,
+                  },
+
+                  /* Belt + braces: header styling in sx too */
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "var(--thead)",
+                    color: "var(--muted)",
+                    borderBottom: "1px solid var(--border)",
+                  },
+                  "& .MuiDataGrid-columnHeaderTitle": {
+                    color: "var(--muted)",
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: ".03em",
+                    fontSize: 12,
+                  },
+                  "& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIcon": { color: "var(--muted)" },
                 }}
               />
             </div>
 
-            {/* Footer / pagination */}
             <div className="r-footer">
               <span className="r-muted">
                 Showing{" "}
@@ -729,11 +765,7 @@ export default function ProductionLog() {
               </span>
 
               <div className="r-flex">
-                <button
-                  className="r-btn-ghost"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
+                <button className="r-btn-ghost" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
                   Prev
                 </button>
 
@@ -741,9 +773,7 @@ export default function ProductionLog() {
 
                 <button
                   className="r-btn-ghost"
-                  onClick={() =>
-                    setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p))
-                  }
+                  onClick={() => setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p))}
                   disabled={(page + 1) * rowsPerPage >= filteredRows.length}
                 >
                   Next
@@ -771,14 +801,12 @@ export default function ProductionLog() {
 
         {/* RIGHT SIDEBAR: QUICK STATS */}
         <aside className="gi-side">
-          {/* Total Remaining highlight */}
           <div className="r-card stat-card stat-accent">
             <p className="stat-title">Total Remaining (Units)</p>
             <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
             <p className="stat-sub">Based on current filters</p>
           </div>
 
-          {/* Core KPIs */}
           <div className="r-card stat-card">
             <div className="stat-row" style={{ marginBottom: 10 }}>
               <span className="stat-kpi">Batches Produced</span>
@@ -796,7 +824,6 @@ export default function ProductionLog() {
             </div>
           </div>
 
-          {/* Top recipes by remaining */}
           <div className="r-card stat-card">
             <p className="stat-title">Top Recipes by Remaining</p>
 
@@ -806,10 +833,7 @@ export default function ProductionLog() {
               <div style={{ display: "grid", gap: 8 }}>
                 {stats.topRecipes.map((t) => (
                   <div key={t.recipe} className="stat-row">
-                    <span
-                      className="stat-sub"
-                      style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a" }}
-                    >
+                    <span className="stat-sub" style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a" }}>
                       {t.recipe}
                     </span>
                     <span className="stat-kpi">{nf(t.units)}</span>
@@ -843,55 +867,36 @@ export default function ProductionLog() {
 
               <div className="r-mbody">
                 <div className="ag-grid">
-                  {/* Recipe */}
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Recipe</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.recipe ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          recipe: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), recipe: e.target.value }))}
                     />
                   </div>
 
-                  {/* Date */}
                   <div className="ag-field">
                     <label className="ag-label">Date</label>
                     <input
                       className="ag-input"
                       type="date"
                       value={formatDateYMD(editingRow.date ?? "")}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          date: formatDateYMD(e.target.value),
-                        }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), date: formatDateYMD(e.target.value) }))}
                     />
                   </div>
 
-                  {/* Batches Produced */}
                   <div className="ag-field ag-field-1">
                     <label className="ag-label">Batches Produced</label>
                     <input
                       className="ag-input"
                       type="number"
                       value={editingRow.batchesProduced ?? 0}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          batchesProduced: toNumber(e.target.value),
-                        }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchesProduced: toNumber(e.target.value) }))}
                     />
                   </div>
 
-                  {/* Units of Waste */}
                   <div className="ag-field ag-field-1">
                     <label className="ag-label">Units of Waste</label>
                     <input
@@ -901,16 +906,11 @@ export default function ProductionLog() {
                       onChange={(e) => {
                         const unitsOfWaste = toNumber(e.target.value);
                         const unitsRemaining = toNumber(editingRow.unitsRemaining);
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          unitsOfWaste,
-                          batchRemaining: unitsRemaining + unitsOfWaste,
-                        }));
+                        setEditingRow((prev) => ({ ...(prev || {}), unitsOfWaste, batchRemaining: unitsRemaining + unitsOfWaste }));
                       }}
                     />
                   </div>
 
-                  {/* Units Remaining */}
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Units Remaining</label>
                     <input
@@ -920,44 +920,28 @@ export default function ProductionLog() {
                       onChange={(e) => {
                         const unitsRemaining = toNumber(e.target.value);
                         const unitsOfWaste = toNumber(editingRow.unitsOfWaste);
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          unitsRemaining,
-                          batchRemaining: unitsRemaining + unitsOfWaste,
-                        }));
+                        setEditingRow((prev) => ({ ...(prev || {}), unitsRemaining, batchRemaining: unitsRemaining + unitsOfWaste }));
                       }}
                     />
                   </div>
 
-                  {/* Produced by */}
                   <div className="ag-field ag-field-2">
                     <label className="ag-label">Produced by (Name)</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.producerName ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          producerName: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), producerName: e.target.value }))}
                     />
                   </div>
 
-                  {/* Batch Code */}
                   <div className="ag-field ag-field-2">
                     <label className="ag-label">Batch Code</label>
                     <input
                       className="ag-input"
                       type="text"
                       value={editingRow.batchCode ?? ""}
-                      onChange={(e) =>
-                        setEditingRow((prev) => ({
-                          ...(prev || {}),
-                          batchCode: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setEditingRow((prev) => ({ ...(prev || {}), batchCode: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -1016,14 +1000,7 @@ export default function ProductionLog() {
                   <DeleteIcon />
                 </div>
 
-                <h3
-                  style={{
-                    fontWeight: 900,
-                    color: isDark ? "#e5e7eb" : "#0f172a",
-                    marginTop: 10,
-                    fontSize: 18,
-                  }}
-                >
+                <h3 style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a", marginTop: 10, fontSize: 18 }}>
                   Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
                 </h3>
 
