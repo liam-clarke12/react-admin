@@ -4,10 +4,33 @@ import { DataGrid } from "@mui/x-data-grid";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
 
-/* ===================== Scoped Styles (identical to Ingredient Inventory) ===================== */
-const Styles = () => (
+/* ===================== Scoped Styles (Light + Dark) ===================== */
+const Styles = ({ isDark }) => (
   <style>{`
-    .ii-page { background:#f1f5f9; min-height:100vh; color:#0f172a; }
+    :root{
+      --bg: ${isDark ? "#0b1220" : "#f1f5f9"};
+      --card: ${isDark ? "#0f172a" : "#ffffff"};
+      --card2: ${isDark ? "#0b1220" : "#ffffff"};
+      --border: ${isDark ? "#1f2a44" : "#e5e7eb"};
+      --text: ${isDark ? "#e5e7eb" : "#0f172a"};
+      --text2: ${isDark ? "#cbd5e1" : "#334155"};
+      --muted: ${isDark ? "#94a3b8" : "#64748b"};
+      --thead: ${isDark ? "rgba(255,255,255,0.03)" : "#fbfcfd"};
+      --rowOdd: ${isDark ? "rgba(255,255,255,0.01)" : "#ffffff"};
+      --rowEven: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
+      --hover: ${isDark ? "rgba(124,58,237,0.14)" : "#f4f1ff"};
+      --chipBg: ${isDark ? "rgba(255,255,255,0.06)" : "#f8fafc"};
+      --chipBorder: ${isDark ? "rgba(255,255,255,0.10)" : "#e5e7eb"};
+      --badgeBg: ${isDark ? "rgba(124,58,237,0.14)" : "#f9f5ff"};
+      --badgeBorder: ${isDark ? "rgba(124,58,237,0.25)" : "#eee"};
+      --badgeText: ${isDark ? "#e5e7eb" : "#7C3AED"};
+      --shadow: ${isDark ? "0 10px 30px rgba(0,0,0,0.45)" : "0 10px 30px rgba(2,6,23,.22)"};
+      --primary: #7C3AED;
+      --primary2: #5B21B6;
+      --danger: #dc2626;
+    }
+
+    .ii-page { background:var(--bg); min-height:100vh; color:var(--text); }
     .ii-wrap { max-width:1200px; margin:0 auto; padding:16px; }
 
     /* Header */
@@ -19,15 +42,18 @@ const Styles = () => (
       box-shadow:0 8px 20px rgba(124,58,237,0.12);
       display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:18px;
     }
-    .ii-title { margin:0; font-weight:800; font-size:20px; }
-    .ii-sub { margin:0; color:#334155; font-size:12px; }
+    .ii-title { margin:0; font-weight:800; font-size:20px; color: var(--text); }
+    .ii-sub { margin:0; color:var(--text2); font-size:12px; }
+
     .ii-iconbtn {
       width:40px; height:40px; border-radius:999px;
-      border:1px solid #e5e7eb; background:#ffffff; cursor:pointer;
+      border:1px solid var(--border);
+      background: ${isDark ? "rgba(255,255,255,0.03)" : "#ffffff"};
+      cursor:pointer;
       display:flex; align-items:center; justify-content:center;
       transition: background .15s ease, transform .08s ease;
     }
-    .ii-iconbtn:hover { background:#f1f5f9; transform: translateY(-1px); }
+    .ii-iconbtn:hover { background: ${isDark ? "rgba(124,58,237,0.12)" : "#f1f5f9"}; transform: translateY(-1px); }
 
     /* Grid */
     .ii-grid { display:grid; grid-template-columns: 1.6fr 1fr; gap:16px; }
@@ -35,80 +61,115 @@ const Styles = () => (
 
     /* Cards */
     .ii-card {
-      background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden;
-      box-shadow:0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08);
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px; overflow:hidden;
+      box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}), 0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
+      color: var(--text2);
     }
-    .ii-card-head { padding:12px 14px; border-bottom:1px solid #e5e7eb; background:#ffffff; }
-    .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; }
-    .ii-card-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+    .ii-card-head { padding:12px 14px; border-bottom:1px solid var(--border); background:var(--card2); }
+    .ii-card-head h3 { margin:0; font-weight:800; font-size:14px; color: var(--text); }
+    .ii-card-head p { margin:2px 0 0; font-size:12px; color:var(--text2); }
 
     /* Search toolbar */
     .ii-toolbar {
-      background:#fff;
+      background:var(--card);
       padding:12px 14px;
-      border-bottom:1px solid #e5e7eb;
+      border-bottom:1px solid var(--border);
     }
     .ii-input {
       width:100%;
       padding:10px 12px;
-      border:1px solid #e5e7eb;
+      border:1px solid var(--border);
       border-radius:10px;
       outline:none;
-      background:#fff;
+      background: ${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+      color: var(--text);
       font-size:14px;
     }
+    .ii-input::placeholder { color: ${isDark ? "rgba(148,163,184,0.8)" : "#94a3b8"}; }
     .ii-input:focus {
-      border-color:#7C3AED;
+      border-color:var(--primary);
       box-shadow:0 0 0 3px rgba(124,58,237,.18);
     }
 
     /* DataGrid to mimic table styling */
     .ii-table-wrap { height: 520px; }
     .ii-dg .MuiDataGrid-columnHeaders {
-      background:#fbfcfd; color:#334155; border-bottom:1px solid #e5e7eb; font-weight:800;
-      text-transform:uppercase; letter-spacing:.02em; font-size:12px;
+      background:var(--thead);
+      color:var(--muted);
+      border-bottom:1px solid var(--border);
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.02em;
+      font-size:12px;
     }
-    .ii-dg .MuiDataGrid-cell { border-bottom:1px solid #e5e7eb; font-size:14px; }
-    .ii-dg .MuiDataGrid-row:nth-child(odd) { background:#ffffff; }
-    .ii-dg .MuiDataGrid-row:nth-child(even) { background:#f8fafc; }
-    .ii-dg .MuiDataGrid-row:hover { background:#f4f1ff; }
-    .ii-dg .MuiDataGrid-footerContainer { border-top:1px solid #e5e7eb; background:#ffffff; }
+    .ii-dg .MuiDataGrid-cell {
+      border-bottom:1px solid var(--border);
+      font-size:14px;
+      color: var(--text2);
+    }
+    .ii-dg .MuiDataGrid-row:nth-child(odd) { background:var(--rowOdd); }
+    .ii-dg .MuiDataGrid-row:nth-child(even) { background:var(--rowEven); }
+    .ii-dg .MuiDataGrid-row:hover { background:var(--hover); }
+    .ii-dg .MuiDataGrid-footerContainer {
+      border-top:1px solid var(--border);
+      background:var(--card2);
+      color: var(--text2);
+    }
+
+    /* Chips / badges */
     .ii-chip {
       display:inline-flex; align-items:center; padding:4px 8px; border-radius:8px;
-      border:1px solid #e5e7eb; background:#f8fafc; font-weight:700; color:#0f172a; font-size:12px;
+      border:1px solid var(--chipBorder);
+      background:var(--chipBg);
+      font-weight:800; color:var(--text);
+      font-size:12px;
     }
     .ii-badge {
-      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700;
-      background:#f9f5ff; color:#7C3AED; border:1px solid #eee;
+      display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:800;
+      background:var(--badgeBg);
+      color:var(--badgeText);
+      border:1px solid var(--badgeBorder);
     }
 
     /* Modal */
     .ii-dim {
-      position:fixed; inset:0; background:rgba(0,0,0,.48);
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
       display:flex; align-items:center; justify-content:center; z-index:50;
       animation: ii-fade .18s ease-out forwards;
     }
     .ii-modal {
-      width:min(540px, 92vw); background:#fff; border:1px solid #e5e7eb; border-radius:14px;
-      box-shadow:0 10px 30px rgba(2,6,23,.22); overflow:hidden;
+      width:min(540px, 92vw);
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
       animation: ii-slide .22s ease-out forwards;
+      color: var(--text2);
     }
-    .ii-mhead { padding:12px 14px; border-bottom:1px solid #e5e7eb; }
-    .ii-mhead h4 { margin:0; font-weight:800; }
-    .ii-mbody { padding:14px; color:#334155; }
-    .ii-mfoot { padding:12px 14px; border-top:1px solid #e5e7eb; text-align:right; }
+    .ii-mhead { padding:12px 14px; border-bottom:1px solid var(--border); }
+    .ii-mhead h4 { margin:0; font-weight:900; color: var(--text); }
+    .ii-mbody { padding:14px; color:var(--text2); }
+    .ii-mfoot { padding:12px 14px; border-top:1px solid var(--border); text-align:right; background: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"}; }
+
     .ii-btn {
       display:inline-flex; align-items:center; gap:8px; border:0; border-radius:10px; cursor:pointer;
-      font-weight:800; padding:10px 14px;
+      font-weight:900; padding:10px 14px;
     }
-    .ii-btn-ghost { background:#fff; border:1px solid #e5e7eb; color:#0f172a; }
-    .ii-btn-ghost:hover { background:#f1f5f9; }
+    .ii-btn-ghost {
+      background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+      border:1px solid var(--border);
+      color:var(--text);
+    }
+    .ii-btn-ghost:hover { background:${isDark ? "rgba(124,58,237,0.12)" : "#f1f5f9"}; }
     .ii-btn-primary { color:#fff; background: linear-gradient(180deg, #7C3AED, #5B21B6); }
     .ii-btn-primary:hover { background: linear-gradient(180deg, #5B21B6, #5B21B6); }
 
     /* Snackbar */
     .ii-snack {
-      position:fixed; right:16px; bottom:16px; background:#dc2626; color:#fff; padding:10px 12px;
+      position:fixed; right:16px; bottom:16px; background:var(--danger); color:#fff; padding:10px 12px;
       border-radius:10px; box-shadow:0 10px 20px rgba(0,0,0,.15);
       transform: translateY(12px); opacity:0; animation: ii-pop .25s ease-out forwards;
       z-index:60;
@@ -126,18 +187,36 @@ const Styles = () => (
     }
     .ii-bar:hover { transform: translateY(-2px); }
     .ii-bar-value {
-      position:absolute; top:-24px; font-size:11px; font-weight:800; color:#5B21B6;
-      background:#fff; border:1px solid #e5e7eb; padding:2px 6px; border-radius:999px; white-space:nowrap;
+      position:absolute; top:-24px; font-size:11px; font-weight:900;
+      color:${isDark ? "#e5e7eb" : "#5B21B6"};
+      background:${isDark ? "rgba(15,23,42,0.92)" : "#fff"};
+      border:1px solid var(--border);
+      padding:2px 6px; border-radius:999px; white-space:nowrap;
       transform: translateY(-2px);
     }
     .ii-bar-label {
-      margin-top:6px; font-size:11px; color:#334155; max-width:60px; text-align:center;
+      margin-top:6px; font-size:11px; color:var(--text2); max-width:60px; text-align:center;
       word-break:break-word;
       display:block;
     }
-    .ii-chart-head { padding:8px 12px; border-bottom:1px solid #e5e7eb; }
-    .ii-chart-head h4 { margin:0; font-weight:800; font-size:14px; }
-    .ii-chart-head p { margin:2px 0 0; font-size:12px; color:#334155; }
+    .ii-chart-head { padding:8px 12px; border-bottom:1px solid var(--border); background: var(--card2); }
+    .ii-chart-head h4 { margin:0; font-weight:900; font-size:14px; color: var(--text); }
+    .ii-chart-head p { margin:2px 0 0; font-size:12px; color:var(--text2); }
+
+    /* MUI DataGrid - dark mode polish */
+    .ii-dg .MuiDataGrid-root { color: var(--text2); }
+    .ii-dg .MuiDataGrid-iconButtonContainer,
+    .ii-dg .MuiDataGrid-menuIcon,
+    .ii-dg .MuiDataGrid-sortIcon,
+    .ii-dg .MuiDataGrid-filterIcon,
+    .ii-dg .MuiDataGrid-columnHeaderTitle { color: var(--muted); }
+    .ii-dg .MuiTablePagination-root,
+    .ii-dg .MuiTablePagination-selectLabel,
+    .ii-dg .MuiTablePagination-displayedRows,
+    .ii-dg .MuiTablePagination-actions { color: var(--muted); }
+    .ii-dg .MuiSvgIcon-root { color: var(--muted); }
+    .ii-dg .MuiCheckbox-root { color: var(--muted); }
+    .ii-dg .MuiDataGrid-virtualScroller { background: var(--card); }
 
     /* keyframes */
     @keyframes ii-fade { from { opacity:0 } to { opacity:1 } }
@@ -147,7 +226,7 @@ const Styles = () => (
 );
 
 /* ===================== Info Modal (same UX) ===================== */
-const InfoModal = ({ open, onClose }) => {
+const InfoModal = ({ open, onClose, isDark }) => {
   if (!open) return null;
   return (
     <div className="ii-dim" onClick={onClose}>
@@ -161,7 +240,9 @@ const InfoModal = ({ open, onClose }) => {
           This view summarizes recipe inventory and cannot be edited directly.
         </div>
         <div className="ii-mfoot">
-          <button className="ii-btn ii-btn-ghost" onClick={onClose}>Close</button>
+          <button className="ii-btn ii-btn-ghost" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -173,6 +254,14 @@ const API_BASE =
   "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const RecipeInventory = () => {
+  // Theme (sync with Topbar)
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  useEffect(() => {
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   const { cognitoId } = useAuth() || {};
   const { recipeInventory, setRecipeInventory } = useData();
   const [infoOpen, setInfoOpen] = useState(false);
@@ -242,11 +331,9 @@ const RecipeInventory = () => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return recipeInventory || [];
     return (recipeInventory || []).filter((r) =>
-      [
-        r.recipe,
-        r.batchCode,
-        r.unitsInStock,
-      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+      [r.recipe, r.batchCode, r.unitsInStock].some((field) =>
+        String(field ?? "").toLowerCase().includes(q)
+      )
     );
   }, [recipeInventory, searchQuery]);
 
@@ -261,9 +348,7 @@ const RecipeInventory = () => {
         flex: 0.6,
         minWidth: 150,
         renderCell: (params) => (
-          <span className="ii-chip">
-            {Number(params.value ?? 0).toLocaleString()}
-          </span>
+          <span className="ii-chip">{Number(params.value ?? 0).toLocaleString()}</span>
         ),
         sortComparator: (a, b) => Number(a) - Number(b),
       },
@@ -272,9 +357,7 @@ const RecipeInventory = () => {
         headerName: "Sample Batch",
         flex: 0.8,
         minWidth: 180,
-        renderCell: (params) => (
-          <span className="ii-badge">{params.value || "-"}</span>
-        ),
+        renderCell: (params) => <span className="ii-badge">{params.value || "-"}</span>,
       },
     ],
     []
@@ -290,20 +373,19 @@ const RecipeInventory = () => {
     [filteredRows]
   );
 
-  const maxAmount = useMemo(
-    () => Math.max(0, ...chartData.map((d) => d.amount)),
-    [chartData]
-  );
+  const maxAmount = useMemo(() => Math.max(0, ...chartData.map((d) => d.amount)), [chartData]);
 
   return (
     <div className="ii-page">
-      <Styles />
+      <Styles isDark={isDark} />
 
       <div className="ii-wrap">
         {/* Header — identical structure */}
         <div className="ii-header">
           <div className="ii-hgroup">
-            <div className="ii-logo" aria-label="Recipe Inventory">Rec</div>
+            <div className="ii-logo" aria-label="Recipe Inventory">
+              Rec
+            </div>
             <div>
               <h1 className="ii-title">Recipe Inventory</h1>
               <p className="ii-sub">Read-only aggregates of active Production Log entries</p>
@@ -317,7 +399,17 @@ const RecipeInventory = () => {
             title="About this table"
           >
             {/* Simple “i” icon to avoid extra deps */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={isDark ? "#94a3b8" : "#334155"}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="16" x2="12" y2="12"></line>
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -360,14 +452,19 @@ const RecipeInventory = () => {
                 }}
                 sx={{
                   border: 0,
+                  backgroundColor: "transparent",
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
-                  "& .MuiDataGrid-virtualScroller": { background: "#fff" },
+                  "& .MuiDataGrid-virtualScroller": { backgroundColor: "transparent" },
+                  "& .MuiDataGrid-overlay": {
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    background: "transparent",
+                  },
                 }}
               />
             </div>
           </div>
 
-          {/* Chart Card (same position & style as Ingredient Inventory) */}
+          {/* Chart Card */}
           <div className="ii-card" style={{ display: "flex", flexDirection: "column" }}>
             <div className="ii-chart-head">
               <h4>Inventory Levels</h4>
@@ -377,13 +474,19 @@ const RecipeInventory = () => {
             <div className="ii-chart">
               <div className="ii-chart-body">
                 {chartData.length === 0 ? (
-                  <div style={{ margin:'auto', color:'#64748b' }}>No data for chart.</div>
+                  <div style={{ margin: "auto", color: isDark ? "#94a3b8" : "#64748b" }}>
+                    No data for chart.
+                  </div>
                 ) : (
                   chartData.map((d, i) => {
-                    const pct = maxAmount > 0 ? (d.amount / maxAmount) : 0;
+                    const pct = maxAmount > 0 ? d.amount / maxAmount : 0;
                     const h = Math.max(6, Math.round(pct * 300)); // up to ~300px
                     return (
-                      <div className="ii-bar-wrap" key={`${d.name}-${i}`} style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                      <div
+                        className="ii-bar-wrap"
+                        key={`${d.name}-${i}`}
+                        style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+                      >
                         <div className="ii-bar" style={{ height: `${h}px` }}>
                           <div className="ii-bar-value">{Number(d.amount).toLocaleString()}</div>
                         </div>
@@ -399,7 +502,7 @@ const RecipeInventory = () => {
       </div>
 
       {/* Info modal & snackbar */}
-      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} isDark={isDark} />
       {snack && (
         <div className="ii-snack" onAnimationEnd={() => setTimeout(() => setSnack(""), 2500)}>
           {snack}

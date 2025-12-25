@@ -6,84 +6,181 @@ import axios from "axios";
 /* ===== API ===== */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Shared brand styles copied from Recipes ---------------- */
-const BrandStyles = () => (
+/* ---------------- Shared brand styles (Light + Dark) ---------------- */
+const BrandStyles = ({ isDark }) => (
   <style>{`
-  .r-wrap { padding: 20px; }
+  :root{
+    --bg: ${isDark ? "#0b1220" : "#f3f4f6"};
+    --card: ${isDark ? "#0f172a" : "#ffffff"};
+    --card2: ${isDark ? "#0b1220" : "#ffffff"};
+    --border: ${isDark ? "#1f2a44" : "#e5e7eb"};
+    --text: ${isDark ? "#e5e7eb" : "#0f172a"};
+    --text2: ${isDark ? "#cbd5e1" : "#334155"};
+    --muted: ${isDark ? "#94a3b8" : "#64748b"};
+    --thead: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
+    --hover: ${isDark ? "rgba(124,58,237,0.14)" : "#f4f1ff"};
+    --chip: ${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"};
+    --primary: #7C3AED;
+    --primary2: #5B21B6;
+    --danger: #dc2626;
+    --danger2: #b91c1c;
+    --shadow: ${isDark ? "0 10px 30px rgba(0,0,0,0.45)" : "0 10px 30px rgba(2,6,23,.22)"};
+  }
+
+  .r-wrap { padding: 20px; background: var(--bg); min-height: calc(100vh - 0px); color: var(--text); }
+
   .r-card {
-    background:#fff; border:1px solid #e5e7eb; border-radius:16px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
     overflow:hidden;
   }
-  .r-head { padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; }
-  .r-title { margin:0; font-weight:800; color:#0f172a; font-size:18px; }
-  .r-pill { font-size:12px; font-weight:800; color:#7C3AED; }
-  .r-btn-icon { border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px; color:#dc2626; }
-  .r-btn-icon:hover { background:#fee2e2; }
+
+  .r-head {
+    padding:16px;
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+    background: var(--card2);
+  }
+  .r-title { margin:0; font-weight:900; color:var(--text); font-size:18px; }
+  .r-pill { font-size:12px; font-weight:900; color:var(--primary); }
 
   .r-actions-right { display:flex; align-items:center; gap:10px; }
+
+  .r-btn-icon {
+    border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px;
+    color:${isDark ? "#fecaca" : "#dc2626"};
+  }
+  .r-btn-icon:hover { background:${isDark ? "rgba(220,38,38,0.18)" : "#fee2e2"}; }
+
   .r-btn-add {
-    display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font-weight:800; color:#fff;
+    display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font-weight:900; color:#fff;
     background:linear-gradient(180deg, #6366f1, #7c3aed); border:0; border-radius:999px;
     box-shadow:0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06); cursor:pointer;
   }
   .r-btn-add:hover { filter:brightness(.95); }
 
   .r-table-wrap { overflow:auto; }
-  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:#334155; }
-  .r-thead { background:#f8fafc; text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:#64748b; }
-  .r-thead th { padding:12px; text-align:left; }
-  .r-row { border-bottom:1px solid #e5e7eb; transition: background .15s ease; }
-  .r-row:hover { background:#f4f1ff; }
-  .r-td { padding:12px; }
-  .r-td--name { font-weight:800; color:#0f172a; white-space:nowrap; }
+  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:var(--text2); }
+  .r-thead { background:var(--thead); text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:var(--muted); }
+  .r-thead th { padding:12px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--border); }
+  .r-row { border-bottom:1px solid var(--border); transition: background .15s ease; }
+  .r-row:hover { background:var(--hover); }
+  .r-td { padding:12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .r-td--name { font-weight:900; color:var(--text); white-space:nowrap; }
   .r-actions { text-align:center; }
-  .r-chk { width:16px; height:16px; }
-  .r-link { color:#7C3AED; font-weight:700; background:transparent; border:0; cursor:pointer; }
-  .r-link:hover { color:#5B21B6; text-decoration:underline; }
+  .r-chk { width:16px; height:16px; accent-color: var(--primary); }
+
+  .r-link { color:var(--primary); font-weight:800; background:transparent; border:0; cursor:pointer; }
+  .r-link:hover { color:var(--primary2); text-decoration:underline; }
+
   .r-btn-ghost {
-    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:800; font-size:14px;
-    color:#0f172a; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:900; font-size:14px;
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+    cursor:pointer;
   }
-  .r-btn-ghost:hover { background:#f4f1ff; }
+  .r-btn-ghost:hover { background:var(--hover); }
+
   .r-btn-primary {
-    padding:10px 16px; font-weight:800; color:#fff; background:#7C3AED; border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08); cursor:pointer;
+    padding:10px 16px; font-weight:900; color:#fff; background:var(--primary); border:0; border-radius:10px;
+    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
+    cursor:pointer;
   }
-  .r-btn-primary:hover { background:#5B21B6; }
-  .r-btn-danger { background:#dc2626; }
-  .r-btn-danger:hover { background:#b91c1c; }
-  .r-footer { padding:12px 16px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; background:#fff; }
+  .r-btn-primary:hover { background:var(--primary2); }
+  .r-btn-danger { background:var(--danger); }
+  .r-btn-danger:hover { background:var(--danger2); }
+
+  .r-footer {
+    padding:12px 16px;
+    border-top:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--card2);
+  }
+  .r-muted { color: var(--muted); }
 
   /* Simple toolbar for top-level search */
   .r-toolbar {
-    background:#fff;
+    background:var(--card);
     padding:12px 16px;
-    border-bottom:1px solid #e5e7eb;
+    border-bottom:1px solid var(--border);
   }
 
-  /* Drawer (shared) */
-  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
+  .r-input {
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    outline:none;
+    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+    color:var(--text);
+  }
+  .r-input::placeholder { color:${isDark ? "rgba(148,163,184,0.8)" : "#94a3b8"}; }
+  .r-input:focus { border-color:var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+
+  /* Drawer */
+  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
   .r-dim.open { opacity:1; pointer-events:auto; }
   .r-drawer {
-    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px; background:#fff; box-shadow:-8px 0 24px rgba(2,6,23,.18);
-    transform:translateX(100%); transition:transform .25s ease; z-index:50; display:flex; flex-direction:column;
+    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px;
+    background:var(--card);
+    box-shadow:-8px 0 24px rgba(2,6,23,.18);
+    transform:translateX(100%); transition:transform .25s ease;
+    z-index:50; display:flex; flex-direction:column;
+    border-left: 1px solid var(--border);
   }
   .r-drawer.open { transform:translateX(0); }
   .r-dhdr {
-    padding:16px; color:#fff; background:linear-gradient(135deg, #6366f1, #7C3AED); display:flex; align-items:center; justify-content:space-between;
+    padding:16px; color:#fff; background:linear-gradient(135deg, #6366f1, #7C3AED);
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
   }
   .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
   .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
-  .r-dbody { padding:14px; background:#f1f5f9; overflow:auto; flex:1; }
-  .r-summary { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow:0 1px 2px rgba(16,24,40,0.06); margin-bottom:10px; }
+
+  .r-dbody { padding:14px; background:${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; overflow:auto; flex:1; }
+  .r-summary {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px;
+    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"});
+    margin-bottom:10px;
+    color: var(--text2);
+  }
+
   .r-stat { text-align:right; }
-  .r-filter { position:sticky; top:0; padding:8px 0; background:#f1f5f9; }
-  .r-input { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; background:#fff; }
-  .r-input:focus { border-color:#7C3AED; box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-filter { position:sticky; top:0; padding:8px 0; background:${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; }
   .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
-  .r-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; }
-  .r-chip { font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; padding:4px 8px; border-radius:999px; }
+  .r-item {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px 12px;
+    color: var(--text2);
+  }
+
+  .r-chip { font-size:12px; font-weight:900; background:var(--chip); color:var(--text); padding:4px 8px; border-radius:999px; }
+  .r-badge {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:28px; height:28px;
+    border-radius:999px;
+    background:${isDark ? "rgba(255,255,255,0.08)" : "#eef2ff"};
+    color:${isDark ? "#e5e7eb" : "#4338ca"};
+    border:1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(99,102,241,0.18)"};
+    flex: 0 0 auto;
+  }
+  .r-strong { color: var(--text); font-weight:900; }
+
+  /* Modal shell (needed because your DeleteConfirmationModal uses these classes) */
+  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
+  .r-modal { background: var(--card); border-radius:14px; width:100%; max-height:90vh; overflow:hidden; box-shadow: var(--shadow); display:flex; flex-direction:column; z-index:10000; border: 1px solid var(--border); }
+  .r-mhdr { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .r-mbody { padding:16px; overflow:auto; background: var(--card); color: var(--text2); }
+  .r-mfooter { padding:12px 16px; border-top:1px solid var(--border); background: ${isDark ? "rgba(255,255,255,0.02)" : "#f8fafc"}; display:flex; justify-content:flex-end; gap:10px; }
 
   /* Toast */
   .su-toast {
@@ -92,9 +189,11 @@ const BrandStyles = () => (
   }
   .su-toast.show { transform: translateY(0); opacity: 1; }
   .su-toast-inner {
-    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
-    padding: 10px 12px; border-radius: 10px; font-weight: 700;
-    box-shadow:0 1px 2px rgba(16,24,40,0.06),0 1px 3px rgba(16,24,40,0.08);
+    background: ${isDark ? "rgba(124,58,237,0.14)" : "#ecfdf5"};
+    border: 1px solid ${isDark ? "rgba(124,58,237,0.25)" : "#a7f3d0"};
+    color: ${isDark ? "#e5e7eb" : "#065f46"};
+    padding: 10px 12px; border-radius: 10px; font-weight: 800;
+    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
   }
   `}</style>
 );
@@ -188,12 +287,16 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
         rows.push([String(raw || ""), ""]);
       }
     });
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const filenameBase = (meta?.recipe || meta?.batchCode || "stock-usage").replace(/\s+/g, "-").toLowerCase();
+    const filenameBase = (meta?.recipe || meta?.batchCode || "stock-usage")
+      .replace(/\s+/g, "-")
+      .toLowerCase();
     a.download = `${filenameBase}-${(header || mode || "items").toLowerCase()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
@@ -205,54 +308,74 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
       <div className={`r-drawer ${isOpen ? "open" : ""}`}>
         <div className="r-dhdr">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span className="r-badge"><MenuIcon /></span>
+            <span className="r-badge">
+              <MenuIcon />
+            </span>
             <div>
-              <h3 className="r-dhdr-title">{header || (mode === "barcodes" ? "Batchcodes" : "Ingredients")}</h3>
+              <h3 className="r-dhdr-title">
+                {header || (mode === "barcodes" ? "Batchcodes" : "Ingredients")}
+              </h3>
               <p className="r-dhdr-sub">
-                {meta?.recipe ? `${meta.recipe} · ${meta?.date ?? ""}` : (meta?.batchCode || "")}
+                {meta?.recipe ? `${meta.recipe} · ${meta?.date ?? ""}` : meta?.batchCode || ""}
               </p>
             </div>
           </div>
-          <div style={{ display:"flex", gap:8 }}>
-            <button className="r-btn-ghost" onClick={exportCsv}><DownloadIcon /> Export</button>
-            <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="r-btn-ghost" onClick={exportCsv}>
+              <DownloadIcon /> Export
+            </button>
+            <button className="r-btn-ghost" onClick={onClose}>
+              <CloseIcon /> Close
+            </button>
           </div>
         </div>
 
         <div className="r-dbody">
-          <div className="r-summary" style={{ display:"flex", justifyContent:"space-between" }}>
+          <div className="r-summary" style={{ display: "flex", justifyContent: "space-between" }}>
             <div>
-              <div className="r-muted" style={{ textTransform:"uppercase", fontWeight:800 }}>Source</div>
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 900 }}>
+                Source
+              </div>
               <div className="r-strong">{meta?.recipe || "—"}</div>
               <div className="r-muted">Batch: {meta?.batchCode ?? "—"}</div>
             </div>
             <div className="r-stat">
-              <div className="r-muted" style={{ textTransform:"uppercase", fontWeight:800 }}>Items</div>
-              <div className="r-strong" style={{ color:"#7C3AED", fontSize:24 }}>{filtered.length}</div>
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 900 }}>
+                Items
+              </div>
+              <div className="r-strong" style={{ color: "#7C3AED", fontSize: 24 }}>
+                {filtered.length}
+              </div>
             </div>
           </div>
 
           <div className="r-filter">
-            <input className="r-input" value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Filter items..." />
+            <input className="r-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter items..." />
           </div>
 
           <ul className="r-list">
             {filtered.map((it, i) => (
               <li key={i} className="r-item">
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <span className="r-badge"><CheckIcon /></span>
-                  <span className="r-strong" style={{ fontWeight:700 }}>{it.name}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="r-badge">
+                    <CheckIcon />
+                  </span>
+                  <span className="r-strong" style={{ fontWeight: 800 }}>
+                    {it.name}
+                  </span>
                 </div>
                 {/* ingredients show qty as chip; barcodes show value as muted text */}
                 {mode === "ingredients" ? (
                   <span className="r-chip">{it.value}</span>
                 ) : (
-                  <span className="r-muted" style={{ wordBreak:"break-word" }}>{it.value}</span>
+                  <span className="r-muted" style={{ wordBreak: "break-word" }}>
+                    {it.value}
+                  </span>
                 )}
               </li>
             ))}
             {filtered.length === 0 && (
-              <li className="r-item" style={{ justifyContent:"center" }}>
+              <li className="r-item" style={{ justifyContent: "center" }}>
                 <span className="r-muted">No items found.</span>
               </li>
             )}
@@ -261,7 +384,9 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
 
         <div className="r-footer">
           <span className="r-muted">{filtered.length} items</span>
-          <button className="r-btn-primary" onClick={onClose}>Done</button>
+          <button className="r-btn-primary" onClick={onClose}>
+            Done
+          </button>
         </div>
       </div>
     </>
@@ -275,21 +400,43 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
     <div className="r-modal-dim">
       <div className="r-modal" style={{ maxWidth: 420 }}>
         <div className="r-mhdr">
-          <h2 className="r-title" style={{ fontSize: 18 }}>Confirm Deletion</h2>
-          <button className="r-btn-ghost" onClick={onClose}><CloseIcon /> Close</button>
+          <h2 className="r-title" style={{ fontSize: 18 }}>
+            Confirm Deletion
+          </h2>
+          <button className="r-btn-ghost" onClick={onClose}>
+            <CloseIcon /> Close
+          </button>
         </div>
         <div className="r-mbody" style={{ textAlign: "center" }}>
-          <div className="r-badge" style={{ width: 52, height: 52, alignItems:"center", justifyContent:"center", background:"#fee2e2", color:"#dc2626", border:"none", margin:"0 auto" }}>
+          <div
+            className="r-badge"
+            style={{
+              width: 52,
+              height: 52,
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(220,38,38,0.18)",
+              color: "#fecaca",
+              border: "1px solid rgba(220,38,38,0.35)",
+              margin: "0 auto",
+            }}
+          >
             <DeleteIcon />
           </div>
-          <h3 className="r-strong" style={{ marginTop: 10, fontSize:18 }}>
-            Delete {count} row{count>1?"s":""}?
+          <h3 className="r-strong" style={{ marginTop: 10, fontSize: 18 }}>
+            Delete {count} row{count > 1 ? "s" : ""}?
           </h3>
-          <p className="r-muted" style={{ marginTop: 6 }}>This action cannot be undone.</p>
+          <p className="r-muted" style={{ marginTop: 6 }}>
+            This action cannot be undone.
+          </p>
         </div>
-        <div className="r-mfooter" style={{ justifyContent:"flex-end" }}>
-          <button className="r-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>Delete</button>
+        <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
+          <button className="r-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="r-btn-primary r-btn-danger" onClick={onConfirm}>
+            Delete
+          </button>
         </div>
       </div>
     </div>
@@ -298,9 +445,17 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
 
 /* ---------------- Main Component ---------------- */
 const StockUsage = () => {
+  // Theme (sync with Topbar)
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  useEffect(() => {
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   const { cognitoId } = useAuth();
 
-  const [rows, setRows] = useState([]);          // grouped usage rows shown in table
+  const [rows, setRows] = useState([]); // grouped usage rows shown in table
   const [selectedIds, setSelectedIds] = useState(new Set()); // table selections (group ids)
 
   // Search
@@ -328,13 +483,9 @@ const StockUsage = () => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [
-        r.date,
-        r.recipeName,
-        r.batchCode,
-        r.ingredients,
-        r.barcodes,
-      ].some((field) => String(field ?? "").toLowerCase().includes(q))
+      [r.date, r.recipeName, r.batchCode, r.ingredients, r.barcodes].some((field) =>
+        String(field ?? "").toLowerCase().includes(q)
+      )
     );
   }, [rows, searchQuery]);
 
@@ -351,6 +502,7 @@ const StockUsage = () => {
     if (e.target.checked) setSelectedIds(new Set(filteredRows.map((r) => r.id)));
     else setSelectedIds(new Set());
   };
+
   const toggleRow = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -381,7 +533,6 @@ const StockUsage = () => {
     setDrawerMeta(meta || null);
     setDrawerOpen(true);
   };
-  const closeDrawer = () => setDrawerOpen(false);
 
   const fetchStockUsage = useCallback(async () => {
     if (!cognitoId) return;
@@ -416,8 +567,12 @@ const StockUsage = () => {
           const totalQuantity = ingredient.quantity * item.batchesProduced;
           const unit = ingredient.unit ?? ingredient.unit_name ?? ingredient.unitLabel ?? "";
           const unitSuffix = unit ? ` ${unit}` : "";
-          grouped[key].ingredients.push(`${ingredient.ingredient_name}: ${totalQuantity}${unitSuffix}`);
-          grouped[key].barcodes.push(`${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes ?? ""}`);
+          grouped[key].ingredients.push(
+            `${ingredient.ingredient_name}: ${totalQuantity}${unitSuffix}`
+          );
+          grouped[key].barcodes.push(
+            `${ingredient.ingredient_name}: ${ingredient.ingredient_barcodes ?? ""}`
+          );
         });
       });
 
@@ -447,7 +602,11 @@ const StockUsage = () => {
     try {
       if (!cognitoId || flatSelectedUsageIds.length === 0) {
         setDeleteOpen(false);
-        setToastMsg(flatSelectedUsageIds.length === 0 ? "Selected rows have no deletable IDs." : "No user id.");
+        setToastMsg(
+          flatSelectedUsageIds.length === 0
+            ? "Selected rows have no deletable IDs."
+            : "No user id."
+        );
         setToastOpen(true);
         return;
       }
@@ -468,16 +627,30 @@ const StockUsage = () => {
 
   return (
     <div className="r-wrap">
-      <BrandStyles />
+      <BrandStyles isDark={isDark} />
 
       <div className="r-card">
         <div className="r-head">
           <h2 className="r-title">Stock Usage</h2>
+
           <div className="r-actions-right">
             {numSelected > 0 && (
-              <div className="r-actions-right" style={{ background:"#eef2ff", padding:"6px 10px", borderRadius:10 }}>
+              <div
+                className="r-actions-right"
+                style={{
+                  background: isDark ? "rgba(124,58,237,0.12)" : "#eef2ff",
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  border: `1px solid ${isDark ? "rgba(124,58,237,0.25)" : "transparent"}`,
+                }}
+              >
                 <span className="r-pill">{numSelected} selected</span>
-                <button className="r-btn-icon" onClick={openDeletePrompt} aria-label="Delete selected">
+                <button
+                  className="r-btn-icon"
+                  onClick={openDeletePrompt}
+                  aria-label="Delete selected"
+                  title="Delete selected"
+                >
                   <DeleteIcon />
                 </button>
               </div>
@@ -591,7 +764,9 @@ const StockUsage = () => {
       />
 
       {/* Toast */}
-      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>{toastMsg}</Toast>
+      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
+        {toastMsg}
+      </Toast>
     </div>
   );
 };
