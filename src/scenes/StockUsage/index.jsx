@@ -4,201 +4,388 @@ import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
 
 /* ===== API ===== */
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Shared brand styles (Light + Dark) ---------------- */
+/* =========================================================================================
+   Brand Styles (Light + Dark) — MATCH GoodsIn
+   - Reads localStorage('theme-mode') + listens for window 'themeChanged'
+   ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
   :root{
-    --bg: ${isDark ? "#0b1220" : "#f3f4f6"};
-    --card: ${isDark ? "#0f172a" : "#ffffff"};
-    --card2: ${isDark ? "#0b1220" : "#ffffff"};
-    --border: ${isDark ? "#1f2a44" : "#e5e7eb"};
-    --text: ${isDark ? "#e5e7eb" : "#0f172a"};
-    --text2: ${isDark ? "#cbd5e1" : "#334155"};
+    --bg: ${isDark ? "#0a0f1e" : "#f8fafc"};
+    --card: ${isDark ? "#151b2e" : "#ffffff"};
+    --card2: ${isDark ? "#1a2033" : "#ffffff"};
+    --mutedCard: ${isDark ? "rgba(255,255,255,0.03)" : "#f9fafb"};
+    --border: ${isDark ? "#1e2942" : "#e2e8f0"};
+    --text: ${isDark ? "#f1f5f9" : "#0f172a"};
+    --text2: ${isDark ? "#cbd5e1" : "#475569"};
     --muted: ${isDark ? "#94a3b8" : "#64748b"};
-    --thead: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
-    --hover: ${isDark ? "rgba(124,58,237,0.14)" : "#f4f1ff"};
-    --chip: ${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"};
-    --primary: #7C3AED;
-    --primary2: #5B21B6;
-    --danger: #dc2626;
-    --danger2: #b91c1c;
-    --shadow: ${isDark ? "0 10px 30px rgba(0,0,0,0.45)" : "0 10px 30px rgba(2,6,23,.22)"};
+    --hover: ${isDark ? "rgba(99,102,241,0.08)" : "#f0f4ff"};
+    --thead: ${isDark ? "rgba(99,102,241,0.05)" : "#f8fafc"};
+    --chip: ${isDark ? "rgba(99,102,241,0.12)" : "#eff6ff"};
+    --monoBg: ${isDark ? "rgba(99,102,241,0.15)" : "#eef2ff"};
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --primary2: #4338ca;
+    --success: #10b981;
+    --success-light: #34d399;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --danger2: #dc2626;
+    --shadow-sm: ${isDark ? "0 1px 2px rgba(0,0,0,0.3)" : "0 1px 2px rgba(0,0,0,0.04)"};
+    --shadow: ${isDark ? "0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2)" : "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04)"};
+    --shadow-lg: ${isDark ? "0 20px 25px -5px rgba(0,0,0,0.4), 0 10px 10px -5px rgba(0,0,0,0.3)" : "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"};
   }
 
-  .r-wrap { padding: 20px; background: var(--bg); min-height: calc(100vh - 0px); color: var(--text); }
+  * { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
 
+  .r-wrap { 
+    padding: 24px; 
+    background: var(--bg); 
+    min-height: calc(100vh - 0px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  }
+  
   .r-card {
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:16px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
-    overflow:hidden;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: visible;
+    color: var(--text2);
   }
-
-  .r-head {
-    padding:16px;
-    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
-    border-bottom:1px solid var(--border);
-    background: var(--card2);
+  
+  .r-head { 
+    padding: 20px 24px; 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 16px; 
+    align-items: center; 
+    justify-content: space-between; 
+    border-bottom: 1px solid var(--border);
+    background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
   }
-  .r-title { margin:0; font-weight:900; color:var(--text); font-size:18px; }
-  .r-pill { font-size:12px; font-weight:900; color:var(--primary); }
-
-  .r-actions-right { display:flex; align-items:center; gap:10px; }
-
-  .r-btn-icon {
-    border:0; background:transparent; cursor:pointer; padding:8px; border-radius:999px;
-    color:${isDark ? "#fecaca" : "#dc2626"};
+  
+  .r-title { 
+    margin: 0; 
+    font-weight: 700; 
+    color: var(--text); 
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
-  .r-btn-icon:hover { background:${isDark ? "rgba(220,38,38,0.18)" : "#fee2e2"}; }
-
-  .r-btn-add {
-    display:inline-flex; align-items:center; gap:8px; padding:10px 16px; font-weight:900; color:#fff;
-    background:linear-gradient(180deg, #6366f1, #7c3aed); border:0; border-radius:999px;
-    box-shadow:0 8px 16px rgba(29,78,216,0.25), 0 2px 4px rgba(15,23,42,0.06); cursor:pointer;
+  
+  .r-sub { 
+    margin: 4px 0 0 0; 
+    color: var(--muted); 
+    font-size: 14px;
+    font-weight: 500;
   }
-  .r-btn-add:hover { filter:brightness(.95); }
-
-  .r-table-wrap { overflow:auto; }
-  table.r-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; color:var(--text2); }
-  .r-thead { background:var(--thead); text-transform:uppercase; letter-spacing:.03em; font-size:12px; color:var(--muted); }
-  .r-thead th { padding:12px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--border); }
-  .r-row { border-bottom:1px solid var(--border); transition: background .15s ease; }
-  .r-row:hover { background:var(--hover); }
-  .r-td { padding:12px; border-bottom:1px solid var(--border); vertical-align:top; }
-  .r-td--name { font-weight:900; color:var(--text); white-space:nowrap; }
-  .r-actions { text-align:center; }
-  .r-chk { width:16px; height:16px; accent-color: var(--primary); }
-
-  .r-link { color:var(--primary); font-weight:800; background:transparent; border:0; cursor:pointer; }
-  .r-link:hover { color:var(--primary2); text-decoration:underline; }
+  
+  .r-pill { 
+    font-size: 13px; 
+    font-weight: 700; 
+    color: var(--primary);
+    background: var(--chip);
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+  
+  .r-flex { 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
+  }
 
   .r-btn-ghost {
-    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:900; font-size:14px;
-    color:var(--text);
-    border:1px solid var(--border);
-    border-radius:10px;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
-    cursor:pointer;
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    padding: 10px 16px; 
+    font-weight: 600; 
+    font-size: 14px;
+    color: var(--text); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    background: var(--card); 
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
   }
-  .r-btn-ghost:hover { background:var(--hover); }
+  .r-btn-ghost:hover { 
+    background: var(--hover);
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  .r-btn-ghost:active { transform: translateY(0); }
 
   .r-btn-primary {
-    padding:10px 16px; font-weight:900; color:#fff; background:var(--primary); border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
-    cursor:pointer;
+    padding: 10px 20px; 
+    font-weight: 600; 
+    font-size: 14px;
+    color: #fff; 
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border: 0; 
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(99,102,241,0.3), 0 2px 4px -1px rgba(99,102,241,0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
   }
-  .r-btn-primary:hover { background:var(--primary2); }
-  .r-btn-danger { background:var(--danger); }
-  .r-btn-danger:hover { background:var(--danger2); }
-
-  .r-footer {
-    padding:12px 16px;
-    border-top:1px solid var(--border);
-    display:flex; align-items:center; justify-content:space-between;
-    background:var(--card2);
+  .r-btn-primary:hover { 
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 10px -1px rgba(99,102,241,0.4), 0 4px 6px -1px rgba(99,102,241,0.3);
   }
-  .r-muted { color: var(--muted); }
+  .r-btn-primary:active { transform: translateY(0); }
 
-  /* Simple toolbar for top-level search */
+  .r-btn-danger { 
+    background: linear-gradient(135deg, var(--danger) 0%, var(--danger2) 100%);
+    box-shadow: 0 4px 6px -1px rgba(239,68,68,0.3), 0 2px 4px -1px rgba(239,68,68,0.2);
+  }
+  .r-btn-danger:hover { 
+    background: linear-gradient(135deg, #f87171 0%, var(--danger) 100%);
+    box-shadow: 0 6px 10px -1px rgba(239,68,68,0.4), 0 4px 6px -1px rgba(239,68,68,0.3);
+  }
+
+  /* Table */
+  .r-table-wrap { overflow-x: auto; background: var(--card); }
+  table.r-table { width: 100%; table-layout: auto; border-collapse: separate; border-spacing: 0; font-size: 14px; color: var(--text2); }
+  .r-thead { background: var(--thead); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .r-thead th { padding: 16px 16px; text-align: left; white-space: nowrap; border-bottom: 2px solid var(--border); font-weight: 700; }
+  .r-row { border-bottom: 1px solid var(--border); transition: all 0.15s ease; }
+  .r-row:hover { background: var(--hover); }
+  .r-td { padding: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .r-td--name { font-weight: 700; color: var(--text); }
+  .r-actions { text-align: right; }
+  .r-chk { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+
+  /* Toolbar (search) */
   .r-toolbar {
-    background:var(--card);
-    padding:12px 16px;
-    border-bottom:1px solid var(--border);
+    background: var(--card2);
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    color: var(--text2);
+    margin: 20px 24px 0 24px;
   }
-
   .r-input {
-    width:100%;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:10px;
-    outline:none;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
-    color:var(--text);
+    min-width: 280px;
+    flex: 1;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
   }
-  .r-input::placeholder { color:${isDark ? "rgba(148,163,184,0.8)" : "#94a3b8"}; }
-  .r-input:focus { border-color:var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-input::placeholder { color: var(--muted); }
+  .r-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: var(--card); }
 
-  /* Drawer */
-  .r-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
-  .r-dim.open { opacity:1; pointer-events:auto; }
+  /* Footer */
+  .r-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
+    color: var(--text2);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .r-muted { color: var(--muted); font-size: 13px; font-weight: 500; }
+
+  /* Link-style button */
+  .r-link {
+    color: var(--primary);
+    font-weight: 700;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0;
+  }
+  .r-link:hover { color: var(--primary2); text-decoration: underline; }
+
+  /* Drawer (styled to match GoodsIn vibe) */
+  .r-dim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 9990;
+  }
+  .r-dim.open { opacity: 1; pointer-events: auto; }
+
   .r-drawer {
-    position:fixed; top:0; right:0; height:100%; width:100%; max-width:420px;
-    background:var(--card);
-    box-shadow:-8px 0 24px rgba(2,6,23,.18);
-    transform:translateX(100%); transition:transform .25s ease;
-    z-index:50; display:flex; flex-direction:column;
+    position: fixed;
+    top: 0; right: 0;
+    height: 100%;
+    width: 100%;
+    max-width: 440px;
+    background: var(--card);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    z-index: 9995;
+    display: flex;
+    flex-direction: column;
     border-left: 1px solid var(--border);
   }
-  .r-drawer.open { transform:translateX(0); }
+  .r-drawer.open { transform: translateX(0); }
+
   .r-dhdr {
-    padding:16px; color:#fff; background:linear-gradient(135deg, #6366f1, #7C3AED);
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding: 18px 18px;
+    border-bottom: 1px solid var(--border);
+    background: ${isDark ? "rgba(99,102,241,0.03)" : "rgba(99,102,241,0.02)"};
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  .r-dhdr-title { margin:0; font-weight:900; font-size:18px; }
-  .r-dhdr-sub { margin:0; font-size:12px; opacity:.92; }
+  .r-dhdr-title { margin: 0; font-weight: 800; color: var(--text); font-size: 16px; letter-spacing: -0.01em; }
+  .r-dhdr-sub { margin: 4px 0 0 0; font-size: 12px; color: var(--muted); font-weight: 600; }
 
-  .r-dbody { padding:14px; background:${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; overflow:auto; flex:1; }
+  .r-dbody {
+    padding: 16px 18px;
+    overflow: auto;
+    background: var(--mutedCard);
+    flex: 1;
+  }
+
   .r-summary {
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:12px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"});
-    margin-bottom:10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 12px;
     color: var(--text2);
   }
 
-  .r-stat { text-align:right; }
-  .r-filter { position:sticky; top:0; padding:8px 0; background:${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; }
-  .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
+  .r-stat { text-align: right; }
+  .r-strong { color: var(--text); font-weight: 800; }
+
+  .r-filter { position: sticky; top: 0; padding: 8px 0 10px 0; background: var(--mutedCard); z-index: 1; }
+
+  .r-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
   .r-item {
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
     color: var(--text2);
+    box-shadow: var(--shadow-sm);
   }
 
-  .r-chip { font-size:12px; font-weight:900; background:var(--chip); color:var(--text); padding:4px 8px; border-radius:999px; }
+  .r-chip {
+    font-size: 12px;
+    font-weight: 800;
+    background: var(--chip);
+    color: var(--primary);
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
   .r-badge {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:28px; height:28px;
-    border-radius:999px;
-    background:${isDark ? "rgba(255,255,255,0.08)" : "#eef2ff"};
-    color:${isDark ? "#e5e7eb" : "#4338ca"};
-    border:1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(99,102,241,0.18)"};
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: var(--monoBg);
+    color: var(--primary);
+    border: 1px solid ${isDark ? "rgba(99,102,241,0.25)" : "rgba(99,102,241,0.18)"};
     flex: 0 0 auto;
   }
-  .r-strong { color: var(--text); font-weight:900; }
 
-  /* Modal shell (needed because your DeleteConfirmationModal uses these classes) */
-  .r-modal-dim { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px;}
-  .r-modal { background: var(--card); border-radius:14px; width:100%; max-height:90vh; overflow:hidden; box-shadow: var(--shadow); display:flex; flex-direction:column; z-index:10000; border: 1px solid var(--border); }
-  .r-mhdr { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .r-mbody { padding:16px; overflow:auto; background: var(--card); color: var(--text2); }
-  .r-mfooter { padding:12px 16px; border-top:1px solid var(--border); background: ${isDark ? "rgba(255,255,255,0.02)" : "#f8fafc"}; display:flex; justify-content:flex-end; gap:10px; }
+  /* Modal (for DeleteConfirmationModal) */
+  .r-modal-dim { 
+    position: fixed; 
+    inset: 0; 
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 10000; 
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .r-modal { 
+    background: var(--card); 
+    border-radius: 16px; 
+    width: 100%; 
+    max-height: 90vh; 
+    overflow: hidden; 
+    box-shadow: var(--shadow-lg);
+    display: flex; 
+    flex-direction: column; 
+    z-index: 10001; 
+    border: 1px solid var(--border);
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+  .r-mhdr { 
+    padding: 20px 24px; 
+    border-bottom: 1px solid var(--border); 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 16px; 
+    flex-wrap: wrap;
+    background: ${isDark ? "rgba(99,102,241,0.03)" : "rgba(99,102,241,0.02)"};
+  }
+  .r-mbody { padding: 24px; overflow: auto; background: var(--card); color: var(--text2); }
+  .r-mfooter { padding: 16px 24px; border-top: 1px solid var(--border); background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"}; display: flex; justify-content: flex-end; gap: 12px; }
 
   /* Toast */
   .su-toast {
-    position: fixed; top: 16px; right: 16px; transform: translateY(-20px); opacity: 0;
-    transition: all .2s ease; z-index: 60; pointer-events: none;
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    transform: translateY(-20px);
+    opacity: 0;
+    transition: all .2s ease;
+    z-index: 11000;
+    pointer-events: none;
   }
   .su-toast.show { transform: translateY(0); opacity: 1; }
   .su-toast-inner {
-    background: ${isDark ? "rgba(124,58,237,0.14)" : "#ecfdf5"};
-    border: 1px solid ${isDark ? "rgba(124,58,237,0.25)" : "#a7f3d0"};
-    color: ${isDark ? "#e5e7eb" : "#065f46"};
-    padding: 10px 12px; border-radius: 10px; font-weight: 800;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
+    background: ${isDark ? "rgba(99,102,241,0.14)" : "#fff"};
+    border: 1px solid ${isDark ? "rgba(99,102,241,0.25)" : "rgba(229,231,235,1)"};
+    color: ${isDark ? "#e5e7eb" : "#0f172a"};
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+    box-shadow: var(--shadow-lg);
   }
   `}</style>
 );
 
-/* ---------------- Tiny Icons (inline SVG to avoid MUI) ---------------- */
+/* ---------------- Tiny Icons (inline SVG) ---------------- */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const DeleteIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -228,9 +415,9 @@ const DownloadIcon = (props) => (
 
 /* ---------------- Toast ---------------- */
 function Toast({ open, onClose, children }) {
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) return;
-    const t = setTimeout(onClose, 3000);
+    const t = setTimeout(onClose, 2500);
     return () => clearTimeout(t);
   }, [open, onClose]);
   return (
@@ -254,7 +441,7 @@ const formatToYYYYMMDD = (val) => {
 };
 
 /* ---------------- Drawer ---------------- */
-const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
+const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items, isDark }) => {
   const [q, setQ] = useState("");
 
   const parsed = useMemo(() => {
@@ -305,9 +492,9 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
   return (
     <>
       <div className={`r-dim ${isOpen ? "open" : ""}`} onClick={onClose} />
-      <div className={`r-drawer ${isOpen ? "open" : ""}`}>
+      <div className={`r-drawer ${isOpen ? "open" : ""}`} role="dialog" aria-modal="true">
         <div className="r-dhdr">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span className="r-badge">
               <MenuIcon />
             </span>
@@ -320,7 +507,7 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
               </p>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 10 }}>
             <button className="r-btn-ghost" onClick={exportCsv}>
               <DownloadIcon /> Export
             </button>
@@ -331,49 +518,55 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
         </div>
 
         <div className="r-dbody">
-          <div className="r-summary" style={{ display: "flex", justifyContent: "space-between" }}>
+          <div className="r-summary" style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 900 }}>
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>
                 Source
               </div>
               <div className="r-strong">{meta?.recipe || "—"}</div>
               <div className="r-muted">Batch: {meta?.batchCode ?? "—"}</div>
             </div>
             <div className="r-stat">
-              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 900 }}>
+              <div className="r-muted" style={{ textTransform: "uppercase", fontWeight: 800 }}>
                 Items
               </div>
-              <div className="r-strong" style={{ color: "#7C3AED", fontSize: 24 }}>
+              <div className="r-strong" style={{ color: "var(--primary)", fontSize: 24 }}>
                 {filtered.length}
               </div>
             </div>
           </div>
 
           <div className="r-filter">
-            <input className="r-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter items..." />
+            <input
+              className="r-input"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filter items..."
+            />
           </div>
 
           <ul className="r-list">
             {filtered.map((it, i) => (
               <li key={i} className="r-item">
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   <span className="r-badge">
                     <CheckIcon />
                   </span>
-                  <span className="r-strong" style={{ fontWeight: 800 }}>
+                  <span className="r-strong" style={{ fontWeight: 800, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {it.name}
                   </span>
                 </div>
-                {/* ingredients show qty as chip; barcodes show value as muted text */}
+
                 {mode === "ingredients" ? (
                   <span className="r-chip">{it.value}</span>
                 ) : (
-                  <span className="r-muted" style={{ wordBreak: "break-word" }}>
+                  <span className="r-muted" style={{ wordBreak: "break-word", maxWidth: 180, textAlign: "right" }}>
                     {it.value}
                   </span>
                 )}
               </li>
             ))}
+
             {filtered.length === 0 && (
               <li className="r-item" style={{ justifyContent: "center" }}>
                 <span className="r-muted">No items found.</span>
@@ -393,8 +586,8 @@ const UsageDrawer = ({ isOpen, onClose, header, meta, mode, items }) => {
   );
 };
 
-/* ---------------- Delete Modal (shared look) ---------------- */
-const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
+/* ---------------- Delete Modal ---------------- */
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count, isDark }) => {
   if (!isOpen || count === 0) return null;
   return (
     <div className="r-modal-dim">
@@ -407,29 +600,40 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, count }) => {
             <CloseIcon /> Close
           </button>
         </div>
+
         <div className="r-mbody" style={{ textAlign: "center" }}>
           <div
-            className="r-badge"
+            className="r-flex"
             style={{
-              width: 52,
-              height: 52,
+              width: 60,
+              height: 60,
+              margin: "0 auto",
               alignItems: "center",
               justifyContent: "center",
-              background: "rgba(220,38,38,0.18)",
-              color: "#fecaca",
-              border: "1px solid rgba(220,38,38,0.35)",
-              margin: "0 auto",
+              background: isDark ? "rgba(220,38,38,0.18)" : "#fee2e2",
+              color: isDark ? "#fecaca" : "#dc2626",
+              borderRadius: 999,
+              border: `1px solid ${isDark ? "rgba(220,38,38,0.35)" : "transparent"}`,
             }}
           >
             <DeleteIcon />
           </div>
-          <h3 className="r-strong" style={{ marginTop: 10, fontSize: 18 }}>
+
+          <h3
+            style={{
+              fontWeight: 900,
+              color: isDark ? "#e5e7eb" : "#0f172a",
+              marginTop: 10,
+              fontSize: 18,
+            }}
+          >
             Delete {count} row{count > 1 ? "s" : ""}?
           </h3>
           <p className="r-muted" style={{ marginTop: 6 }}>
             This action cannot be undone.
           </p>
         </div>
+
         <div className="r-mfooter" style={{ justifyContent: "flex-end" }}>
           <button className="r-btn-ghost" onClick={onClose}>
             Cancel
@@ -545,14 +749,16 @@ const StockUsage = () => {
       response.data.forEach((item) => {
         const usageIds = item?.ids || item?.stock_usage_ids || [];
         const date = formatToYYYYMMDD(item.production_log_date ?? item.date ?? "");
-        const key = `${item.recipe_name}-${date}-${item.batchCode}`;
+        const recipeName = item.recipe_name ?? "";
+        const batchCode = item.batchCode ?? "";
+        const key = `${recipeName}-${date}-${batchCode}`;
 
         if (!grouped[key]) {
           grouped[key] = {
             id: key,
             date,
-            recipeName: item.recipe_name,
-            batchCode: item.batchCode,
+            recipeName,
+            batchCode,
             batchesProduced: item.batchesProduced,
             ingredients: [],
             barcodes: [],
@@ -564,7 +770,10 @@ const StockUsage = () => {
 
         if (!Array.isArray(item.ingredients)) return;
         item.ingredients.forEach((ingredient) => {
-          const totalQuantity = ingredient.quantity * item.batchesProduced;
+          const qty = Number(ingredient.quantity || 0);
+          const produced = Number(item.batchesProduced || 0);
+          const totalQuantity = qty * produced;
+
           const unit = ingredient.unit ?? ingredient.unit_name ?? ingredient.unitLabel ?? "";
           const unitSuffix = unit ? ` ${unit}` : "";
           grouped[key].ingredients.push(
@@ -631,12 +840,15 @@ const StockUsage = () => {
 
       <div className="r-card">
         <div className="r-head">
-          <h2 className="r-title">Stock Usage</h2>
+          <div>
+            <h2 className="r-title">Stock Usage</h2>
+            <p className="r-sub">View production runs and the ingredients/batchcodes consumed</p>
+          </div>
 
-          <div className="r-actions-right">
+          <div className="r-flex">
             {numSelected > 0 && (
               <div
-                className="r-actions-right"
+                className="r-flex"
                 style={{
                   background: isDark ? "rgba(124,58,237,0.12)" : "#eef2ff",
                   padding: "6px 10px",
@@ -646,19 +858,24 @@ const StockUsage = () => {
               >
                 <span className="r-pill">{numSelected} selected</span>
                 <button
-                  className="r-btn-icon"
+                  className="r-btn-ghost"
                   onClick={openDeletePrompt}
                   aria-label="Delete selected"
                   title="Delete selected"
+                  style={{
+                    color: isDark ? "#fecaca" : "#dc2626",
+                    borderColor: isDark ? "rgba(220,38,38,0.35)" : "#fecaca",
+                  }}
                 >
                   <DeleteIcon />
+                  Delete
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Search toolbar */}
+        {/* Toolbar (search) */}
         <div className="r-toolbar">
           <input
             className="r-input"
@@ -669,11 +886,11 @@ const StockUsage = () => {
           />
         </div>
 
-        <div className="r-table-wrap">
+        <div className="r-table-wrap" style={{ marginTop: 16 }}>
           <table className="r-table">
             <thead className="r-thead">
               <tr>
-                <th className="r-td">
+                <th className="r-td" style={{ width: 40 }}>
                   <input
                     ref={selectAllRef}
                     className="r-chk"
@@ -682,11 +899,11 @@ const StockUsage = () => {
                     checked={rowCount > 0 && numSelected === rowCount}
                   />
                 </th>
-                <th className="r-td">Date</th>
-                <th className="r-td">Recipe</th>
-                <th className="r-td">Ingredients</th>
-                <th className="r-td">Batch Code</th>
-                <th className="r-td">Ingredient Batchcodes Used</th>
+                <th className="r-td" style={{ width: 120 }}>Date</th>
+                <th className="r-td" style={{ width: 220 }}>Recipe</th>
+                <th className="r-td" style={{ width: 160 }}>Ingredients</th>
+                <th className="r-td" style={{ width: 160 }}>Batch Code</th>
+                <th className="r-td" style={{ width: 220 }}>Ingredient Batchcodes Used</th>
               </tr>
             </thead>
             <tbody>
@@ -743,6 +960,21 @@ const StockUsage = () => {
             </tbody>
           </table>
         </div>
+
+        <div className="r-footer">
+          <span className="r-muted">
+            Showing <strong>{filteredRows.length}</strong> run{filteredRows.length === 1 ? "" : "s"}
+          </span>
+          <span className="r-muted">
+            {numSelected > 0 ? (
+              <>
+                <strong>{numSelected}</strong> selected
+              </>
+            ) : (
+              "Select rows to delete"
+            )}
+          </span>
+        </div>
       </div>
 
       {/* Drawer */}
@@ -753,6 +985,7 @@ const StockUsage = () => {
         mode={drawerMode}
         items={drawerItems}
         meta={drawerMeta}
+        isDark={isDark}
       />
 
       {/* Delete confirmation */}
@@ -761,6 +994,7 @@ const StockUsage = () => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={confirmDelete}
         count={selectedIds.size}
+        isDark={isDark}
       />
 
       {/* Toast */}
