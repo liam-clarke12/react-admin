@@ -6,182 +6,249 @@ import ProductionLogForm from "../form/ProductionLog";
 import { useAuth } from "../../contexts/AuthContext";
 
 /* =========================================================================================
-   Brand Styles (identical to Goods In) + sidebar cards + DARK MODE
-   - Reads localStorage "theme-mode" = "dark"
-   - Listens for window "themeChanged" event
-
-   FIXES APPLIED:
-   1) DataGrid header forced to follow dark mode via stronger selectors + !important.
-   2) Modal form dropdown stacking fixed:
-      - modal containers now use consistent, very high z-index
-      - MUI Popover/Menu/Popper forced above modal
-      - common portal roots (MuiModal/MuiDialog/MuiDrawer) also forced above
+   Production Log — updated to match Goods In styling (Light + Dark)
+   - Reads localStorage('theme-mode') + listens for window 'themeChanged'
+   - Preserves all existing functionality (fetch, search/sort, pagination, edit, delete, record)
+   - Keeps the original modal portal approach + ensures dropdowns render above modal
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
   :root{
-    --bg: ${isDark ? "#0b1220" : "#f3f4f6"};
-    --card: ${isDark ? "#0f172a" : "#fff"};
-    --card2: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"};
-    --border: ${isDark ? "#1f2a44" : "#e5e7eb"};
-    --text: ${isDark ? "#e5e7eb" : "#0f172a"};
-    --text2: ${isDark ? "#cbd5e1" : "#334155"};
+    --bg: ${isDark ? "#0a0f1e" : "#f8fafc"};
+    --card: ${isDark ? "#151b2e" : "#ffffff"};
+    --card2: ${isDark ? "#1a2033" : "#ffffff"};
+    --mutedCard: ${isDark ? "rgba(255,255,255,0.03)" : "#f9fafb"};
+    --border: ${isDark ? "#1e2942" : "#e2e8f0"};
+    --text: ${isDark ? "#f1f5f9" : "#0f172a"};
+    --text2: ${isDark ? "#cbd5e1" : "#475569"};
     --muted: ${isDark ? "#94a3b8" : "#64748b"};
-    --thead: ${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
-    --hover: ${isDark ? "rgba(124,58,237,0.14)" : "#f4f1ff"};
-    --chip: ${isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"};
-    --accentBg: ${isDark ? "rgba(124,58,237,0.10)" : "#f9f7ff"};
-    --accentBorder: ${isDark ? "rgba(124,58,237,0.28)" : "#7C3AED66"};
-    --primary: #7C3AED;
-    --primary2: #5B21B6;
-    --danger: #dc2626;
-    --danger2: #b91c1c;
+    --hover: ${isDark ? "rgba(99,102,241,0.08)" : "#f0f4ff"};
+    --thead: ${isDark ? "rgba(99,102,241,0.05)" : "#f8fafc"};
+    --chip: ${isDark ? "rgba(99,102,241,0.12)" : "#eff6ff"};
+    --monoBg: ${isDark ? "rgba(99,102,241,0.15)" : "#eef2ff"};
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --primary2: #4338ca;
+    --success: #10b981;
+    --success-light: #34d399;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --danger2: #dc2626;
+    --shadow-sm: ${isDark ? "0 1px 2px rgba(0,0,0,0.3)" : "0 1px 2px rgba(0,0,0,0.04)"};
+    --shadow: ${isDark ? "0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2)" : "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04)"};
+    --shadow-lg: ${isDark ? "0 20px 25px -5px rgba(0,0,0,0.4), 0 10px 10px -5px rgba(0,0,0,0.3)" : "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"};
   }
 
-  .r-wrap { padding: 16px; background: var(--bg); min-height: calc(100vh - 0px); color: var(--text); }
+  * { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
 
-  .r-card{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:16px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
-    overflow:hidden;
+  .r-wrap {
+    padding: 24px;
+    background: var(--bg);
+    min-height: calc(100vh - 0px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    color: var(--text2);
   }
-  .r-head{
-    padding:16px;
-    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
-    border-bottom:1px solid var(--border);
-    background: var(--card2);
+
+  .r-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: visible;
+    color: var(--text2);
   }
-  .r-title { margin:0; font-weight:900; color:var(--text); font-size:20px; }
-  .r-sub { margin:0; color:var(--muted); font-size:12px; }
-  .r-pill { font-size:12px; font-weight:900; color:var(--primary); }
-  .r-flex { display:flex; align-items:center; gap:10px; }
+
+  .r-head {
+    padding: 20px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
+  }
+
+  .r-title {
+    margin: 0;
+    font-weight: 700;
+    color: var(--text);
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .r-sub {
+    margin: 4px 0 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .r-pill {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--chip);
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+
+  .r-flex { display:flex; align-items:center; gap:12px; }
 
   .r-btn-ghost{
-    display:inline-flex; align-items:center; gap:8px; padding:8px 12px; font-weight:900; font-size:14px;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px;
+    font-weight:600; font-size:14px;
     color:var(--text);
     border:1px solid var(--border);
-    border-radius:10px;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+    border-radius:8px;
+    background:var(--card);
     cursor:pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
   }
-  .r-btn-ghost:hover { background: var(--hover); }
-  .r-btn-ghost:disabled { opacity:.55; cursor:not-allowed; }
+  .r-btn-ghost:hover{
+    background:var(--hover);
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  .r-btn-ghost:active{ transform: translateY(0); }
+  .r-btn-ghost:disabled{ opacity:.55; cursor:not-allowed; transform:none; }
 
   .r-btn-primary{
-    padding:10px 16px; font-weight:900; color:#fff; background:var(--primary);
-    border:0; border-radius:10px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"}),0 1px 3px rgba(16,24,40,${isDark ? "0.28" : "0.08"});
+    padding:10px 20px;
+    font-weight:600; font-size:14px;
+    color:#fff;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border:0;
+    border-radius:8px;
+    box-shadow: 0 4px 6px -1px rgba(99,102,241,0.3), 0 2px 4px -1px rgba(99,102,241,0.2);
     cursor:pointer;
+    transition: all 0.2s ease;
   }
-  .r-btn-primary:hover { background:var(--primary2); }
-  .r-btn-danger { background:var(--danger); }
-  .r-btn-danger:hover { background:var(--danger2); }
+  .r-btn-primary:hover{
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 10px -1px rgba(99,102,241,0.4), 0 4px 6px -1px rgba(99,102,241,0.3);
+  }
+  .r-btn-primary:active{ transform: translateY(0); }
+
+  .r-btn-danger{
+    background: linear-gradient(135deg, var(--danger) 0%, var(--danger2) 100%);
+    box-shadow: 0 4px 6px -1px rgba(239,68,68,0.3), 0 2px 4px -1px rgba(239,68,68,0.2);
+  }
+  .r-btn-danger:hover{
+    background: linear-gradient(135deg, #f87171 0%, var(--danger) 100%);
+    box-shadow: 0 6px 10px -1px rgba(239,68,68,0.4), 0 4px 6px -1px rgba(239,68,68,0.3);
+  }
 
   /* Toolbar */
   .r-toolbar{
-    background:var(--card);
-    padding:12px 16px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    box-shadow:0 1px 2px rgba(16,24,40,${isDark ? "0.22" : "0.06"});
-    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
-    margin: 12px 16px 0;
+    background: var(--card2);
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    color: var(--text2);
+    margin: 16px 24px 0;
   }
+
   .r-input{
-    min-width:260px; flex:1;
-    padding:10px 12px;
+    min-width: 280px;
+    flex:1;
+    padding: 11px 14px;
     border:1px solid var(--border);
-    border-radius:10px;
+    border-radius:8px;
     outline:none;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
-    color:var(--text);
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
+    color: var(--text);
+    font-size:14px;
+    font-weight:500;
+    transition: all 0.2s ease;
   }
-  .r-input::placeholder { color:${isDark ? "rgba(148,163,184,0.85)" : "#94a3b8"}; }
-  .r-input:focus { border-color:var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .r-input::placeholder{ color: var(--muted); }
+  .r-input:focus{
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    background: var(--card);
+  }
 
   .r-select{
-    padding:10px 12px;
+    padding: 11px 14px;
     border:1px solid var(--border);
-    border-radius:10px;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
-    color:var(--text);
+    border-radius:8px;
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
+    color: var(--text);
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    transition: all 0.2s ease;
   }
-  .r-toolbar-gap { margin-top:12px; }
+  .r-select:focus{
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    outline:none;
+  }
+
+  .r-toolbar-gap{ margin-top: 16px; }
 
   /* Footer */
   .r-footer{
-    padding:12px 16px;
-    border-top:1px solid var(--border);
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between;
-    background: var(--card2);
+    background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
+    color: var(--text2);
+    font-size: 14px;
+    font-weight: 500;
   }
-  .r-muted{ color:var(--muted); font-size:12px; }
+  .r-muted{ color: var(--muted); font-size: 13px; font-weight: 500; }
 
-  /* Page layout */
+  /* Layout */
   .gi-layout{ display:flex; gap:24px; align-items:flex-start; }
-  .gi-main{ flex:1 1 0%; min-width:0; }
-  .gi-side{ width:320px; flex:0 0 320px; display:flex; flex-direction:column; gap:12px; position:sticky; top:16px; }
+  .gi-main{ flex: 1 1 0%; min-width:0; }
+  .gi-side{ width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:20px; }
 
-  /* Modal shell */
-  .r-modal-dim{
-    position:fixed; inset:0;
-    background:rgba(0,0,0,.55);
-    display:flex; align-items:center; justify-content:center;
-    z-index:200000 !important;
-    padding:16px;
-  }
-  .r-modal{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    width:100%;
-    max-width:900px;
-    max-height:90vh;
-    overflow:hidden;
-    box-shadow:0 10px 30px rgba(0,0,0,${isDark ? "0.45" : "0.22"});
-    display:flex; flex-direction:column;
-    z-index:200001 !important;
-    position:relative;
-  }
-  .r-mhdr{ padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background: var(--card2); }
-  .r-mbody{
-    padding:16px;
-    overflow-y:auto;
-    overflow-x:visible;
-    background:var(--card);
-    flex:1;
+  .gi-card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 20px;
     color: var(--text2);
   }
-  .r-mfooter{ padding:12px 16px; border-top:1px solid var(--border); background:${isDark ? "rgba(255,255,255,0.02)" : "#f8fafc"}; display:flex; justify-content:flex-end; gap:10px; }
-
-  /* Grid form bits in modal */
-  .ag-grid{ display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0, 1fr)); overflow:visible !important; }
-  .ag-field{ grid-column: span 2; }
-  .ag-field-1{ grid-column: span 1; }
-  .ag-field-2{ grid-column: span 2; }
-  .ag-field-4{ grid-column: span 4; }
-  .ag-label{ font-size:12px; color:var(--muted); font-weight:900; margin-bottom:6px; display:block; }
-  .ag-input, .ag-select{
-    width:100%;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:10px;
-    outline:none;
-    background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
-    color:var(--text);
+  .gi-card h3{
+    margin:0 0 16px 0;
+    font-size:16px;
+    font-weight:700;
+    color: var(--text);
+    letter-spacing:-0.01em;
   }
-  .ag-input:focus, .ag-select:focus{ border-color:var(--primary); box-shadow:0 0 0 4px rgba(124,58,237,.18); }
+  .gi-card strong{ color: var(--text); font-weight:700; }
 
-  /* Ensure native selects / inputs inside modal aren't clipped */
-  .ag-select, .ag-input, select{ position:relative; z-index:200005 !important; }
+  /* DataGrid container */
+  .dg-wrap{
+    height: 70vh;
+    min-width: 750px;
+    padding: 0 24px 16px;
+  }
 
-  /* DataGrid */
-  .dg-wrap{ height: 70vh; min-width: 750px; }
-  .dg-wrap .MuiDataGrid-root{ border:0; font-size:14px; color:var(--text2); background: transparent; }
+  /* DataGrid theme */
+  .dg-wrap .MuiDataGrid-root{
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 14px;
+    color: var(--text2);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
 
-  /* ===== FIX: FORCE HEADER ROW TO FOLLOW DARK MODE (strong selectors + !important) ===== */
+  /* Header */
   .dg-wrap .MuiDataGrid-columnHeaders,
   .dg-wrap .MuiDataGrid-columnHeadersInner,
   .dg-wrap .MuiDataGrid-columnHeader,
@@ -190,49 +257,152 @@ const BrandStyles = ({ isDark }) => (
     background: var(--thead) !important;
   }
   .dg-wrap .MuiDataGrid-columnHeaders{
-    border-bottom:1px solid var(--border) !important;
+    border-bottom: 2px solid var(--border) !important;
   }
   .dg-wrap .MuiDataGrid-columnHeaderTitle,
-  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
   .dg-wrap .MuiDataGrid-sortIcon,
   .dg-wrap .MuiDataGrid-menuIcon,
   .dg-wrap .MuiDataGrid-iconButtonContainer{
     color: var(--muted) !important;
-    font-weight:900 !important;
-    text-transform:uppercase;
-    letter-spacing:.03em;
-    font-size:12px;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: 11px;
   }
 
-  .dg-wrap .MuiDataGrid-cell{ border-bottom:1px solid var(--border); }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(odd){ background: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"}; }
-  .dg-wrap .MuiDataGrid-row:nth-of-type(even){ background: ${isDark ? "rgba(255,255,255,0.01)" : "#f8fafc"}; }
-  .dg-wrap .MuiDataGrid-row:hover{ background: var(--hover) !important; }
-  .dg-wrap .MuiCheckbox-root, .dg-wrap .MuiSvgIcon-root{ color: ${isDark ? "#cbd5e1" : "#334155"}; }
-  .dg-wrap .MuiDataGrid-virtualScroller{ background: transparent; }
+  .dg-wrap .MuiDataGrid-cell{
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .dg-wrap .MuiDataGrid-row:hover{
+    background: var(--hover) !important;
+  }
+  .dg-wrap .MuiDataGrid-virtualScroller{
+    background: transparent;
+  }
+  .dg-wrap .MuiCheckbox-root, .dg-wrap .MuiSvgIcon-root{
+    color: ${isDark ? "#cbd5e1" : "#334155"};
+  }
 
-  /* Badges like Goods In */
-  .r-qty-badge{ display:inline-block; padding:2px 8px; border-radius:10px; background:var(--chip); color:var(--text); font-weight:800; }
+  /* Badge */
+  .r-qty-badge{
+    display:inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--chip);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+  }
 
-  /* Selection chip area */
+  /* Selection chip */
   .r-chip{
-    background:${isDark ? "rgba(124,58,237,0.14)" : "#eef2ff"};
-    border:1px solid ${isDark ? "rgba(124,58,237,0.25)" : "transparent"};
-    padding:6px 10px;
-    border-radius:10px;
+    background: var(--chip);
+    border: 1px solid ${isDark ? "rgba(99,102,241,0.20)" : "transparent"};
+    padding: 6px 10px;
+    border-radius: 10px;
     display:flex; align-items:center; gap:10px;
   }
 
-  /* Sidebar stat cards */
-  .stat-card{ padding:14px 16px; }
-  .stat-title{ font-size:12px; color:var(--muted); font-weight:900; margin:0 0 6px; }
-  .stat-value{ font-weight:900; color:var(--text); font-size:28px; line-height:1; margin:0; }
-  .stat-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .stat-kpi{ font-size:14px; font-weight:900; color:var(--text); }
-  .stat-sub{ font-size:12px; color:var(--muted); }
-  .stat-accent{ border:1px dashed var(--accentBorder); background: var(--accentBg); }
+  /* Modals */
+  .r-modal-dim{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index: 9999;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
-  /* ===== FIX: FORCE MUI dropdowns above modal (portal stacking) ===== */
+  .r-modal{
+    background: var(--card);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 920px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    display:flex;
+    flex-direction: column;
+    z-index: 10000;
+    border: 1px solid var(--border);
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from{opacity:0; transform: translateY(20px)} to{opacity:1; transform: translateY(0)} }
+
+  .r-mhdr{
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: ${isDark ? "rgba(99,102,241,0.03)" : "rgba(99,102,241,0.02)"};
+  }
+  .r-mbody{
+    padding: 24px;
+    overflow: auto;
+    background: var(--card);
+    color: var(--text2);
+  }
+  .r-mfooter{
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
+    display:flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  /* Form grid inside modal */
+  .ag-grid{
+    display:grid;
+    gap: 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .ag-field{ grid-column: span 2; }
+  .ag-field-1{ grid-column: span 1; }
+  .ag-field-2{ grid-column: span 2; }
+  .ag-field-4{ grid-column: span 4; }
+
+  .ag-label{
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display:block;
+    letter-spacing: -0.01em;
+  }
+
+  .ag-input, .ag-select{
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .ag-input::placeholder{ color: var(--muted); }
+  .ag-input:focus, .ag-select:focus{
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    background: var(--card);
+  }
+
+  /* Ensure native inputs/selects aren't clipped */
+  .ag-select, .ag-input, select{ position: relative; z-index: 10001; }
+
+  /* Dropdown stacking above modal */
   .MuiPopover-root,
   .MuiPopover-root .MuiPaper-root,
   .MuiMenu-root,
@@ -240,33 +410,32 @@ const BrandStyles = ({ isDark }) => (
   .MuiPopper-root,
   .MuiAutocomplete-popper,
   .MuiPickersPopper-root{
-    z-index: 400000 !important;
+    z-index: 10020 !important;
   }
-
-  /* If any MUI modal/dialog/drawer exists, keep it above app shell */
   .MuiModal-root,
   .MuiDialog-root,
   .MuiDrawer-root{
-    z-index: 350000 !important;
+    z-index: 10010 !important;
   }
 
   @media (max-width: 1100px){
-    .gi-layout{ flex-direction:column; }
-    .gi-side{ width:100%; position:static; top:auto; flex: 1; }
-    .dg-wrap{ min-width: 0; height: 65vh; }
+    .gi-layout{ flex-direction: column; }
+    .gi-side{ width: 100%; }
+    .dg-wrap{ min-width: 0; height: 65vh; padding: 0 0 16px; }
+    .r-toolbar{ margin: 16px 0 0; }
   }
 `}</style>
 );
 
-/* Icons (match Goods In) */
+/* Icons (match Goods In style sizing) */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
 );
 const DeleteIcon = (props) => (
-  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
@@ -449,9 +618,8 @@ export default function ProductionLog() {
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let rows = [...productionLogs];
-    if (q) {
-      rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
-    }
+    if (q) rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+
     const dir = sortBy.dir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       const fa = a[sortBy.field] ?? "";
@@ -594,36 +762,25 @@ export default function ProductionLog() {
     return filteredRows.slice(start, start + rowsPerPage);
   }, [filteredRows, page, rowsPerPage]);
 
+  const dangerCardStyle = {
+    borderColor: isDark ? "rgba(220,38,38,0.55)" : "#fecaca",
+    background: isDark ? "rgba(220,38,38,0.12)" : "#fff1f2",
+    color: isDark ? "#fecaca" : "#b91c1c",
+    marginBottom: 12,
+  };
+
   return (
     <div className="r-wrap">
       <BrandStyles isDark={isDark} />
 
       {!cognitoId && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: isDark ? "rgba(220,38,38,0.45)" : "#fecaca",
-            background: isDark ? "rgba(220,38,38,0.10)" : "#fff1f2",
-            color: isDark ? "#fecaca" : "#b91c1c",
-            marginBottom: 12,
-            padding: 14,
-          }}
-        >
+        <div className="gi-card" style={dangerCardStyle}>
           <strong>Can’t load data:</strong> No cognito_id detected.
         </div>
       )}
 
       {fatalMsg && (
-        <div
-          className="r-card"
-          style={{
-            borderColor: isDark ? "rgba(220,38,38,0.45)" : "#fecaca",
-            background: isDark ? "rgba(220,38,38,0.10)" : "#fff1f2",
-            color: isDark ? "#fecaca" : "#b91c1c",
-            marginBottom: 12,
-            padding: 14,
-          }}
-        >
+        <div className="gi-card" style={dangerCardStyle}>
           <strong>API error:</strong> {fatalMsg}
         </div>
       )}
@@ -638,13 +795,11 @@ export default function ProductionLog() {
                 <p className="r-sub">Track batches, waste and remaining units</p>
               </div>
 
-              <div style={{ marginLeft: "auto" }}>
+              <div className="r-flex" style={{ marginLeft: "auto" }}>
                 <button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>
                   + Record Production
                 </button>
-              </div>
 
-              <div className="r-flex">
                 {selectedRows.length > 0 && (
                   <div className="r-chip">
                     <span className="r-pill">{selectedRows.length} selected</span>
@@ -655,7 +810,6 @@ export default function ProductionLog() {
                       style={{
                         color: isDark ? "#fecaca" : "#dc2626",
                         borderColor: isDark ? "rgba(220,38,38,0.35)" : "#fecaca",
-                        background: isDark ? "rgba(220,38,38,0.10)" : undefined,
                       }}
                     >
                       <DeleteIcon /> Delete
@@ -718,21 +872,19 @@ export default function ProductionLog() {
                   border: 0,
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
                   "& .MuiDataGrid-footerContainer": {
-                    borderTop: `1px solid ${isDark ? "#1f2a44" : "#e5e7eb"}`,
+                    borderTop: `1px solid ${isDark ? "#1e2942" : "#e2e8f0"}`,
                   },
-
-                  /* Belt + braces: header styling in sx too */
                   "& .MuiDataGrid-columnHeaders": {
                     backgroundColor: "var(--thead)",
                     color: "var(--muted)",
-                    borderBottom: "1px solid var(--border)",
+                    borderBottom: "2px solid var(--border)",
                   },
                   "& .MuiDataGrid-columnHeaderTitle": {
                     color: "var(--muted)",
-                    fontWeight: 900,
+                    fontWeight: 700,
                     textTransform: "uppercase",
-                    letterSpacing: ".03em",
-                    fontSize: 12,
+                    letterSpacing: ".05em",
+                    fontSize: 11,
                   },
                   "& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIcon": { color: "var(--muted)" },
                 }}
@@ -742,17 +894,9 @@ export default function ProductionLog() {
             <div className="r-footer">
               <span className="r-muted">
                 Showing{" "}
-                <strong style={{ color: isDark ? "#e5e7eb" : "#0f172a" }}>
-                  {filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}
-                </strong>
-                –
-                <strong style={{ color: isDark ? "#e5e7eb" : "#0f172a" }}>
-                  {Math.min((page + 1) * rowsPerPage, filteredRows.length)}
-                </strong>{" "}
-                of{" "}
-                <strong style={{ color: isDark ? "#e5e7eb" : "#0f172a" }}>
-                  {filteredRows.length}
-                </strong>
+                <strong style={{ color: "var(--text)" }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
+                <strong style={{ color: "var(--text)" }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong>{" "}
+                of <strong style={{ color: "var(--text)" }}>{filteredRows.length}</strong>
               </span>
 
               <div className="r-flex">
@@ -790,44 +934,46 @@ export default function ProductionLog() {
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR: QUICK STATS */}
+        {/* RIGHT SIDEBAR */}
         <aside className="gi-side">
-          <div className="r-card stat-card stat-accent">
-            <p className="stat-title">Total Remaining (Units)</p>
-            <p className="stat-value">{nf(stats.totalUnitsRemaining)}</p>
-            <p className="stat-sub">Based on current filters</p>
+          <div className="gi-card">
+            <h3>Total Remaining (Units)</h3>
+            <p style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", margin: "6px 0 6px" }}>{nf(stats.totalUnitsRemaining)}</p>
+            <p className="r-muted" style={{ margin: 0 }}>
+              Based on current filters
+            </p>
           </div>
 
-          <div className="r-card stat-card">
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Batches Produced</span>
-              <span className="stat-kpi">{nf(stats.totalBatchesProduced)}</span>
+          <div className="gi-card">
+            <h3>Quick Stats</h3>
+
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+              <span className="r-muted">Batches Produced</span>
+              <strong>{nf(stats.totalBatchesProduced)}</strong>
             </div>
 
-            <div className="stat-row" style={{ marginBottom: 10 }}>
-              <span className="stat-kpi">Units of Waste</span>
-              <span className="stat-kpi">{nf(stats.totalWaste)}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+              <span className="r-muted">Units of Waste</span>
+              <strong>{nf(stats.totalWaste)}</strong>
             </div>
 
-            <div className="stat-row">
-              <span className="stat-kpi">Active Batches</span>
-              <span className="stat-kpi">{nf(stats.activeBatches)}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+              <span className="r-muted">Active Batches</span>
+              <strong>{nf(stats.activeBatches)}</strong>
             </div>
           </div>
 
-          <div className="r-card stat-card">
-            <p className="stat-title">Top Recipes by Remaining</p>
+          <div className="gi-card">
+            <h3>Top Recipes by Remaining</h3>
 
             {stats.topRecipes.length === 0 ? (
-              <p className="stat-sub">No data</p>
+              <p className="r-muted">No data</p>
             ) : (
-              <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "grid", gap: 10 }}>
                 {stats.topRecipes.map((t) => (
-                  <div key={t.recipe} className="stat-row">
-                    <span className="stat-sub" style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a" }}>
-                      {t.recipe}
-                    </span>
-                    <span className="stat-kpi">{nf(t.units)}</span>
+                  <div key={t.recipe} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 700, color: "var(--text)" }}>{t.recipe}</span>
+                    <span className="r-qty-badge">{nf(t.units)}</span>
                   </div>
                 ))}
               </div>
@@ -982,7 +1128,7 @@ export default function ProductionLog() {
                     margin: "0 auto",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "rgba(220,38,38,0.16)",
+                    background: isDark ? "rgba(220,38,38,0.18)" : "#fee2e2",
                     color: isDark ? "#fecaca" : "#dc2626",
                     borderRadius: 999,
                     border: `1px solid ${isDark ? "rgba(220,38,38,0.35)" : "transparent"}`,
@@ -991,7 +1137,7 @@ export default function ProductionLog() {
                   <DeleteIcon />
                 </div>
 
-                <h3 style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a", marginTop: 10, fontSize: 18 }}>
+                <h3 style={{ fontWeight: 900, color: "var(--text)", marginTop: 10, fontSize: 18 }}>
                   Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
                 </h3>
 

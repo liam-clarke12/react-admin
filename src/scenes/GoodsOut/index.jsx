@@ -13,6 +13,8 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
@@ -25,7 +27,7 @@ import * as yup from "yup";
 import { Formik, FieldArray } from "formik";
 
 /* =========================================================================================
-   Brand Styles (Light + Dark) — MATCH GoodsIn
+   Brand Styles (Light + Dark) — matches GoodsIn styling
    - Reads localStorage('theme-mode') + listens for window 'themeChanged'
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
@@ -48,6 +50,7 @@ const BrandStyles = ({ isDark }) => (
     --primary-dark: #4f46e5;
     --primary2: #4338ca;
     --success: #10b981;
+    --success-light: #34d399;
     --warning: #f59e0b;
     --danger: #ef4444;
     --danger2: #dc2626;
@@ -58,15 +61,14 @@ const BrandStyles = ({ isDark }) => (
 
   * { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
 
-  .r-wrap {
-    padding: 24px;
-    background: var(--bg);
+  .r-wrap { 
+    padding: 24px; 
+    background: var(--bg); 
     min-height: calc(100vh - 0px);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    color: var(--text2);
   }
 
-  .r-card{
+  .r-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -75,157 +77,159 @@ const BrandStyles = ({ isDark }) => (
     color: var(--text2);
   }
 
-  .r-head{
-    padding: 20px 24px;
-    display:flex;
-    flex-wrap:wrap;
-    gap:16px;
-    align-items:center;
-    justify-content:space-between;
-    border-bottom:1px solid var(--border);
+  .r-head { 
+    padding: 20px 24px; 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 16px; 
+    align-items: center; 
+    justify-content: space-between; 
+    border-bottom: 1px solid var(--border);
     background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
   }
 
-  .r-title{
-    margin:0;
-    font-weight:700;
-    color:var(--text);
-    font-size:24px;
-    letter-spacing:-0.02em;
-    line-height:1.2;
+  .r-title { 
+    margin: 0; 
+    font-weight: 700; 
+    color: var(--text); 
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
 
-  .r-sub{
-    margin:4px 0 0 0;
-    color:var(--muted);
-    font-size:14px;
-    font-weight:500;
+  .r-sub { 
+    margin: 4px 0 0 0; 
+    color: var(--muted); 
+    font-size: 14px;
+    font-weight: 500;
   }
 
-  .r-pill{
-    font-size:13px;
-    font-weight:700;
-    color:var(--primary);
-    background:var(--chip);
-    padding:4px 12px;
-    border-radius:6px;
+  .r-pill { 
+    font-size: 13px; 
+    font-weight: 700; 
+    color: var(--primary);
+    background: var(--chip);
+    padding: 4px 12px;
+    border-radius: 6px;
   }
 
-  .r-flex{ display:flex; align-items:center; gap:12px; }
-
-  .r-btn-ghost{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 16px;
-    font-weight:600;
-    font-size:14px;
-    color:var(--text);
-    border:1px solid var(--border);
-    border-radius:8px;
-    background:var(--card);
-    cursor:pointer;
-    box-shadow:var(--shadow-sm);
-    transition:all 0.2s ease;
+  .r-flex { 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
   }
-  .r-btn-ghost:hover{
-    background:var(--hover);
-    border-color:var(--primary-light);
-    transform:translateY(-1px);
-    box-shadow:var(--shadow);
-  }
-  .r-btn-ghost:active{ transform:translateY(0); }
 
-  .r-btn-primary{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 20px;
-    font-weight:600;
-    font-size:14px;
-    color:#fff;
+  .r-btn-ghost {
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    padding: 10px 16px; 
+    font-weight: 600; 
+    font-size: 14px;
+    color: var(--text); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    background: var(--card); 
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+  }
+  .r-btn-ghost:hover { 
+    background: var(--hover);
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+  .r-btn-ghost:active { transform: translateY(0); }
+
+  .r-btn-primary {
+    display:inline-flex; align-items:center; gap:8px;
+    padding: 10px 20px; 
+    font-weight: 600; 
+    font-size: 14px;
+    color: #fff; 
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    border:0;
-    border-radius:8px;
+    border: 0; 
+    border-radius: 8px;
     box-shadow: 0 4px 6px -1px rgba(99,102,241,0.3), 0 2px 4px -1px rgba(99,102,241,0.2);
-    cursor:pointer;
-    transition:all 0.2s ease;
+    cursor: pointer;
+    transition: all 0.2s ease;
   }
-  .r-btn-primary:hover{
+  .r-btn-primary:hover { 
     background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-    transform:translateY(-1px);
+    transform: translateY(-1px);
     box-shadow: 0 6px 10px -1px rgba(99,102,241,0.4), 0 4px 6px -1px rgba(99,102,241,0.3);
   }
-  .r-btn-primary:active{ transform:translateY(0); }
+  .r-btn-primary:active { transform: translateY(0); }
 
-  .r-btn-danger{
+  .r-btn-danger { 
     background: linear-gradient(135deg, var(--danger) 0%, var(--danger2) 100%);
     box-shadow: 0 4px 6px -1px rgba(239,68,68,0.3), 0 2px 4px -1px rgba(239,68,68,0.2);
   }
-  .r-btn-danger:hover{
+  .r-btn-danger:hover { 
     background: linear-gradient(135deg, #f87171 0%, var(--danger) 100%);
     box-shadow: 0 6px 10px -1px rgba(239,68,68,0.4), 0 4px 6px -1px rgba(239,68,68,0.3);
   }
 
-  .r-toolbar{
+  .r-toolbar {
     background: var(--card2);
     padding: 16px 20px;
     border: 1px solid var(--border);
     border-radius: 10px;
     box-shadow: var(--shadow-sm);
-    display:flex;
-    flex-wrap:wrap;
-    gap:12px;
-    align-items:center;
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 12px; 
+    align-items: center;
     color: var(--text2);
-    margin: 0 24px 20px;
+    margin: 16px 24px 0;
   }
 
-  .r-input{
-    min-width:280px;
-    flex:1;
-    padding:11px 14px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    outline:none;
+  .r-input {
+    min-width: 280px; 
+    flex: 1; 
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px; 
+    outline: none;
     background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
     color: var(--text);
-    font-size:14px;
-    font-weight:500;
-    transition:all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
   }
-  .r-input::placeholder{ color: var(--muted); }
-  .r-input:focus{
-    border-color: var(--primary);
+  .r-input::placeholder { color: var(--muted); }
+  .r-input:focus { 
+    border-color: var(--primary); 
     box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
     background: var(--card);
   }
 
-  .r-select{
-    padding:11px 14px;
-    border:1px solid var(--border);
-    border-radius:8px;
+  .r-select {
+    padding: 11px 14px; 
+    border: 1px solid var(--border); 
+    border-radius: 8px;
     background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
     color: var(--text);
-    font-size:14px;
-    font-weight:500;
-    cursor:pointer;
-    transition:all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
   }
-  .r-select:focus{
+  .r-select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
-    outline:none;
+    outline: none;
   }
 
-  .r-toolbar-gap{ margin-top: 16px; }
+  .r-toolbar-gap { margin-top: 16px; }
 
-  .r-footer{
+  .r-footer {
     padding: 16px 24px;
     border-top: 1px solid var(--border);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
     background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
     color: var(--text2);
     font-size: 14px;
@@ -234,16 +238,15 @@ const BrandStyles = ({ isDark }) => (
     flex-wrap: wrap;
   }
 
-  .r-muted{
-    color: var(--muted);
+  .r-muted { 
+    color: var(--muted); 
     font-size: 13px;
     font-weight: 500;
   }
 
-  /* Layout (match GoodsIn) */
-  .gi-layout{ display:flex; gap:24px; align-items:flex-start; }
-  .gi-main{ flex:1 1 0%; min-width:0; }
-  .gi-side{ width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:20px; }
+  .gi-layout { display:flex; gap:24px; align-items:flex-start; }
+  .gi-main { flex:1 1 0%; min-width:0; }
+  .gi-side { width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:20px; }
 
   .gi-card{
     background: var(--card);
@@ -262,290 +265,176 @@ const BrandStyles = ({ isDark }) => (
   }
   .gi-card strong{ color: var(--text); font-weight: 700; }
 
-  /* Modal (match GoodsIn) */
-  .r-modal-dim{
-    position:fixed;
-    inset:0;
+  /* Modal (matches GoodsIn) */
+  .r-modal-dim { 
+    position: fixed; 
+    inset: 0; 
     background: rgba(0,0,0,0.6);
     backdrop-filter: blur(4px);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    z-index: 9999;
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 9999; 
     padding: 20px;
     animation: fadeIn 0.2s ease;
   }
-  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-  .r-modal{
-    background: var(--card);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 920px;
-    max-height: 90vh;
-    overflow: hidden;
+  .r-modal { 
+    background: var(--card); 
+    border-radius: 16px; 
+    width: 100%; 
+    max-width: 920px; 
+    max-height: 90vh; 
+    overflow: hidden; 
     box-shadow: var(--shadow-lg);
-    display:flex;
-    flex-direction:column;
-    z-index: 10000;
+    display: flex; 
+    flex-direction: column; 
+    z-index: 10000; 
     border: 1px solid var(--border);
     animation: slideUp 0.3s ease;
   }
-  @keyframes slideUp{
-    from{ opacity:0; transform: translateY(20px); }
-    to{ opacity:1; transform: translateY(0); }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  .r-mhdr{
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:16px;
-    flex-wrap:wrap;
+  .r-mhdr { 
+    padding: 20px 24px; 
+    border-bottom: 1px solid var(--border); 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 16px; 
+    flex-wrap: wrap;
     background: ${isDark ? "rgba(99,102,241,0.03)" : "rgba(99,102,241,0.02)"};
   }
-  .r-mbody{
-    padding: 24px;
-    overflow:auto;
-    background: var(--card);
-    color: var(--text2);
-  }
-  .r-mfooter{
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
+  .r-mbody { padding: 24px; overflow: auto; background: var(--card); color: var(--text2); }
+  .r-mfooter { 
+    padding: 16px 24px; 
+    border-top: 1px solid var(--border); 
     background: ${isDark ? "rgba(99,102,241,0.02)" : "rgba(99,102,241,0.01)"};
-    display:flex;
-    justify-content:flex-end;
-    gap:12px;
+    display: flex; 
+    justify-content: flex-end; 
+    gap: 12px;
   }
 
-  /* Segmented control (match GoodsIn) */
-  .seg{
-    display:inline-flex;
-    gap:4px;
-    padding:4px;
+  /* Segmented control (matches GoodsIn) */
+  .seg {
+    display: inline-flex; 
+    gap: 4px; 
+    padding: 4px;
     background: ${isDark ? "rgba(255,255,255,0.05)" : "#f1f5f9"};
     border: 1px solid var(--border);
     border-radius: 10px;
-    position: relative;
+    position: relative; 
     z-index: 10001;
   }
-  .seg button{
-    border:0;
-    background:transparent;
-    padding:8px 16px;
-    border-radius:8px;
-    font-weight:600;
-    cursor:pointer;
+  .seg button {
+    border: 0; 
+    background: transparent; 
+    padding: 8px 16px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    cursor: pointer; 
     color: var(--text2);
     font-size: 14px;
     transition: all 0.2s ease;
   }
-  .seg button:hover{
+  .seg button:hover { 
     background: ${isDark ? "rgba(99,102,241,0.1)" : "#e0e7ff"};
     color: var(--text);
   }
-  .seg .active{
+  .seg .active { 
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color:#fff;
+    color: #fff; 
     box-shadow: 0 2px 4px rgba(99,102,241,0.3);
   }
 
-  /* Form (match GoodsIn ag-*) */
-  .ag-grid{
-    display:grid;
-    gap:16px;
+  /* Form grid (matches GoodsIn ag-*) */
+  .ag-grid { 
+    display: grid; 
+    gap: 16px; 
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .ag-field{ grid-column: span 2; }
-  .ag-field-4{ grid-column: span 4; }
-  .ag-field-1{ grid-column: span 1; }
+  .ag-field { grid-column: span 2; }
+  .ag-field-1 { grid-column: span 1; }
+  .ag-field-4 { grid-column: span 4; }
 
-  .ag-label{
-    font-size: 13px;
-    color: var(--text);
-    font-weight: 600;
-    margin-bottom: 8px;
-    display:block;
+  @media (max-width: 900px){
+    .ag-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ag-field, .ag-field-1, .ag-field-4 { grid-column: span 2; }
+    .gi-layout{ flex-direction: column; }
+    .gi-side{ width: 100%; }
+  }
+
+  .ag-label { 
+    font-size: 13px; 
+    color: var(--text); 
+    font-weight: 600; 
+    margin-bottom: 8px; 
+    display: block;
     letter-spacing: -0.01em;
   }
-  .ag-input, .ag-select{
+  .ag-input, .ag-select {
     width: 100%;
     padding: 11px 14px;
     border: 1px solid var(--border);
     border-radius: 8px;
-    outline:none;
+    outline: none;
     background: ${isDark ? "rgba(255,255,255,0.04)" : "#fff"};
     color: var(--text);
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s ease;
   }
-  .ag-input::placeholder{ color: var(--muted); }
-  .ag-input:focus, .ag-select:focus{
-    border-color: var(--primary);
+  .ag-input::placeholder { color: var(--muted); }
+  .ag-input:focus, .ag-select:focus { 
+    border-color: var(--primary); 
     box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
     background: var(--card);
   }
+  .ag-error{ color: #ef4444; font-size: 12px; margin-top: 6px; font-weight: 600; }
 
-  .ag-row{
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-    background: var(--card);
+  .ag-row { 
+    border: 1px solid var(--border); 
+    border-radius: 10px; 
+    padding: 16px; 
+    background: var(--card); 
     color: var(--text2);
     margin-bottom: 12px;
   }
-  .ag-row:nth-child(odd){
-    background: ${isDark ? "rgba(255,255,255,0.02)" : "#f9fafb"};
-  }
-  .ag-error{
-    color: #ef4444;
-    font-size: 12px;
-    margin-top: 6px;
-    font-weight: 600;
-  }
-
-  /* Toast (simple, matches palette) */
-  .go-toast{
-    position:fixed;
-    top:16px;
-    right:16px;
-    background: ${isDark ? "rgba(99,102,241,0.14)" : "#fff"};
-    color: ${isDark ? "#e5e7eb" : "#0f172a"};
-    border: 1px solid ${isDark ? "rgba(99,102,241,0.25)" : "rgba(226,232,240,1)"};
-    padding: 10px 14px;
-    border-radius: 12px;
-    box-shadow: var(--shadow-lg);
-    animation: toastIn .2s forwards;
-    z-index: 10050;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  @keyframes toastIn{
-    from{ opacity:0; transform: translateY(-12px); }
-    to{ opacity:1; transform: translateY(0); }
-  }
+  .ag-row:nth-child(odd){ background: ${isDark ? "rgba(255,255,255,0.02)" : "#f9fafb"}; }
 
   /* DataGrid */
-  .dg-wrap { height: 70vh; min-width: 750px; margin: 0 24px; }
-  .dg-wrap .MuiDataGrid-root { border:0; background: transparent; color: var(--text2); }
-  .dg-wrap .MuiDataGrid-cell{ border-bottom:1px solid var(--border); }
-  .dg-wrap .MuiCheckbox-root, .dg-wrap .MuiSvgIcon-root{ color: ${isDark ? "#cbd5e1" : "#334155"}; }
-
-  /* Force header theme */
-  .dg-wrap .MuiDataGrid-columnHeaders,
-  .dg-wrap .MuiDataGrid-columnHeadersInner,
-  .dg-wrap .MuiDataGrid-columnHeader,
-  .dg-wrap .MuiDataGrid-columnHeaderTitleContainer{
-    background: var(--thead) !important;
-  }
+  .dg-wrap { height: 70vh; min-width: 750px; padding: 0 24px 16px; }
+  .dg-wrap .MuiDataGrid-root { border:0; background: transparent; }
   .dg-wrap .MuiDataGrid-columnHeaders{
-    border-bottom:2px solid var(--border) !important;
+    background: var(--thead);
+    border-bottom:1px solid var(--border);
+    color: var(--muted);
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    font-size:11px;
   }
-  .dg-wrap .MuiDataGrid-columnHeaderTitle,
-  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
-  .dg-wrap .MuiDataGrid-sortIcon,
-  .dg-wrap .MuiDataGrid-menuIcon,
-  .dg-wrap .MuiDataGrid-iconButtonContainer{
-    color: var(--muted) !important;
+  .dg-wrap .MuiDataGrid-cell{
+    border-bottom:1px solid var(--border);
+    color: var(--text2);
+    font-weight: 500;
+  }
+  .dg-wrap .MuiCheckbox-root, .dg-wrap .MuiSvgIcon-root{
+    color: ${isDark ? "#cbd5e1" : "#475569"};
   }
 
-  /* Ensure MUI portals behave above modals (belt+braces) */
-  .MuiPopover-root, .MuiModal-root, .MuiDrawer-root { z-index: 12000; }
+  /* Slightly lift MUI drawer header contrast */
+  .go-drawer-meta { opacity: 0.95; }
   `}</style>
 );
 
-/* =====================================================================
-   HARD BLOCK MODAL (NO PROCEED)
-   ===================================================================== */
-const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
-  if (!open) return null;
-  return createPortal(
-    <div className="r-modal-dim" onClick={onClose}>
-      <div className="r-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-        <div className="r-mhdr">
-          <h3 className="r-title" style={{ fontSize: 18 }}>
-            Insufficient Finished Units
-          </h3>
-          <button className="r-btn-ghost" onClick={onClose}>
-            Close
-          </button>
-        </div>
-
-        <div className="r-mbody">
-          <p
-            style={{
-              background: isDark ? "rgba(239,68,68,0.12)" : "#fff1f2",
-              border: `1px solid ${isDark ? "rgba(239,68,68,0.35)" : "#fecaca"}`,
-              padding: "12px",
-              borderRadius: "12px",
-              color: isDark ? "#fecaca" : "#b91c1c",
-              fontWeight: 800,
-              marginBottom: "16px",
-            }}
-          >
-            You’re trying to send out more <strong>{recipe}</strong> units than are currently available.
-          </p>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-              marginBottom: "14px",
-            }}
-          >
-            <div style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "10px 12px" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 900, textTransform: "uppercase" }}>
-                Requested
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "var(--text)" }}>{need}</div>
-            </div>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "10px 12px" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 900, textTransform: "uppercase" }}>
-                Available
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "var(--text)" }}>{have}</div>
-            </div>
-          </div>
-
-          <p style={{ fontSize: 13, color: "var(--text2)" }}>
-            Please produce more <strong>{recipe}</strong> before recording these goods out.
-          </p>
-        </div>
-
-        <div className="r-mfooter">
-          <button className="r-btn-ghost" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-/* =====================================================================
-   TOAST
-   ===================================================================== */
-const Toast = ({ open, children, onClose }) => {
-  if (!open) return null;
-  return createPortal(
-    <div className="go-toast" onClick={onClose}>
-      {children}
-    </div>,
-    document.body
-  );
-};
-
-/* =====================================================================
-   GOODS OUT FORM (Single + Multiple)
-   ===================================================================== */
-
+/* =========================================================================================
+   Config + Validation
+   ========================================================================================= */
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const goodsOutSchema = yup.object().shape({
@@ -600,9 +489,9 @@ const useAvailableUnitsFetcher = (cognitoId) => {
   );
 };
 
-/* =====================================================================
+/* =========================================================================================
    Helpers
-   ===================================================================== */
+   ========================================================================================= */
 const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const safeParse = (val, fallback) => {
@@ -673,9 +562,73 @@ const buildDrawerItems = (row) =>
 const Portal = ({ children }) =>
   typeof window === "undefined" ? null : createPortal(children, document.body);
 
-/* =====================================================================
+/* =========================================================================================
+   HARD BLOCK MODAL (NO PROCEED) — styled like GoodsIn modal
+   ========================================================================================= */
+const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
+  if (!open) return null;
+
+  return createPortal(
+    <div className="r-modal-dim" onClick={onClose}>
+      <div className="r-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <div className="r-mhdr">
+          <h3 className="r-title" style={{ fontSize: 18 }}>
+            Insufficient Finished Units
+          </h3>
+          <button className="r-btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <div className="r-mbody">
+          <div
+            className="gi-card"
+            style={{
+              padding: 14,
+              marginBottom: 14,
+              borderColor: isDark ? "rgba(239,68,68,0.55)" : "#fecaca",
+              background: isDark ? "rgba(239,68,68,0.12)" : "#fff1f2",
+              color: isDark ? "#fecaca" : "#b91c1c",
+              boxShadow: "none",
+            }}
+          >
+            You’re trying to send out more <strong>{recipe}</strong> units than are currently available.
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="gi-card" style={{ padding: 14, boxShadow: "none" }}>
+              <div className="r-muted" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Requested
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{need}</div>
+            </div>
+            <div className="gi-card" style={{ padding: 14, boxShadow: "none" }}>
+              <div className="r-muted" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Available
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{have}</div>
+            </div>
+          </div>
+
+          <p style={{ marginTop: 12, fontSize: 14, color: "var(--text2)", fontWeight: 600 }}>
+            Please produce more <strong>{recipe}</strong> before recording these goods out.
+          </p>
+        </div>
+
+        <div className="r-mfooter">
+          <button className="r-btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+/* =========================================================================================
    MAIN COMPONENT
-   ===================================================================== */
+   ========================================================================================= */
 export default function GoodsOut() {
   const { cognitoId } = useAuth();
 
@@ -689,7 +642,7 @@ export default function GoodsOut() {
 
   /* ===========================
      Form Modal State
-  ============================= */
+  ============================ */
   const [formOpen, setFormOpen] = useState(false);
   const [formView, setFormView] = useState("single"); // single | multiple
 
@@ -772,7 +725,6 @@ export default function GoodsOut() {
         );
 
         const recipe = r.recipe ?? r.recipe_name ?? r.product ?? r.product_name ?? "Unknown";
-
         const recipients = r.recipients ?? r.customer ?? r.client ?? r.destination ?? "";
 
         const date =
@@ -840,6 +792,7 @@ export default function GoodsOut() {
   const handleSubmitBatch = async (values, helpers) => {
     const items = values.items || [];
 
+    // aggregate needs
     const needMap = {};
     items.forEach((item) => {
       const r = item.recipe?.trim();
@@ -847,6 +800,7 @@ export default function GoodsOut() {
       needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0);
     });
 
+    // HARD precheck
     for (const [recipe, need] of Object.entries(needMap)) {
       const have = await fetchAvailableUnits(recipe);
       if (need > have) {
@@ -886,7 +840,7 @@ export default function GoodsOut() {
   };
 
   /* =====================================================================
-     FORM MODAL CONTENT (restyled to match GoodsIn)
+     FORM MODAL CONTENT (styled like GoodsIn)
      ===================================================================== */
   const renderFormModal = () => {
     if (!formOpen) return null;
@@ -894,34 +848,43 @@ export default function GoodsOut() {
     return createPortal(
       <div className="r-modal-dim" onClick={() => setFormOpen(false)}>
         <div className="r-modal" onClick={(e) => e.stopPropagation()}>
+          {/* HEADER */}
           <div className="r-mhdr">
             <h3 className="r-title" style={{ fontSize: 18 }}>
               Add Goods Out
             </h3>
 
-            <div className="seg" role="tablist" aria-label="Add goods out mode">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={formView === "single"}
-                className={formView === "single" ? "active" : ""}
-                onClick={() => setFormView("single")}
-              >
-                Single
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={formView === "multiple"}
-                className={formView === "multiple" ? "active" : ""}
-                onClick={() => setFormView("multiple")}
-              >
-                Multiple
+            <div className="r-flex" style={{ gap: 10 }}>
+              <div className="seg" role="tablist" aria-label="Goods out mode">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={formView === "single"}
+                  className={formView === "single" ? "active" : ""}
+                  onClick={() => setFormView("single")}
+                >
+                  Single
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={formView === "multiple"}
+                  className={formView === "multiple" ? "active" : ""}
+                  onClick={() => setFormView("multiple")}
+                >
+                  Multiple
+                </button>
+              </div>
+
+              <button className="r-btn-ghost" onClick={() => setFormOpen(false)}>
+                Close
               </button>
             </div>
           </div>
 
+          {/* BODY */}
           <div className="r-mbody">
+            {/* ===================== SINGLE FORM ===================== */}
             {formView === "single" && (
               <Formik
                 initialValues={{
@@ -1016,6 +979,7 @@ export default function GoodsOut() {
               </Formik>
             )}
 
+            {/* ===================== MULTIPLE FORM ===================== */}
             {formView === "multiple" && (
               <Formik
                 initialValues={{
@@ -1049,7 +1013,7 @@ export default function GoodsOut() {
                                       display: "flex",
                                       justifyContent: "space-between",
                                       alignItems: "center",
-                                      marginBottom: 8,
+                                      marginBottom: 10,
                                     }}
                                   >
                                     <strong style={{ color: "var(--text)" }}>Goods Out {idx + 1}</strong>
@@ -1057,12 +1021,12 @@ export default function GoodsOut() {
                                       <button
                                         type="button"
                                         className="r-btn-ghost"
+                                        onClick={() => remove(idx)}
                                         style={{
                                           padding: "8px 12px",
                                           color: isDark ? "#fecaca" : "#dc2626",
-                                          borderColor: isDark ? "rgba(220,38,38,0.35)" : "#fecaca",
+                                          borderColor: isDark ? "rgba(239,68,68,0.35)" : "#fecaca",
                                         }}
-                                        onClick={() => remove(idx)}
                                       >
                                         Remove
                                       </button>
@@ -1093,11 +1057,7 @@ export default function GoodsOut() {
                                         onChange={handleChange}
                                       >
                                         <option value="" disabled>
-                                          {recipesLoading
-                                            ? "Loading..."
-                                            : recipesError
-                                            ? recipesError
-                                            : "Select recipe…"}
+                                          {recipesLoading ? "Loading..." : recipesError ? recipesError : "Select recipe…"}
                                         </option>
                                         {recipes.map((r, i) => (
                                           <option key={i} value={r}>
@@ -1158,7 +1118,7 @@ export default function GoodsOut() {
                                 })
                               }
                             >
-                              + Add another
+                              + Add another row
                             </button>
                           </div>
 
@@ -1275,9 +1235,7 @@ export default function GoodsOut() {
     rows.sort((a, b) => {
       const fa = a[sortBy.field] ?? "";
       const fb = b[sortBy.field] ?? "";
-      if (typeof fa === "number" || typeof fb === "number") {
-        return (Number(fa) - Number(fb)) * dir;
-      }
+      if (typeof fa === "number" || typeof fb === "number") return (Number(fa) - Number(fb)) * dir;
       return String(fa).localeCompare(String(fb)) * dir;
     });
 
@@ -1299,19 +1257,14 @@ export default function GoodsOut() {
     return { totalUnits, shipments, uniqueRecipes, uniqueRecipients };
   }, [filteredRows]);
 
-  const dangerCardStyle = {
-    borderColor: isDark ? "rgba(220,38,38,0.55)" : "#fecaca",
-    background: isDark ? "rgba(220,38,38,0.12)" : "#fff1f2",
-    color: isDark ? "#fecaca" : "#b91c1c",
-    marginBottom: 12,
-  };
-
   return (
     <div className="r-wrap">
       <BrandStyles isDark={isDark} />
 
+      {/* Form modal */}
       {renderFormModal()}
 
+      {/* Hard block modal */}
       <HardBlockModal
         open={blockOpen}
         recipe={blockInfo.recipe}
@@ -1321,26 +1274,50 @@ export default function GoodsOut() {
         isDark={isDark}
       />
 
-      <Toast open={toastOpen} onClose={() => setToastOpen(false)}>
-        Goods Out recorded successfully!
-      </Toast>
+      {/* Toast (matches GoodsIn) */}
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={2500}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setToastOpen(false)}
+          severity="success"
+          sx={{
+            fontWeight: 700,
+            borderRadius: 2,
+            bgcolor: isDark ? "rgba(99,102,241,0.14)" : "#fff",
+            color: isDark ? "#e5e7eb" : "inherit",
+            border: `1px solid ${isDark ? "rgba(99,102,241,0.25)" : "rgba(229,231,235,1)"}`,
+            "& .MuiAlert-icon": { color: "var(--primary)" },
+          }}
+        >
+          Goods Out recorded successfully!
+        </Alert>
+      </Snackbar>
 
       {/* Errors */}
-      {!cognitoId && (
-        <div className="gi-card" style={dangerCardStyle}>
-          <strong>Can’t load data:</strong> No cognito_id detected. Ensure your auth provider sets{" "}
-          <code>cognitoId</code>.
-        </div>
-      )}
       {fatalMsg && (
-        <div className="gi-card" style={dangerCardStyle}>
+        <div
+          className="gi-card"
+          style={{
+            borderColor: isDark ? "rgba(239,68,68,0.55)" : "#fecaca",
+            background: isDark ? "rgba(239,68,68,0.12)" : "#fff1f2",
+            color: isDark ? "#fecaca" : "#b91c1c",
+            marginBottom: 12,
+          }}
+        >
           <strong>API error:</strong> {fatalMsg}
         </div>
       )}
 
+      {/* Layout */}
       <div className="gi-layout">
+        {/* MAIN TABLE */}
         <div className="gi-main">
           <div className="r-card">
+            {/* Header */}
             <div className="r-head">
               <div>
                 <h2 className="r-title">Goods Out</h2>
@@ -1353,35 +1330,25 @@ export default function GoodsOut() {
                 </button>
 
                 {selectedRows.length > 0 && (
-                  <div
-                    className="r-flex"
+                  <button
+                    className="r-btn-ghost"
+                    onClick={() => setDeleteOpen(true)}
                     style={{
-                      background: isDark ? "rgba(99,102,241,0.12)" : "#eef2ff",
-                      padding: "6px 10px",
-                      borderRadius: 10,
-                      border: `1px solid ${isDark ? "rgba(99,102,241,0.25)" : "transparent"}`,
+                      color: isDark ? "#fecaca" : "#dc2626",
+                      borderColor: isDark ? "rgba(239,68,68,0.35)" : "#fecaca",
                     }}
                   >
-                    <span className="r-pill">{selectedRows.length} selected</span>
-                    <button
-                      className="r-btn-ghost"
-                      onClick={() => setDeleteOpen(true)}
-                      style={{
-                        color: isDark ? "#fecaca" : "#dc2626",
-                        borderColor: isDark ? "rgba(220,38,38,0.35)" : "#fecaca",
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" /> Delete
-                    </button>
-                  </div>
+                    <DeleteIcon fontSize="small" /> Delete
+                  </button>
                 )}
               </div>
             </div>
 
+            {/* Toolbar */}
             <div className="r-toolbar">
               <input
                 className="r-input"
-                placeholder="Search by date, recipe, recipient, batchcode..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -1409,6 +1376,7 @@ export default function GoodsOut() {
               </select>
             </div>
 
+            {/* DataGrid */}
             <div className="r-toolbar-gap dg-wrap">
               <DataGrid
                 rows={visibleRows}
@@ -1417,26 +1385,18 @@ export default function GoodsOut() {
                 checkboxSelection
                 disableRowSelectionOnClick
                 rowSelectionModel={selectedRows}
-                onRowSelectionModelChange={(m) =>
-                  setSelectedRows((Array.isArray(m) ? m : []).map(String))
-                }
+                onRowSelectionModelChange={(m) => setSelectedRows((Array.isArray(m) ? m : []).map(String))}
                 hideFooter
                 sx={{
                   border: 0,
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
                   "& .MuiDataGrid-virtualScroller": { background: "transparent" },
                   "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${isDark ? "#1e2942" : "#e2e8f0"}` },
-                  "& .MuiDataGrid-columnHeaders": {
-                    backgroundColor: "var(--thead)",
-                    color: "var(--muted)",
-                    borderBottom: "2px solid var(--border)",
-                  },
-                  "& .MuiDataGrid-columnHeaderTitle": { color: "var(--muted)", fontWeight: 700 },
-                  "& .MuiDataGrid-sortIcon, & .MuiDataGrid-menuIcon": { color: "var(--muted)" },
                 }}
               />
             </div>
 
+            {/* Footer */}
             <div className="r-footer">
               <span className="r-muted">
                 Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
@@ -1445,11 +1405,7 @@ export default function GoodsOut() {
               </span>
 
               <div className="r-flex">
-                <button
-                  className="r-btn-ghost"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
+                <button className="r-btn-ghost" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
                   Prev
                 </button>
 
@@ -1458,9 +1414,7 @@ export default function GoodsOut() {
                 <button
                   className="r-btn-ghost"
                   disabled={(page + 1) * rowsPerPage >= filteredRows.length}
-                  onClick={() =>
-                    setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p))
-                  }
+                  onClick={() => setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p))}
                 >
                   Next
                 </button>
@@ -1483,17 +1437,21 @@ export default function GoodsOut() {
           </div>
         </div>
 
+        {/* RIGHT SIDEBAR */}
         <aside className="gi-side">
           <div className="gi-card">
             <h3>Total Units Out</h3>
-            <p className="r-muted" style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", lineHeight: 1.1 }}>
+              {nf(stats.totalUnits)}
+            </div>
+            <p className="r-muted" style={{ marginTop: 8 }}>
               Based on filtered data
             </p>
+          </div>
+
+          <div className="gi-card">
+            <h3>Quick Stats</h3>
             <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span className="r-muted">Units</span>
-                <strong>{nf(stats.totalUnits)}</strong>
-              </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span className="r-muted">Shipments</span>
                 <strong>{nf(stats.shipments)}</strong>
@@ -1534,10 +1492,10 @@ export default function GoodsOut() {
                     margin: "0 auto",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: isDark ? "rgba(220,38,38,0.18)" : "#fee2e2",
+                    background: isDark ? "rgba(239,68,68,0.18)" : "#fee2e2",
                     color: isDark ? "#fecaca" : "#dc2626",
                     borderRadius: 999,
-                    border: `1px solid ${isDark ? "rgba(220,38,38,0.35)" : "transparent"}`,
+                    border: `1px solid ${isDark ? "rgba(239,68,68,0.35)" : "transparent"}`,
                   }}
                 >
                   <DeleteIcon />
@@ -1572,7 +1530,7 @@ export default function GoodsOut() {
         </Portal>
       )}
 
-      {/* DRAWER (kept functional, styled to new palette) */}
+      {/* BATCHCODE DRAWER */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -1588,6 +1546,7 @@ export default function GoodsOut() {
           },
         }}
       >
+        {/* HEADER */}
         <Box
           sx={{
             background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
@@ -1600,7 +1559,7 @@ export default function GoodsOut() {
         >
           <Box display="flex" alignItems="center" gap={2}>
             <MenuOutlinedIcon />
-            <Box>
+            <Box className="go-drawer-meta">
               <Typography variant="h6" fontWeight={900}>
                 {drawerHeader}
               </Typography>
@@ -1615,6 +1574,7 @@ export default function GoodsOut() {
           </IconButton>
         </Box>
 
+        {/* CONTENT */}
         <Box sx={{ p: 2 }}>
           <Card
             variant="outlined"
@@ -1645,7 +1605,7 @@ export default function GoodsOut() {
               mb: 2,
               "& .MuiOutlinedInput-root": {
                 color: isDark ? "#f1f5f9" : "#0f172a",
-                backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "#fff",
+                backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "#fff",
                 "& fieldset": { borderColor: isDark ? "#1e2942" : "#e2e8f0" },
                 "&:hover fieldset": { borderColor: isDark ? "rgba(129,140,248,0.5)" : "rgba(99,102,241,0.5)" },
                 "&.Mui-focused fieldset": { borderColor: "#6366f1" },
@@ -1671,6 +1631,7 @@ export default function GoodsOut() {
                     borderRadius: 2,
                     p: 1.5,
                     mb: 1,
+                    boxShadow: "none",
                   }}
                 >
                   <ListItem
@@ -1683,7 +1644,7 @@ export default function GoodsOut() {
                           background: isDark ? "rgba(99,102,241,0.12)" : "#eff6ff",
                           border: `1px solid ${isDark ? "rgba(99,102,241,0.25)" : "rgba(226,232,240,1)"}`,
                           fontSize: 12,
-                          fontWeight: 900,
+                          fontWeight: 800,
                           color: isDark ? "#f1f5f9" : "#0f172a",
                         }}
                       >
@@ -1697,7 +1658,7 @@ export default function GoodsOut() {
                     <ListItemText
                       primary={it.code}
                       primaryTypographyProps={{
-                        fontWeight: 800,
+                        fontWeight: 900,
                         color: isDark ? "#f1f5f9" : "#0f172a",
                       }}
                     />
