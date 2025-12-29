@@ -1,3 +1,4 @@
+// src/scenes/HRP/ProductionLog/ProductionLog.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DataGrid } from "@mui/x-data-grid";
@@ -7,7 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 /* =========================================================================================
    Brand Styles (identical to Goods In) + sidebar cards + DARK MODE
    - Reads localStorage "theme-mode" = "dark"
-   - Listens for window "themeChanged" event (same as other pages)
+   - Listens for window "themeChanged" event
 
    FIXES APPLIED:
    1) DataGrid header forced to follow dark mode via stronger selectors + !important.
@@ -248,34 +249,24 @@ const BrandStyles = ({ isDark }) => (
   .MuiDrawer-root{
     z-index: 350000 !important;
   }
+
+  @media (max-width: 1100px){
+    .gi-layout{ flex-direction:column; }
+    .gi-side{ width:100%; position:static; top:auto; flex: 1; }
+    .dg-wrap{ min-width: 0; height: 65vh; }
+  }
 `}</style>
 );
 
 /* Icons (match Goods In) */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
 const EditIcon = (props) => (
-  <Svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
 );
 const DeleteIcon = (props) => (
-  <Svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
@@ -297,9 +288,7 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
-// Prefer batchCode as the key everywhere
 const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
-
 const makeStableId = (row) => {
   if (!row) return null;
   const key = getRowKey(row);
@@ -335,7 +324,7 @@ export default function ProductionLog() {
   const [selectedRows, setSelectedRows] = useState([]);
   const [fatalMsg, setFatalMsg] = useState("");
 
-  // Search + sort (to match Goods In toolbar)
+  // Search + sort
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
 
@@ -434,10 +423,11 @@ export default function ProductionLog() {
       {
         field: "actions",
         headerName: "Actions",
-        width: 120,
+        width: 140,
         sortable: false,
         filterable: false,
         align: "right",
+        headerAlign: "right",
         renderCell: (params) => (
           <button
             className="r-btn-ghost"
@@ -622,6 +612,7 @@ export default function ProductionLog() {
           <strong>Can’t load data:</strong> No cognito_id detected.
         </div>
       )}
+
       {fatalMsg && (
         <div
           className="r-card"
