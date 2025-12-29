@@ -2,23 +2,49 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 
 /* ===========================
    Inline CSS (no Tailwind)
    =========================== */
-const DashboardStyles = () => (
+
+const DashboardStyles = ({ isDark }) => (
   <style>{`
     :root{
-      --bg: #f3f4f6; --bg-card: #ffffff; --text: #111827; --text-muted: #6b7280; --text-muted-2: #374151;
-      --indigo: #6366f1; --shadow: 0 4px 16px rgba(0,0,0,0.08); --shadow-strong: 0 10px 30px rgba(0,0,0,0.18);
-      --g50: #f9fafb; --g200: #e5e7eb; --g700: #374151; --green: #10b981; --green-100: #d1fae5; --green-900: #064e3b; --green-300: #86efac;
-      --red: #ef4444; --red-100: #fee2e2; --red-900: #7f1d1d; --red-300: #fca5a5; --yellow: #f59e0b;
-      --overlay: rgba(0,0,0,0.2); --overlay-dark: rgba(0,0,0,0.4); --radius-xl: 14px; --radius-full: 999px; --pad: 24px; --gap: 24px;
+      --bg: ${isDark ? "#0b1220" : "#f3f4f6"};
+      --bg-card: ${isDark ? "#0f172a" : "#ffffff"};
+      --text: ${isDark ? "#e5e7eb" : "#111827"};
+      --text-muted: ${isDark ? "#94a3b8" : "#6b7280"};
+      --text-muted-2: ${isDark ? "#cbd5e1" : "#374151"};
+
+      --indigo: #6366f1;
+
+      --shadow: ${isDark ? "0 4px 18px rgba(0,0,0,0.45)" : "0 4px 16px rgba(0,0,0,0.08)"};
+      --shadow-strong: ${isDark ? "0 10px 30px rgba(0,0,0,0.60)" : "0 10px 30px rgba(0,0,0,0.18)"};
+
+      --g50: ${isDark ? "rgba(255,255,255,0.04)" : "#f9fafb"};
+      --g200: ${isDark ? "rgba(148,163,184,0.22)" : "#e5e7eb"};
+      --g700: ${isDark ? "#94a3b8" : "#374151"};
+
+      --green: #10b981; --green-100: ${isDark ? "rgba(16,185,129,0.16)" : "#d1fae5"}; --green-900: ${isDark ? "#86efac" : "#064e3b"}; --green-300: #86efac;
+      --red: #ef4444; --red-100: ${isDark ? "rgba(239,68,68,0.16)" : "#fee2e2"}; --red-900: ${isDark ? "#fca5a5" : "#7f1d1d"}; --red-300: #fca5a5;
+      --yellow: #f59e0b;
+
+      --overlay: rgba(0,0,0,0.2);
+      --overlay-dark: rgba(0,0,0,0.4);
+      --radius-xl: 14px; --radius-full: 999px;
+      --pad: 24px; --gap: 24px;
     }
 
-    .dash { min-height: 100vh; background: var(--bg); padding: 24px 16px; }
+    .dash { min-height: 100vh; background: var(--bg); padding: 24px 16px; transition: background 0.25s ease; }
     .container { max-width: 1120px; margin: 0 auto; }
     .header { margin-bottom: 24px; }
     .h1 { font-size: 28px; font-weight: 800; color: var(--text); margin: 0 0 6px 0; }
@@ -34,7 +60,17 @@ const DashboardStyles = () => (
     .subgrid-2 { grid-template-columns: 1fr; }
     @media (min-width:1024px){ .subgrid-2{ grid-template-columns: repeat(2,1fr); } }
 
-    .card { background: var(--bg-card); border-radius: var(--radius-xl); box-shadow: var(--shadow); padding: var(--pad); display: flex; flex-direction: column; min-width: 0; }
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      padding: var(--pad);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border: 1px solid ${isDark ? "rgba(148,163,184,0.14)" : "transparent"};
+      transition: background 0.25s ease, box-shadow 0.25s ease, border 0.25s ease;
+    }
     .card-header { display: flex; align-items: center; margin-bottom: 16px; }
     .card-title { font-size: 20px; font-weight: 600; color: var(--text-muted-2); margin: 0; }
     .card-body { flex: 1 1 auto; min-height: 0; }
@@ -48,8 +84,8 @@ const DashboardStyles = () => (
     .list-item-sub { color: var(--text-muted); margin: 0; }
 
     .badge { font-weight: 700; border-radius: var(--radius-full); padding: 6px 12px; font-size: 16px; }
-    .badge-green { background: var(--green-100); color: #065f46; }
-    .badge-red { background: var(--red-100); color: #b91c1c; }
+    .badge-green { background: var(--green-100); color: var(--green-900); }
+    .badge-red { background: var(--red-100); color: var(--red-900); }
 
     .muted-box { background: var(--g50); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
 
@@ -62,8 +98,8 @@ const DashboardStyles = () => (
 
     .chart { width: 100%; height: 290px; }
 
-    .veil { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; }
-    .veil-box { background: var(--bg-card); color: var(--text); border-radius: var(--radius-xl); box-shadow: var(--shadow-strong); padding: 16px 24px; font-weight: 600; }
+    .veil { position: fixed; inset: 0; background: var(--overlay-dark); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .veil-box { background: var(--bg-card); color: var(--text); border-radius: var(--radius-xl); box-shadow: var(--shadow-strong); padding: 16px 24px; font-weight: 700; border: 1px solid ${isDark ? "rgba(148,163,184,0.14)" : "transparent"}; }
   `}</style>
 );
 
@@ -71,33 +107,54 @@ const DashboardStyles = () => (
    Unit helpers (normalize amounts)
    ========================================== */
 
-const UnitGroup = Object.freeze({ GRAMS: "grams_group", ML: "ml_group", UNITS: "units_group" });
+const UnitGroup = Object.freeze({
+  GRAMS: "grams_group",
+  ML: "ml_group",
+  UNITS: "units_group",
+});
 
 function detectUnitGroup(unit) {
   const u = String(unit || "").toLowerCase();
   if (u === "kg" || u === "g" || u === "grams") return UnitGroup.GRAMS;
-  if (u === "l" || u === "litre" || u === "litres" || u === "liter" || u === "liters" || u === "ml") return UnitGroup.ML;
+  if (
+    u === "l" ||
+    u === "litre" ||
+    u === "litres" ||
+    u === "liter" ||
+    u === "liters" ||
+    u === "ml"
+  )
+    return UnitGroup.ML;
   return UnitGroup.UNITS;
 }
 
 function toBaseAmount(amount, unit) {
   const val = Number(amount || 0);
   const u = String(unit || "").toLowerCase();
-  if (u === "kg") return val * 1000;            // grams base
-  if (u === "g" || u === "grams") return val;   // grams base
-  if (u === "l" || u === "litre" || u === "litres" || u === "liter" || u === "liters") return val * 1000; // ml base
-  if (u === "ml") return val;                   // ml base
-  return val;                                   // units base (no change)
+  if (u === "kg") return val * 1000; // grams base
+  if (u === "g" || u === "grams") return val; // grams base
+  if (
+    u === "l" ||
+    u === "litre" ||
+    u === "litres" ||
+    u === "liter" ||
+    u === "liters"
+  )
+    return val * 1000; // ml base
+  if (u === "ml") return val; // ml base
+  return val; // units base (no change)
 }
 
 function formatDisplayAmount(baseAmount, group) {
   const n = Number(baseAmount || 0);
   if (group === UnitGroup.GRAMS) {
-    if (Math.abs(n) >= 1000) return { amount: Number((n / 1000).toFixed(2)), unit: "kg" };
+    if (Math.abs(n) >= 1000)
+      return { amount: Number((n / 1000).toFixed(2)), unit: "kg" };
     return { amount: Math.round(n), unit: "g" };
   }
   if (group === UnitGroup.ML) {
-    if (Math.abs(n) >= 1000) return { amount: Number((n / 1000).toFixed(2)), unit: "L" };
+    if (Math.abs(n) >= 1000)
+      return { amount: Number((n / 1000).toFixed(2)), unit: "L" };
     return { amount: Math.round(n), unit: "ml" };
   }
   return { amount: Math.round(n), unit: "units" };
@@ -120,23 +177,32 @@ const DashboardCard = ({ title, icon, children, className = "" }) => (
 // Expiring ingredients (from ACTIVE inventory)
 const ExpiringIngredients = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
-  if (list.length === 0) return <div className="list-empty">No ingredients expiring soon. Good job!</div>;
+  if (list.length === 0)
+    return (
+      <div className="list-empty">No ingredients expiring soon. Good job!</div>
+    );
 
   const getDaysRemaining = (date) => {
     if (!date) return 0;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const expiry = new Date(date); expiry.setHours(0,0,0,0);
-    return Math.ceil((expiry.getTime() - today.getTime()) / (1000*60*60*24));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(date);
+    expiry.setHours(0, 0, 0, 0);
+    return Math.ceil(
+      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
   };
 
   return (
-    <div className="list" style={{height: 320}}>
+    <div className="list" style={{ height: 320 }}>
       {list.map((ing) => {
         const daysRemaining = getDaysRemaining(ing.expiryDate);
         const urgencyStyle =
-          daysRemaining <= 1 ? { color: "#ef4444" } :
-          daysRemaining <= 3 ? { color: "#f59e0b" } :
-          { color: "var(--text-muted)" };
+          daysRemaining <= 1
+            ? { color: "#ef4444" }
+            : daysRemaining <= 3
+            ? { color: "#f59e0b" }
+            : { color: "var(--text-muted)" };
         return (
           <div key={ing.id} className="list-item">
             <div>
@@ -158,20 +224,28 @@ const ExpiringIngredients = ({ ingredients }) => {
 // Ingredient stock bars (from ingredient-inventory/active, original logic)
 const IngredientStock = ({ ingredients }) => {
   const list = Array.isArray(ingredients) ? ingredients : [];
-  if (list.length === 0) return <p className="list-item-sub">No ingredients in stock.</p>;
+  if (list.length === 0)
+    return <p className="list-item-sub">No ingredients in stock.</p>;
 
-  const sorted = [...list].sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
+  const sorted = [...list].sort(
+    (a, b) => a.stockBase / a.maxBase - b.stockBase / b.maxBase
+  );
 
   return (
-    <div className="list" style={{height: 320}}>
+    <div className="list" style={{ height: 320 }}>
       {sorted.map((ing) => {
-        const pct = Math.max(0, Math.min(100, (ing.stockBase / ing.maxBase) * 100));
+        const pct = Math.max(
+          0,
+          Math.min(100, (ing.stockBase / ing.maxBase) * 100)
+        );
         const color = pct < 25 ? "red" : pct < 50 ? "yellow" : "green";
         return (
           <div key={ing.id}>
             <div className="progress-row">
               <span className="name">{ing.name}</span>
-              <span className="qty">{ing.display.amount} {ing.display.unit}</span>
+              <span className="qty">
+                {ing.display.amount} {ing.display.unit}
+              </span>
             </div>
             <div className="progress">
               <div className={`bar ${color}`} style={{ width: `${pct}%` }} />
@@ -186,20 +260,28 @@ const IngredientStock = ({ ingredients }) => {
 // Recipe stock bars (current units remaining per recipe)
 const RecipeStock = ({ recipes }) => {
   const list = Array.isArray(recipes) ? recipes : [];
-  if (list.length === 0) return <p className="list-item-sub">No recipes in stock.</p>;
+  if (list.length === 0)
+    return <p className="list-item-sub">No recipes in stock.</p>;
 
-  const sorted = [...list].sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
+  const sorted = [...list].sort(
+    (a, b) => a.stockBase / a.maxBase - b.stockBase / b.maxBase
+  );
 
   return (
-    <div className="list" style={{height: 320}}>
+    <div className="list" style={{ height: 320 }}>
       {sorted.map((rec) => {
-        const pct = Math.max(0, Math.min(100, (rec.stockBase / rec.maxBase) * 100));
+        const pct = Math.max(
+          0,
+          Math.min(100, (rec.stockBase / rec.maxBase) * 100)
+        );
         const color = pct < 25 ? "red" : pct < 50 ? "yellow" : "green";
         return (
           <div key={rec.id}>
             <div className="progress-row">
               <span className="name">{rec.name}</span>
-              <span className="qty">{rec.display.amount} {rec.display.unit}</span>
+              <span className="qty">
+                {rec.display.amount} {rec.display.unit}
+              </span>
             </div>
             <div className="progress">
               <div className={`bar ${color}`} style={{ width: `${pct}%` }} />
@@ -212,17 +294,22 @@ const RecipeStock = ({ recipes }) => {
 };
 
 // Weekly usage chart
-const WeeklyUsageChart = ({ data }) => (
+const WeeklyUsageChart = ({ data, isDark }) => (
   <div className="chart">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 128, 128, 0.2)" />
-        <XAxis dataKey="day" tick={{ fill: "#9CA3AF" }} />
-        <YAxis tick={{ fill: "#9CA3AF" }} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke={isDark ? "rgba(148,163,184,0.18)" : "rgba(128,128,128,0.2)"}
+        />
+        <XAxis dataKey="day" tick={{ fill: isDark ? "#cbd5e1" : "#9CA3AF" }} />
+        <YAxis tick={{ fill: isDark ? "#cbd5e1" : "#9CA3AF" }} />
         <Tooltip
           contentStyle={{
-            backgroundColor: "rgba(31, 41, 55, 0.85)",
-            borderColor: "#4B5563",
+            backgroundColor: isDark
+              ? "rgba(15,23,42,0.92)"
+              : "rgba(31, 41, 55, 0.85)",
+            borderColor: isDark ? "rgba(148,163,184,0.22)" : "#4B5563",
             borderRadius: "8px",
           }}
           labelStyle={{ color: "#F9FAFB" }}
@@ -238,13 +325,14 @@ const WeeklyUsageChart = ({ data }) => (
    Helpers
    =========================== */
 
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
-const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const API_BASE =
+  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function startOfISOWeek(d = new Date()) {
   const date = new Date(d);
   const day = (date.getDay() + 6) % 7; // Mon=0 .. Sun=6
-  date.setHours(0,0,0,0);
+  date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() - day);
   return date;
 }
@@ -263,11 +351,24 @@ const Dashboard = () => {
   const { cognitoId } = useAuth() || {};
   const [loading, setLoading] = useState(true);
 
+  // theme sync with Topbar
+  const [isDark, setIsDark] = useState(
+    () => localStorage.getItem("theme-mode") === "dark"
+  );
+
+  useEffect(() => {
+    const onThemeChanged = () => {
+      setIsDark(localStorage.getItem("theme-mode") === "dark");
+    };
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   // data
-  const [inventoryRaw, setInventoryRaw] = useState([]);     // ingredient-inventory/active
-  const [prodLogs, setProdLogs] = useState([]);             // full production-log (for batches chart)
+  const [inventoryRaw, setInventoryRaw] = useState([]); // ingredient-inventory/active
+  const [prodLogs, setProdLogs] = useState([]); // full production-log (for batches chart)
   const [prodLogsActive, setProdLogsActive] = useState([]); // production-log/active (for recipe stock)
-  const [goodsInRaw, setGoodsInRaw] = useState([]);         // goods-in/active (for stockouts KPI)
+  const [goodsInRaw, setGoodsInRaw] = useState([]); // goods-in/active (for stockouts KPI)
 
   useEffect(() => {
     if (!cognitoId) return;
@@ -276,17 +377,35 @@ const Dashboard = () => {
       setLoading(true);
       try {
         const [invRes, plRes, plaRes, giRes] = await Promise.all([
-          fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`),
-          fetch(`${API_BASE}/production-log?cognito_id=${encodeURIComponent(cognitoId)}`),
-          fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`),
-          fetch(`${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(cognitoId)}`),
+          fetch(
+            `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(
+              cognitoId
+            )}`
+          ),
+          fetch(
+            `${API_BASE}/production-log?cognito_id=${encodeURIComponent(
+              cognitoId
+            )}`
+          ),
+          fetch(
+            `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
+              cognitoId
+            )}`
+          ),
+          fetch(
+            `${API_BASE}/goods-in/active?cognito_id=${encodeURIComponent(
+              cognitoId
+            )}`
+          ),
         ]);
+
         const [invJson, plJson, plaJson, giJson] = await Promise.all([
           invRes.ok ? invRes.json() : [],
           plRes.ok ? plRes.json() : [],
           plaRes.ok ? plaRes.json() : [],
           giRes.ok ? giRes.json() : [],
         ]);
+
         if (!mounted) return;
         setInventoryRaw(Array.isArray(invJson) ? invJson : []);
         setProdLogs(Array.isArray(plJson) ? plJson : []);
@@ -295,12 +414,17 @@ const Dashboard = () => {
       } catch (e) {
         console.error("Dashboard load error:", e);
         if (!mounted) return;
-        setInventoryRaw([]); setProdLogs([]); setProdLogsActive([]); setGoodsInRaw([]);
+        setInventoryRaw([]);
+        setProdLogs([]);
+        setProdLogsActive([]);
+        setGoodsInRaw([]);
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [cognitoId]);
 
   const {
@@ -352,7 +476,7 @@ const Dashboard = () => {
         const maxBase = Math.max(it.stockBase, Math.round(meanBase * 1.25), 1);
         return { ...it, maxBase };
       })
-      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
+      .sort((a, b) => a.stockBase / a.maxBase - b.stockBase / b.maxBase);
 
     const now = new Date();
     const soonCut = new Date(startOfISOWeek(now));
@@ -362,8 +486,7 @@ const Dashboard = () => {
       .filter((r) => r.expiryDate && r.expiryDate <= soonCut)
       .sort(
         (a, b) =>
-          (a.expiryDate?.getTime() || 0) -
-          (b.expiryDate?.getTime() || 0)
+          (a.expiryDate?.getTime() || 0) - (b.expiryDate?.getTime() || 0)
       )
       .slice(0, 30);
 
@@ -388,12 +511,7 @@ const Dashboard = () => {
         row.name ||
         "Unknown";
 
-      const unit =
-        row.unit ||
-        row.uom ||
-        row.measure_unit ||
-        "";
-
+      const unit = row.unit || row.uom || row.measure_unit || "";
       const group = detectUnitGroup(unit);
 
       const remainingRaw =
@@ -502,10 +620,14 @@ const Dashboard = () => {
 
     const recipeStockList = recipeArray
       .map((it) => {
-        const maxBase = Math.max(it.stockBase, Math.round(meanRecipeBase * 1.25), 1);
+        const maxBase = Math.max(
+          it.stockBase,
+          Math.round(meanRecipeBase * 1.25),
+          1
+        );
         return { ...it, maxBase };
       })
-      .sort((a, b) => (a.stockBase / a.maxBase) - (b.stockBase / b.maxBase));
+      .sort((a, b) => a.stockBase / a.maxBase - b.stockBase / b.maxBase);
 
     return {
       kpiStockoutsCount,
@@ -519,10 +641,13 @@ const Dashboard = () => {
 
   return (
     <div className="dash">
-      <DashboardStyles />
+      <DashboardStyles isDark={isDark} />
+
       <div className="container header">
         <h1 className="h1">Inventory & Production Dashboard</h1>
-        <p className="sub">Current ISO week (Mon–Sun): production & inventory at a glance.</p>
+        <p className="sub">
+          Current ISO week (Mon–Sun): production & inventory at a glance.
+        </p>
       </div>
 
       {/* KPI Row */}
@@ -552,7 +677,7 @@ const Dashboard = () => {
           </DashboardCard>
 
           <DashboardCard title="Batches per Day (This Week)">
-            <WeeklyUsageChart data={weeklyBatchesData} />
+            <WeeklyUsageChart data={weeklyBatchesData} isDark={isDark} />
           </DashboardCard>
 
           <DashboardCard title="Recipe Availability (Current units remaining)">

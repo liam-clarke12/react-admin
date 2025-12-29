@@ -1,4 +1,3 @@
-// src/scenes/inventory/RecipeInventory.jsx
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
@@ -20,7 +19,8 @@ const Styles = ({ isDark }) => (
       --text-soft: ${isDark ? "#cbd5e1" : "#94a3b8"};
 
       --border: ${isDark ? "rgba(148,163,184,0.12)" : "#e2e8f0"};
-      --thead-bg: ${isDark ? "rgba(99,102,241,0.05)" : "#f8fafc"};
+      /* FIX: Use a solid color for dark mode header to cover any default white background */
+      --thead-bg: ${isDark ? "#1e293b" : "#f8fafc"}; 
       --row-even: ${isDark ? "rgba(255,255,255,0.02)" : "#fafbfc"};
       --row-odd: ${isDark ? "transparent" : "#ffffff"};
       --row-hover: ${isDark ? "rgba(99,102,241,0.12)" : "#f1f5f9"};
@@ -401,7 +401,7 @@ const Styles = ({ isDark }) => (
     }
 
     .ii-dg .MuiDataGrid-columnHeaders {
-      background: var(--thead-bg) !important;
+      background-color: var(--thead-bg) !important;
       color: var(--text-muted) !important;
       border-bottom: 1px solid var(--border) !important;
     }
@@ -711,6 +711,10 @@ const RecipeInventory = () => {
                     backgroundColor: "transparent",
                   },
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
+                  // Ensure icons (sort, menu) are visible in dark mode
+                  "& .MuiSvgIcon-root": {
+                    color: "var(--text-muted)",
+                  },
                 }}
               />
             </div>
