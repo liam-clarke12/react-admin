@@ -1,14 +1,12 @@
 // src/scenes/account/AccountPage.jsx
-"use client"
+"use client";
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
   TextField,
   Typography,
-  Avatar,
-  IconButton,
   Grid,
   Snackbar,
   Alert,
@@ -20,25 +18,23 @@ import {
   Divider,
   Chip,
   InputAdornment,
-  Tooltip,
-} from "@mui/material"
+} from "@mui/material";
 
-import EditIcon from "@mui/icons-material/Edit"
-import SaveIcon from "@mui/icons-material/Save"
-import CancelIcon from "@mui/icons-material/Cancel"
-import UploadIcon from "@mui/icons-material/Upload"
-import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined"
-import MailOutlineIcon from "@mui/icons-material/MailOutline"
-import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined"
-import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined"
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline"
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined"
-import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined"
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined"
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
+import KeyOutlinedIcon from "@mui/icons-material/KeyOutlined";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 
 // Amplify v6 modular APIs
-import { fetchUserAttributes, updateUserAttributes, updatePassword, getCurrentUser } from "aws-amplify/auth"
-import { uploadData, getUrl } from "aws-amplify/storage"
+import { fetchUserAttributes, updateUserAttributes, updatePassword } from "aws-amplify/auth";
 
 /* =====================
    Indigo SaaS theme (match IngredientInventory style)
@@ -118,7 +114,7 @@ const Styles = ({ isDark }) => (
 
     .acct-title{
       margin:0;
-      font-weight:700;
+      font-weight:800;
       font-size:24px;
       letter-spacing:-0.02em;
       color: var(--text);
@@ -127,7 +123,7 @@ const Styles = ({ isDark }) => (
       margin: 4px 0 0;
       color: var(--text-muted);
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .acct-actions{
@@ -140,7 +136,7 @@ const Styles = ({ isDark }) => (
     .btn-solid{
       color:#fff;
       border-radius: 12px;
-      font-weight: 700;
+      font-weight: 800;
       padding: 10px 16px;
       text-transform:none;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -157,7 +153,7 @@ const Styles = ({ isDark }) => (
       border: 1px solid var(--border);
       color: var(--text);
       background: transparent;
-      font-weight: 700;
+      font-weight: 800;
       border-radius: 12px;
       text-transform: none;
     }
@@ -205,7 +201,7 @@ const Styles = ({ isDark }) => (
 
     .card-title{
       margin:0;
-      font-weight:700;
+      font-weight:800;
       color: var(--text);
       letter-spacing:-0.01em;
       font-size: 16px;
@@ -213,46 +209,69 @@ const Styles = ({ isDark }) => (
     .card-sub{
       margin: 4px 0 0;
       color: var(--text-muted);
-      font-weight:500;
+      font-weight:600;
       font-size: 13px;
     }
 
     .card-b{ padding: 16px; }
 
-    .avatar-wrap{
-      position: relative;
-      width: 128px;
-      margin: 4px auto 0;
-    }
-    .avatar-ring{
-      border-radius: 999px;
-      padding: 4px;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.45), rgba(255,255,255,0) 45%),
-        linear-gradient(135deg, rgba(99,102,241,0.75), rgba(79,70,229,0.75));
-      box-shadow: 0 18px 40px rgba(2,6,23,0.18);
-    }
-    .avatar-overlay{
-      position:absolute; inset:0;
-      display:grid; place-items:center;
-      background: ${isDark ? "rgba(15,23,42,0.55)" : "rgba(248, 250, 252, 0.72)"};
-      border-radius: 999px;
-      backdrop-filter: blur(6px);
-    }
-    .upload-btn{
-      position: absolute;
-      bottom: -6px;
-      right: -6px;
-      background: var(--bg-card);
+    /* ✅ NEW: Identity header block (replaces avatar) */
+    .id-hero{
       border: 1px solid var(--border);
-      box-shadow: 0 10px 22px rgba(2,6,23,0.12);
+      border-radius: 16px;
+      padding: 14px 14px;
+      background:
+        radial-gradient(600px 220px at 10% 0%, rgba(99,102,241,${isDark ? "0.18" : "0.12"}), transparent 60%),
+        ${isDark ? "rgba(255,255,255,0.02)" : "#fafbff"};
+      display:flex;
+      align-items:center;
+      gap: 12px;
+      min-width: 0;
     }
-    .upload-btn:hover{ background: ${isDark ? "rgba(255,255,255,0.05)" : "#f8fafc"}; }
+
+    .id-badge{
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display:grid;
+      place-items:center;
+      background: rgba(99,102,241,0.14);
+      border: 1px solid rgba(99,102,241,0.26);
+      color: var(--primary-dark);
+      flex: 0 0 auto;
+    }
+
+    .id-meta{
+      min-width: 0;
+      display:flex;
+      flex-direction:column;
+      gap: 2px;
+    }
+
+    .id-name{
+      font-weight: 900;
+      color: var(--text);
+      font-size: 16px;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+    }
+
+    .id-sub{
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 12.5px;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+    }
 
     .mini-actions{
       display:grid;
       gap: 10px;
-      margin-top: 14px;
+      margin-top: 12px;
       min-width: 0;
     }
 
@@ -267,10 +286,10 @@ const Styles = ({ isDark }) => (
       background: ${isDark ? "rgba(99,102,241,0.03)" : "#fafbfc"};
       min-width: 0;
     }
-    .side-stat strong{ color: var(--text); font-weight: 700; }
+    .side-stat strong{ color: var(--text); font-weight: 800; }
     .side-stat span{
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
       font-size: 13px;
       overflow:hidden;
       text-overflow: ellipsis;
@@ -320,9 +339,9 @@ const Styles = ({ isDark }) => (
     .input .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline{ border-color: rgba(99,102,241,0.35); }
     .input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline{ border-color: var(--primary); }
     .input .MuiOutlinedInput-root.Mui-focused{ box-shadow: 0 0 0 3px var(--primary-ring); }
-    .input .MuiInputLabel-root{ color: var(--text-muted); font-weight: 600; }
-    .input .MuiInputLabel-root.Mui-focused{ color: var(--primary-dark); font-weight: 700; }
-    .input .MuiInputBase-input{ color: var(--text); font-weight: 600; }
+    .input .MuiInputLabel-root{ color: var(--text-muted); font-weight: 700; }
+    .input .MuiInputLabel-root.Mui-focused{ color: var(--primary-dark); font-weight: 800; }
+    .input .MuiInputBase-input{ color: var(--text); font-weight: 700; }
     .input .MuiInputBase-input.Mui-disabled{ -webkit-text-fill-color: var(--text-muted); }
     .input .MuiSvgIcon-root{ color: var(--text-muted); }
 
@@ -331,7 +350,7 @@ const Styles = ({ isDark }) => (
       gap: 8px;
       align-items:flex-start;
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
       font-size: 12.5px;
       line-height: 1.35;
       padding: 10px 12px;
@@ -358,175 +377,100 @@ const Styles = ({ isDark }) => (
       background: ${isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)"};
       border: 1px solid rgba(99,102,241,0.22);
       color: ${isDark ? "rgba(241,245,249,0.92)" : "rgba(15,23,42,0.88)"};
-      font-weight: 700;
+      font-weight: 800;
       font-size: 12px;
       backdrop-filter: blur(10px);
     }
-
-    /* Modal overlay for password dialog (Dialog already handles backdrop; keep for consistency) */
-    @keyframes ii-pop { to { transform:none; opacity:1 } }
   `}</style>
-)
+);
 
 function splitName(full = "") {
-  const s = String(full).trim()
-  if (!s) return { firstName: "", lastName: "" }
-  const parts = s.split(/\s+/)
-  if (parts.length === 1) return { firstName: parts[0], lastName: "" }
-  return { firstName: parts.slice(0, -1).join(" "), lastName: parts.slice(-1)[0] }
+  const s = String(full).trim();
+  if (!s) return { firstName: "", lastName: "" };
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return { firstName: parts.slice(0, -1).join(" "), lastName: parts.slice(-1)[0] };
 }
 function joinName(first = "", last = "") {
-  return [first, last].filter(Boolean).join(" ").trim()
-}
-function isHttpUrl(v = "") {
-  return /^https?:\/\//i.test(v)
-}
-function initialsFromName(first = "", last = "", fallback = "U") {
-  const a = (first || "").trim()[0] || ""
-  const b = (last || "").trim()[0] || ""
-  const i = `${a}${b}`.toUpperCase()
-  return i || fallback
+  return [first, last].filter(Boolean).join(" ").trim();
 }
 
 export default function AccountPage() {
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true);
 
   // Theme sync with Topbar (same pattern as other pages)
-  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark")
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   useEffect(() => {
-    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark")
-    window.addEventListener("themeChanged", onThemeChanged)
-    return () => window.removeEventListener("themeChanged", onThemeChanged)
-  }, [])
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
 
-  const [form, setForm] = useState({ firstName: "", lastName: "", company: "", jobTitle: "" })
-  const [email, setEmail] = useState("")
+  const [form, setForm] = useState({ firstName: "", lastName: "", company: "", jobTitle: "" });
+  const [email, setEmail] = useState("");
 
-  const [avatarUrl, setAvatarUrl] = useState("")
-  const [avatarKey, setAvatarKey] = useState("")
-  const [avatarUploading, setAvatarUploading] = useState(false)
-  const [avatarProgress, setAvatarProgress] = useState(0)
+  const [editMode, setEditMode] = useState(false);
 
-  const [editMode, setEditMode] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwBusy, setPwBusy] = useState(false);
 
-  const [pwOpen, setPwOpen] = useState(false)
-  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" })
-  const [pwBusy, setPwBusy] = useState(false)
-
-  const [snack, setSnack] = useState({ open: false, severity: "success", message: "" })
+  const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
   const fullName = useMemo(
     () => joinName(form.firstName, form.lastName) || "Your profile",
-    [form.firstName, form.lastName],
-  )
-
-  const resolveAvatarUrl = async (pictureAttr) => {
-    if (!pictureAttr) return ""
-    if (isHttpUrl(pictureAttr)) return pictureAttr
-    try {
-      const { url } = await getUrl({ key: pictureAttr, options: { level: "private", expiresIn: 60 * 60 } })
-      return url.toString()
-    } catch (e) {
-      console.warn("[AccountPage] Failed to sign avatar URL:", e)
-      return ""
-    }
-  }
+    [form.firstName, form.lastName]
+  );
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       try {
-        const attrs = await fetchUserAttributes()
-        const first = attrs?.given_name || splitName(attrs?.name || "").firstName
-        const last = attrs?.family_name || splitName(attrs?.name || "").lastName
+        const attrs = await fetchUserAttributes();
+        const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
+        const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
 
         setForm({
           firstName: first || "",
           lastName: last || "",
           company: attrs?.["custom:Company"] || "",
           jobTitle: attrs?.["custom:jobTitle"] || "",
-        })
-        setEmail(attrs?.email || "")
-
-        const picture = attrs?.picture || ""
-        setAvatarKey(picture || "")
-        setAvatarUrl(await resolveAvatarUrl(picture))
+        });
+        setEmail(attrs?.email || "");
       } catch (err) {
-        console.error("[AccountPage] Failed to fetch user attributes:", err)
-        setSnack({ open: true, severity: "error", message: "Failed to load profile." })
+        console.error("[AccountPage] Failed to fetch user attributes:", err);
+        setSnack({ open: true, severity: "error", message: "Failed to load profile." });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    })();
+  }, []);
 
-  const onChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
-
-  const onAvatarUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      setAvatarUploading(true)
-      setAvatarProgress(0)
-
-      const { userId } = await getCurrentUser()
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-      const key = `avatars/${userId}/${Date.now()}-${safeName}`
-
-      await uploadData({
-        key,
-        data: file,
-        options: {
-          level: "private",
-          contentType: file.type,
-          onProgress: ({ transferredBytes, totalBytes }) => {
-            if (totalBytes) setAvatarProgress(Math.round((transferredBytes / totalBytes) * 100))
-          },
-        },
-      }).result
-
-      const url = await resolveAvatarUrl(key)
-      setAvatarKey(key)
-      setAvatarUrl(url)
-
-      setSnack({ open: true, severity: "success", message: "Image uploaded. Click Save to update your profile." })
-    } catch (err) {
-      console.error("[AccountPage] Avatar upload failed:", err)
-      setSnack({ open: true, severity: "error", message: "Failed to upload image." })
-    } finally {
-      setAvatarUploading(false)
-    }
-  }
+  const onChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const onCancel = async () => {
     try {
-      const attrs = await fetchUserAttributes()
-      const first = attrs?.given_name || splitName(attrs?.name || "").firstName
-      const last = attrs?.family_name || splitName(attrs?.name || "").lastName
+      const attrs = await fetchUserAttributes();
+      const first = attrs?.given_name || splitName(attrs?.name || "").firstName;
+      const last = attrs?.family_name || splitName(attrs?.name || "").lastName;
 
       setForm({
         firstName: first || "",
         lastName: last || "",
         company: attrs?.["custom:Company"] || "",
         jobTitle: attrs?.["custom:jobTitle"] || "",
-      })
-
-      const picture = attrs?.picture || ""
-      setAvatarKey(picture || "")
-      setAvatarUrl(await resolveAvatarUrl(picture))
+      });
     } catch (err) {
-      console.error("[AccountPage] Failed to refresh attributes:", err)
+      console.error("[AccountPage] Failed to refresh attributes:", err);
     } finally {
-      setEditMode(false)
+      setEditMode(false);
     }
-  }
+  };
 
   const onSave = async () => {
-    if (!form.firstName.trim()) return setSnack({ open: true, severity: "warning", message: "First name is required." })
-    if (!form.lastName.trim()) return setSnack({ open: true, severity: "warning", message: "Last name is required." })
-    if (avatarUploading)
-      return setSnack({ open: true, severity: "info", message: "Please wait for the image to finish uploading." })
+    if (!form.firstName.trim())
+      return setSnack({ open: true, severity: "warning", message: "First name is required." });
+    if (!form.lastName.trim())
+      return setSnack({ open: true, severity: "warning", message: "Last name is required." });
 
     try {
       await updateUserAttributes({
@@ -536,62 +480,61 @@ export default function AccountPage() {
           name: joinName(form.firstName, form.lastName),
           "custom:Company": form.company || "",
           "custom:jobTitle": form.jobTitle || "",
-          ...(avatarKey ? { picture: avatarKey } : {}),
         },
-      })
+      });
 
-      setSnack({ open: true, severity: "success", message: "Profile updated." })
-      setEditMode(false)
+      setSnack({ open: true, severity: "success", message: "Profile updated." });
+      setEditMode(false);
     } catch (err) {
-      console.error("[AccountPage] Failed to update attributes:", err)
+      console.error("[AccountPage] Failed to update attributes:", err);
       const msg =
         err?.message ||
-        "Failed to update profile. Please ensure custom attributes exist in your user pool."
-      setSnack({ open: true, severity: "error", message: msg })
+        "Failed to update profile. Please ensure custom attributes exist in your user pool.";
+      setSnack({ open: true, severity: "error", message: msg });
     }
-  }
+  };
 
   const openPwDialog = () => {
-    setPwForm({ current: "", next: "", confirm: "" })
-    setPwOpen(true)
-  }
+    setPwForm({ current: "", next: "", confirm: "" });
+    setPwOpen(true);
+  };
   const closePwDialog = () => {
-    if (!pwBusy) setPwOpen(false)
-  }
-  const onPwChange = (field) => (e) => setPwForm((p) => ({ ...p, [field]: e.target.value }))
+    if (!pwBusy) setPwOpen(false);
+  };
+  const onPwChange = (field) => (e) => setPwForm((p) => ({ ...p, [field]: e.target.value }));
 
   const onChangePassword = async () => {
-    const { current, next, confirm } = pwForm
+    const { current, next, confirm } = pwForm;
     if (!current || !next || !confirm) {
-      return setSnack({ open: true, severity: "warning", message: "Please fill in all password fields." })
+      return setSnack({ open: true, severity: "warning", message: "Please fill in all password fields." });
     }
     if (next !== confirm) {
-      return setSnack({ open: true, severity: "warning", message: "New passwords do not match." })
+      return setSnack({ open: true, severity: "warning", message: "New passwords do not match." });
     }
     if (next.length < 8) {
-      return setSnack({ open: true, severity: "warning", message: "New password must be at least 8 characters." })
+      return setSnack({ open: true, severity: "warning", message: "New password must be at least 8 characters." });
     }
 
-    setPwBusy(true)
+    setPwBusy(true);
     try {
-      await updatePassword({ oldPassword: current, newPassword: next })
-      setPwBusy(false)
-      setPwOpen(false)
-      setSnack({ open: true, severity: "success", message: "Password changed successfully." })
+      await updatePassword({ oldPassword: current, newPassword: next });
+      setPwBusy(false);
+      setPwOpen(false);
+      setSnack({ open: true, severity: "success", message: "Password changed successfully." });
     } catch (err) {
-      console.error("[AccountPage] Change password failed:", err)
-      setPwBusy(false)
-      const message = err?.message || "Failed to change password. Check your current password and try again."
-      setSnack({ open: true, severity: "error", message })
+      console.error("[AccountPage] Change password failed:", err);
+      setPwBusy(false);
+      const message = err?.message || "Failed to change password. Check your current password and try again.";
+      setSnack({ open: true, severity: "error", message });
     }
-  }
+  };
 
   if (loading) {
     return (
       <Box p={4} display="grid" placeItems="center">
         <CircularProgress />
       </Box>
-    )
+    );
   }
 
   return (
@@ -599,7 +542,7 @@ export default function AccountPage() {
       <Styles isDark={isDark} />
       <Box className="acct-backdrop" aria-hidden />
       <Box className="acct-shell">
-        {/* ✅ Header removed — keep edit/save/cancel actions in a light topbar */}
+        {/* Top header */}
         <Box className="acct-topbar">
           <Box>
             <Typography className="acct-title">Account</Typography>
@@ -608,7 +551,7 @@ export default function AccountPage() {
             <Box className="badge-row">
               <Box className="pill">
                 <ShieldOutlinedIcon sx={{ fontSize: 16 }} />
-                Private avatar storage
+                Secure identity
               </Box>
               <Box className="pill">
                 <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
@@ -641,19 +584,19 @@ export default function AccountPage() {
 
         {/* Main content */}
         <Box className="acct-grid">
-          {/* Left: Identity card */}
+          {/* Left: Identity card (no avatar) */}
           <Box className="card">
             <Box className="card-h">
               <Box>
                 <Typography className="card-title">Identity</Typography>
-                <Typography className="card-sub">Avatar + quick actions</Typography>
+                <Typography className="card-sub">Quick actions & sign-in details</Typography>
               </Box>
 
               <Chip
                 label={editMode ? "Editing" : "View mode"}
                 size="small"
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 800,
                   borderRadius: 999,
                   border: "1px solid var(--border)",
                   background: editMode ? "rgba(99,102,241,0.12)" : "transparent",
@@ -663,52 +606,17 @@ export default function AccountPage() {
             </Box>
 
             <Box className="card-b">
-              <Box className="avatar-wrap">
-                <Box className="avatar-ring">
-                  <Avatar
-                    src={avatarUrl || undefined}
-                    alt={fullName}
-                    sx={{
-                      width: 120,
-                      height: 120,
-                      bgcolor: "rgba(99,102,241,0.25)",
-                      color: "#fff",
-                      fontWeight: 800,
-                      border: "1px solid rgba(255,255,255,0.18)",
-                    }}
-                  >
-                    {initialsFromName(form.firstName, form.lastName)}
-                  </Avatar>
+              {/* ✅ Replaces avatar block */}
+              <Box className="id-hero">
+                <Box className="id-badge">
+                  <PersonOutlineIcon sx={{ fontSize: 22 }} />
                 </Box>
-
-                {avatarUploading && (
-                  <Box className="avatar-overlay">
-                    <Box display="grid" gap={1} justifyItems="center">
-                      <CircularProgress size={28} />
-                      <Typography variant="caption" sx={{ color: "var(--text-muted)", fontWeight: 700 }}>
-                        Uploading… {avatarProgress}%
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {editMode && (
-                  <Tooltip title="Upload a new avatar">
-                    <IconButton component="label" className="upload-btn">
-                      <UploadIcon />
-                      <input hidden type="file" accept="image/*" onChange={onAvatarUpload} />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-
-              <Box textAlign="center" mt={1.5}>
-                <Typography sx={{ fontWeight: 800, color: "var(--text)", fontSize: 18, letterSpacing: -0.01 }}>
-                  {fullName}
-                </Typography>
-                <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
-                  {form.jobTitle || "—"} {form.company ? `• ${form.company}` : ""}
-                </Typography>
+                <Box className="id-meta">
+                  <Typography className="id-name">{fullName}</Typography>
+                  <Typography className="id-sub">
+                    {form.jobTitle || "—"} {form.company ? `• ${form.company}` : ""}
+                  </Typography>
+                </Box>
               </Box>
 
               <Divider sx={{ my: 2, borderColor: "var(--border)" }} />
@@ -733,10 +641,20 @@ export default function AccountPage() {
                   <MailOutlineIcon sx={{ color: "var(--primary-dark)" }} />
                 </Box>
 
+                <Box className="side-stat">
+                  <Box>
+                    <strong>Account status</strong>
+                    <Box mt={0.3}>
+                      <span>Active</span>
+                    </Box>
+                  </Box>
+                  <ShieldOutlinedIcon sx={{ color: "var(--primary-dark)" }} />
+                </Box>
+
                 <Box className="hint">
                   <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
-                  Your avatar is uploaded to private storage and the profile saves the S3 key to your Cognito{" "}
-                  <b>picture</b> attribute.
+                  Your email is read-only because it’s linked to your login method. Update your name, company, and job
+                  title using <b>Edit Profile</b>.
                 </Box>
               </Box>
             </Box>
@@ -754,7 +672,7 @@ export default function AccountPage() {
                 label={editMode ? "Fields unlocked" : "Locked"}
                 size="small"
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 800,
                   borderRadius: 999,
                   border: "1px solid var(--border)",
                   background: editMode ? "rgba(99,102,241,0.12)" : "transparent",
@@ -773,10 +691,10 @@ export default function AccountPage() {
                           <MailOutlineIcon sx={{ fontSize: 18 }} />
                         </Box>
                         <Box>
-                          <Typography sx={{ fontWeight: 800, color: "var(--text)", letterSpacing: -0.01 }}>
+                          <Typography sx={{ fontWeight: 900, color: "var(--text)", letterSpacing: -0.01 }}>
                             Contact
                           </Typography>
-                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 500, fontSize: 13 }}>
+                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
                             Email is fixed to your login
                           </Typography>
                         </Box>
@@ -808,10 +726,10 @@ export default function AccountPage() {
                           <PersonOutlineIcon sx={{ fontSize: 18 }} />
                         </Box>
                         <Box>
-                          <Typography sx={{ fontWeight: 800, color: "var(--text)", letterSpacing: -0.01 }}>
+                          <Typography sx={{ fontWeight: 900, color: "var(--text)", letterSpacing: -0.01 }}>
                             Personal
                           </Typography>
-                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 500, fontSize: 13 }}>
+                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
                             Your name appears in activity logs and reports
                           </Typography>
                         </Box>
@@ -866,10 +784,10 @@ export default function AccountPage() {
                           <BusinessOutlinedIcon sx={{ fontSize: 18 }} />
                         </Box>
                         <Box>
-                          <Typography sx={{ fontWeight: 800, color: "var(--text)", letterSpacing: -0.01 }}>
+                          <Typography sx={{ fontWeight: 900, color: "var(--text)", letterSpacing: -0.01 }}>
                             Work
                           </Typography>
-                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 500, fontSize: 13 }}>
+                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
                             Used for permissions, routing, and B2B visibility
                           </Typography>
                         </Box>
@@ -916,8 +834,43 @@ export default function AccountPage() {
 
                     <Box mt={2} className="hint">
                       <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
-                      Tip: if you upload a new avatar, you still need to hit <b>Save Changes</b> to persist the key to
-                      Cognito.
+                      Tip: Keep job titles consistent (e.g. “Operations Manager”) so your activity logs and exports stay
+                      tidy.
+                    </Box>
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box className="section">
+                    <Box className="section-h">
+                      <Box className="kicker">
+                        <Box className="k-icon">
+                          <VpnKeyOutlinedIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 900, color: "var(--text)", letterSpacing: -0.01 }}>
+                            Security
+                          </Typography>
+                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
+                            Update your password anytime
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Button
+                      onClick={openPwDialog}
+                      startIcon={<KeyOutlinedIcon />}
+                      className="btn-ghost"
+                      sx={{ borderRadius: 14, fontWeight: 900 }}
+                    >
+                      Open password settings
+                    </Button>
+
+                    <Box mt={2} className="hint">
+                      <ShieldOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
+                      Use a unique password and rotate it regularly. If you use Google sign-in, password changes may not
+                      apply.
                     </Box>
                   </Box>
                 </Grid>
@@ -943,7 +896,7 @@ export default function AccountPage() {
         >
           <DialogTitle
             sx={{
-              fontWeight: 800,
+              fontWeight: 900,
               color: "var(--text)",
               background: isDark ? "rgba(99,102,241,0.03)" : "var(--bg-card)",
               borderBottom: "1px solid var(--border)",
@@ -983,7 +936,12 @@ export default function AccountPage() {
             <Button onClick={closePwDialog} disabled={pwBusy} className="btn-ghost" sx={{ borderRadius: 14 }}>
               Cancel
             </Button>
-            <Button onClick={onChangePassword} disabled={pwBusy} className="btn-solid" sx={{ borderRadius: 14, minWidth: 160 }}>
+            <Button
+              onClick={onChangePassword}
+              disabled={pwBusy}
+              className="btn-solid"
+              sx={{ borderRadius: 14, minWidth: 160 }}
+            >
               {pwBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Update Password"}
             </Button>
           </DialogActions>
@@ -996,15 +954,11 @@ export default function AccountPage() {
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
-          <Alert
-            severity={snack.severity}
-            onClose={() => setSnack((s) => ({ ...s, open: false }))}
-            variant="filled"
-          >
+          <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))} variant="filled">
             {snack.message}
           </Alert>
         </Snackbar>
       </Box>
     </Box>
-  )
+  );
 }
