@@ -126,7 +126,12 @@ const Styles = ({ isDark }) => (
     }
 
     /* Grid */
-    .ii-grid { display:grid; grid-template-columns: 1.6fr 1fr; gap:20px; }
+    .ii-grid { 
+      display:grid; 
+      grid-template-columns: 1.6fr 1fr; 
+      gap:20px; 
+      align-items:start; /* ✅ FIX: stop cards stretching to the tallest item */
+    }
     @media (max-width: 900px) { .ii-grid { grid-template-columns: 1fr; } }
 
     /* Enhanced card design with better shadows */
@@ -394,7 +399,10 @@ const Styles = ({ isDark }) => (
     }
 
     /* ===== DataGrid (MUI) styling to match the table look ===== */
-    .ii-table-wrap { height: 600px; }
+    .ii-table-wrap { 
+      overflow:auto; 
+      max-height:600px; /* ✅ FIX: don't force 600px tall when only a few rows */
+    }
 
     .ii-dg .MuiDataGrid-root {
       border:0 !important;
@@ -686,7 +694,7 @@ const RecipeInventory = () => {
                 rows={filteredRows}
                 columns={columns}
                 getRowId={(row) => row.id}
-                autoHeight={false}
+                autoHeight // ✅ FIX: let the grid size to its rows (no forced 600px)
                 disableRowSelectionOnClick
                 pagination
                 pageSizeOptions={[10, 25, 50]}
