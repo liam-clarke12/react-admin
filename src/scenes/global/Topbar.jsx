@@ -74,9 +74,7 @@ const pageOptions = [
   { label: "Employees", path: "/Employees", icon: <PeopleAltOutlinedIcon fontSize="small" /> },
   { label: "Roles", path: "/Roles", icon: <BadgeOutlinedIcon fontSize="small" /> },
   { label: "Leave Requests", path: "/hrp/leave", icon: <EventNoteOutlinedIcon fontSize="small" /> },
-  { label: "HRP Roles", path: "/hrp/roles", icon: <GroupWorkOutlinedIcon fontSize="small" /> },
-  { label: "Skills & Training", path: "/hrp/skills", icon: <GroupWorkOutlinedIcon fontSize="small" /> },
-  { label: "HRP Roster", path: "/hrp/roster", icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
+
 
   // Account
   { label: "Account", path: "/account", icon: <PersonIcon fontSize="small" /> },
