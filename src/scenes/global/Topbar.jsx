@@ -25,13 +25,14 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PersonIcon from "@mui/icons-material/Person";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
-import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
-import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import BakeryDiningOutlinedIcon from "@mui/icons-material/BakeryDiningOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import WarehouseOutlinedIcon from "@mui/icons-material/WarehouseOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
@@ -41,7 +42,6 @@ import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useData } from "../../contexts/DataContext";
 
 const getBrand = (isDark) => ({
   text: isDark ? "#f1f5f9" : "#1e293b",
@@ -54,11 +54,9 @@ const getBrand = (isDark) => ({
 });
 
 /**
- * ✅ Search options = ALL sidebar routes + account routes
- * You can add more here anytime and it will appear in search immediately.
+ * ✅ Add ALL routes you want searchable here (sidebar + account + any others)
  */
 const pageOptions = [
-  // Core
   { label: "Dashboard", path: "/dashboard", icon: <HomeOutlinedIcon fontSize="small" /> },
 
   // MRP
@@ -75,20 +73,20 @@ const pageOptions = [
   { label: "Employees", path: "/Employees", icon: <PeopleAltOutlinedIcon fontSize="small" /> },
   { label: "Roles", path: "/Roles", icon: <BadgeOutlinedIcon fontSize="small" /> },
   { label: "Leave Requests", path: "/hrp/leave", icon: <EventNoteOutlinedIcon fontSize="small" /> },
-
-  // (If/when you use these routes)
   { label: "HRP Roles", path: "/hrp/roles", icon: <GroupWorkOutlinedIcon fontSize="small" /> },
   { label: "Skills & Training", path: "/hrp/skills", icon: <GroupWorkOutlinedIcon fontSize="small" /> },
   { label: "HRP Roster", path: "/hrp/roster", icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
 
   // Account
   { label: "Account", path: "/account", icon: <PersonIcon fontSize="small" /> },
+
+  // Auth page (so you can also jump to it manually)
+  { label: "Sign In / Sign Out", path: "/auth", icon: <LogoutIcon fontSize="small" /> },
 ];
 
 export default function Topbar() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { goodsInRows } = useData();
 
   const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   const brand = useMemo(() => getBrand(isDark), [isDark]);
@@ -102,13 +100,8 @@ export default function Topbar() {
 
   const [profile, setProfile] = useState({ firstName: "", lastName: "", jobTitle: "" });
 
-  // ✅ Notifications popover
   const [notifAnchor, setNotifAnchor] = useState(null);
-
-  // ✅ Profile popover
   const [profileAnchor, setProfileAnchor] = useState(null);
-
-  // ✅ Logout dialog
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   useEffect(() => {
@@ -120,23 +113,44 @@ export default function Topbar() {
           lastName: attrs?.family_name || "",
           jobTitle: attrs?.["custom:jobTitle"] || "Manager",
         });
-      } catch (e) {
+      } catch {
         setProfile({ firstName: "User", lastName: "", jobTitle: "Manager" });
       }
     })();
   }, []);
 
-  // ✅ Notification count example (you can wire this to real data later)
-  const notifCount = 0; // set to >0 to show dot
+  const notifCount = 0;
   const notifOpen = Boolean(notifAnchor);
   const profileOpen = Boolean(profileAnchor);
 
+  /**
+   * ✅ Logout + redirect that does NOT require manual refresh
+   * - First: SPA navigate to /auth
+   * - Fallback: if auth state lags and route doesn't change, force redirect after a beat
+   */
   const handleLogout = async () => {
+    setLogoutOpen(false);
+    setProfileAnchor(null);
+    setNotifAnchor(null);
+
+    const targetAuthRoute = "/auth"; // <-- change if your auth route is different
+
     try {
-      await signOut();
+      // signOut might be sync or async depending on your AuthContext implementation
+      await Promise.resolve(signOut?.());
+    } catch (e) {
+      // even if signOut throws, we still want them off protected pages
+      console.error("signOut error:", e);
     } finally {
-      // ✅ Redirect to sign-in/out page after logout
-      navigate("/", { replace: true }); // change "/" if your auth route is different (e.g. "/auth" or "/sign-in")
+      // SPA redirect first
+      navigate(targetAuthRoute, { replace: true });
+
+      // Fallback: if router/auth guards lag, force redirect automatically (no manual refresh)
+      window.setTimeout(() => {
+        if (window.location.pathname !== targetAuthRoute) {
+          window.location.assign(targetAuthRoute);
+        }
+      }, 150);
     }
   };
 
@@ -166,7 +180,7 @@ export default function Topbar() {
           Hupes Production
         </Typography>
 
-        {/* Center: Search */}
+        {/* Search */}
         <Box sx={{ width: { xs: "60%", sm: 420 } }}>
           <Autocomplete
             options={pageOptions}
@@ -214,19 +228,16 @@ export default function Topbar() {
             {isDark ? <LightModeOutlinedIcon fontSize="small" /> : <DarkModeOutlinedIcon fontSize="small" />}
           </IconButton>
 
-          {/* ✅ Notifications now opens */}
+          {/* Notifications */}
           <IconButton onClick={(e) => setNotifAnchor(e.currentTarget)} sx={{ color: brand.subtext }}>
             <Badge variant={notifCount > 0 ? "dot" : "standard"} color="error">
               <NotificationsNoneIcon fontSize="small" />
             </Badge>
           </IconButton>
 
-          <Divider
-            orientation="vertical"
-            flexItem
-            sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }}
-          />
+          <Divider orientation="vertical" flexItem sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }} />
 
+          {/* Profile trigger */}
           <Box
             onClick={(e) => setProfileAnchor(e.currentTarget)}
             sx={{
@@ -252,7 +263,7 @@ export default function Topbar() {
         </Stack>
       </Box>
 
-      {/* ✅ Notifications Popover */}
+      {/* Notifications Popover */}
       <Popover
         open={notifOpen}
         anchorEl={notifAnchor}
@@ -278,48 +289,22 @@ export default function Topbar() {
             Notifications
           </Typography>
 
-          {notifCount === 0 ? (
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: "10px",
-                bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                border: `1px solid ${brand.border}`,
-              }}
-            >
-              <Typography sx={{ color: brand.subtext, fontSize: "0.85rem", fontWeight: 600 }}>
-                No notifications yet.
-              </Typography>
-              <Typography sx={{ color: brand.subtext, fontSize: "0.75rem", mt: 0.5 }}>
-                (Wire this to your real alerts when ready.)
-              </Typography>
-            </Box>
-          ) : (
-            <Box sx={{ display: "grid", gap: 1 }}>
-              {/* Example notification item */}
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: "10px",
-                  bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
-                  border: `1px solid ${brand.border}`,
-                  cursor: "pointer",
-                  "&:hover": { borderColor: brand.primary },
-                }}
-              >
-                <Typography sx={{ color: brand.text, fontWeight: 800, fontSize: "0.85rem" }}>
-                  Example notification
-                </Typography>
-                <Typography sx={{ color: brand.subtext, fontSize: "0.75rem", mt: 0.25 }}>
-                  Click to view details…
-                </Typography>
-              </Box>
-            </Box>
-          )}
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: "10px",
+              bgcolor: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
+              border: `1px solid ${brand.border}`,
+            }}
+          >
+            <Typography sx={{ color: brand.subtext, fontSize: "0.85rem", fontWeight: 600 }}>
+              No notifications yet.
+            </Typography>
+          </Box>
         </Box>
       </Popover>
 
-      {/* Profile Menu Popover */}
+      {/* Profile Menu */}
       <Popover
         open={profileOpen}
         anchorEl={profileAnchor}
