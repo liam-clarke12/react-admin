@@ -50,6 +50,7 @@ const getBrand = (isDark) => ({
   surface: isDark ? "rgba(15, 23, 42, 0.9)" : "rgba(255, 255, 255, 0.8)",
   surfaceMuted: isDark ? "#1e293b" : "#f8fafc",
   primary: "#7C3AED",
+  primaryDark: "#5B21B6",
   shadow: isDark ? "0 4px 20px rgba(0,0,0,0.5)" : "0 4px 20px rgba(0,0,0,0.05)",
 });
 
@@ -125,8 +126,6 @@ export default function Topbar() {
 
   /**
    * ✅ Logout + redirect that does NOT require manual refresh
-   * - First: SPA navigate to /auth
-   * - Fallback: if auth state lags and route doesn't change, force redirect after a beat
    */
   const handleLogout = async () => {
     setLogoutOpen(false);
@@ -136,16 +135,12 @@ export default function Topbar() {
     const targetAuthRoute = "/auth"; // <-- change if your auth route is different
 
     try {
-      // signOut might be sync or async depending on your AuthContext implementation
       await Promise.resolve(signOut?.());
     } catch (e) {
-      // even if signOut throws, we still want them off protected pages
       console.error("signOut error:", e);
     } finally {
-      // SPA redirect first
       navigate(targetAuthRoute, { replace: true });
 
-      // Fallback: if router/auth guards lag, force redirect automatically (no manual refresh)
       window.setTimeout(() => {
         if (window.location.pathname !== targetAuthRoute) {
           window.location.assign(targetAuthRoute);
@@ -169,16 +164,47 @@ export default function Topbar() {
       }}
     >
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Typography
+        {/* ✅ Brand (bigger + logo beside it, like LandingPage) */}
+        <Box
+          onClick={() => navigate("/dashboard")}
+          role="button"
+          aria-label="Go to dashboard"
           sx={{
-            fontWeight: 700,
-            color: brand.text,
-            fontSize: "0.9rem",
-            display: { xs: "none", md: "block" },
+            display: { xs: "none", md: "flex" },
+            alignItems: "center",
+            gap: 1,
+            cursor: "pointer",
+            userSelect: "none",
+            "&:hover .brand-text": { color: brand.primaryDark },
           }}
         >
-          Hupes Production
-        </Typography>
+          <Typography
+            className="brand-text"
+            sx={{
+              fontWeight: 900,
+              fontSize: "1.25rem", // ✅ bigger
+              color: brand.text,
+              transition: "color .15s ease",
+              letterSpacing: "-0.01em",
+              lineHeight: 1,
+            }}
+          >
+            Hupes
+          </Typography>
+
+          <Box
+            component="img"
+            src="/user.png"
+            alt="Logo"
+            sx={{
+              height: 34,
+              width: "auto",
+              ml: 0.5,
+              pointerEvents: "none",
+              filter: isDark ? "brightness(1.05) contrast(1.05)" : "none",
+            }}
+          />
+        </Box>
 
         {/* Search */}
         <Box sx={{ width: { xs: "60%", sm: 420 } }}>
@@ -235,7 +261,11 @@ export default function Topbar() {
             </Badge>
           </IconButton>
 
-          <Divider orientation="vertical" flexItem sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }} />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }}
+          />
 
           {/* Profile trigger */}
           <Box
@@ -285,9 +315,7 @@ export default function Topbar() {
         }}
       >
         <Box sx={{ p: 1.5 }}>
-          <Typography sx={{ fontWeight: 900, color: brand.text, mb: 1 }}>
-            Notifications
-          </Typography>
+          <Typography sx={{ fontWeight: 900, color: brand.text, mb: 1 }}>Notifications</Typography>
 
           <Box
             sx={{
@@ -352,9 +380,7 @@ export default function Topbar() {
       >
         <DialogTitle sx={{ color: brand.text, fontWeight: 900 }}>Confirm Logout</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ color: brand.subtext }}>
-            Are you sure you want to sign out?
-          </DialogContentText>
+          <DialogContentText sx={{ color: brand.subtext }}>Are you sure you want to sign out?</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setLogoutOpen(false)} sx={{ color: brand.subtext }}>

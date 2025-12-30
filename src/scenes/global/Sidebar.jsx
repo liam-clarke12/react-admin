@@ -294,13 +294,7 @@ const Sidebar = () => {
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
 
-  /**
-   * ✅ FIX:
-   * Previously you had: mrpOpen || !isCollapsed, which means when expanded (!isCollapsed === true)
-   * the items ALWAYS show — so the section header toggle appeared "broken" when expanded.
-   *
-   * Now: items show only when the section is open, regardless of collapsed/expanded.
-   */
+  // show items only when section is open
   const showMrpItems = mrpOpen;
   const showHrpItems = hrpOpen;
 
@@ -353,14 +347,9 @@ const Sidebar = () => {
                 mb: 1,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: isCollapsed ? "center" : "space-between",
+                justifyContent: isCollapsed ? "center" : "flex-end", // ✅ no title, just the toggle
               }}
             >
-              {!isCollapsed && (
-                <Typography sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}>
-                  Hupes
-                </Typography>
-              )}
               <IconButton
                 onClick={() => setIsCollapsed((v) => !v)}
                 sx={{
