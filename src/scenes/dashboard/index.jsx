@@ -182,27 +182,45 @@ const ExpiringIngredients = ({ ingredients }) => {
       <div className="list-empty">No ingredients expiring soon. Good job!</div>
     );
 
+  const startOfDay = (d) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+
+  const formatExpiry = (date) => {
+    if (!date) return "—";
+    try {
+      // e.g. 30 Dec 2025 (GB style, nice for IE)
+      return new Intl.DateTimeFormat("en-IE", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    } catch {
+      return new Date(date).toLocaleDateString();
+    }
+  };
+
   const getDaysRemaining = (date) => {
     if (!date) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiry = new Date(date);
-    expiry.setHours(0, 0, 0, 0);
-    return Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const today = startOfDay(new Date());
+    const expiry = startOfDay(date);
+    return Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   return (
     <div className="list" style={{ height: 320 }}>
       {list.map((ing) => {
         const daysRemaining = getDaysRemaining(ing.expiryDate);
+
         const urgencyStyle =
           daysRemaining <= 1
             ? { color: "#ef4444" }
             : daysRemaining <= 3
             ? { color: "#f59e0b" }
             : { color: "var(--text-muted)" };
+
         return (
           <div key={ing.id} className="list-item">
             <div>
@@ -211,8 +229,10 @@ const ExpiringIngredients = ({ ingredients }) => {
                 {ing.display.amount} {ing.display.unit}
               </p>
             </div>
+
+            {/* ✅ CHANGE: show the expiry date instead of "Today" */}
             <span className="badge" style={urgencyStyle}>
-              {daysRemaining <= 0 ? "Today" : `${daysRemaining}d`}
+              {formatExpiry(ing.expiryDate)}
             </span>
           </div>
         );
@@ -672,7 +692,7 @@ const Dashboard = () => {
             <IngredientStock ingredients={ingredientStockList} />
           </DashboardCard>
 
-          <DashboardCard title="Expiring Soon (next 7 days)">
+          <DashboardCard title="Expiring/Expired">
             <ExpiringIngredients ingredients={expiringSoonList} />
           </DashboardCard>
 
