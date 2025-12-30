@@ -1,9 +1,9 @@
 // src/scenes/HRP/ProductionLog/ProductionLog.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { DataGrid } from "@mui/x-data-grid";
-import ProductionLogForm from "../form/ProductionLog";
-import { useAuth } from "../../contexts/AuthContext";
+import React, { useEffect, useMemo, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
+import { DataGrid } from "@mui/x-data-grid"
+import ProductionLogForm from "../form/ProductionLog"
+import { useAuth } from "../../contexts/AuthContext"
 
 /* =========================================================================================
    Production Log — updated to match Goods In styling (Light + Dark)
@@ -23,7 +23,10 @@ const BrandStyles = ({ isDark }) => (
     --text2: ${isDark ? "#cbd5e1" : "#475569"};
     --muted: ${isDark ? "#94a3b8" : "#64748b"};
     --hover: ${isDark ? "rgba(99,102,241,0.08)" : "#f0f4ff"};
-    --thead: ${isDark ? "rgba(99,102,241,0.05)" : "#f8fafc"};
+
+    /* ✅ FIX: make header bg solid in dark mode (prevents light/white bleed) */
+    --thead: ${isDark ? "#1e293b" : "#f8fafc"};
+
     --chip: ${isDark ? "rgba(99,102,241,0.12)" : "#eff6ff"};
     --monoBg: ${isDark ? "rgba(99,102,241,0.15)" : "#eef2ff"};
     --primary: #6366f1;
@@ -248,14 +251,19 @@ const BrandStyles = ({ isDark }) => (
     box-shadow: var(--shadow-sm);
   }
 
-  /* Header */
+  /* ✅ FIX: force ALL header-related containers to use thead background (prevents white bar in dark mode) */
+  .dg-wrap .MuiDataGrid-topContainer,
   .dg-wrap .MuiDataGrid-columnHeaders,
   .dg-wrap .MuiDataGrid-columnHeadersInner,
+  .dg-wrap .MuiDataGrid-columnHeaderRow,
   .dg-wrap .MuiDataGrid-columnHeader,
   .dg-wrap .MuiDataGrid-columnHeaderTitleContainer,
-  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent{
-    background: var(--thead) !important;
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
+  .dg-wrap .MuiDataGrid-scrollbarFiller,
+  .dg-wrap .MuiDataGrid-filler{
+    background-color: var(--thead) !important;
   }
+
   .dg-wrap .MuiDataGrid-columnHeaders{
     border-bottom: 2px solid var(--border) !important;
   }
@@ -425,131 +433,131 @@ const BrandStyles = ({ isDark }) => (
     .r-toolbar{ margin: 16px 0 0; }
   }
 `}</style>
-);
+)
 
 /* Icons (match Goods In style sizing) */
-const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />;
+const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />
 const EditIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
-);
+)
 const DeleteIcon = (props) => (
   <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
-);
+)
 
 /* =========================================================================================
    Config & utils
    ========================================================================================= */
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api"
 
 const formatDateYMD = (val) => {
-  if (!val) return "";
-  const d = new Date(val);
+  if (!val) return ""
+  const d = new Date(val)
   if (Number.isNaN(d.getTime())) {
-    const s = String(val);
-    const m = s.match(/\d{4}-\d{2}-\d{2}/);
-    return m ? m[0] : s;
+    const s = String(val)
+    const m = s.match(/\d{4}-\d{2}-\d{2}/)
+    return m ? m[0] : s
   }
-  return d.toISOString().split("T")[0];
-};
+  return d.toISOString().split("T")[0]
+}
 
-const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
+const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "")
 const makeStableId = (row) => {
-  if (!row) return null;
-  const key = getRowKey(row);
-  if (key) return key;
-  const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`;
-  return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
-};
+  if (!row) return null
+  const key = getRowKey(row)
+  if (key) return key
+  const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`
+  return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`
+}
 
-const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
-const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
+const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0)
+const nf = (n) => new Intl.NumberFormat().format(n ?? 0)
 
 const Portal = ({ children }) => {
-  if (typeof window === "undefined") return null;
-  return createPortal(children, document.body);
-};
+  if (typeof window === "undefined") return null
+  return createPortal(children, document.body)
+}
 
 /* =========================================================================================
    Component
    ========================================================================================= */
 export default function ProductionLog() {
-  const { cognitoId } = useAuth() || {};
+  const { cognitoId } = useAuth() || {}
 
   // Theme (sync with Topbar)
-  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark")
   useEffect(() => {
-    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
-    window.addEventListener("themeChanged", onThemeChanged);
-    return () => window.removeEventListener("themeChanged", onThemeChanged);
-  }, []);
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark")
+    window.addEventListener("themeChanged", onThemeChanged)
+    return () => window.removeEventListener("themeChanged", onThemeChanged)
+  }, [])
 
-  const [productionLogs, setProductionLogs] = useState([]);
-  const [recipesMap, setRecipesMap] = useState({});
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [fatalMsg, setFatalMsg] = useState("");
+  const [productionLogs, setProductionLogs] = useState([])
+  const [recipesMap, setRecipesMap] = useState({})
+  const [selectedRows, setSelectedRows] = useState([])
+  const [fatalMsg, setFatalMsg] = useState("")
 
   // Search + sort
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" })
 
   // Edit dialog state
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingRow, setEditingRow] = useState(null);
-  const [updating, setUpdating] = useState(false);
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState(null)
+  const [updating, setUpdating] = useState(false)
 
   // Delete dialog state
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [openProductionForm, setOpenProductionForm] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [openProductionForm, setOpenProductionForm] = useState(false)
 
   // ===== Recipes map =====
   useEffect(() => {
-    if (!cognitoId) return;
+    if (!cognitoId) return
     const run = async () => {
       try {
-        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
-        if (!res.ok) throw new Error("Failed to fetch recipes");
-        const data = await res.json();
-        const map = {};
-        (Array.isArray(data) ? data : []).forEach((r) => {
-          const key = r.recipe_name ?? r.recipe ?? r.name ?? "unknown";
-          map[key] = Number(r.units_per_batch) || 0;
-        });
-        setRecipesMap(map);
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`)
+        if (!res.ok) throw new Error("Failed to fetch recipes")
+        const data = await res.json()
+        const map = {}
+        ;(Array.isArray(data) ? data : []).forEach((r) => {
+          const key = r.recipe_name ?? r.recipe ?? r.name ?? "unknown"
+          map[key] = Number(r.units_per_batch) || 0
+        })
+        setRecipesMap(map)
       } catch (e) {
-        console.error("Recipes fetch error:", e);
+        console.error("Recipes fetch error:", e)
       }
-    };
-    run();
-  }, [cognitoId]);
+    }
+    run()
+  }, [cognitoId])
 
   // ===== Fetch production logs =====
   const fetchLogs = useCallback(async () => {
     if (!cognitoId) {
-      setFatalMsg("Missing cognito_id.");
-      return;
+      setFatalMsg("Missing cognito_id.")
+      return
     }
     try {
-      const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`);
-      if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`)
+      if (!res.ok) throw new Error(`Fetch failed (${res.status})`)
+      const data = await res.json()
       if (!Array.isArray(data)) {
-        setProductionLogs([]);
-        return;
+        setProductionLogs([])
+        return
       }
       const sanitized = data.map((row) => {
-        const dbId = row.id ?? row.ID ?? null;
-        const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced);
-        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining);
-        const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste);
-        const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
-        const unitsRemaining = toNumber(row.unitsRemaining ?? batchRemaining - unitsOfWaste);
-        const batchesRemaining = upb > 0 ? unitsRemaining / upb : null;
-        const producerName = row.producer_name ?? row.producerName ?? "";
+        const dbId = row.id ?? row.ID ?? null
+        const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced)
+        const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining)
+        const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste)
+        const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch)
+        const unitsRemaining = toNumber(row.unitsRemaining ?? batchRemaining - unitsOfWaste)
+        const batchesRemaining = upb > 0 ? unitsRemaining / upb : null
+        const producerName = row.producer_name ?? row.producerName ?? ""
 
         const normalized = {
           id: String(dbId ?? row.batchCode ?? row.batch_code ?? makeStableId(row)),
@@ -563,21 +571,21 @@ export default function ProductionLog() {
           batchesRemaining,
           producerName,
           __raw: row,
-        };
-        normalized.id = String(normalized.batchCode ?? normalized.id);
-        return normalized;
-      });
-      setProductionLogs(sanitized);
-      setFatalMsg("");
+        }
+        normalized.id = String(normalized.batchCode ?? normalized.id)
+        return normalized
+      })
+      setProductionLogs(sanitized)
+      setFatalMsg("")
     } catch (e) {
-      console.error("Production log fetch error:", e);
-      setFatalMsg(String(e?.message || e));
+      console.error("Production log fetch error:", e)
+      setFatalMsg(String(e?.message || e))
     }
-  }, [cognitoId, recipesMap]);
+  }, [cognitoId, recipesMap])
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    fetchLogs()
+  }, [fetchLogs])
 
   // ===== Grid columns =====
   const columns = useMemo(
@@ -602,8 +610,8 @@ export default function ProductionLog() {
             className="r-btn-ghost"
             aria-label="Edit row"
             onClick={() => {
-              setEditingRow(params.row);
-              setEditOpen(true);
+              setEditingRow(params.row)
+              setEditOpen(true)
             }}
           >
             <EditIcon /> Edit
@@ -611,56 +619,56 @@ export default function ProductionLog() {
         ),
       },
     ],
-    []
-  );
+    [],
+  )
 
   // ===== Search + sort (client-side) =====
   const filteredRows = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let rows = [...productionLogs];
-    if (q) rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)));
+    const q = searchQuery.trim().toLowerCase()
+    let rows = [...productionLogs]
+    if (q) rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)))
 
-    const dir = sortBy.dir === "asc" ? 1 : -1;
+    const dir = sortBy.dir === "asc" ? 1 : -1
     rows.sort((a, b) => {
-      const fa = a[sortBy.field] ?? "";
-      const fb = b[sortBy.field] ?? "";
-      if (typeof fa === "number" && typeof fb === "number") return (fa - fb) * dir;
-      return String(fa).localeCompare(String(fb)) * dir;
-    });
-    return rows;
-  }, [productionLogs, searchQuery, sortBy]);
+      const fa = a[sortBy.field] ?? ""
+      const fb = b[sortBy.field] ?? ""
+      if (typeof fa === "number" && typeof fb === "number") return (fa - fb) * dir
+      return String(fa).localeCompare(String(fb)) * dir
+    })
+    return rows
+  }, [productionLogs, searchQuery, sortBy])
 
   // ===== Sidebar Stats =====
   const stats = useMemo(() => {
-    const totalUnitsRemaining = filteredRows.reduce((s, r) => s + toNumber(r.unitsRemaining), 0);
-    const totalWaste = filteredRows.reduce((s, r) => s + toNumber(r.unitsOfWaste), 0);
-    const totalBatchesProduced = filteredRows.reduce((s, r) => s + toNumber(r.batchesProduced), 0);
-    const activeBatches = filteredRows.length;
+    const totalUnitsRemaining = filteredRows.reduce((s, r) => s + toNumber(r.unitsRemaining), 0)
+    const totalWaste = filteredRows.reduce((s, r) => s + toNumber(r.unitsOfWaste), 0)
+    const totalBatchesProduced = filteredRows.reduce((s, r) => s + toNumber(r.batchesProduced), 0)
+    const activeBatches = filteredRows.length
     const byRecipe = filteredRows.reduce((acc, r) => {
-      const k = r.recipe || "Unknown";
-      acc[k] = (acc[k] || 0) + toNumber(r.unitsRemaining);
-      return acc;
-    }, {});
+      const k = r.recipe || "Unknown"
+      acc[k] = (acc[k] || 0) + toNumber(r.unitsRemaining)
+      return acc
+    }, {})
     const topRecipes = Object.entries(byRecipe)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([recipe, units]) => ({ recipe, units }));
+      .map(([recipe, units]) => ({ recipe, units }))
 
-    return { totalUnitsRemaining, totalWaste, totalBatchesProduced, activeBatches, topRecipes };
-  }, [filteredRows]);
+    return { totalUnitsRemaining, totalWaste, totalBatchesProduced, activeBatches, topRecipes }
+  }, [filteredRows])
 
   // ===== Update row (PUT) =====
   const processRowUpdate = async (updatedRow) => {
-    if (!cognitoId) throw new Error("Missing cognitoId");
+    if (!cognitoId) throw new Error("Missing cognitoId")
 
-    const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code;
-    if (!batchCodeForPath) throw new Error("batchCode is required to update production_log");
+    const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code
+    if (!batchCodeForPath) throw new Error("batchCode is required to update production_log")
 
-    const dateYmd = formatDateYMD(updatedRow.date);
-    const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
-    const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
-    const unitsRemaining = toNumber(updatedRow.unitsRemaining);
-    const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? unitsRemaining + unitsOfWaste);
+    const dateYmd = formatDateYMD(updatedRow.date)
+    const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced)
+    const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste)
+    const unitsRemaining = toNumber(updatedRow.unitsRemaining)
+    const batchRemaining = toNumber(updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? unitsRemaining + unitsOfWaste)
 
     const payload = {
       date: dateYmd,
@@ -671,28 +679,28 @@ export default function ProductionLog() {
       unitsRemaining,
       producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
       cognito_id: cognitoId,
-    };
+    }
 
-    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`;
+    const url = `${API_BASE}/production-log/${encodeURIComponent(batchCodeForPath)}`
     const res = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    });
+    })
     if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(txt || `Server returned ${res.status}`);
+      const txt = await res.text().catch(() => "")
+      throw new Error(txt || `Server returned ${res.status}`)
     }
 
-    await fetchLogs();
-  };
+    await fetchLogs()
+  }
 
   const handleConfirmEdit = async () => {
     if (!editingRow) {
-      setEditOpen(false);
-      return;
+      setEditOpen(false)
+      return
     }
-    setUpdating(true);
+    setUpdating(true)
     try {
       const patched = {
         ...editingRow,
@@ -703,33 +711,35 @@ export default function ProductionLog() {
         batchesProduced: toNumber(editingRow.batchesProduced),
         unitsOfWaste: toNumber(editingRow.unitsOfWaste),
         unitsRemaining: toNumber(editingRow.unitsRemaining),
-        batchRemaining: toNumber(editingRow.batchRemaining ?? (toNumber(editingRow.unitsRemaining) + toNumber(editingRow.unitsOfWaste))),
+        batchRemaining: toNumber(
+          editingRow.batchRemaining ?? (toNumber(editingRow.unitsRemaining) + toNumber(editingRow.unitsOfWaste)),
+        ),
         producerName: editingRow.producerName ?? "",
-      };
+      }
 
       setProductionLogs((prev) => {
-        const next = [...prev];
-        const key = getRowKey(patched);
-        const idx = next.findIndex((r) => getRowKey(r) === key);
-        if (idx >= 0) next[idx] = { ...next[idx], ...patched };
-        return next;
-      });
+        const next = [...prev]
+        const key = getRowKey(patched)
+        const idx = next.findIndex((r) => getRowKey(r) === key)
+        if (idx >= 0) next[idx] = { ...next[idx], ...patched }
+        return next
+      })
 
-      await processRowUpdate(patched);
-      setEditOpen(false);
-      setEditingRow(null);
+      await processRowUpdate(patched)
+      setEditOpen(false)
+      setEditingRow(null)
     } catch (e) {
-      console.error("Edit failed:", e);
-      alert(`Update failed: ${e?.message || e}`);
+      console.error("Edit failed:", e)
+      alert(`Update failed: ${e?.message || e}`)
     } finally {
-      setUpdating(false);
+      setUpdating(false)
     }
-  };
+  }
 
   // ===== Delete (soft) =====
   const handleDeleteSelectedRows = async () => {
-    if (!cognitoId || selectedRows.length === 0) return;
-    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(getRowKey(r)));
+    if (!cognitoId || selectedRows.length === 0) return
+    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(getRowKey(r)))
     try {
       await Promise.all(
         rowsToDelete.map((row) =>
@@ -739,35 +749,35 @@ export default function ProductionLog() {
             body: JSON.stringify({ batchCode: row.batchCode, cognito_id: cognitoId }),
           }).then(async (res) => {
             if (!res.ok) {
-              const t = await res.text().catch(() => "");
-              throw new Error(t || `Delete failed for ${row.batchCode}`);
+              const t = await res.text().catch(() => "")
+              throw new Error(t || `Delete failed for ${row.batchCode}`)
             }
-          })
-        )
-      );
-      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(getRowKey(r))));
-      setSelectedRows([]);
-      setDeleteOpen(false);
+          }),
+        ),
+      )
+      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(getRowKey(r))))
+      setSelectedRows([])
+      setDeleteOpen(false)
     } catch (err) {
-      console.error("Delete failed:", err);
-      alert(`Delete failed: ${err?.message || err}`);
+      console.error("Delete failed:", err)
+      alert(`Delete failed: ${err?.message || err}`)
     }
-  };
+  }
 
   // ===== Pagination =====
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
   const visibleRows = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredRows.slice(start, start + rowsPerPage);
-  }, [filteredRows, page, rowsPerPage]);
+    const start = page * rowsPerPage
+    return filteredRows.slice(start, start + rowsPerPage)
+  }, [filteredRows, page, rowsPerPage])
 
   const dangerCardStyle = {
     borderColor: isDark ? "rgba(220,38,38,0.55)" : "#fecaca",
     background: isDark ? "rgba(220,38,38,0.12)" : "#fff1f2",
     color: isDark ? "#fecaca" : "#b91c1c",
     marginBottom: 12,
-  };
+  }
 
   return (
     <div className="r-wrap">
@@ -826,8 +836,8 @@ export default function ProductionLog() {
                 placeholder="Search by recipe, batch code, producer..."
                 value={searchQuery}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(0);
+                  setSearchQuery(e.target.value)
+                  setPage(0)
                 }}
               />
 
@@ -836,9 +846,9 @@ export default function ProductionLog() {
                   className="r-select"
                   value={`${sortBy.field}:${sortBy.dir}`}
                   onChange={(e) => {
-                    const [field, dir] = e.target.value.split(":");
-                    setSortBy({ field, dir });
-                    setPage(0);
+                    const [field, dir] = e.target.value.split(":")
+                    setSortBy({ field, dir })
+                    setPage(0)
                   }}
                 >
                   <option value="date:desc">Date (new → old)</option>
@@ -859,14 +869,14 @@ export default function ProductionLog() {
                 checkboxSelection
                 rowSelectionModel={selectedRows}
                 onRowSelectionModelChange={(model) => {
-                  const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
-                  setSelectedRows(arr);
+                  const arr = Array.isArray(model) ? model.map((m) => String(m)) : []
+                  setSelectedRows(arr)
                 }}
                 disableRowSelectionOnClick
                 hideFooter
                 onCellDoubleClick={(params) => {
-                  setEditingRow(params.row);
-                  setEditOpen(true);
+                  setEditingRow(params.row)
+                  setEditOpen(true)
                 }}
                 sx={{
                   border: 0,
@@ -874,11 +884,20 @@ export default function ProductionLog() {
                   "& .MuiDataGrid-footerContainer": {
                     borderTop: `1px solid ${isDark ? "#1e2942" : "#e2e8f0"}`,
                   },
-                  "& .MuiDataGrid-columnHeaders": {
+
+                  // ✅ FIX: cover header + sticky/top containers that sometimes keep a white background
+                  "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
                     backgroundColor: "var(--thead)",
                     color: "var(--muted)",
                     borderBottom: "2px solid var(--border)",
                   },
+                  "& .MuiDataGrid-columnHeadersInner, & .MuiDataGrid-columnHeaderRow": {
+                    backgroundColor: "var(--thead)",
+                  },
+                  "& .MuiDataGrid-scrollbarFiller, & .MuiDataGrid-filler": {
+                    backgroundColor: "var(--thead)",
+                  },
+
                   "& .MuiDataGrid-columnHeaderTitle": {
                     color: "var(--muted)",
                     fontWeight: 700,
@@ -893,10 +912,9 @@ export default function ProductionLog() {
 
             <div className="r-footer">
               <span className="r-muted">
-                Showing{" "}
-                <strong style={{ color: "var(--text)" }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
-                <strong style={{ color: "var(--text)" }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong>{" "}
-                of <strong style={{ color: "var(--text)" }}>{filteredRows.length}</strong>
+                Showing <strong style={{ color: "var(--text)" }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
+                <strong style={{ color: "var(--text)" }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
+                <strong style={{ color: "var(--text)" }}>{filteredRows.length}</strong>
               </span>
 
               <div className="r-flex">
@@ -919,8 +937,8 @@ export default function ProductionLog() {
                     className="r-select"
                     value={rowsPerPage}
                     onChange={(e) => {
-                      setRowsPerPage(Number(e.target.value));
-                      setPage(0);
+                      setRowsPerPage(Number(e.target.value))
+                      setPage(0)
                     }}
                   >
                     <option value={5}>5</option>
@@ -994,8 +1012,8 @@ export default function ProductionLog() {
                 <button
                   className="r-btn-ghost"
                   onClick={() => {
-                    setEditOpen(false);
-                    setEditingRow(null);
+                    setEditOpen(false)
+                    setEditingRow(null)
                   }}
                 >
                   Close
@@ -1041,9 +1059,9 @@ export default function ProductionLog() {
                       type="number"
                       value={editingRow.unitsOfWaste ?? 0}
                       onChange={(e) => {
-                        const unitsOfWaste = toNumber(e.target.value);
-                        const unitsRemaining = toNumber(editingRow.unitsRemaining);
-                        setEditingRow((prev) => ({ ...(prev || {}), unitsOfWaste, batchRemaining: unitsRemaining + unitsOfWaste }));
+                        const unitsOfWaste = toNumber(e.target.value)
+                        const unitsRemaining = toNumber(editingRow.unitsRemaining)
+                        setEditingRow((prev) => ({ ...(prev || {}), unitsOfWaste, batchRemaining: unitsRemaining + unitsOfWaste }))
                       }}
                     />
                   </div>
@@ -1055,9 +1073,9 @@ export default function ProductionLog() {
                       type="number"
                       value={editingRow.unitsRemaining ?? 0}
                       onChange={(e) => {
-                        const unitsRemaining = toNumber(e.target.value);
-                        const unitsOfWaste = toNumber(editingRow.unitsOfWaste);
-                        setEditingRow((prev) => ({ ...(prev || {}), unitsRemaining, batchRemaining: unitsRemaining + unitsOfWaste }));
+                        const unitsRemaining = toNumber(e.target.value)
+                        const unitsOfWaste = toNumber(editingRow.unitsOfWaste)
+                        setEditingRow((prev) => ({ ...(prev || {}), unitsRemaining, batchRemaining: unitsRemaining + unitsOfWaste }))
                       }}
                     />
                   </div>
@@ -1088,8 +1106,8 @@ export default function ProductionLog() {
                 <button
                   className="r-btn-ghost"
                   onClick={() => {
-                    setEditOpen(false);
-                    setEditingRow(null);
+                    setEditOpen(false)
+                    setEditingRow(null)
                   }}
                   disabled={updating}
                 >
@@ -1177,8 +1195,8 @@ export default function ProductionLog() {
                 <ProductionLogForm
                   cognitoId={cognitoId}
                   onSubmitted={() => {
-                    fetchLogs();
-                    setOpenProductionForm(false);
+                    fetchLogs()
+                    setOpenProductionForm(false)
                   }}
                   formId="production-log-form"
                 />
@@ -1194,5 +1212,5 @@ export default function ProductionLog() {
         </Portal>
       )}
     </div>
-  );
+  )
 }

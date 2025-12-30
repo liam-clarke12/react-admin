@@ -1,6 +1,6 @@
 // src/scenes/goodsout/GoodsOut.jsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { createPortal } from "react-dom";
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { createPortal } from "react-dom"
 import {
   Box,
   Drawer,
@@ -15,16 +15,16 @@ import {
   ListItemText,
   Snackbar,
   Alert,
-} from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import DeleteIcon from "@mui/icons-material/Delete";
-import CloseIcon from "@mui/icons-material/Close";
-import AddIcon from "@mui/icons-material/Add";
-import { useAuth } from "../../contexts/AuthContext";
-import * as yup from "yup";
-import { Formik, FieldArray } from "formik";
+} from "@mui/material"
+import { DataGrid } from "@mui/x-data-grid"
+import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined"
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded"
+import DeleteIcon from "@mui/icons-material/Delete"
+import CloseIcon from "@mui/icons-material/Close"
+import AddIcon from "@mui/icons-material/Add"
+import { useAuth } from "../../contexts/AuthContext"
+import * as yup from "yup"
+import { Formik, FieldArray } from "formik"
 
 /* =========================================================================================
    Brand Styles (Light + Dark) — matches GoodsIn styling
@@ -42,7 +42,10 @@ const BrandStyles = ({ isDark }) => (
     --text2: ${isDark ? "#cbd5e1" : "#475569"};
     --muted: ${isDark ? "#94a3b8" : "#64748b"};
     --hover: ${isDark ? "rgba(99,102,241,0.08)" : "#f0f4ff"};
-    --thead: ${isDark ? "rgba(99,102,241,0.05)" : "#f8fafc"};
+
+    /* ✅ FIX: use a SOLID header background in dark mode to prevent white/ghost bars */
+    --thead: ${isDark ? "#1e293b" : "#f8fafc"};
+
     --chip: ${isDark ? "rgba(99,102,241,0.12)" : "#eff6ff"};
     --monoBg: ${isDark ? "rgba(99,102,241,0.15)" : "#eef2ff"};
     --primary: #6366f1;
@@ -408,16 +411,38 @@ const BrandStyles = ({ isDark }) => (
 
   /* DataGrid */
   .dg-wrap { height: 70vh; min-width: 750px; padding: 0 24px 16px; }
+
+  /* Keep your existing "transparent root", but FIX header containers */
   .dg-wrap .MuiDataGrid-root { border:0; background: transparent; }
-  .dg-wrap .MuiDataGrid-columnHeaders{
-    background: var(--thead);
-    border-bottom:1px solid var(--border);
-    color: var(--muted);
-    font-weight:800;
-    text-transform:uppercase;
-    letter-spacing:.05em;
-    font-size:11px;
+
+  /* ✅ FIX: cover all header-related containers (prevents white stripe in dark mode) */
+  .dg-wrap .MuiDataGrid-topContainer,
+  .dg-wrap .MuiDataGrid-columnHeaders,
+  .dg-wrap .MuiDataGrid-columnHeadersInner,
+  .dg-wrap .MuiDataGrid-columnHeaderRow,
+  .dg-wrap .MuiDataGrid-columnHeader,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainer,
+  .dg-wrap .MuiDataGrid-columnHeaderTitleContainerContent,
+  .dg-wrap .MuiDataGrid-scrollbarFiller,
+  .dg-wrap .MuiDataGrid-filler{
+    background-color: var(--thead) !important;
   }
+
+  .dg-wrap .MuiDataGrid-columnHeaders{
+    border-bottom:1px solid var(--border) !important;
+  }
+
+  .dg-wrap .MuiDataGrid-columnHeaderTitle,
+  .dg-wrap .MuiDataGrid-sortIcon,
+  .dg-wrap .MuiDataGrid-menuIcon,
+  .dg-wrap .MuiDataGrid-iconButtonContainer{
+    color: var(--muted) !important;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: 11px;
+  }
+
   .dg-wrap .MuiDataGrid-cell{
     border-bottom:1px solid var(--border);
     color: var(--text2);
@@ -430,143 +455,136 @@ const BrandStyles = ({ isDark }) => (
   /* Slightly lift MUI drawer header contrast */
   .go-drawer-meta { opacity: 0.95; }
   `}</style>
-);
+)
 
 /* =========================================================================================
    Config + Validation
    ========================================================================================= */
-const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api"
 
 const goodsOutSchema = yup.object().shape({
   date: yup.string().required("Date is required"),
   recipe: yup.string().required("Recipe is required"),
-  stockAmount: yup
-    .number()
-    .typeError("Must be a number")
-    .positive("Must be positive")
-    .required("Amount is required"),
+  stockAmount: yup.number().typeError("Must be a number").positive("Must be positive").required("Amount is required"),
   recipients: yup.string().required("Recipient is required"),
-});
+})
 
 const multiGoodsOutSchema = yup.object().shape({
   items: yup.array().of(goodsOutSchema).min(1, "You must add at least one row"),
-});
+})
 
 /* Fetch available units from Production Log */
 const useAvailableUnitsFetcher = (cognitoId) => {
   return useCallback(
     async (recipeName) => {
-      if (!cognitoId || !recipeName) return 0;
+      if (!cognitoId || !recipeName) return 0
       try {
-        const res = await fetch(
-          `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch production log");
+        const res = await fetch(`${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`)
+        if (!res.ok) throw new Error("Failed to fetch production log")
 
-        const rows = await res.json();
-        let total = 0;
+        const rows = await res.json()
+        let total = 0
 
-        (Array.isArray(rows) ? rows : []).forEach((r) => {
-          const rName = r.recipe ?? r.recipe_name ?? r.name ?? "";
-          if ((rName || "").trim() !== recipeName.trim()) return;
+        ;(Array.isArray(rows) ? rows : []).forEach((r) => {
+          const rName = r.recipe ?? r.recipe_name ?? r.name ?? ""
+          if ((rName || "").trim() !== recipeName.trim()) return
 
-          const br = Number(r.batchRemaining ?? r.batch_remaining ?? r.units_per_batch_total ?? 0);
-          const waste = Number(r.units_of_waste ?? r.unitsOfWaste ?? 0);
-          const out = Number(r.units_out ?? r.unitsOut ?? 0);
-          const apiUnits = Number(r.units_remaining ?? r.unitsRemaining ?? NaN);
+          const br = Number(r.batchRemaining ?? r.batch_remaining ?? r.units_per_batch_total ?? 0)
+          const waste = Number(r.units_of_waste ?? r.unitsOfWaste ?? 0)
+          const out = Number(r.units_out ?? r.unitsOut ?? 0)
+          const apiUnits = Number(r.units_remaining ?? r.unitsRemaining ?? NaN)
 
-          const remain = Number.isFinite(apiUnits) ? apiUnits : Math.max(0, br - waste - out);
-          if (Number.isFinite(remain)) total += remain;
-        });
+          const remain = Number.isFinite(apiUnits) ? apiUnits : Math.max(0, br - waste - out)
+          if (Number.isFinite(remain)) total += remain
+        })
 
-        return total;
+        return total
       } catch (err) {
-        console.error("[AvailCheck] failed:", err);
-        return 0;
+        console.error("[AvailCheck] failed:", err)
+        return 0
       }
     },
-    [cognitoId]
-  );
-};
+    [cognitoId],
+  )
+}
 
 /* =========================================================================================
    Helpers
    ========================================================================================= */
-const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
+const nf = (n) => new Intl.NumberFormat().format(n ?? 0)
 
 const safeParse = (val, fallback) => {
-  if (val == null) return fallback;
-  if (Array.isArray(val) || (typeof val === "object" && val !== null)) return val;
+  if (val == null) return fallback
+  if (Array.isArray(val) || (typeof val === "object" && val !== null)) return val
   if (typeof val === "string") {
     try {
-      const trimmed = val.trim();
-      if (!trimmed) return fallback;
-      const p = JSON.parse(trimmed);
-      return p ?? fallback;
+      const trimmed = val.trim()
+      if (!trimmed) return fallback
+      const p = JSON.parse(trimmed)
+      return p ?? fallback
     } catch {
-      return fallback;
+      return fallback
     }
   }
-  return fallback;
-};
+  return fallback
+}
 
 const formatToYYYYMMDD = (val) => {
-  if (!val) return "";
+  if (!val) return ""
   try {
-    const d = new Date(val);
-    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    const d = new Date(val)
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
   } catch {}
-  const m = String(val).match(/\d{4}-\d{2}-\d{2}/);
-  return m ? m[0] : String(val).slice(0, 10);
-};
+  const m = String(val).match(/\d{4}-\d{2}-\d{2}/)
+  return m ? m[0] : String(val).slice(0, 10)
+}
 
 const normalizeRowPairs = (row) => {
-  const rawCodes = row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes;
-  const rawQty = row.quantitiesUsed ?? row.quantities ?? row.batchesUsed ?? row.quantities_used;
+  const rawCodes = row.batchcodes ?? row.batchCodes ?? row.codes ?? row.batch_codes
+  const rawQty = row.quantitiesUsed ?? row.quantities ?? row.batchesUsed ?? row.quantities_used
 
-  const codes = safeParse(rawCodes, []);
-  const qty = safeParse(rawQty, []);
+  const codes = safeParse(rawCodes, [])
+  const qty = safeParse(rawQty, [])
 
-  const out = [];
+  const out = []
 
   if (Array.isArray(codes) && codes.length) {
     codes.forEach((c, i) => {
-      const code = typeof c === "string" ? c : c?.code || c?.batchCode || `Batch ${i + 1}`;
-      const units = Number((Array.isArray(qty) ? qty[i] : qty?.[code]) ?? c?.units ?? c?.qty ?? 0);
-      out.push({ code, units });
-    });
-    return out;
+      const code = typeof c === "string" ? c : c?.code || c?.batchCode || `Batch ${i + 1}`
+      const units = Number((Array.isArray(qty) ? qty[i] : qty?.[code]) ?? c?.units ?? c?.qty ?? 0)
+      out.push({ code, units })
+    })
+    return out
   }
 
   if (codes && typeof codes === "object") {
     Object.entries(codes).forEach(([code, units]) => {
-      out.push({ code, units: Number(units) || 0 });
-    });
-    return out;
+      out.push({ code, units: Number(units) || 0 })
+    })
+    return out
   }
 
   if (Array.isArray(qty)) {
-    return qty.map((u, i) => ({ code: `Batch ${i + 1}`, units: Number(u) || 0 }));
+    return qty.map((u, i) => ({ code: `Batch ${i + 1}`, units: Number(u) || 0 }))
   }
 
-  return [];
-};
+  return []
+}
 
 const buildDrawerItems = (row) =>
   normalizeRowPairs(row).map((it) => ({
     ...it,
     unitsLabel: `${nf(it.units)} units`,
-  }));
+  }))
 
 /* Drawer Portal */
-const Portal = ({ children }) =>
-  typeof window === "undefined" ? null : createPortal(children, document.body);
+const Portal = ({ children }) => (typeof window === "undefined" ? null : createPortal(children, document.body))
 
 /* =========================================================================================
    HARD BLOCK MODAL (NO PROCEED) — styled like GoodsIn modal
    ========================================================================================= */
 const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
-  if (!open) return null;
+  if (!open) return null
 
   return createPortal(
     <div className="r-modal-dim" onClick={onClose}>
@@ -622,113 +640,102 @@ const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
         </div>
       </div>
     </div>,
-    document.body
-  );
-};
+    document.body,
+  )
+}
 
 /* =========================================================================================
    MAIN COMPONENT
    ========================================================================================= */
 export default function GoodsOut() {
-  const { cognitoId } = useAuth();
+  const { cognitoId } = useAuth()
 
   // Theme (sync with Topbar)
-  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark")
   useEffect(() => {
-    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
-    window.addEventListener("themeChanged", onThemeChanged);
-    return () => window.removeEventListener("themeChanged", onThemeChanged);
-  }, []);
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark")
+    window.addEventListener("themeChanged", onThemeChanged)
+    return () => window.removeEventListener("themeChanged", onThemeChanged)
+  }, [])
 
   /* ===========================
      Form Modal State
   ============================ */
-  const [formOpen, setFormOpen] = useState(false);
-  const [formView, setFormView] = useState("single"); // single | multiple
+  const [formOpen, setFormOpen] = useState(false)
+  const [formView, setFormView] = useState("single") // single | multiple
 
-  const [recipes, setRecipes] = useState([]);
-  const [recipesLoading, setRecipesLoading] = useState(false);
-  const [recipesError, setRecipesError] = useState("");
+  const [recipes, setRecipes] = useState([])
+  const [recipesLoading, setRecipesLoading] = useState(false)
+  const [recipesError, setRecipesError] = useState("")
 
-  const [toastOpen, setToastOpen] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false)
 
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [blockInfo, setBlockInfo] = useState({ recipe: "", need: 0, have: 0 });
+  const [blockOpen, setBlockOpen] = useState(false)
+  const [blockInfo, setBlockInfo] = useState({ recipe: "", need: 0, have: 0 })
 
-  const fetchAvailableUnits = useAvailableUnitsFetcher(cognitoId);
+  const fetchAvailableUnits = useAvailableUnitsFetcher(cognitoId)
 
-  const [goodsOut, setGoodsOut] = useState([]);
-  const [fatalMsg, setFatalMsg] = useState("");
+  const [goodsOut, setGoodsOut] = useState([])
+  const [fatalMsg, setFatalMsg] = useState("")
 
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([])
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerItems, setDrawerItems] = useState([]);
-  const [drawerHeader, setDrawerHeader] = useState("");
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerItems, setDrawerItems] = useState([])
+  const [drawerHeader, setDrawerHeader] = useState("")
+  const [selectedRow, setSelectedRow] = useState(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" })
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   /* Fetch recipes for select dropdown */
   useEffect(() => {
-    if (!cognitoId) return;
+    if (!cognitoId) return
     const loadRecipes = async () => {
-      setRecipesLoading(true);
-      setRecipesError("");
+      setRecipesLoading(true)
+      setRecipesError("")
 
       try {
-        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
-        if (!res.ok) throw new Error("Failed to load recipes");
-        const data = await res.json();
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`)
+        if (!res.ok) throw new Error("Failed to load recipes")
+        const data = await res.json()
 
-        const names = Array.isArray(data)
-          ? data.map((r) => r.recipe_name ?? r.recipe ?? r.name).filter(Boolean)
-          : [];
+        const names = Array.isArray(data) ? data.map((r) => r.recipe_name ?? r.recipe ?? r.name).filter(Boolean) : []
 
-        setRecipes([...new Set(names)]);
+        setRecipes([...new Set(names)])
       } catch (err) {
-        console.error("Recipe load error:", err);
-        setRecipesError("Error loading recipes");
+        console.error("Recipe load error:", err)
+        setRecipesError("Error loading recipes")
       } finally {
-        setRecipesLoading(false);
+        setRecipesLoading(false)
       }
-    };
+    }
 
-    loadRecipes();
-  }, [cognitoId]);
+    loadRecipes()
+  }, [cognitoId])
 
   /* Fetch goods-out list */
   const fetchGoodsOut = useCallback(async () => {
-    if (!cognitoId) return setFatalMsg("Missing cognito_id.");
+    if (!cognitoId) return setFatalMsg("Missing cognito_id.")
 
     try {
-      const res = await fetch(`${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`);
-      if (!res.ok) throw new Error("Failed to fetch goods out");
+      const res = await fetch(`${API_BASE}/goods-out?cognito_id=${encodeURIComponent(cognitoId)}`)
+      if (!res.ok) throw new Error("Failed to fetch goods out")
 
-      const raw = await res.json();
-      const arr = Array.isArray(raw) ? raw : [];
+      const raw = await res.json()
+      const arr = Array.isArray(raw) ? raw : []
 
       const norm = arr.map((r, idx) => {
-        const stockAmount = Number(
-          r.stockAmount ??
-            r.stock_amount ??
-            r.unitsOut ??
-            r.units_out ??
-            r.units ??
-            r.qty ??
-            0
-        );
+        const stockAmount = Number(r.stockAmount ?? r.stock_amount ?? r.unitsOut ?? r.units_out ?? r.units ?? r.qty ?? 0)
 
-        const recipe = r.recipe ?? r.recipe_name ?? r.product ?? r.product_name ?? "Unknown";
-        const recipients = r.recipients ?? r.customer ?? r.client ?? r.destination ?? "";
+        const recipe = r.recipe ?? r.recipe_name ?? r.product ?? r.product_name ?? "Unknown"
+        const recipients = r.recipients ?? r.customer ?? r.client ?? r.destination ?? ""
 
-        const date =
-          formatToYYYYMMDD(r.date ?? r.production_log_date ?? r.created_at ?? r.createdAt) || "";
+        const date = formatToYYYYMMDD(r.date ?? r.production_log_date ?? r.created_at ?? r.createdAt) || ""
 
         return {
           ...r,
@@ -737,76 +744,76 @@ export default function GoodsOut() {
           recipe,
           recipients,
           date,
-        };
-      });
+        }
+      })
 
-      setGoodsOut(norm);
-      setFatalMsg("");
+      setGoodsOut(norm)
+      setFatalMsg("")
     } catch (err) {
-      console.error("[GoodsOut] fetch failed:", err);
-      setFatalMsg(String(err.message || err));
+      console.error("[GoodsOut] fetch failed:", err)
+      setFatalMsg(String(err.message || err))
     }
-  }, [cognitoId]);
+  }, [cognitoId])
 
   useEffect(() => {
-    fetchGoodsOut();
-  }, [fetchGoodsOut]);
+    fetchGoodsOut()
+  }, [fetchGoodsOut])
 
   /* ===============================
      Submit — SINGLE
   =============================== */
   const handleSubmitSingle = async (values, helpers) => {
-    const need = Number(values.stockAmount) || 0;
-    const have = await fetchAvailableUnits(values.recipe);
+    const need = Number(values.stockAmount) || 0
+    const have = await fetchAvailableUnits(values.recipe)
 
     if (need > have) {
-      setBlockInfo({ recipe: values.recipe, need, have });
-      setBlockOpen(true);
-      return;
+      setBlockInfo({ recipe: values.recipe, need, have })
+      setBlockOpen(true)
+      return
     }
 
     try {
-      const payload = { ...values, cognito_id: cognitoId };
+      const payload = { ...values, cognito_id: cognitoId }
 
       const res = await fetch(`${API_BASE}/add-goods-out`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
+      })
 
-      if (!res.ok) throw new Error("Submit failed");
+      if (!res.ok) throw new Error("Submit failed")
 
-      helpers.resetForm();
-      setFormOpen(false);
-      setToastOpen(true);
-      await fetchGoodsOut();
+      helpers.resetForm()
+      setFormOpen(false)
+      setToastOpen(true)
+      await fetchGoodsOut()
     } catch (err) {
-      alert("Submission failed. Check console.");
-      console.error(err);
+      alert("Submission failed. Check console.")
+      console.error(err)
     }
-  };
+  }
 
   /* ===============================
      Submit — MULTIPLE
   =============================== */
   const handleSubmitBatch = async (values, helpers) => {
-    const items = values.items || [];
+    const items = values.items || []
 
     // aggregate needs
-    const needMap = {};
+    const needMap = {}
     items.forEach((item) => {
-      const r = item.recipe?.trim();
-      if (!r) return;
-      needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0);
-    });
+      const r = item.recipe?.trim()
+      if (!r) return
+      needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0)
+    })
 
     // HARD precheck
     for (const [recipe, need] of Object.entries(needMap)) {
-      const have = await fetchAvailableUnits(recipe);
+      const have = await fetchAvailableUnits(recipe)
       if (need > have) {
-        setBlockInfo({ recipe, need, have });
-        setBlockOpen(true);
-        return;
+        setBlockInfo({ recipe, need, have })
+        setBlockOpen(true)
+        return
       }
     }
 
@@ -819,31 +826,31 @@ export default function GoodsOut() {
           recipients: i.recipients,
         })),
         cognito_id: cognitoId,
-      };
+      }
 
       const res = await fetch(`${API_BASE}/add-goods-out-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
+      })
 
-      if (!res.ok) throw new Error("Batch submit failed");
+      if (!res.ok) throw new Error("Batch submit failed")
 
-      helpers.resetForm();
-      setFormOpen(false);
-      setToastOpen(true);
-      await fetchGoodsOut();
+      helpers.resetForm()
+      setFormOpen(false)
+      setToastOpen(true)
+      await fetchGoodsOut()
     } catch (err) {
-      console.error(err);
-      alert("Batch submission failed.");
+      console.error(err)
+      alert("Batch submission failed.")
     }
-  };
+  }
 
   /* =====================================================================
      FORM MODAL CONTENT (styled like GoodsIn)
      ===================================================================== */
   const renderFormModal = () => {
-    if (!formOpen) return null;
+    if (!formOpen) return null
 
     return createPortal(
       <div className="r-modal-dim" onClick={() => setFormOpen(false)}>
@@ -944,9 +951,7 @@ export default function GoodsOut() {
                           onChange={handleChange}
                           onBlur={handleBlur}
                         />
-                        {touched.stockAmount && errors.stockAmount && (
-                          <div className="ag-error">{errors.stockAmount}</div>
-                        )}
+                        {touched.stockAmount && errors.stockAmount && <div className="ag-error">{errors.stockAmount}</div>}
                       </div>
 
                       <div className="ag-field-4">
@@ -960,9 +965,7 @@ export default function GoodsOut() {
                           onChange={handleChange}
                           onBlur={handleBlur}
                         />
-                        {touched.recipients && errors.recipients && (
-                          <div className="ag-error">{errors.recipients}</div>
-                        )}
+                        {touched.recipients && errors.recipients && <div className="ag-error">{errors.recipients}</div>}
                       </div>
                     </div>
 
@@ -1003,8 +1006,8 @@ export default function GoodsOut() {
                         <>
                           <div style={{ display: "grid", gap: 12 }}>
                             {values.items.map((item, idx) => {
-                              const itemErrors = errors.items?.[idx] || {};
-                              const itemTouched = touched.items?.[idx] || {};
+                              const itemErrors = errors.items?.[idx] || {}
+                              const itemTouched = touched.items?.[idx] || {}
 
                               return (
                                 <div key={idx} className="ag-row">
@@ -1043,9 +1046,7 @@ export default function GoodsOut() {
                                         value={item.date}
                                         onChange={handleChange}
                                       />
-                                      {itemTouched.date && itemErrors.date && (
-                                        <div className="ag-error">{itemErrors.date}</div>
-                                      )}
+                                      {itemTouched.date && itemErrors.date && <div className="ag-error">{itemErrors.date}</div>}
                                     </div>
 
                                     <div className="ag-field">
@@ -1065,9 +1066,7 @@ export default function GoodsOut() {
                                           </option>
                                         ))}
                                       </select>
-                                      {itemTouched.recipe && itemErrors.recipe && (
-                                        <div className="ag-error">{itemErrors.recipe}</div>
-                                      )}
+                                      {itemTouched.recipe && itemErrors.recipe && <div className="ag-error">{itemErrors.recipe}</div>}
                                     </div>
 
                                     <div className="ag-field-4">
@@ -1101,7 +1100,7 @@ export default function GoodsOut() {
                                     </div>
                                   </div>
                                 </div>
-                              );
+                              )
                             })}
                           </div>
 
@@ -1140,58 +1139,58 @@ export default function GoodsOut() {
           </div>
         </div>
       </div>,
-      document.body
-    );
-  };
+      document.body,
+    )
+  }
 
   /* Drawer open */
   const openDrawerForRow = (row) => {
-    const rr = { ...row, date: formatToYYYYMMDD(row?.date) };
-    setSelectedRow(rr);
-    setDrawerHeader("Batchcodes");
-    setDrawerItems(buildDrawerItems(rr));
-    setSearchTerm("");
-    setDrawerOpen(true);
-  };
+    const rr = { ...row, date: formatToYYYYMMDD(row?.date) }
+    setSelectedRow(rr)
+    setDrawerHeader("Batchcodes")
+    setDrawerItems(buildDrawerItems(rr))
+    setSearchTerm("")
+    setDrawerOpen(true)
+  }
 
   const closeDrawer = () => {
-    setDrawerOpen(false);
-    setSelectedRow(null);
-    setDrawerItems([]);
-  };
+    setDrawerOpen(false)
+    setSelectedRow(null)
+    setDrawerItems([])
+  }
 
   /* Delete selected rows */
   const handleDelete = async () => {
     try {
-      const map = new Map(goodsOut.map((r) => [String(r.id), r]));
+      const map = new Map(goodsOut.map((r) => [String(r.id), r]))
       const ids = selectedRows
         .map((rid) => map.get(String(rid)))
         .filter(Boolean)
         .map((r) => r.id)
         .map(Number)
-        .filter((n) => !isNaN(n));
+        .filter((n) => !Number.isNaN(n))
 
       if (!ids.length) {
-        setDeleteOpen(false);
-        return;
+        setDeleteOpen(false)
+        return
       }
 
       const res = await fetch(`${API_BASE}/goods-out/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, cognito_id: cognitoId }),
-      });
+      })
 
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) throw new Error("Delete failed")
 
-      await fetchGoodsOut();
-      setSelectedRows([]);
-      setDeleteOpen(false);
+      await fetchGoodsOut()
+      setSelectedRows([])
+      setDeleteOpen(false)
     } catch (err) {
-      console.error("Delete failed:", err);
-      setDeleteOpen(false);
+      console.error("Delete failed:", err)
+      setDeleteOpen(false)
     }
-  };
+  }
 
   /* DataGrid columns */
   const columns = useMemo(
@@ -1219,43 +1218,43 @@ export default function GoodsOut() {
       },
       { field: "recipients", headerName: "Recipients", flex: 1 },
     ],
-    []
-  );
+    [],
+  )
 
   /* Filter + sort */
   const filteredRows = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    let rows = [...goodsOut];
+    const q = searchQuery.toLowerCase().trim()
+    let rows = [...goodsOut]
 
     if (q) {
-      rows = rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(q)));
+      rows = rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(q)))
     }
 
-    const dir = sortBy.dir === "asc" ? 1 : -1;
+    const dir = sortBy.dir === "asc" ? 1 : -1
     rows.sort((a, b) => {
-      const fa = a[sortBy.field] ?? "";
-      const fb = b[sortBy.field] ?? "";
-      if (typeof fa === "number" || typeof fb === "number") return (Number(fa) - Number(fb)) * dir;
-      return String(fa).localeCompare(String(fb)) * dir;
-    });
+      const fa = a[sortBy.field] ?? ""
+      const fb = b[sortBy.field] ?? ""
+      if (typeof fa === "number" || typeof fb === "number") return (Number(fa) - Number(fb)) * dir
+      return String(fa).localeCompare(String(fb)) * dir
+    })
 
-    return rows;
-  }, [goodsOut, searchQuery, sortBy]);
+    return rows
+  }, [goodsOut, searchQuery, sortBy])
 
   const visibleRows = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredRows.slice(start, start + rowsPerPage);
-  }, [filteredRows, page, rowsPerPage]);
+    const start = page * rowsPerPage
+    return filteredRows.slice(start, start + rowsPerPage)
+  }, [filteredRows, page, rowsPerPage])
 
   /* Stats */
   const stats = useMemo(() => {
-    const totalUnits = filteredRows.reduce((s, r) => s + (r.stockAmount || 0), 0);
-    const shipments = filteredRows.length;
-    const uniq = (arr) => Array.from(new Set(arr.filter(Boolean))).length;
-    const uniqueRecipes = uniq(filteredRows.map((r) => r.recipe));
-    const uniqueRecipients = uniq(filteredRows.map((r) => r.recipients));
-    return { totalUnits, shipments, uniqueRecipes, uniqueRecipients };
-  }, [filteredRows]);
+    const totalUnits = filteredRows.reduce((s, r) => s + (r.stockAmount || 0), 0)
+    const shipments = filteredRows.length
+    const uniq = (arr) => Array.from(new Set(arr.filter(Boolean))).length
+    const uniqueRecipes = uniq(filteredRows.map((r) => r.recipe))
+    const uniqueRecipients = uniq(filteredRows.map((r) => r.recipients))
+    return { totalUnits, shipments, uniqueRecipes, uniqueRecipients }
+  }, [filteredRows])
 
   return (
     <div className="r-wrap">
@@ -1351,8 +1350,8 @@ export default function GoodsOut() {
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(0);
+                  setSearchQuery(e.target.value)
+                  setPage(0)
                 }}
               />
 
@@ -1360,9 +1359,9 @@ export default function GoodsOut() {
                 className="r-select"
                 value={`${sortBy.field}:${sortBy.dir}`}
                 onChange={(e) => {
-                  const [field, dir] = e.target.value.split(":");
-                  setSortBy({ field, dir });
-                  setPage(0);
+                  const [field, dir] = e.target.value.split(":")
+                  setSortBy({ field, dir })
+                  setPage(0)
                 }}
               >
                 <option value="date:desc">Date (new → old)</option>
@@ -1392,6 +1391,13 @@ export default function GoodsOut() {
                   "& .MuiDataGrid-columnSeparator": { display: "none" },
                   "& .MuiDataGrid-virtualScroller": { background: "transparent" },
                   "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${isDark ? "#1e2942" : "#e2e8f0"}` },
+
+                  // ✅ FIX: belt + braces in sx too, so even if CSS gets overridden you’re safe
+                  "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                    backgroundColor: "var(--thead)",
+                  },
+                  "& .MuiDataGrid-columnHeadersInner, & .MuiDataGrid-columnHeaderRow": { backgroundColor: "var(--thead)" },
+                  "& .MuiDataGrid-scrollbarFiller, & .MuiDataGrid-filler": { backgroundColor: "var(--thead)" },
                 }}
               />
             </div>
@@ -1423,8 +1429,8 @@ export default function GoodsOut() {
                   className="r-select"
                   value={rowsPerPage}
                   onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setPage(0);
+                    setRowsPerPage(Number(e.target.value))
+                    setPage(0)
                   }}
                 >
                   <option value={5}>5</option>
@@ -1441,9 +1447,7 @@ export default function GoodsOut() {
         <aside className="gi-side">
           <div className="gi-card">
             <h3>Total Units Out</h3>
-            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", lineHeight: 1.1 }}>
-              {nf(stats.totalUnits)}
-            </div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", lineHeight: 1.1 }}>{nf(stats.totalUnits)}</div>
             <p className="r-muted" style={{ marginTop: 8 }}>
               Based on filtered data
             </p>
@@ -1673,5 +1677,5 @@ export default function GoodsOut() {
         </Box>
       </Drawer>
     </div>
-  );
+  )
 }
