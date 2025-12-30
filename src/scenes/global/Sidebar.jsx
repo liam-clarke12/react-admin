@@ -37,9 +37,7 @@ const getBrand = (isDark) => ({
   surface: isDark ? "#0b1220" : "#ffffff",
   surfaceMuted: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc",
   primary: "#7C3AED",
-  primaryLight: isDark
-    ? "rgba(124, 58, 237, 0.18)"
-    : "rgba(124, 58, 237, 0.08)",
+  primaryLight: isDark ? "rgba(124, 58, 237, 0.18)" : "rgba(124, 58, 237, 0.08)",
   hover: isDark ? "rgba(124,58,237,0.14)" : "#f1f5f9",
   icon: isDark ? "#cbd5e1" : "#334155",
 });
@@ -127,24 +125,20 @@ const Sidebar = () => {
   const location = useLocation();
 
   // read & listen for Topbar theme toggle
-  const [isDark, setIsDark] = useState(
-    () => localStorage.getItem("theme-mode") === "dark"
-  );
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   useEffect(() => {
-    const onThemeChanged = () =>
-      setIsDark(localStorage.getItem("theme-mode") === "dark");
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
     window.addEventListener("themeChanged", onThemeChanged);
     return () => window.removeEventListener("themeChanged", onThemeChanged);
   }, []);
 
   const brand = useMemo(() => getBrand(isDark), [isDark]);
 
-  // ✅ start expanded
+  // start expanded
   const [isCollapsed, setIsCollapsed] = useState(false);
-
   const [selected, setSelected] = useState("Dashboard");
 
-  // ✅ start open on app load
+  // start open on app load
   const [mrpOpen, setMrpOpen] = useState(true);
   const [hrpOpen, setHrpOpen] = useState(true);
 
@@ -158,9 +152,7 @@ const Sidebar = () => {
 
   const requestHrpUnlock = () => {
     if (hrpUnlocked) return;
-    const code = window.prompt(
-      "HRP is under construction.\n\nEnter access code to unlock (dev):"
-    );
+    const code = window.prompt("HRP is under construction.\n\nEnter access code to unlock (dev):");
     if (code === null) return;
     if (String(code).trim() === HRP_ACCESS_CODE) {
       try {
@@ -287,6 +279,7 @@ const Sidebar = () => {
               </Typography>
             )}
           </Box>
+
           {!isCollapsed &&
             (open ? (
               <ExpandMoreRoundedIcon sx={{ fontSize: 16, color: brand.subtext }} />
@@ -301,9 +294,15 @@ const Sidebar = () => {
   const COLLAPSED_W = 80;
   const EXPANDED_W = 260;
 
-  // ✅ NEW: when collapsed, show all page icons if section is open
-  const showMrpItems = mrpOpen || !isCollapsed;
-  const showHrpItems = hrpOpen || !isCollapsed;
+  /**
+   * ✅ FIX:
+   * Previously you had: mrpOpen || !isCollapsed, which means when expanded (!isCollapsed === true)
+   * the items ALWAYS show — so the section header toggle appeared "broken" when expanded.
+   *
+   * Now: items show only when the section is open, regardless of collapsed/expanded.
+   */
+  const showMrpItems = mrpOpen;
+  const showHrpItems = hrpOpen;
 
   return (
     <Box display="flex">
@@ -318,7 +317,7 @@ const Sidebar = () => {
           transition: "background 0.25s ease, border 0.25s ease, width 0.3s ease",
           "& .pro-sidebar-inner": { background: `${brand.surface} !important` },
 
-          // ✅ remove circles around icons
+          // remove circles around icons
           "& .pro-icon-wrapper": {
             backgroundColor: "transparent !important",
             borderRadius: "0 !important",
@@ -358,14 +357,12 @@ const Sidebar = () => {
               }}
             >
               {!isCollapsed && (
-                <Typography
-                  sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}
-                >
+                <Typography sx={{ fontWeight: 800, color: brand.text, fontSize: "1.1rem", ml: 1 }}>
                   Hupes
                 </Typography>
               )}
               <IconButton
-                onClick={() => setIsCollapsed(!isCollapsed)}
+                onClick={() => setIsCollapsed((v) => !v)}
                 sx={{
                   color: brand.subtext,
                   borderRadius: "12px",
@@ -397,12 +394,11 @@ const Sidebar = () => {
                 label="MRP"
                 icon={<FolderOutlinedIcon sx={{ fontSize: 18 }} />}
                 open={mrpOpen}
-                onToggle={() => setMrpOpen(!mrpOpen)}
+                onToggle={() => setMrpOpen((v) => !v)}
               />
 
-              {/* ✅ CHANGED: when collapsed, if MRP is open => show items (icons) */}
               {showMrpItems && (
-                <Box sx={{ display: isCollapsed ? "block" : "block" }}>
+                <Box>
                   <Item
                     title="Goods In"
                     to="/GoodsIn"
@@ -466,12 +462,11 @@ const Sidebar = () => {
                 label="HRP"
                 icon={<GroupWorkOutlinedIcon sx={{ fontSize: 18 }} />}
                 open={hrpOpen}
-                onToggle={() => setHrpOpen(!hrpOpen)}
+                onToggle={() => setHrpOpen((v) => !v)}
               />
 
-              {/* ✅ CHANGED: when collapsed, if HRP is open => show items (icons) */}
               {showHrpItems && (
-                <Box sx={{ display: isCollapsed ? "block" : "block" }}>
+                <Box>
                   <LockedItem
                     title="Roster"
                     to="/Roster"
@@ -569,6 +564,7 @@ const Sidebar = () => {
         </Box>
       </Box>
 
+      {/* Spacer to offset fixed sidebar */}
       <Box
         sx={{
           marginLeft: isCollapsed ? `${COLLAPSED_W}px` : `${EXPANDED_W}px`,
