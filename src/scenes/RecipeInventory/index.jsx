@@ -19,8 +19,10 @@ const Styles = ({ isDark }) => (
       --text-soft: ${isDark ? "#cbd5e1" : "#94a3b8"};
 
       --border: ${isDark ? "rgba(148,163,184,0.12)" : "#e2e8f0"};
-      /* FIX: Use a solid color for dark mode header to cover any default white background */
-      --thead-bg: ${isDark ? "#1e293b" : "#f8fafc"}; 
+
+      /* Use a SOLID header background in dark mode (no transparency) */
+      --thead-bg: ${isDark ? "#1e293b" : "#f8fafc"};
+
       --row-even: ${isDark ? "rgba(255,255,255,0.02)" : "#fafbfc"};
       --row-odd: ${isDark ? "transparent" : "#ffffff"};
       --row-hover: ${isDark ? "rgba(99,102,241,0.12)" : "#f1f5f9"};
@@ -400,8 +402,18 @@ const Styles = ({ isDark }) => (
       background: transparent !important;
     }
 
-    .ii-dg .MuiDataGrid-columnHeaders {
+    /* ✅ FIX: force ALL header-related containers to use thead background (prevents white bar in dark mode) */
+    .ii-dg .MuiDataGrid-topContainer,
+    .ii-dg .MuiDataGrid-columnHeaders,
+    .ii-dg .MuiDataGrid-columnHeadersInner,
+    .ii-dg .MuiDataGrid-columnHeaderRow,
+    .ii-dg .MuiDataGrid-columnHeader,
+    .ii-dg .MuiDataGrid-scrollbarFiller,
+    .ii-dg .MuiDataGrid-filler {
       background-color: var(--thead-bg) !important;
+    }
+
+    .ii-dg .MuiDataGrid-columnHeaders {
       color: var(--text-muted) !important;
       border-bottom: 1px solid var(--border) !important;
     }
@@ -690,11 +702,18 @@ const RecipeInventory = () => {
                     background: "transparent",
                   },
 
-                  // Keep this in sx too so it wins, but still mirrors CSS vars
-                  "& .MuiDataGrid-columnHeaders": {
+                  // ✅ FIX: cover header + sticky/top containers that sometimes keep a white background
+                  "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
                     backgroundColor: "var(--thead-bg)",
                     borderBottom: "1px solid var(--border)",
                   },
+                  "& .MuiDataGrid-columnHeadersInner, & .MuiDataGrid-columnHeaderRow": {
+                    backgroundColor: "var(--thead-bg)",
+                  },
+                  "& .MuiDataGrid-scrollbarFiller, & .MuiDataGrid-filler": {
+                    backgroundColor: "var(--thead-bg)",
+                  },
+
                   "& .MuiDataGrid-columnHeaderTitle": {
                     color: "var(--text-muted)",
                     fontWeight: 700,
