@@ -37,7 +37,6 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
-import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
 
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
@@ -75,12 +74,8 @@ const pageOptions = [
   { label: "Roles", path: "/Roles", icon: <BadgeOutlinedIcon fontSize="small" /> },
   { label: "Leave Requests", path: "/hrp/leave", icon: <EventNoteOutlinedIcon fontSize="small" /> },
 
-
   // Account
   { label: "Account", path: "/account", icon: <PersonIcon fontSize="small" /> },
-
-  // Auth page (so you can also jump to it manually)
-  { label: "Sign In / Sign Out", path: "/auth", icon: <LogoutIcon fontSize="small" /> },
 ];
 
 export default function Topbar() {
@@ -180,7 +175,7 @@ export default function Topbar() {
             className="brand-text"
             sx={{
               fontWeight: 900,
-              fontSize: "1.25rem", // ✅ bigger
+              fontSize: "1.25rem",
               color: brand.text,
               transition: "color .15s ease",
               letterSpacing: "-0.01em",
@@ -218,9 +213,7 @@ export default function Topbar() {
                   <Typography sx={{ color: brand.text, fontWeight: 700, fontSize: "0.85rem" }}>
                     {option.label}
                   </Typography>
-                  <Box sx={{ ml: "auto", color: brand.subtext, fontSize: "0.75rem" }}>
-                    {option.path}
-                  </Box>
+                  {/* ✅ removed path display */}
                 </Box>
               </li>
             )}
@@ -259,11 +252,7 @@ export default function Topbar() {
             </Badge>
           </IconButton>
 
-          <Divider
-            orientation="vertical"
-            flexItem
-            sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }}
-          />
+          <Divider orientation="vertical" flexItem sx={{ height: 20, mx: 1, alignSelf: "center", borderColor: brand.border }} />
 
           {/* Profile trigger */}
           <Box
