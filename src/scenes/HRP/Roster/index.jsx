@@ -2,80 +2,177 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
-/* ---------------- Styles (yours, unchanged) ---------------- */
-const Styles = () => (
+/* ---------------- Styles (updated: dark mode + same layout) ---------------- */
+const Styles = ({ isDark }) => (
   <style>{`
     :root{
       --dae-purple:#7C3AED;
       --dae-purple-dark:#5B21B6;
       --dae-purple-ring: rgba(124,58,237,0.22);
+
+      /* Theme tokens */
+      --bg: ${isDark ? "#0a0f1e" : "#f6f7fb"};
+      --card: ${isDark ? "#0f172a" : "#ffffff"};
+      --card-2: ${isDark ? "#111c33" : "#ffffff"};
+      --text: ${isDark ? "#f1f5f9" : "#0f172a"};
+      --muted: ${isDark ? "#94a3b8" : "#64748b"};
+      --muted2: ${isDark ? "#cbd5e1" : "#94a3b8"};
+      --border: ${isDark ? "rgba(148,163,184,0.14)" : "#e5e7eb"};
+      --shadow: ${
+        isDark
+          ? "0 10px 26px rgba(0,0,0,0.35)"
+          : "0 10px 26px rgba(15,23,42,0.08)"
+      };
+      --shadow-sm: ${
+        isDark
+          ? "0 8px 16px rgba(0,0,0,0.25)"
+          : "0 8px 16px rgba(15,23,42,0.06)"
+      };
+      --thead: ${isDark ? "#1e293b" : "#f8fafc"};
+      --hover: ${isDark ? "rgba(124,58,237,0.10)" : "#f8fafc"};
+      --cellHover: ${isDark ? "rgba(255,255,255,0.02)" : "#fbfdff"};
+      --chipBg: ${isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"};
+      --chipBd: ${isDark ? "rgba(148,163,184,0.16)" : "#e5e7eb"};
+      --chipText: ${isDark ? "#cbd5e1" : "#334155"};
+      --danger: ${isDark ? "#fca5a5" : "#b91c1c"};
     }
-    .r-page{ min-height:100vh; padding:16px; background:#f6f7fb; color:#0f172a; }
+
+    .r-page{ min-height:100vh; padding:16px; background:var(--bg); color:var(--text); transition: background .25s ease, color .25s ease; }
     .r-layout{ display:grid; gap:14px; grid-template-columns: 260px minmax(0,1fr); align-items:start; max-width: 1500px; margin:0 auto; }
     @media (max-width: 1024px){ .r-layout{ grid-template-columns: minmax(0,1fr); } }
-    .r-panel{ background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 10px 26px rgba(15,23,42,0.08); overflow:hidden; }
+
+    .r-panel{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
     .r-panel-body{ padding:12px; }
-    .r-title{ margin:0 0 8px; font-size:13px; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:#111827; }
-    .r-sub{ margin:0 0 12px; font-size:12px; color:#64748b; line-height:1.4; }
-    .r-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-bottom:1px solid #e5e7eb; background:#fff; flex-wrap:wrap; }
+
+    .r-title{ margin:0 0 8px; font-size:13px; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; color:var(--text); }
+    .r-sub{ margin:0 0 12px; font-size:12px; color:var(--muted); line-height:1.4; }
+
+    .r-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--card); flex-wrap:wrap; }
     .r-toolbar-left,.r-toolbar-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .r-btn{ display:inline-flex; align-items:center; gap:6px; padding:8px 10px; font-size:13px; font-weight:900; border-radius:10px; border:1px solid #e5e7eb; background:#fff; color:#0f172a; cursor:pointer; transition:transform .08s ease-out, box-shadow .12s ease-out, background .12s ease-out; }
-    .r-btn:hover{ background:#f8fafc; box-shadow:0 10px 18px rgba(15,23,42,0.08); transform:translateY(-1px); }
+
+    .r-btn{
+      display:inline-flex; align-items:center; gap:6px; padding:8px 10px;
+      font-size:13px; font-weight:900; border-radius:10px; border:1px solid var(--border);
+      background: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"};
+      color:var(--text); cursor:pointer;
+      transition:transform .08s ease-out, box-shadow .12s ease-out, background .12s ease-out, border-color .12s ease-out;
+    }
+    .r-btn:hover{
+      background:${isDark ? "rgba(255,255,255,0.05)" : "#f8fafc"};
+      box-shadow:${isDark ? "0 10px 18px rgba(0,0,0,0.28)" : "0 10px 18px rgba(15,23,42,0.08)"};
+      transform:translateY(-1px);
+      border-color:${isDark ? "rgba(124,58,237,0.25)" : "var(--border)"};
+    }
+
     .r-btn-primary{ background:var(--dae-purple); border-color:var(--dae-purple); color:#fff; box-shadow:0 12px 24px rgba(124,58,237,0.22); }
     .r-btn-primary:hover{ background:var(--dae-purple-dark); border-color:var(--dae-purple-dark); }
     .r-btn-primary:focus{ outline:none; box-shadow:0 0 0 4px var(--dae-purple-ring), 0 12px 24px rgba(124,58,237,0.22); }
     .r-btn:disabled{ opacity:0.55; cursor:not-allowed; transform:none; box-shadow:none; }
-    .r-chip{ font-size:12px; font-weight:900; padding:6px 10px; border-radius:999px; background:#f1f5f9; border:1px solid #e5e7eb; color:#334155; }
-    .r-week-label{ font-size:13px; font-weight:900; color:#0f172a; }
-    .r-block{ border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#fff; }
+
+    .r-chip{
+      font-size:12px; font-weight:900; padding:6px 10px; border-radius:999px;
+      background:var(--chipBg); border:1px solid var(--chipBd); color:var(--chipText);
+    }
+    .r-week-label{ font-size:13px; font-weight:900; color:var(--text); }
+
+    .r-block{ border:1px solid var(--border); border-radius:12px; padding:10px; background: ${isDark ? "rgba(255,255,255,0.02)" : "#fff"}; }
     .r-stack{ display:flex; flex-direction:column; gap:10px; }
+
     .r-emp-list{ display:flex; flex-direction:column; gap:8px; max-height: 45vh; overflow:auto; padding-right:4px; }
-    .r-emp-chip{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 10px; border-radius:12px; border:1px solid #e5e7eb; background:#ffffff; user-select:none; }
-    .r-emp-name{ font-size:13px; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .r-emp-meta{ font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f8fafc; color:#334155; flex:0 0 auto; }
+    .r-emp-chip{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:10px 10px; border-radius:12px; border:1px solid var(--border);
+      background:${isDark ? "rgba(255,255,255,0.02)" : "#ffffff"}; user-select:none;
+    }
+    .r-emp-name{ font-size:13px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .r-emp-meta{
+      font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px;
+      border:1px solid var(--border); background:${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
+      color:var(--chipText); flex:0 0 auto;
+    }
 
     .r-role-search{
       width:100%;
-      border:1px solid #e5e7eb;
+      border:1px solid var(--border);
       border-radius:12px;
       padding:10px 10px;
       font-size:13px;
       font-weight:800;
-      color:#0f172a;
+      color:var(--text);
       outline:none;
-      background:#fff;
+      background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
       margin-bottom:10px;
+      transition: box-shadow .12s ease-out, border-color .12s ease-out, background .12s ease-out;
     }
+    .r-role-search::placeholder{ color:var(--muted); font-weight:800; }
     .r-role-search:focus{
       box-shadow:0 0 0 4px var(--dae-purple-ring);
       border-color: rgba(124,58,237,0.45);
+      background:${isDark ? "rgba(15,23,42,0.75)" : "#fff"};
     }
 
     .r-role-list{ display:flex; flex-direction:column; gap:8px; }
-    .r-role-chip{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 10px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:grab; user-select:none; box-shadow:0 8px 16px rgba(15,23,42,0.06); transition:transform .08s ease-out, box-shadow .12s ease-out; }
-    .r-role-chip:hover{ box-shadow:0 12px 22px rgba(15,23,42,0.10); transform:translateY(-1px); }
+    .r-role-chip{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:10px 10px; border-radius:12px; border:1px solid var(--border);
+      background:${isDark ? "rgba(255,255,255,0.02)" : "#fff"};
+      cursor:grab; user-select:none;
+      box-shadow:var(--shadow-sm);
+      transition:transform .08s ease-out, box-shadow .12s ease-out, background .12s ease-out, border-color .12s ease-out;
+    }
+    .r-role-chip:hover{
+      box-shadow:${isDark ? "0 12px 22px rgba(0,0,0,0.35)" : "0 12px 22px rgba(15,23,42,0.10)"};
+      transform:translateY(-1px);
+      border-color:${isDark ? "rgba(124,58,237,0.25)" : "var(--border)"};
+    }
     .r-role-chip:active{ cursor:grabbing; transform:scale(0.99); }
     .r-role-left{ display:flex; align-items:center; gap:10px; min-width:0; }
-    .r-swatch{ width:12px; height:12px; border-radius:999px; background: var(--swatch); box-shadow: 0 0 0 3px rgba(255,255,255,0.8), 0 10px 18px rgba(15,23,42,0.20); flex:0 0 auto; }
-    .r-role-name{ font-size:13px; font-weight:900; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .r-role-hint{ font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#f8fafc; color:#334155; flex:0 0 auto; }
+    .r-swatch{
+      width:12px; height:12px; border-radius:999px; background: var(--swatch);
+      box-shadow: 0 0 0 3px ${isDark ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.8)"}, 0 10px 18px rgba(15,23,42,0.20);
+      flex:0 0 auto;
+    }
+    .r-role-name{ font-size:13px; font-weight:900; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .r-role-hint{
+      font-size:11px; font-weight:900; padding:4px 8px; border-radius:999px;
+      border:1px solid var(--border); background:${isDark ? "rgba(255,255,255,0.03)" : "#f8fafc"};
+      color:var(--chipText); flex:0 0 auto;
+    }
 
-    .r-calendar{ background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 10px 26px rgba(15,23,42,0.08); overflow:hidden; }
+    .r-calendar{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+
     .r-grid{ display:grid; grid-template-columns: 220px repeat(7, minmax(0, 1fr)); width:100%; font-size:12px; }
-    .r-head{ padding:10px; background:#f8fafc; border-bottom:1px solid #e5e7eb; border-right:1px solid #e5e7eb; font-weight:900; color:#0f172a; text-align:center; }
-    .r-head:first-of-type{ text-align:left; color:#475569; }
-    .r-day-label{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#64748b; }
-    .r-day-date{ font-size:13px; font-weight:900; color:#0f172a; margin-top:2px; }
-    .r-row-label{ padding:10px; border-right:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; background:#fff; }
-    .r-row-name{ font-size:13px; font-weight:900; color:#0f172a; margin:0; line-height:1.2; }
-    .r-row-sub{ margin-top:4px; font-size:11px; color:#94a3b8; font-weight:800; }
-    .r-cell{ min-height:86px; padding:8px; border-right:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; background:#fff; transition:box-shadow .12s ease-out, background .12s ease-out; position:relative; }
-    .r-cell:hover{ background:#fbfdff; }
-    .r-cell-dropping{ background: var(--drop-bg, #f8fafc); box-shadow: inset 0 0 0 2px var(--drop-bd, #111827); }
-    .r-cell-empty{ font-size:11px; color:#cbd5e1; font-style:italic; text-align:center; margin-top:18px; }
+    .r-head{
+      padding:10px;
+      background:var(--thead);
+      border-bottom:1px solid var(--border);
+      border-right:1px solid var(--border);
+      font-weight:900;
+      color:var(--text);
+      text-align:center;
+    }
+    .r-head:first-of-type{ text-align:left; color:var(--muted2); }
+
+    .r-day-label{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+    .r-day-date{ font-size:13px; font-weight:900; color:var(--text); margin-top:2px; }
+
+    .r-row-label{ padding:10px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); background:var(--card); }
+    .r-row-name{ font-size:13px; font-weight:900; color:var(--text); margin:0; line-height:1.2; }
+    .r-row-sub{ margin-top:4px; font-size:11px; color:var(--muted2); font-weight:800; }
+
+    .r-cell{
+      min-height:86px; padding:8px;
+      border-right:1px solid var(--border); border-bottom:1px solid var(--border);
+      background:${isDark ? "rgba(255,255,255,0.01)" : "#fff"};
+      transition:box-shadow .12s ease-out, background .12s ease-out;
+      position:relative;
+    }
+    .r-cell:hover{ background:var(--cellHover); }
+    .r-cell-dropping{ background: var(--drop-bg, var(--cellHover)); box-shadow: inset 0 0 0 2px var(--drop-bd, var(--text)); }
+    .r-cell-empty{ font-size:11px; color:${isDark ? "rgba(203,213,225,0.35)" : "#cbd5e1"}; font-style:italic; text-align:center; margin-top:18px; }
+
     .r-shifts{ display:flex; flex-direction:column; gap:8px; }
     .r-shift{
       border-radius:12px; padding:10px 12px;
@@ -84,30 +181,79 @@ const Styles = () => (
       background: var(--bd);
       color:#fff;
       border:1px solid rgba(15,23,42,0.10);
-      box-shadow:0 10px 18px rgba(15,23,42,0.10);
+      box-shadow:${isDark ? "0 10px 18px rgba(0,0,0,0.28)" : "0 10px 18px rgba(15,23,42,0.10)"};
     }
     .r-shift::before, .r-shift::after{ content:none !important; }
     .r-shift-left{ min-width:0; }
     .r-shift-role{ font-weight:950; font-size:12px; line-height:1.2; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 160px; }
     .r-shift-time{ margin-top:5px; font-size:11px; font-weight:800; white-space:nowrap; opacity:0.95; }
-    .r-icon-btn{ border:none; background:rgba(255,255,255,0.22); cursor:pointer; font-weight:1000; color:inherit; padding:6px 8px; line-height:1; border-radius:999px; opacity:0.95; flex:0 0 auto; }
+
+    .r-icon-btn{
+      border:none; background:rgba(255,255,255,0.22);
+      cursor:pointer; font-weight:1000; color:inherit;
+      padding:6px 8px; line-height:1; border-radius:999px; opacity:0.95; flex:0 0 auto;
+      transition: transform .08s ease-out, opacity .08s ease-out, background .12s ease-out;
+    }
     .r-icon-btn:hover{ opacity:1; transform: translateY(-1px); }
-    .r-modal-overlay{ position:fixed; inset:0; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:18px; z-index:9999; }
-    .r-modal{ width:min(520px, 100%); background:#fff; border-radius:16px; border:1px solid #e5e7eb; box-shadow:0 22px 70px rgba(0,0,0,0.22); overflow:hidden; }
-    .r-modal-hdr{ padding:12px 14px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .r-modal-title{ margin:0; font-size:13px; font-weight:1000; letter-spacing:0.05em; text-transform:uppercase; color:#111827; }
+
+    .r-modal-overlay{
+      position:fixed; inset:0;
+      background:${isDark ? "rgba(0,0,0,0.70)" : "rgba(15,23,42,0.55)"};
+      display:flex; align-items:center; justify-content:center;
+      padding:18px; z-index:9999;
+      backdrop-filter: blur(4px);
+    }
+    .r-modal{
+      width:min(520px, 100%);
+      background:var(--card);
+      border-radius:16px;
+      border:1px solid var(--border);
+      box-shadow:${isDark ? "0 22px 70px rgba(0,0,0,0.55)" : "0 22px 70px rgba(0,0,0,0.22)"};
+      overflow:hidden;
+      color:var(--text);
+    }
+    .r-modal-hdr{
+      padding:12px 14px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:${isDark ? "rgba(255,255,255,0.02)" : "#fff"};
+    }
+    .r-modal-title{ margin:0; font-size:13px; font-weight:1000; letter-spacing:0.05em; text-transform:uppercase; color:var(--text); }
     .r-modal-body{ padding:14px; display:flex; flex-direction:column; gap:12px; }
     .r-field{ display:flex; flex-direction:column; gap:6px; }
-    .r-label{ font-size:12px; font-weight:900; color:#334155; }
-    .r-input, .r-select{ border:1px solid #e5e7eb; border-radius:12px; padding:10px 10px; font-size:13px; font-weight:800; color:#0f172a; background:#fff; outline:none; }
-    .r-input:focus, .r-select:focus{ box-shadow:0 0 0 4px var(--dae-purple-ring); border-color: rgba(124,58,237,0.45); }
+    .r-label{ font-size:12px; font-weight:900; color:var(--muted2); }
+
+    .r-input, .r-select{
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 10px;
+      font-size:13px;
+      font-weight:800;
+      color:var(--text);
+      background:${isDark ? "rgba(255,255,255,0.03)" : "#fff"};
+      outline:none;
+      transition: box-shadow .12s ease-out, border-color .12s ease-out, background .12s ease-out;
+    }
+    .r-input:focus, .r-select:focus{
+      box-shadow:0 0 0 4px var(--dae-purple-ring);
+      border-color: rgba(124,58,237,0.45);
+      background:${isDark ? "rgba(15,23,42,0.75)" : "#fff"};
+    }
+
     .r-row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-    .r-modal-ftr{ padding:12px 14px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; background:#fff; }
-    .r-note{ font-size:12px; color:#64748b; line-height:1.35; }
+    .r-modal-ftr{
+      padding:12px 14px;
+      border-top:1px solid var(--border);
+      display:flex; justify-content:flex-end; gap:10px;
+      background:${isDark ? "rgba(255,255,255,0.02)" : "#fff"};
+    }
+    .r-note{ font-size:12px; color:var(--muted); line-height:1.35; }
     .r-kv{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .r-kv strong{ color:#0f172a; }
-    .r-badge-warn{ background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
-    .r-badge-ok{ background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; }
+    .r-kv strong{ color:var(--text); }
+
+    .r-badge-warn{ background:${isDark ? "rgba(251,146,60,0.12)" : "#fff7ed"}; border:1px solid ${isDark ? "rgba(251,146,60,0.25)" : "#fed7aa"}; color:${isDark ? "#fdba74" : "#9a3412"}; }
+    .r-badge-ok{ background:${isDark ? "rgba(34,211,238,0.10)" : "#ecfeff"}; border:1px solid ${isDark ? "rgba(34,211,238,0.22)" : "#a5f3fc"}; color:${isDark ? "#67e8f9" : "#155e75"}; }
+
     @media (max-width: 900px){
       .r-grid{ grid-template-columns: 190px repeat(7, minmax(0, 1fr)); }
       .r-row-label{ padding:8px; }
@@ -152,10 +298,7 @@ function timeToMinutes(t) {
   return hh * 60 + mm;
 }
 function overlaps(aStart, aEnd, bStart, bEnd) {
-  return (
-    timeToMinutes(aStart) < timeToMinutes(bEnd) &&
-    timeToMinutes(bStart) < timeToMinutes(aEnd)
-  );
+  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(bStart) < timeToMinutes(aEnd);
 }
 function toHHMM(x) {
   if (x == null) return "";
@@ -183,6 +326,14 @@ function hashColor(str) {
 const Roster = () => {
   const { cognitoId } = useAuth();
 
+  // ✅ Dark mode (sync with Topbar)
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  useEffect(() => {
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
@@ -202,14 +353,8 @@ const Roster = () => {
 
   const [dragOverCell, setDragOverCell] = useState(null);
 
-  const weekDates = useMemo(
-    () => DAYS.map((_, idx) => addDays(weekStart, idx)),
-    [weekStart]
-  );
-  const weekStartYYYYMMDD = useMemo(
-    () => weekStart.toISOString().slice(0, 10),
-    [weekStart]
-  );
+  const weekDates = useMemo(() => DAYS.map((_, idx) => addDays(weekStart, idx)), [weekStart]);
+  const weekStartYYYYMMDD = useMemo(() => weekStart.toISOString().slice(0, 10), [weekStart]);
 
   // Build roster roles from DB rows
   const roles = useMemo(() => {
@@ -251,8 +396,7 @@ const Roster = () => {
   });
 
   const closeModal = () => setModal((m) => ({ ...m, open: false, error: "" }));
-  const closeSendModal = () =>
-    setSendModal({ open: false, sending: false, error: "", results: null });
+  const closeSendModal = () => setSendModal({ open: false, sending: false, error: "", results: null });
 
   // Ensure modal roleKey always valid when roles load/change
   useEffect(() => {
@@ -273,9 +417,7 @@ const Roster = () => {
   const filteredEmployees = useMemo(() => {
     const q = employeeQuery.trim().toLowerCase();
     if (!q) return employees;
-    return employees.filter((e) =>
-      String(e.full_name || "").toLowerCase().includes(q)
-    );
+    return employees.filter((e) => String(e.full_name || "").toLowerCase().includes(q));
   }, [employees, employeeQuery]);
 
   const getEmployeeName = (id) => {
@@ -283,7 +425,7 @@ const Roster = () => {
     return emp?.full_name || `#${id}`;
   };
 
-  // ✅ NEW helper: employee title
+  // ✅ employee title
   const getEmployeeTitle = (id) => {
     const emp = employees.find((e) => String(e.id) === String(id));
     return emp?.title || "";
@@ -292,9 +434,7 @@ const Roster = () => {
   const getDayShifts = (employeeId, dayIndex) => {
     const empDays = assignments?.[employeeId] || {};
     const shifts = empDays?.[dayIndex] || [];
-    return [...shifts].sort(
-      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
-    );
+    return [...shifts].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
   };
 
   const rebuildAssignmentsFromWeekRows = useCallback(
@@ -305,9 +445,7 @@ const Roster = () => {
         const employeeId = r.employee_id; // UUID
         const shiftDate = String(r.shift_date).slice(0, 10);
 
-        const dayIndex = weekDates.findIndex(
-          (d) => d.toISOString().slice(0, 10) === shiftDate
-        );
+        const dayIndex = weekDates.findIndex((d) => d.toISOString().slice(0, 10) === shiftDate);
         if (dayIndex < 0) return;
 
         // Prefer role_code from backend (roles.code), else map by template_name, else fallback
@@ -350,9 +488,7 @@ const Roster = () => {
     (async () => {
       try {
         setLoadingEmployees(true);
-        const res = await fetch(
-          `${API_BASE}/employees/list?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/employees/list?cognito_id=${encodeURIComponent(cognitoId)}`);
         const json = await res.json();
         setEmployees(Array.isArray(json) ? json : []);
       } catch (err) {
@@ -371,9 +507,7 @@ const Roster = () => {
     (async () => {
       try {
         setLoadingRoles(true);
-        const res = await fetch(
-          `${API_BASE}/roles/list?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/roles/list?cognito_id=${encodeURIComponent(cognitoId)}`);
         const json = await res.json();
         setRolesDb(Array.isArray(json) ? json : []);
       } catch (err) {
@@ -393,9 +527,9 @@ const Roster = () => {
       try {
         setLoadingWeek(true);
         const res = await fetch(
-          `${API_BASE}/roster/week?cognito_id=${encodeURIComponent(
-            cognitoId
-          )}&week_start=${encodeURIComponent(weekStartYYYYMMDD)}`
+          `${API_BASE}/roster/week?cognito_id=${encodeURIComponent(cognitoId)}&week_start=${encodeURIComponent(
+            weekStartYYYYMMDD
+          )}`
         );
 
         if (!res.ok) {
@@ -470,7 +604,6 @@ const Roster = () => {
           date,
           role_key: roleKey,
           role_name: role?.name || roleKey,
-          // OPTIONAL: pass role_id if your backend supports it
           role_id: role?.id || null,
           area: "default",
           start,
@@ -500,9 +633,7 @@ const Roster = () => {
           date,
           rosterShiftId: created.roster_shift_id,
         });
-        empDays[dayIndex] = dayArr.sort(
-          (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
-        );
+        empDays[dayIndex] = dayArr.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
         next[employeeId] = empDays;
         return next;
       });
@@ -523,18 +654,14 @@ const Roster = () => {
       const next = { ...prev };
       const empDays = next[employeeId] ? { ...next[employeeId] } : {};
       const dayArr = empDays[dayIndex] ? [...empDays[dayIndex]] : [];
-      empDays[dayIndex] = dayArr.filter(
-        (s) => String(s.id) !== String(assignmentId)
-      );
+      empDays[dayIndex] = dayArr.filter((s) => String(s.id) !== String(assignmentId));
       next[employeeId] = empDays;
       return next;
     });
 
     try {
       const res = await fetch(
-        `${API_BASE}/roster/assignment/${encodeURIComponent(
-          assignmentId
-        )}?cognito_id=${encodeURIComponent(cognitoId)}`,
+        `${API_BASE}/roster/assignment/${encodeURIComponent(assignmentId)}?cognito_id=${encodeURIComponent(cognitoId)}`,
         { method: "DELETE" }
       );
 
@@ -582,9 +709,7 @@ const Roster = () => {
       }
 
       if (days.length > 0) {
-        // IMPORTANT: update this if your employee email field differs
-        const email =
-          emp.email || emp.email_address || emp.work_email || emp.personal_email || "";
+        const email = emp.email || emp.email_address || emp.work_email || emp.personal_email || "";
 
         byEmp.push({
           employee_id: String(emp.id),
@@ -635,7 +760,7 @@ const Roster = () => {
         body: JSON.stringify({
           cognito_id: cognitoId,
           week_start: weekStartYYYYMMDD,
-          roster: rostered, // backend can re-query, but this helps for MVP
+          roster: rostered,
         }),
       });
 
@@ -658,7 +783,7 @@ const Roster = () => {
 
   return (
     <div className="r-page">
-      <Styles />
+      <Styles isDark={isDark} />
 
       <div className="r-layout">
         {/* LEFT */}
@@ -668,22 +793,18 @@ const Roster = () => {
               {/* Roles */}
               <div className="r-block">
                 <div className="r-title">Roles</div>
-                <p className="r-sub">
-                  Drag a role into a person’s day cell, then set start/finish time.
-                </p>
+                <p className="r-sub">Drag a role into a person’s day cell, then set start/finish time.</p>
 
                 <input
                   className="r-role-search"
                   value={roleQuery}
                   onChange={(e) => setRoleQuery(e.target.value)}
-                  placeholder={
-                    loadingRoles ? "Loading roles…" : `Search roles (${roles.length})…`
-                  }
+                  placeholder={loadingRoles ? "Loading roles…" : `Search roles (${roles.length})…`}
                 />
 
                 <div className="r-role-list">
                   {!loadingRoles && filteredRoles.length === 0 ? (
-                    <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 800 }}>
                       No roles match that search.
                     </div>
                   ) : null}
@@ -702,16 +823,13 @@ const Roster = () => {
                       title="Drag into the roster"
                     >
                       <div className="r-role-left">
-                        <span
-                          className="r-swatch"
-                          style={{ ["--swatch"]: role.style.bd }}
-                        />
+                        <span className="r-swatch" style={{ ["--swatch"]: role.style.bd }} />
                         <span className="r-role-name">
                           {role.name}
                           {role.code ? (
                             <span
                               style={{
-                                color: "rgba(15,23,42,0.55)",
+                                color: "var(--muted)",
                                 fontWeight: 900,
                                 marginLeft: 8,
                               }}
@@ -731,36 +849,30 @@ const Roster = () => {
               <div className="r-block">
                 <div className="r-title">Team</div>
                 <p className="r-sub">
-                  Rows are people. Columns are days. Blocks use the same colour as
-                  the role dot.
+                  Rows are people. Columns are days. Blocks use the same colour as the role dot.
                 </p>
 
-                {/* ✅ employee search */}
                 <input
                   className="r-role-search"
                   value={employeeQuery}
                   onChange={(e) => setEmployeeQuery(e.target.value)}
-                  placeholder={
-                    loadingEmployees
-                      ? "Loading team…"
-                      : `Search team (${employees.length})…`
-                  }
+                  placeholder={loadingEmployees ? "Loading team…" : `Search team (${employees.length})…`}
                 />
 
                 <div className="r-emp-list">
-                  {loadingEmployees && <span>Loading employees…</span>}
+                  {loadingEmployees && <span style={{ color: "var(--muted)", fontWeight: 800 }}>Loading employees…</span>}
 
                   {!loadingEmployees && employees.length === 0 && (
-                    <span>No employees yet. Add them in HRP → Employees.</span>
+                    <span style={{ color: "var(--muted)", fontWeight: 800 }}>
+                      No employees yet. Add them in HRP → Employees.
+                    </span>
                   )}
 
-                  {!loadingEmployees &&
-                    employees.length > 0 &&
-                    filteredEmployees.length === 0 && (
-                      <span style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>
-                        No team members match that search.
-                      </span>
-                    )}
+                  {!loadingEmployees && employees.length > 0 && filteredEmployees.length === 0 && (
+                    <span style={{ color: "var(--muted)", fontWeight: 800, fontSize: 12 }}>
+                      No team members match that search.
+                    </span>
+                  )}
 
                   {filteredEmployees.map((emp) => (
                     <div key={emp.id} className="r-emp-chip">
@@ -773,7 +885,7 @@ const Roster = () => {
                               marginTop: 4,
                               fontSize: 11,
                               fontWeight: 900,
-                              color: "#94a3b8",
+                              color: "var(--muted2)",
                               lineHeight: 1.2,
                             }}
                           >
@@ -801,16 +913,12 @@ const Roster = () => {
                 Next →
               </button>
               <span className="r-chip">
-                {loadingEmployees || loadingWeek
-                  ? "Loading…"
-                  : `${filteredEmployees.length}/${employees.length} staff`}
+                {loadingEmployees || loadingWeek ? "Loading…" : `${filteredEmployees.length}/${employees.length} staff`}
               </span>
             </div>
 
             <div className="r-toolbar-right">
-              <span className="r-week-label">
-                Week of {formatShort(weekStart)} ({formatRangeLabel(weekStart)})
-              </span>
+              <span className="r-week-label">Week of {formatShort(weekStart)} ({formatRangeLabel(weekStart)})</span>
 
               <button
                 type="button"
@@ -835,30 +943,23 @@ const Roster = () => {
               </div>
             ))}
 
-            {/* ✅ calendar rows filtered by employeeQuery */}
             {filteredEmployees.map((emp) => (
               <React.Fragment key={emp.id}>
                 <div className="r-row-label">
                   <p className="r-row-name">{emp.full_name}</p>
-                  <div className="r-row-sub">
-                    {emp.title ? emp.title : "Drop roles into cells"}
-                  </div>
+                  <div className="r-row-sub">{emp.title ? emp.title : "Drop roles into cells"}</div>
                 </div>
 
                 {DAYS.map((_, dayIndex) => {
                   const shifts = getDayShifts(emp.id, dayIndex);
 
                   const isDropping =
-                    dragOverCell &&
-                    dragOverCell.employeeId === emp.id &&
-                    dragOverCell.dayIndex === dayIndex;
+                    dragOverCell && dragOverCell.employeeId === emp.id && dragOverCell.dayIndex === dayIndex;
 
                   const cellDropStyle = isDropping
                     ? {
-                        ["--drop-bg"]: dragOverCell?.roleBd
-                          ? `${dragOverCell.roleBd}22`
-                          : "#f8fafc",
-                        ["--drop-bd"]: dragOverCell?.roleBd || "#111827",
+                        ["--drop-bg"]: dragOverCell?.roleBd ? `${dragOverCell.roleBd}22` : "var(--cellHover)",
+                        ["--drop-bd"]: dragOverCell?.roleBd || "var(--text)",
                       }
                     : undefined;
 
@@ -875,8 +976,7 @@ const Roster = () => {
                           try {
                             const parsed = JSON.parse(raw);
                             const rk = parsed?.roleKey;
-                            roleBd =
-                              roles.find((r) => r.key === rk)?.style?.bd || null;
+                            roleBd = roles.find((r) => r.key === rk)?.style?.bd || null;
                           } catch {}
                         }
                         setDragOverCell({ employeeId: emp.id, dayIndex, roleBd });
@@ -884,12 +984,7 @@ const Roster = () => {
                       onDragLeave={() => {
                         setTimeout(() => {
                           setDragOverCell((cur) => {
-                            if (
-                              cur &&
-                              cur.employeeId === emp.id &&
-                              cur.dayIndex === dayIndex
-                            )
-                              return null;
+                            if (cur && cur.employeeId === emp.id && cur.dayIndex === dayIndex) return null;
                             return cur;
                           });
                         }, 30);
@@ -925,9 +1020,7 @@ const Roster = () => {
                                 title={`${role?.name || s.roleKey} • ${s.start}–${s.end}`}
                               >
                                 <div className="r-shift-left">
-                                  <p className="r-shift-role">
-                                    {role?.name || s.roleKey}
-                                  </p>
+                                  <p className="r-shift-role">{role?.name || s.roleKey}</p>
                                   <div className="r-shift-time">
                                     {s.start} – {s.end}
                                   </div>
@@ -966,12 +1059,7 @@ const Roster = () => {
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Add shift</h3>
-              <button
-                className="r-icon-btn"
-                type="button"
-                onClick={closeModal}
-                aria-label="Close"
-              >
+              <button className="r-icon-btn" type="button" onClick={closeModal} aria-label="Close">
                 ×
               </button>
             </div>
@@ -980,14 +1068,10 @@ const Roster = () => {
               <div className="r-note">
                 <strong>{getEmployeeName(modal.employeeId)}</strong>
                 {getEmployeeTitle(modal.employeeId) ? (
-                  <span style={{ color: "#64748b", fontWeight: 900 }}>
-                    {" "}
-                    · {getEmployeeTitle(modal.employeeId)}
-                  </span>
+                  <span style={{ color: "var(--muted)", fontWeight: 900 }}> · {getEmployeeTitle(modal.employeeId)}</span>
                 ) : null}
                 {" · "}
-                <strong>{DAYS[modal.dayIndex]}</strong> ·{" "}
-                <strong>{formatShort(weekDates[modal.dayIndex])}</strong>
+                <strong>{DAYS[modal.dayIndex]}</strong> · <strong>{formatShort(weekDates[modal.dayIndex])}</strong>
               </div>
 
               <div className="r-field">
@@ -995,9 +1079,7 @@ const Roster = () => {
                 <select
                   className="r-select"
                   value={modal.roleKey}
-                  onChange={(e) =>
-                    setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))
-                  }
+                  onChange={(e) => setModal((m) => ({ ...m, roleKey: e.target.value, error: "" }))}
                 >
                   {roles.map((r) => (
                     <option key={r.id || r.key} value={r.key}>
@@ -1015,9 +1097,7 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.start}
-                    onChange={(e) =>
-                      setModal((m) => ({ ...m, start: e.target.value, error: "" }))
-                    }
+                    onChange={(e) => setModal((m) => ({ ...m, start: e.target.value, error: "" }))}
                   />
                 </div>
                 <div className="r-field">
@@ -1026,15 +1106,13 @@ const Roster = () => {
                     className="r-input"
                     type="time"
                     value={modal.end}
-                    onChange={(e) =>
-                      setModal((m) => ({ ...m, end: e.target.value, error: "" }))
-                    }
+                    onChange={(e) => setModal((m) => ({ ...m, end: e.target.value, error: "" }))}
                   />
                 </div>
               </div>
 
               {modal.error && (
-                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
+                <div className="r-note" style={{ color: "var(--danger)", fontWeight: 900 }}>
                   {modal.error}
                 </div>
               )}
@@ -1044,11 +1122,7 @@ const Roster = () => {
               <button type="button" className="r-btn" onClick={closeModal}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="r-btn r-btn-primary"
-                onClick={confirmAddShift}
-              >
+              <button type="button" className="r-btn r-btn-primary" onClick={confirmAddShift}>
                 Add
               </button>
             </div>
@@ -1067,12 +1141,7 @@ const Roster = () => {
           <div className="r-modal" role="dialog" aria-modal="true">
             <div className="r-modal-hdr">
               <h3 className="r-modal-title">Send week roster</h3>
-              <button
-                className="r-icon-btn"
-                type="button"
-                onClick={closeSendModal}
-                aria-label="Close"
-              >
+              <button className="r-icon-btn" type="button" onClick={closeSendModal} aria-label="Close">
                 ×
               </button>
             </div>
@@ -1083,9 +1152,7 @@ const Roster = () => {
                   <span>
                     <strong>Week:</strong> {formatRangeLabel(weekStart)}
                   </span>
-                  <span className="r-chip r-badge-ok">
-                    {weekRosterSummary.length} email(s)
-                  </span>
+                  <span className="r-chip r-badge-ok">{weekRosterSummary.length} email(s)</span>
                 </div>
               </div>
 
@@ -1095,20 +1162,12 @@ const Roster = () => {
                 <div className="r-stack" style={{ gap: 10 }}>
                   {weekRosterSummary.map((emp) => (
                     <div key={emp.employee_id} className="r-block">
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 12,
-                        }}
-                      >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 1000, fontSize: 13 }}>
-                            {emp.full_name}
-                          </div>
+                          <div style={{ fontWeight: 1000, fontSize: 13, color: "var(--text)" }}>{emp.full_name}</div>
                           <div
                             style={{
-                              color: emp.email ? "#64748b" : "#b91c1c",
+                              color: emp.email ? "var(--muted)" : "var(--danger)",
                               fontWeight: 900,
                               fontSize: 12,
                             }}
@@ -1119,39 +1178,17 @@ const Roster = () => {
                         <span className="r-chip">{emp.days.length} day(s)</span>
                       </div>
 
-                      <div
-                        style={{
-                          marginTop: 10,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 8,
-                        }}
-                      >
+                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                         {emp.days.map((d) => (
                           <div key={d.date} style={{ fontSize: 12 }}>
-                            <div style={{ fontWeight: 1000, marginBottom: 4 }}>
+                            <div style={{ fontWeight: 1000, marginBottom: 4, color: "var(--text)" }}>
                               {d.day_label} · {formatShort(d.date)}
                             </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 6,
-                              }}
-                            >
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                               {d.shifts.map((s) => (
-                                <div
-                                  key={s.assignment_id}
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    gap: 10,
-                                  }}
-                                >
-                                  <span style={{ fontWeight: 900 }}>
-                                    {s.role_name}
-                                  </span>
-                                  <span style={{ color: "#475569", fontWeight: 900 }}>
+                                <div key={s.assignment_id} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                                  <span style={{ fontWeight: 900, color: "var(--text)" }}>{s.role_name}</span>
+                                  <span style={{ color: "var(--muted2)", fontWeight: 900 }}>
                                     {s.start}–{s.end}
                                   </span>
                                 </div>
@@ -1166,15 +1203,14 @@ const Roster = () => {
               )}
 
               {sendModal.error && (
-                <div className="r-note" style={{ color: "#b91c1c", fontWeight: 900 }}>
+                <div className="r-note" style={{ color: "var(--danger)", fontWeight: 900 }}>
                   {sendModal.error}
                 </div>
               )}
 
               {sendModal.results && (
-                <div className="r-note" style={{ fontWeight: 900 }}>
-                  Sent: {sendModal.results?.sent?.length || 0} · Failed:{" "}
-                  {sendModal.results?.failed?.length || 0}
+                <div className="r-note" style={{ fontWeight: 900, color: "var(--text)" }}>
+                  Sent: {sendModal.results?.sent?.length || 0} · Failed: {sendModal.results?.failed?.length || 0}
                 </div>
               )}
             </div>

@@ -22,6 +22,7 @@ import {
   FormControlLabel,
   InputAdornment,
   Tooltip,
+  Divider,
 } from "@mui/material";
 
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
@@ -31,11 +32,9 @@ import SearchIcon from "@mui/icons-material/Search";
 
 import { useAuth } from "../../../contexts/AuthContext";
 
-const API_BASE =
-  "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
+const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 function hashColor(str) {
-  // deterministic pleasant-ish HSL from string
   const s = String(str || "");
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
@@ -43,8 +42,31 @@ function hashColor(str) {
   return `hsl(${hue} 70% 45%)`;
 }
 
+// ✅ Topbar-style theme tokens
+const getBrand = (isDark) => ({
+  text: isDark ? "#f1f5f9" : "#0f172a",
+  subtext: isDark ? "#94a3b8" : "#64748b",
+  border: isDark ? "rgba(148,163,184,0.14)" : "#e5e7eb",
+  surface: isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.9)",
+  surfaceSolid: isDark ? "#0f172a" : "#ffffff",
+  surfaceMuted: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
+  shadow: isDark ? "0 10px 26px rgba(0,0,0,0.35)" : "0 10px 26px rgba(15,23,42,0.08)",
+});
+
 const Roles = () => {
   const { cognitoId } = useAuth();
+
+  // ✅ Dark mode sync with Topbar
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
+  useEffect(() => {
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
+  const brand = useMemo(() => getBrand(isDark), [isDark]);
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,9 +93,7 @@ const Roles = () => {
   const loadRoles = async () => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `${API_BASE}/roles/list?cognito_id=${encodeURIComponent(cognitoId)}`
-      );
+      const res = await fetch(`${API_BASE}/roles/list?cognito_id=${encodeURIComponent(cognitoId)}`);
       const json = await res.json();
       setRoles(Array.isArray(json) ? json : []);
     } catch (err) {
@@ -166,9 +186,7 @@ const Roles = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE}/roles/delete/${encodeURIComponent(
-          id
-        )}?cognito_id=${encodeURIComponent(cognitoId)}`,
+        `${API_BASE}/roles/delete/${encodeURIComponent(id)}?cognito_id=${encodeURIComponent(cognitoId)}`,
         { method: "DELETE" }
       );
 
@@ -192,7 +210,15 @@ const Roles = () => {
   }, [roles]);
 
   return (
-    <Box p={3}>
+    <Box
+      p={3}
+      sx={{
+        minHeight: "100vh",
+        background: isDark ? "#0a0f1e" : "#f6f7fb",
+        color: brand.text,
+        transition: "background .25s ease, color .25s ease",
+      }}
+    >
       {/* Header */}
       <Paper
         elevation={0}
@@ -200,10 +226,12 @@ const Roles = () => {
           p: 2,
           mb: 2,
           borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          background:
-            "linear-gradient(135deg, rgba(124,58,237,0.10), rgba(255,255,255,1) 45%)",
+          border: `1px solid ${brand.border}`,
+          background: isDark
+            ? "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(15,23,42,0.85) 55%)"
+            : "linear-gradient(135deg, rgba(124,58,237,0.10), rgba(255,255,255,1) 45%)",
+          boxShadow: brand.shadow,
+          backdropFilter: "blur(10px)",
         }}
       >
         <Stack
@@ -213,24 +241,35 @@ const Roles = () => {
           justifyContent="space-between"
         >
           <Box>
-            <Typography variant="h4" fontWeight={900} sx={{ lineHeight: 1.1 }}>
+            <Typography variant="h4" fontWeight={900} sx={{ lineHeight: 1.1, color: brand.text }}>
               Roles
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            <Typography variant="body2" sx={{ color: brand.subtext, mt: 0.5 }}>
               Manage roles used across HRP and rostering.
             </Typography>
 
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
               <Chip
                 size="small"
                 label={`${stats.total} total`}
-                sx={{ fontWeight: 900 }}
+                sx={{
+                  fontWeight: 900,
+                  bgcolor: brand.surfaceMuted,
+                  border: `1px solid ${brand.border}`,
+                  color: brand.text,
+                }}
               />
               <Chip
                 size="small"
                 label={`${stats.prod} production`}
-                sx={{ fontWeight: 900 }}
                 variant="outlined"
+                sx={{
+                  fontWeight: 900,
+                  borderRadius: 2,
+                  borderColor: brand.border,
+                  color: brand.text,
+                  bgcolor: "transparent",
+                }}
               />
             </Stack>
           </Box>
@@ -241,11 +280,22 @@ const Roles = () => {
               placeholder="Search roles…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              sx={{ minWidth: { xs: "100%", sm: 280 } }}
+              sx={{
+                minWidth: { xs: "100%", sm: 280 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  color: brand.text,
+                  bgcolor: brand.surfaceMuted,
+                  "& fieldset": { borderColor: brand.border },
+                  "&:hover fieldset": { borderColor: brand.primary },
+                  "&.Mui-focused fieldset": { borderColor: brand.primary },
+                },
+                "& .MuiInputBase-input::placeholder": { color: brand.subtext, opacity: 1 },
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
+                    <SearchIcon fontSize="small" sx={{ color: brand.subtext }} />
                   </InputAdornment>
                 ),
               }}
@@ -258,8 +308,9 @@ const Roles = () => {
               sx={{
                 fontWeight: 900,
                 borderRadius: 2,
-                backgroundColor: "#7C3AED",
-                "&:hover": { backgroundColor: "#5B21B6" },
+                backgroundColor: brand.primary,
+                "&:hover": { backgroundColor: brand.primaryDark },
+                boxShadow: "0 12px 24px rgba(124,58,237,0.22)",
               }}
             >
               Add Role
@@ -269,15 +320,28 @@ const Roles = () => {
       </Paper>
 
       {/* Table */}
-      <Paper sx={{ width: "100%", overflow: "hidden", borderRadius: 3 }}>
+      <Paper
+        sx={{
+          width: "100%",
+          overflow: "hidden",
+          borderRadius: 3,
+          border: `1px solid ${brand.border}`,
+          background: brand.surfaceSolid,
+          boxShadow: brand.shadow,
+        }}
+      >
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: "rgba(124,58,237,0.06)" }}>
-              <TableCell sx={{ fontWeight: 900 }}>Role</TableCell>
-              <TableCell sx={{ fontWeight: 900 }}>Code</TableCell>
-              <TableCell sx={{ fontWeight: 900 }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: 900 }}>Description</TableCell>
-              <TableCell sx={{ fontWeight: 900, width: 140 }} align="center">
+            <TableRow
+              sx={{
+                backgroundColor: isDark ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.06)",
+              }}
+            >
+              <TableCell sx={{ fontWeight: 900, color: brand.text }}>Role</TableCell>
+              <TableCell sx={{ fontWeight: 900, color: brand.text }}>Code</TableCell>
+              <TableCell sx={{ fontWeight: 900, color: brand.text }}>Type</TableCell>
+              <TableCell sx={{ fontWeight: 900, color: brand.text }}>Description</TableCell>
+              <TableCell sx={{ fontWeight: 900, width: 140, color: brand.text }} align="center">
                 Actions
               </TableCell>
             </TableRow>
@@ -286,7 +350,7 @@ const Roles = () => {
           <TableBody>
             {filtered.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={5} align="center" sx={{ color: brand.subtext }}>
                   No roles found.
                 </TableCell>
               </TableRow>
@@ -299,10 +363,11 @@ const Roles = () => {
                   key={role.id}
                   hover
                   sx={{
-                    "&:hover": { backgroundColor: "rgba(124,58,237,0.04)" },
+                    "&:hover": { backgroundColor: isDark ? "rgba(124,58,237,0.08)" : "rgba(124,58,237,0.04)" },
+                    "& td": { borderColor: brand.border },
                   }}
                 >
-                  <TableCell>
+                  <TableCell sx={{ color: brand.text }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Box
                         sx={{
@@ -310,10 +375,12 @@ const Roles = () => {
                           height: 10,
                           borderRadius: 999,
                           backgroundColor: color,
-                          boxShadow: "0 0 0 3px rgba(0,0,0,0.03)",
+                          boxShadow: isDark ? "0 0 0 3px rgba(255,255,255,0.04)" : "0 0 0 3px rgba(0,0,0,0.03)",
                         }}
                       />
-                      <Typography fontWeight={900}>{role.name}</Typography>
+                      <Typography fontWeight={900} sx={{ color: brand.text }}>
+                        {role.name}
+                      </Typography>
                     </Stack>
                   </TableCell>
 
@@ -325,11 +392,13 @@ const Roles = () => {
                         sx={{
                           fontWeight: 900,
                           borderRadius: 2,
-                          backgroundColor: "rgba(15,23,42,0.06)",
+                          bgcolor: brand.surfaceMuted,
+                          border: `1px solid ${brand.border}`,
+                          color: brand.text,
                         }}
                       />
                     ) : (
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" sx={{ color: brand.subtext }}>
                         —
                       </Typography>
                     )}
@@ -342,23 +411,35 @@ const Roles = () => {
                       sx={{
                         fontWeight: 900,
                         borderRadius: 2,
-                        color: role.is_production_role ? "#065f46" : "#0f172a",
+                        color: role.is_production_role ? (isDark ? "#6ee7b7" : "#065f46") : brand.text,
                         backgroundColor: role.is_production_role
-                          ? "rgba(16,185,129,0.14)"
+                          ? isDark
+                            ? "rgba(16,185,129,0.16)"
+                            : "rgba(16,185,129,0.14)"
+                          : isDark
+                          ? "rgba(148,163,184,0.18)"
                           : "rgba(148,163,184,0.22)",
+                        border: `1px solid ${brand.border}`,
                       }}
                     />
                   </TableCell>
 
                   <TableCell>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: brand.subtext }}>
                       {role.description || "—"}
                     </Typography>
                   </TableCell>
 
                   <TableCell align="center">
                     <Tooltip title="Edit">
-                      <IconButton onClick={() => openEdit(role)} size="small">
+                      <IconButton
+                        onClick={() => openEdit(role)}
+                        size="small"
+                        sx={{
+                          color: brand.subtext,
+                          "&:hover": { color: brand.text, bgcolor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" },
+                        }}
+                      >
                         <EditOutlinedIcon />
                       </IconButton>
                     </Tooltip>
@@ -367,7 +448,10 @@ const Roles = () => {
                       <IconButton
                         onClick={() => deleteRole(role.id)}
                         size="small"
-                        color="error"
+                        sx={{
+                          color: isDark ? "#fca5a5" : "error.main",
+                          "&:hover": { bgcolor: isDark ? "rgba(239,68,68,0.10)" : "rgba(239,68,68,0.08)" },
+                        }}
                       >
                         <DeleteOutlineOutlinedIcon />
                       </IconButton>
@@ -381,7 +465,7 @@ const Roles = () => {
 
         {loading && (
           <Box p={2}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: brand.subtext }}>
               Loading…
             </Typography>
           </Box>
@@ -394,8 +478,16 @@ const Roles = () => {
         onClose={() => setModalOpen(false)}
         fullWidth
         maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: brand.surfaceSolid,
+            border: `1px solid ${brand.border}`,
+            boxShadow: brand.shadow,
+          },
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 900 }}>
+        <DialogTitle sx={{ fontWeight: 900, color: brand.text }}>
           {editing ? "Edit Role" : "Create Role"}
         </DialogTitle>
 
@@ -406,6 +498,17 @@ const Roles = () => {
               label="Role Name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              InputLabelProps={{ sx: { color: brand.subtext } }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  color: brand.text,
+                  bgcolor: brand.surfaceMuted,
+                  "& fieldset": { borderColor: brand.border },
+                  "&:hover fieldset": { borderColor: brand.primary },
+                  "&.Mui-focused fieldset": { borderColor: brand.primary },
+                },
+              }}
             />
 
             <TextField
@@ -415,21 +518,29 @@ const Roles = () => {
               value={form.code}
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
               helperText="Short code helps link roles to roster templates cleanly."
+              FormHelperTextProps={{ sx: { color: brand.subtext } }}
+              InputLabelProps={{ sx: { color: brand.subtext } }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  color: brand.text,
+                  bgcolor: brand.surfaceMuted,
+                  "& fieldset": { borderColor: brand.border },
+                  "&:hover fieldset": { borderColor: brand.primary },
+                  "&.Mui-focused fieldset": { borderColor: brand.primary },
+                },
+                "& .MuiInputBase-input::placeholder": { color: brand.subtext, opacity: 1 },
+              }}
             />
 
             <FormControlLabel
               control={
                 <Switch
                   checked={form.is_production_role}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      is_production_role: e.target.checked,
-                    }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, is_production_role: e.target.checked }))}
                 />
               }
-              label="Production role"
+              label={<span style={{ color: brand.text, fontWeight: 900 }}>Production role</span>}
             />
 
             <TextField
@@ -438,24 +549,34 @@ const Roles = () => {
               rows={3}
               label="Description (optional)"
               value={form.description}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              InputLabelProps={{ sx: { color: brand.subtext } }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  color: brand.text,
+                  bgcolor: brand.surfaceMuted,
+                  "& fieldset": { borderColor: brand.border },
+                  "&:hover fieldset": { borderColor: brand.primary },
+                  "&.Mui-focused fieldset": { borderColor: brand.primary },
+                },
+              }}
             />
+
+            <Divider sx={{ borderColor: brand.border }} />
 
             <Box
               sx={{
                 p: 1.5,
                 borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                backgroundColor: "rgba(124,58,237,0.04)",
+                border: `1px solid ${brand.border}`,
+                backgroundColor: isDark ? "rgba(124,58,237,0.10)" : "rgba(124,58,237,0.04)",
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 900 }}>
+              <Typography variant="body2" sx={{ fontWeight: 900, color: brand.text }}>
                 Preview
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, flexWrap: "wrap" }}>
                 <Box
                   sx={{
                     width: 10,
@@ -467,14 +588,25 @@ const Roles = () => {
                 <Chip
                   size="small"
                   label={form.name || "Role name"}
-                  sx={{ fontWeight: 900, borderRadius: 2 }}
+                  sx={{
+                    fontWeight: 900,
+                    borderRadius: 2,
+                    bgcolor: brand.surfaceMuted,
+                    border: `1px solid ${brand.border}`,
+                    color: brand.text,
+                  }}
                 />
                 {form.code?.trim() ? (
                   <Chip
                     size="small"
                     variant="outlined"
                     label={form.code.trim()}
-                    sx={{ fontWeight: 900, borderRadius: 2 }}
+                    sx={{
+                      fontWeight: 900,
+                      borderRadius: 2,
+                      borderColor: brand.border,
+                      color: brand.text,
+                    }}
                   />
                 ) : null}
               </Stack>
@@ -482,16 +614,18 @@ const Roles = () => {
           </Stack>
         </DialogContent>
 
-        <DialogActions>
-          <Button onClick={() => setModalOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setModalOpen(false)} sx={{ color: brand.subtext, fontWeight: 900 }}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={saveRole}
             sx={{
               fontWeight: 900,
               borderRadius: 2,
-              backgroundColor: "#7C3AED",
-              "&:hover": { backgroundColor: "#5B21B6" },
+              backgroundColor: brand.primary,
+              "&:hover": { backgroundColor: brand.primaryDark },
             }}
           >
             Save
