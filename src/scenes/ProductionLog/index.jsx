@@ -5,23 +5,6 @@ import { DataGrid } from "@mui/x-data-grid";
 import ProductionLogForm from "../form/ProductionLog";
 import { useAuth } from "../../contexts/AuthContext";
 
-/* =========================================================================================
-   Production Log — updated to match Goods In styling (Light + Dark)
-   - Reads localStorage('theme-mode') + listens for window 'themeChanged'
-   - Preserves all existing functionality (fetch, search/sort, pagination, edit, delete, record)
-   - Keeps the original modal portal approach + ensures dropdowns render above modal
-
-   ✅ NEW (frontend only):
-   - "Use non-expired goods only" checkbox shown in Record Production modal.
-   - Value is passed into the form as prop: avoidExpiredGoods (boolean)
-
-   ✅ UPDATE:
-   - Added Expiry Date to:
-     - DataGrid columns (after Units of Waste)
-     - Row normalization from backend keys (expiryDate / expiry_date / expiry)
-     - Edit modal (after Units of Waste)
-     - PUT payload (expiry_date) + local patched row
-   ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
   :root{

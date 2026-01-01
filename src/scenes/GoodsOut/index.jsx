@@ -29,6 +29,7 @@ import { Formik, FieldArray } from "formik"
 /* =========================================================================================
    Brand Styles (Light + Dark) — matches GoodsIn styling
    - Reads localStorage('theme-mode') + listens for window 'themeChanged'
+   - ✅ NEW: checkbox styling (r-check) to match Production Log
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
@@ -268,6 +269,37 @@ const BrandStyles = ({ isDark }) => (
   }
   .gi-card strong{ color: var(--text); font-weight: 700; }
 
+  /* ✅ Checkbox row (same component as Production Log) */
+  .r-check{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--mutedCard);
+    box-shadow: var(--shadow-sm);
+  }
+  .r-check input[type="checkbox"]{
+    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+  .r-check-title{
+    font-weight: 800;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.2;
+  }
+  .r-check-sub{
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
   /* Modal (matches GoodsIn) */
   .r-modal-dim { 
     position: fixed; 
@@ -411,11 +443,8 @@ const BrandStyles = ({ isDark }) => (
 
   /* DataGrid */
   .dg-wrap { height: 70vh; min-width: 750px; padding: 0 24px 16px; }
-
-  /* Keep your existing "transparent root", but FIX header containers */
   .dg-wrap .MuiDataGrid-root { border:0; background: transparent; }
 
-  /* ✅ FIX: cover all header-related containers (prevents white stripe in dark mode) */
   .dg-wrap .MuiDataGrid-topContainer,
   .dg-wrap .MuiDataGrid-columnHeaders,
   .dg-wrap .MuiDataGrid-columnHeadersInner,
@@ -452,7 +481,6 @@ const BrandStyles = ({ isDark }) => (
     color: ${isDark ? "#cbd5e1" : "#475569"};
   }
 
-  /* Slightly lift MUI drawer header contrast */
   .go-drawer-meta { opacity: 0.95; }
   `}</style>
 )
@@ -645,6 +673,62 @@ const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
 }
 
 /* =========================================================================================
+   EXPIRY NOTICE MODAL (frontend-only)
+   - Shows when "Use non-expired goods only" is ON
+   - Backend will enforce later; this is a clear user-facing warning
+   ========================================================================================= */
+const ExpiryNoticeModal = ({ open, onClose, isDark }) => {
+  if (!open) return null
+
+  return createPortal(
+    <div className="r-modal-dim" onClick={onClose}>
+      <div className="r-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+        <div className="r-mhdr">
+          <h3 className="r-title" style={{ fontSize: 18 }}>
+            Non-Expired Goods Only
+          </h3>
+          <button className="r-btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <div className="r-mbody">
+          <div
+            className="gi-card"
+            style={{
+              padding: 14,
+              marginBottom: 14,
+              borderColor: isDark ? "rgba(245,158,11,0.45)" : "rgba(245,158,11,0.35)",
+              background: isDark ? "rgba(245,158,11,0.10)" : "rgba(255,247,237,1)",
+              color: isDark ? "#fde68a" : "#92400e",
+              boxShadow: "none",
+            }}
+          >
+            This checkbox will ensure your goods-out is allocated only against <strong>non-expired production batches</strong>.
+            <br />
+            <span style={{ opacity: 0.9 }}>
+              Backend enforcement is coming next — for now this is a front-end flag that will be sent with the request.
+            </span>
+          </div>
+
+          <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text2)", fontWeight: 600, fontSize: 14, lineHeight: 1.55 }}>
+            <li>When enabled, the system should exclude batches with an expiry date before the goods-out date.</li>
+            <li>If stock can’t be satisfied using non-expired batches, the backend will hard-block (later).</li>
+          </ul>
+        </div>
+
+        <div className="r-mfooter">
+          <button className="r-btn-primary" onClick={onClose}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/* =========================================================================================
    MAIN COMPONENT
    ========================================================================================= */
 export default function GoodsOut() {
@@ -672,6 +756,10 @@ export default function GoodsOut() {
 
   const [blockOpen, setBlockOpen] = useState(false)
   const [blockInfo, setBlockInfo] = useState({ recipe: "", need: 0, have: 0 })
+
+  // ✅ NEW: expiry checkbox state (frontend only)
+  const [avoidExpiredGoods, setAvoidExpiredGoods] = useState(true)
+  const [expiryNoticeOpen, setExpiryNoticeOpen] = useState(false)
 
   const fetchAvailableUnits = useAvailableUnitsFetcher(cognitoId)
 
@@ -773,7 +861,8 @@ export default function GoodsOut() {
     }
 
     try {
-      const payload = { ...values, cognito_id: cognitoId }
+      // ✅ send flag (backend will enforce later)
+      const payload = { ...values, cognito_id: cognitoId, avoidExpiredGoods }
 
       const res = await fetch(`${API_BASE}/add-goods-out`, {
         method: "POST",
@@ -807,7 +896,7 @@ export default function GoodsOut() {
       needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0)
     })
 
-    // HARD precheck
+    // HARD precheck (total available units; expiry filtering will be backend later)
     for (const [recipe, need] of Object.entries(needMap)) {
       const have = await fetchAvailableUnits(recipe)
       if (need > have) {
@@ -826,6 +915,9 @@ export default function GoodsOut() {
           recipients: i.recipients,
         })),
         cognito_id: cognitoId,
+
+        // ✅ send top-level flag (backend later)
+        avoidExpiredGoods,
       }
 
       const res = await fetch(`${API_BASE}/add-goods-out-batch`, {
@@ -891,6 +983,25 @@ export default function GoodsOut() {
 
           {/* BODY */}
           <div className="r-mbody">
+            {/* ✅ NEW: expiry checkbox (shared across single & multiple) */}
+            <label className="r-check" style={{ marginBottom: 16 }}>
+              <input
+                type="checkbox"
+                checked={!!avoidExpiredGoods}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setAvoidExpiredGoods(next)
+                  if (next) setExpiryNoticeOpen(true) // show info popup like Production Log
+                }}
+              />
+              <div>
+                <div className="r-check-title">Use non-expired goods only</div>
+                <div className="r-check-sub">
+                  When enabled, goods out should be allocated only from batches that haven’t expired (backend logic coming next).
+                </div>
+              </div>
+            </label>
+
             {/* ===================== SINGLE FORM ===================== */}
             {formView === "single" && (
               <Formik
@@ -1263,6 +1374,9 @@ export default function GoodsOut() {
       {/* Form modal */}
       {renderFormModal()}
 
+      {/* ✅ NEW: expiry notice popup */}
+      <ExpiryNoticeModal open={expiryNoticeOpen} onClose={() => setExpiryNoticeOpen(false)} isDark={isDark} />
+
       {/* Hard block modal */}
       <HardBlockModal
         open={blockOpen}
@@ -1273,7 +1387,7 @@ export default function GoodsOut() {
         isDark={isDark}
       />
 
-      {/* Toast (matches GoodsIn) */}
+      {/* Toast */}
       <Snackbar
         open={toastOpen}
         autoHideDuration={2500}
@@ -1392,7 +1506,6 @@ export default function GoodsOut() {
                   "& .MuiDataGrid-virtualScroller": { background: "transparent" },
                   "& .MuiDataGrid-footerContainer": { borderTop: `1px solid ${isDark ? "#1e2942" : "#e2e8f0"}` },
 
-                  // ✅ FIX: belt + braces in sx too, so even if CSS gets overridden you’re safe
                   "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
                     backgroundColor: "var(--thead)",
                   },
