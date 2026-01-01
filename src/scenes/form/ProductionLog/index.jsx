@@ -1,5 +1,6 @@
 // Nory-styled Production Log with Single / Multiple tabs
 // + ACTIVE-ingredient inventory precheck & soft deficit warning (can proceed)
+// ✅ Updated to pass avoidExpiredGoods flag to backend (single + batch)
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Formik, FieldArray, getIn } from "formik";
@@ -132,7 +133,13 @@ const multipleSchema = yup.object().shape({
 // API FUNCTIONS
 // =====================================================================
 
-const postProductionLog = async (data, cognitoId, isBatch = false) => {
+// ✅ updated: accepts avoidExpiredGoods and includes it in request body
+const postProductionLog = async (
+  data,
+  cognitoId,
+  isBatch = false,
+  avoidExpiredGoods = false
+) => {
   const endpoint = isBatch
     ? `${API_BASE}/add-production-log/batch`
     : `${API_BASE}/add-production-log`;
@@ -141,10 +148,14 @@ const postProductionLog = async (data, cognitoId, isBatch = false) => {
     ? {
         entries: data,
         cognito_id: cognitoId,
+        // ✅ NEW: top-level flag applies to whole batch
+        avoidExpiredGoods: !!avoidExpiredGoods,
       }
     : {
         ...data,
         cognito_id: cognitoId,
+        // ✅ NEW: single flag
+        avoidExpiredGoods: !!avoidExpiredGoods,
       };
 
   const res = await fetch(endpoint, {
@@ -274,6 +285,9 @@ export default function ProductionLogForm({
   cognitoId,
   onSubmitted,
   formId = "production-log-form",
+
+  // ✅ NEW: passed from ProductionLog.jsx modal checkbox
+  avoidExpiredGoods = false,
 }) {
   // 0 = Single, 1 = Multiple
   const [tabValue, setTabValue] = useState(0);
@@ -364,8 +378,11 @@ export default function ProductionLogForm({
         await postProductionLog(
           tabValue === 0 ? logsToPost[0] : logsToPost,
           cognitoId,
-          tabValue === 1
+          tabValue === 1,
+          // ✅ pass checkbox flag through to backend
+          avoidExpiredGoods
         );
+
         setOpenSnackbar(true);
         resetForm({
           values: tabValue === 0 ? defaultSingleLog : defaultMultipleLog,
@@ -378,7 +395,7 @@ export default function ProductionLogForm({
         setLoading(false);
       }
     },
-    [cognitoId, tabValue, onSubmitted, getUnitsPerBatch]
+    [cognitoId, tabValue, onSubmitted, getUnitsPerBatch, avoidExpiredGoods]
   );
 
   // =====================================================================
@@ -420,8 +437,7 @@ export default function ProductionLogForm({
 
         if (tabValue === 0) {
           const recipeRows = recipeIngredients.filter(
-            (r) =>
-              (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
+            (r) => (r.recipe_name ?? r.recipe ?? r.name) === values.recipe
           );
           const totalBatches = toNumber(values.batchesProduced);
 
@@ -438,8 +454,7 @@ export default function ProductionLogForm({
             if (!recipeName) return;
 
             const recipeRows = recipeIngredients.filter(
-              (r) =>
-                (r.recipe_name ?? r.recipe ?? r.name) === recipeName
+              (r) => (r.recipe_name ?? r.recipe ?? r.name) === recipeName
             );
             const batches = toNumber(log.batchesProduced);
 
@@ -464,11 +479,7 @@ export default function ProductionLogForm({
         });
 
         const deficits = [];
-        for (const {
-          ingredient,
-          requiredBase,
-          displayUnit,
-        } of requirementsMap.values()) {
+        for (const { ingredient, requiredBase, displayUnit } of requirementsMap.values()) {
           const availableBase = stockMap.get(ingredient) || 0;
 
           if (requiredBase > availableBase) {
