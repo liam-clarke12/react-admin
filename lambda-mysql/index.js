@@ -1900,6 +1900,11 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     unitsRemaining,
     producer_name,    // snake_case (preferred)
     producerName,     // camelCase (clients might send this)
+
+    // ✅ NEW: expiry date (DB column)
+    expiry_date,      // snake_case (preferred)
+    expiryDate,       // camelCase (clients might send this)
+
     cognito_id,
   } = body;
 
@@ -1909,6 +1914,10 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
   if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
 
   const conn = await db.promise().getConnection();
+
+  // ✅ helper: validate YYYY-MM-DD if provided
+  const isYmd = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
   try {
     await conn.beginTransaction();
     console.info("[PUT.production-log] transaction started for user:", cognito_id);
@@ -1937,6 +1946,25 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     const newProducerName = producer_name !== undefined
       ? producer_name
       : (producerName !== undefined ? producerName : existing.producer_name ?? existing.producerName ?? null);
+
+    // ✅ resolve expiry date (do not force update unless provided)
+    const expiryProvided = expiry_date !== undefined || expiryDate !== undefined;
+    const newExpiryDate = expiry_date !== undefined
+      ? expiry_date
+      : (expiryDate !== undefined ? expiryDate : existing.expiry_date ?? existing.expiryDate ?? null);
+
+    // validate dates if provided
+    if (date !== undefined && date !== null && date !== "" && !isYmd(date)) {
+      await conn.rollback();
+      return res.status(400).json({ error: `Invalid date format (expected YYYY-MM-DD): ${date}` });
+    }
+    if (expiryProvided) {
+      // allow null/empty to clear the expiry_date
+      if (newExpiryDate !== null && newExpiryDate !== "" && !isYmd(newExpiryDate)) {
+        await conn.rollback();
+        return res.status(400).json({ error: `Invalid expiry date format (expected YYYY-MM-DD): ${newExpiryDate}` });
+      }
+    }
 
     // Determine recipe to use for the lookup (body.recipe overrides existing.recipe)
     const recipeToUse = (recipe !== undefined && recipe !== null && String(recipe).trim() !== "")
@@ -1984,6 +2012,12 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
     if (date !== undefined) { updateCols.push("date = ?"); params.push(date); }
     if (recipe !== undefined) { updateCols.push("recipe = ?"); params.push(recipe); }
     if (batchesProduced !== undefined) { updateCols.push("batchesProduced = ?"); params.push(Number(batchesProduced)); }
+
+    // ✅ Update expiry_date only if explicitly provided
+    if (expiryProvided) {
+      updateCols.push("expiry_date = ?");
+      params.push(newExpiryDate === "" ? null : newExpiryDate);
+    }
 
     // Only include batchRemaining if we computed it from unitsRemaining above
     if (computedBatchRemainingUnits !== null) {
@@ -2048,6 +2082,11 @@ app.put("/api/production-log/:batchCode", async (req, res) => {
         ...updated,
         // make sure producer_name is included in the returned object (it comes from DB if present)
         producer_name: updated.producer_name ?? updated.producerName ?? null,
+
+        // ✅ include expiry_date + camelCase alias
+        expiry_date: updated.expiry_date ?? updated.expiryDate ?? null,
+        expiryDate: updated.expiry_date ?? updated.expiryDate ?? null,
+
         unitsRemaining: returnedUnitsRemaining,
         batchesRemaining: returnedBatchesRemaining,
       },
