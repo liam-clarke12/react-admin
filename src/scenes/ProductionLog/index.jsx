@@ -14,6 +14,13 @@ import { useAuth } from "../../contexts/AuthContext";
    ✅ NEW (frontend only):
    - "Use non-expired goods only" checkbox shown in Record Production modal.
    - Value is passed into the form as prop: avoidExpiredGoods (boolean)
+
+   ✅ UPDATE:
+   - Added Expiry Date to:
+     - DataGrid columns (after Units of Waste)
+     - Row normalization from backend keys (expiryDate / expiry_date / expiry)
+     - Edit modal (after Units of Waste)
+     - PUT payload (expiry_date) + local patched row
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
@@ -518,20 +525,16 @@ const formatDateYMD = (val) => {
   return d.toISOString().split("T")[0];
 };
 
-const getRowKey = (row) =>
-  String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
+const getRowKey = (row) => String(row?.batchCode ?? row?.batch_code ?? row?.id ?? "");
 const makeStableId = (row) => {
   if (!row) return null;
   const key = getRowKey(row);
   if (key) return key;
-  const slug = `${row.recipe || "r"}|${row.date || "d"}|${
-    row.producer_name || row.producerName || "p"
-  }`;
+  const slug = `${row.recipe || "r"}|${row.date || "d"}|${row.producer_name || row.producerName || "p"}`;
   return `gen-${slug.replace(/[^a-zA-Z0-9-_]/g, "-")}`;
 };
 
-const toNumber = (v) =>
-  v === "" || v === null || v === undefined ? 0 : Number(v) || 0;
+const toNumber = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v) || 0);
 const nf = (n) => new Intl.NumberFormat().format(n ?? 0);
 
 const Portal = ({ children }) => {
@@ -546,12 +549,9 @@ export default function ProductionLog() {
   const { cognitoId } = useAuth() || {};
 
   // Theme (sync with Topbar)
-  const [isDark, setIsDark] = useState(
-    () => localStorage.getItem("theme-mode") === "dark"
-  );
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   useEffect(() => {
-    const onThemeChanged = () =>
-      setIsDark(localStorage.getItem("theme-mode") === "dark");
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
     window.addEventListener("themeChanged", onThemeChanged);
     return () => window.removeEventListener("themeChanged", onThemeChanged);
   }, []);
@@ -582,9 +582,7 @@ export default function ProductionLog() {
     if (!cognitoId) return;
     const run = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
-        );
+        const res = await fetch(`${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`);
         if (!res.ok) throw new Error("Failed to fetch recipes");
         const data = await res.json();
         const map = {};
@@ -608,9 +606,7 @@ export default function ProductionLog() {
     }
     try {
       const res = await fetch(
-        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(
-          cognitoId
-        )}`
+        `${API_BASE}/production-log/active?cognito_id=${encodeURIComponent(cognitoId)}`
       );
       if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
       const data = await res.json();
@@ -618,11 +614,21 @@ export default function ProductionLog() {
         setProductionLogs([]);
         return;
       }
+
       const sanitized = data.map((row) => {
         const dbId = row.id ?? row.ID ?? null;
         const batchesProduced = toNumber(row.batchesProduced ?? row.batches_produced);
         const batchRemaining = toNumber(row.batchRemaining ?? row.batch_remaining);
         const unitsOfWaste = toNumber(row.units_of_waste ?? row.unitsOfWaste);
+
+        // ✅ NEW: expiry date normalization from possible backend keys
+        const expiryDate =
+          row.expiryDate ??
+          row.expiry_date ??
+          row.expiry ??
+          row.expiryDateYMD ??
+          null;
+
         const upb = recipesMap[row.recipe] ?? toNumber(row.units_per_batch);
         const unitsRemaining = toNumber(row.unitsRemaining ?? batchRemaining - unitsOfWaste);
         const batchesRemaining = upb > 0 ? unitsRemaining / upb : null;
@@ -634,8 +640,9 @@ export default function ProductionLog() {
           recipe: row.recipe ?? "",
           date: formatDateYMD(row.date ?? null),
           batchesProduced,
-          batchRemaining,
           unitsOfWaste,
+          expiryDate: formatDateYMD(expiryDate), // ✅ NEW
+          batchRemaining,
           unitsRemaining,
           batchesRemaining,
           producerName,
@@ -644,6 +651,7 @@ export default function ProductionLog() {
         normalized.id = String(normalized.batchCode ?? normalized.id);
         return normalized;
       });
+
       setProductionLogs(sanitized);
       setFatalMsg("");
     } catch (e) {
@@ -677,6 +685,10 @@ export default function ProductionLog() {
         align: "left",
         headerAlign: "left",
       },
+
+      // ✅ NEW: Expiry Date (after Units of Waste)
+      { field: "expiryDate", headerName: "Expiry Date", flex: 1 },
+
       {
         field: "unitsRemaining",
         headerName: "Units Remaining",
@@ -718,9 +730,7 @@ export default function ProductionLog() {
     let rows = [...productionLogs];
     if (q)
       rows = rows.filter((r) =>
-        Object.values(r).some((v) =>
-          String(v ?? "").toLowerCase().includes(q)
-        )
+        Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q))
       );
 
     const dir = sortBy.dir === "asc" ? 1 : -1;
@@ -735,18 +745,9 @@ export default function ProductionLog() {
 
   // ===== Sidebar Stats =====
   const stats = useMemo(() => {
-    const totalUnitsRemaining = filteredRows.reduce(
-      (s, r) => s + toNumber(r.unitsRemaining),
-      0
-    );
-    const totalWaste = filteredRows.reduce(
-      (s, r) => s + toNumber(r.unitsOfWaste),
-      0
-    );
-    const totalBatchesProduced = filteredRows.reduce(
-      (s, r) => s + toNumber(r.batchesProduced),
-      0
-    );
+    const totalUnitsRemaining = filteredRows.reduce((s, r) => s + toNumber(r.unitsRemaining), 0);
+    const totalWaste = filteredRows.reduce((s, r) => s + toNumber(r.unitsOfWaste), 0);
+    const totalBatchesProduced = filteredRows.reduce((s, r) => s + toNumber(r.batchesProduced), 0);
     const activeBatches = filteredRows.length;
     const byRecipe = filteredRows.reduce((acc, r) => {
       const k = r.recipe || "Unknown";
@@ -772,17 +773,15 @@ export default function ProductionLog() {
     if (!cognitoId) throw new Error("Missing cognitoId");
 
     const batchCodeForPath = updatedRow.batchCode || updatedRow.batch_code;
-    if (!batchCodeForPath)
-      throw new Error("batchCode is required to update production_log");
+    if (!batchCodeForPath) throw new Error("batchCode is required to update production_log");
 
     const dateYmd = formatDateYMD(updatedRow.date);
+    const expiryYmd = formatDateYMD(updatedRow.expiryDate); // ✅ NEW
     const batchesProduced = toNumber(updatedRow.batchesProduced ?? updatedRow.batches_produced);
     const unitsOfWaste = toNumber(updatedRow.unitsOfWaste ?? updatedRow.units_of_waste);
     const unitsRemaining = toNumber(updatedRow.unitsRemaining);
     const batchRemaining = toNumber(
-      updatedRow.batchRemaining ??
-        updatedRow.batch_remaining ??
-        unitsRemaining + unitsOfWaste
+      updatedRow.batchRemaining ?? updatedRow.batch_remaining ?? unitsRemaining + unitsOfWaste
     );
 
     const payload = {
@@ -790,6 +789,7 @@ export default function ProductionLog() {
       recipe: updatedRow.recipe,
       batchesProduced,
       units_of_waste: unitsOfWaste,
+      expiry_date: expiryYmd, // ✅ NEW (snake_case for backend consistency)
       batchRemaining,
       unitsRemaining,
       producer_name: updatedRow.producerName ?? updatedRow.producer_name ?? "",
@@ -822,9 +822,9 @@ export default function ProductionLog() {
         id: getRowKey(editingRow),
         batchCode: editingRow.batchCode ?? editingRow.batch_code,
         date: formatDateYMD(editingRow.date),
-        recipe: editingRow.recipe ?? "",
         batchesProduced: toNumber(editingRow.batchesProduced),
         unitsOfWaste: toNumber(editingRow.unitsOfWaste),
+        expiryDate: formatDateYMD(editingRow.expiryDate), // ✅ NEW
         unitsRemaining: toNumber(editingRow.unitsRemaining),
         batchRemaining: toNumber(
           editingRow.batchRemaining ??
@@ -855,9 +855,7 @@ export default function ProductionLog() {
   // ===== Delete (soft) =====
   const handleDeleteSelectedRows = async () => {
     if (!cognitoId || selectedRows.length === 0) return;
-    const rowsToDelete = productionLogs.filter((r) =>
-      selectedRows.includes(getRowKey(r))
-    );
+    const rowsToDelete = productionLogs.filter((r) => selectedRows.includes(getRowKey(r)));
     try {
       await Promise.all(
         rowsToDelete.map((row) =>
@@ -873,9 +871,7 @@ export default function ProductionLog() {
           })
         )
       );
-      setProductionLogs((prev) =>
-        prev.filter((r) => !selectedRows.includes(getRowKey(r)))
-      );
+      setProductionLogs((prev) => prev.filter((r) => !selectedRows.includes(getRowKey(r))));
       setSelectedRows([]);
       setDeleteOpen(false);
     } catch (err) {
@@ -926,10 +922,7 @@ export default function ProductionLog() {
               </div>
 
               <div className="r-flex" style={{ marginLeft: "auto" }}>
-                <button
-                  className="r-btn-primary"
-                  onClick={() => setOpenProductionForm(true)}
-                >
+                <button className="r-btn-primary" onClick={() => setOpenProductionForm(true)}>
                   + Record Production
                 </button>
 
@@ -978,12 +971,11 @@ export default function ProductionLog() {
                   <option value="date:asc">Date (old → new)</option>
                   <option value="recipe:asc">Recipe A→Z</option>
                   <option value="recipe:desc">Recipe Z→A</option>
-                  <option value="unitsRemaining:desc">
-                    Units remaining (high → low)
-                  </option>
-                  <option value="unitsRemaining:asc">
-                    Units remaining (low → high)
-                  </option>
+                  <option value="unitsRemaining:desc">Units remaining (high → low)</option>
+                  <option value="unitsRemaining:asc">Units remaining (low → high)</option>
+                  {/* optional: expiry sorting */}
+                  <option value="expiryDate:asc">Expiry (soon → later)</option>
+                  <option value="expiryDate:desc">Expiry (later → soon)</option>
                 </select>
               )}
             </div>
@@ -996,9 +988,7 @@ export default function ProductionLog() {
                 checkboxSelection
                 rowSelectionModel={selectedRows}
                 onRowSelectionModelChange={(model) => {
-                  const arr = Array.isArray(model)
-                    ? model.map((m) => String(m))
-                    : [];
+                  const arr = Array.isArray(model) ? model.map((m) => String(m)) : [];
                   setSelectedRows(arr);
                 }}
                 disableRowSelectionOnClick
@@ -1015,16 +1005,14 @@ export default function ProductionLog() {
                   },
 
                   // ✅ FIX: cover header + sticky/top containers that sometimes keep a white background
-                  "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader":
-                    {
-                      backgroundColor: "var(--thead)",
-                      color: "var(--muted)",
-                      borderBottom: "2px solid var(--border)",
-                    },
-                  "& .MuiDataGrid-columnHeadersInner, & .MuiDataGrid-columnHeaderRow":
-                    {
-                      backgroundColor: "var(--thead)",
-                    },
+                  "& .MuiDataGrid-topContainer, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader": {
+                    backgroundColor: "var(--thead)",
+                    color: "var(--muted)",
+                    borderBottom: "2px solid var(--border)",
+                  },
+                  "& .MuiDataGrid-columnHeadersInner, & .MuiDataGrid-columnHeaderRow": {
+                    backgroundColor: "var(--thead)",
+                  },
                   "& .MuiDataGrid-scrollbarFiller, & .MuiDataGrid-filler": {
                     backgroundColor: "var(--thead)",
                   },
@@ -1054,9 +1042,7 @@ export default function ProductionLog() {
                   {Math.min((page + 1) * rowsPerPage, filteredRows.length)}
                 </strong>{" "}
                 of{" "}
-                <strong style={{ color: "var(--text)" }}>
-                  {filteredRows.length}
-                </strong>
+                <strong style={{ color: "var(--text)" }}>{filteredRows.length}</strong>
               </span>
 
               <div className="r-flex">
@@ -1073,9 +1059,7 @@ export default function ProductionLog() {
                 <button
                   className="r-btn-ghost"
                   onClick={() =>
-                    setPage((p) =>
-                      (p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p
-                    )
+                    setPage((p) => ((p + 1) * rowsPerPage < filteredRows.length ? p + 1 : p))
                   }
                   disabled={(page + 1) * rowsPerPage >= filteredRows.length}
                 >
@@ -1124,35 +1108,17 @@ export default function ProductionLog() {
           <div className="gi-card">
             <h3>Quick Stats</h3>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">Batches Produced</span>
               <strong>{nf(stats.totalBatchesProduced)}</strong>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">Units of Waste</span>
               <strong>{nf(stats.totalWaste)}</strong>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">Active Batches</span>
               <strong>{nf(stats.activeBatches)}</strong>
             </div>
@@ -1174,9 +1140,7 @@ export default function ProductionLog() {
                       alignItems: "baseline",
                     }}
                   >
-                    <span style={{ fontWeight: 700, color: "var(--text)" }}>
-                      {t.recipe}
-                    </span>
+                    <span style={{ fontWeight: 700, color: "var(--text)" }}>{t.recipe}</span>
                     <span className="r-qty-badge">{nf(t.units)}</span>
                   </div>
                 ))}
@@ -1271,6 +1235,22 @@ export default function ProductionLog() {
                     />
                   </div>
 
+                  {/* ✅ NEW: Expiry Date (after Units of Waste) */}
+                  <div className="ag-field ag-field-2">
+                    <label className="ag-label">Expiry Date</label>
+                    <input
+                      className="ag-input"
+                      type="date"
+                      value={formatDateYMD(editingRow.expiryDate ?? "")}
+                      onChange={(e) =>
+                        setEditingRow((prev) => ({
+                          ...(prev || {}),
+                          expiryDate: formatDateYMD(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Units Remaining</label>
                     <input
@@ -1333,11 +1313,7 @@ export default function ProductionLog() {
                   Cancel
                 </button>
 
-                <button
-                  className="r-btn-primary"
-                  onClick={handleConfirmEdit}
-                  disabled={updating}
-                >
+                <button className="r-btn-primary" onClick={handleConfirmEdit} disabled={updating}>
                   {updating ? "Saving..." : "Save Changes"}
                 </button>
               </div>
@@ -1378,14 +1354,7 @@ export default function ProductionLog() {
                   <DeleteIcon />
                 </div>
 
-                <h3
-                  style={{
-                    fontWeight: 900,
-                    color: "var(--text)",
-                    marginTop: 10,
-                    fontSize: 18,
-                  }}
-                >
+                <h3 style={{ fontWeight: 900, color: "var(--text)", marginTop: 10, fontSize: 18 }}>
                   Delete {selectedRows.length} record{selectedRows.length > 1 ? "s" : ""}?
                 </h3>
 

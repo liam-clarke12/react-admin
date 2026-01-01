@@ -1236,12 +1236,6 @@ app.get("/api/recipes/:id", async (req, res) => {
   }
 });
 
-// =========================
-// SINGLE: /api/add-production-log
-// - Adds support for avoidExpiredGoods flag
-// - When avoidExpiredGoods=true, lots must have expiryDate >= production date
-// - When avoidExpiredGoods=true and stock cannot be satisfied, throws + rolls back (hard block)
-// =========================
 app.post("/api/add-production-log", async (req, res) => {
   const {
     date,
@@ -1255,13 +1249,20 @@ app.post("/api/add-production-log", async (req, res) => {
     producerName: producerNameFromBody,
     producer_name: producerNameSnake,
 
-    // ✅ NEW: checkbox flag (frontend)
+    // ✅ NEW: expiry date
+    expiryDate,
+    expiry_date,
+
+    // ✅ checkbox flag (frontend)
     avoidExpiredGoods,
     avoid_expired_goods,
   } = req.body
 
   // prefer camelCase if provided, otherwise snake_case; fall back to null
   const producerName = producerNameFromBody ?? producerNameSnake ?? null
+
+  // ✅ normalize expiry date
+  const expiry = expiryDate ?? expiry_date ?? null
 
   // ✅ normalize checkbox flag
   const avoidExpired = Boolean(avoidExpiredGoods ?? avoid_expired_goods ?? false) === true
@@ -1274,6 +1275,7 @@ app.post("/api/add-production-log", async (req, res) => {
     unitsOfWaste,
     cognito_id,
     producerName,
+    expiry,
     avoidExpired,
   })
 
@@ -1329,6 +1331,9 @@ app.post("/api/add-production-log", async (req, res) => {
     if (!isYmd(date)) {
       throw new Error(`Invalid production date format (expected YYYY-MM-DD): ${date}`)
     }
+    if (expiry != null && expiry !== "" && !isYmd(expiry)) {
+      throw new Error(`Invalid expiry date format (expected YYYY-MM-DD): ${expiry}`)
+    }
 
     // fetch recipe + units_per_batch
     const [recipeRows] = await connection.execute(
@@ -1358,15 +1363,16 @@ app.post("/api/add-production-log", async (req, res) => {
       user_id: cognito_id,
       units_of_waste: finalUnitsOfWaste,
       producer_name: producerName,
+      expiry_date: expiry,
       avoidExpired,
     })
 
-    // Insert into production_log including producer_name (nullable)
+    // ✅ Insert into production_log including producer_name + expiry_date (nullable)
     const [productionLogResult] = await connection.execute(
       `
       INSERT INTO production_log
-        (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name, expiry_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         date,
@@ -1377,6 +1383,7 @@ app.post("/api/add-production-log", async (req, res) => {
         cognito_id,
         finalUnitsOfWaste,
         producerName,
+        expiry || null,
       ],
     )
 
@@ -1487,6 +1494,7 @@ app.post("/api/add-production-log", async (req, res) => {
       message: "Production log saved successfully",
       id: productionLogId,
       producer_name: producerName,
+      expiry_date: expiry || null,
       avoidExpiredGoods: avoidExpired,
     })
   } catch (err) {
@@ -1498,19 +1506,12 @@ app.post("/api/add-production-log", async (req, res) => {
   }
 })
 
-
-// =========================
-// BATCH: /api/add-production-log/batch
-// - Adds support for avoidExpiredGoods flag (top-level + per-entry override)
-// - When avoidExpiredGoods=true, lots must have expiryDate >= entry.date
-// - When avoidExpiredGoods=true and stock cannot be satisfied, throws + rolls back (hard block)
-// =========================
 app.post("/api/add-production-log/batch", async (req, res) => {
   const {
     entries,
     cognito_id,
 
-    // ✅ NEW: top-level checkbox flag
+    // ✅ top-level checkbox flag
     avoidExpiredGoods,
     avoid_expired_goods,
   } = req.body
@@ -1589,6 +1590,10 @@ app.post("/api/add-production-log/batch", async (req, res) => {
         producerName: producerNameFromBody,
         producer_name: producerNameSnake,
 
+        // ✅ NEW: expiry date per-entry
+        expiryDate,
+        expiry_date,
+
         // ✅ optional per-entry override
         avoidExpiredGoods: entryAvoidExpiredGoods,
         avoid_expired_goods: entryAvoidExpiredGoodsSnake,
@@ -1598,10 +1603,16 @@ app.post("/api/add-production-log/batch", async (req, res) => {
         throw new Error(`Invalid production date format (expected YYYY-MM-DD): ${date}`)
       }
 
+      const expiry = expiryDate ?? expiry_date ?? null
+      if (expiry != null && expiry !== "" && !isYmd(expiry)) {
+        throw new Error(`Invalid expiry date format (expected YYYY-MM-DD): ${expiry}`)
+      }
+
       const producerName = producerNameFromBody ?? producerNameSnake ?? null
 
       // entry override > batch flag
-      const avoidExpiredEntry = Boolean(entryAvoidExpiredGoods ?? entryAvoidExpiredGoodsSnake ?? avoidExpiredBatch ?? false) === true
+      const avoidExpiredEntry =
+        Boolean(entryAvoidExpiredGoods ?? entryAvoidExpiredGoodsSnake ?? avoidExpiredBatch ?? false) === true
 
       // fetch recipe + units_per_batch
       const [recipeRows] = await connection.execute(
@@ -1617,14 +1628,14 @@ app.post("/api/add-production-log/batch", async (req, res) => {
       const batchRemaining = Number(batchesProduced) * unitsPerBatch
       const finalUnitsOfWaste = Number(unitsOfWaste) || 0
 
-      // insert production_log (returns id)
+      // ✅ insert production_log (returns id) INCLUDING expiry_date
       const [productionLogResult] = await connection.execute(
         `
           INSERT INTO production_log
-            (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name, expiry_date)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        [date, recipe, batchesProduced, batchRemaining, batchCode, cognito_id, finalUnitsOfWaste, producerName],
+        [date, recipe, batchesProduced, batchRemaining, batchCode, cognito_id, finalUnitsOfWaste, producerName, expiry || null],
       )
 
       const productionLogId = productionLogResult.insertId
@@ -1782,6 +1793,7 @@ app.get("/api/production-log/active", async (req, res) => {
   try {
     // compute derived fields server-side so clients see canonical values
     // include producer_name explicitly (and a camelCase alias producerName for client convenience)
+    // ✅ NEW: include expiry_date (and camelCase alias expiryDate)
     const query = `
       SELECT
         pl.id,
@@ -1792,6 +1804,11 @@ app.get("/api/production-log/active", async (req, res) => {
         pl.batchCode,
         pl.user_id,
         pl.units_of_waste,
+
+        -- ✅ NEW
+        pl.expiry_date,
+        pl.expiry_date AS expiryDate,
+
         pl.deleted_at,
         pl.deleted_by,
         pl.producer_name,

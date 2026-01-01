@@ -3,6 +3,10 @@
 // - Reads localStorage('theme-mode') + listens for window 'themeChanged'
 // - Uses CSS variables for light/dark palettes (inputs, tabs, rows, toast, modals)
 // - Keeps your existing logic + portals + z-index protections
+//
+// ✅ Update:
+// - Added Expiry Date input AFTER Units of Waste (Single + Multiple)
+// - Included in defaults + validation schemas + batch payloads
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -72,6 +76,7 @@ const defaultSingleLog = {
   date: formatDateYMD(new Date()),
   batchesProduced: 1,
   unitsOfWaste: 0,
+  expiryDate: "", // ✅ NEW
   producerName: "",
   batchCode: "",
 };
@@ -80,8 +85,8 @@ const defaultMultipleLog = {
   date: formatDateYMD(new Date()),
   producerName: "",
   logs: [
-    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
-    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" },
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, expiryDate: "", batchCode: "" }, // ✅ NEW
+    { recipe: "", batchesProduced: 1, unitsOfWaste: 0, expiryDate: "", batchCode: "" }, // ✅ NEW
   ],
 };
 
@@ -89,6 +94,10 @@ const singleSchema = yup.object().shape({
   recipe: yup.string().required("Recipe is required"),
   batchesProduced: yup.number().min(1, "Must be at least 1").required("Required"),
   unitsOfWaste: yup.number().min(0, "Cannot be negative").required("Required"),
+  expiryDate: yup
+    .string()
+    .required("Expiry date is required")
+    .test("is-date", "Expiry date is invalid", (v) => !v || !Number.isNaN(new Date(v).getTime())), // ✅ NEW
   producerName: yup.string(),
   date: yup.date().required("Date is required"),
   batchCode: yup.string().required("Batch code is required"),
@@ -104,6 +113,10 @@ const multipleSchema = yup.object().shape({
         recipe: yup.string().required("Recipe is required"),
         batchesProduced: yup.number().min(1, "Must be at least 1").required("Required"),
         unitsOfWaste: yup.number().min(0, "Cannot be negative").required("Required"),
+        expiryDate: yup
+          .string()
+          .required("Expiry date is required")
+          .test("is-date", "Expiry date is invalid", (v) => !v || !Number.isNaN(new Date(v).getTime())), // ✅ NEW
         batchCode: yup.string().required("Batch code is required"),
       })
     )
@@ -295,9 +308,16 @@ function ErrorModal({ open, title, message, onClose }) {
 // MAIN COMPONENT
 // =====================================================================
 
-export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "production-log-form", avoidExpiredGoods = false }) {
+export default function ProductionLogForm({
+  cognitoId,
+  onSubmitted,
+  formId = "production-log-form",
+  avoidExpiredGoods = false,
+}) {
   // Theme (sync with Topbar)
-  const [isDark, setIsDark] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("theme-mode") === "dark" : false));
+  const [isDark, setIsDark] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("theme-mode") === "dark" : false
+  );
   useEffect(() => {
     const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
     window.addEventListener("themeChanged", onThemeChanged);
@@ -376,6 +396,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
           ? [
               {
                 ...values,
+                expiryDate: formatDateYMD(values.expiryDate), // ✅ NEW (normalized)
                 batchesProduced: toNumber(values.batchesProduced),
                 unitsOfWaste: toNumber(values.unitsOfWaste),
                 unitsRemaining:
@@ -388,9 +409,9 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
               recipe: log.recipe,
               batchesProduced: toNumber(log.batchesProduced),
               unitsOfWaste: toNumber(log.unitsOfWaste),
+              expiryDate: formatDateYMD(log.expiryDate), // ✅ NEW (normalized)
               batchCode: log.batchCode,
-              unitsRemaining:
-                toNumber(log.batchesProduced) * getUnitsPerBatch(log.recipe) - toNumber(log.unitsOfWaste),
+              unitsRemaining: toNumber(log.batchesProduced) * getUnitsPerBatch(log.recipe) - toNumber(log.unitsOfWaste),
             }));
 
       try {
@@ -577,14 +598,16 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
 
           --pl-danger: ${brand.danger};
 
-          --pl-shadow: ${isDark
-            ? "0 1px 2px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25)"
-            : brand.shadow};
+          --pl-shadow: ${
+            isDark
+              ? "0 1px 2px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25)"
+              : brand.shadow
+          };
 
           --pl-hover: ${isDark ? "rgba(99,102,241,0.10)" : "#eef2ff"};
 
           --pl-modal-bg: ${isDark ? "#151b2e" : "#ffffff"};
-          --pl-backdrop: rgba(15,23,42,${isDark ? 0.62 : 0.40});
+          --pl-backdrop: rgba(15,23,42,${isDark ? 0.62 : 0.4});
 
           --pl-warn-bg: ${isDark ? "rgba(220,38,38,0.16)" : "#fef2f2"};
           --pl-warn-border: ${isDark ? "rgba(239,68,68,0.28)" : "#fecaca"};
@@ -934,6 +957,23 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
                     )}
                   </div>
 
+                  {/* ✅ NEW: Expiry Date (after Units of Waste) */}
+                  <div className="gof-field col-4">
+                    <label className="gof-label" htmlFor="expiryDate">
+                      Expiry Date *
+                    </label>
+                    <input
+                      id="expiryDate"
+                      name="expiryDate"
+                      type="date"
+                      className="gof-input"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      value={values.expiryDate}
+                    />
+                    {touched.expiryDate && errors.expiryDate && <div className="gof-error">{errors.expiryDate}</div>}
+                  </div>
+
                   <div className="gof-field col-4">
                     <label className="gof-label" htmlFor="producerName">
                       Produced By (Name)
@@ -1029,11 +1069,13 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
                         const recipePath = `logs[${index}].recipe`;
                         const batchesProducedPath = `logs[${index}].batchesProduced`;
                         const unitsOfWastePath = `logs[${index}].unitsOfWaste`;
+                        const expiryDatePath = `logs[${index}].expiryDate`; // ✅ NEW
                         const batchCodePath = `logs[${index}].batchCode`;
 
                         const recipeError = getIn(touched, recipePath) && getIn(errors, recipePath);
                         const batchesError = getIn(touched, batchesProducedPath) && getIn(errors, batchesProducedPath);
                         const wasteError = getIn(touched, unitsOfWastePath) && getIn(errors, unitsOfWastePath);
+                        const expiryError = getIn(touched, expiryDatePath) && getIn(errors, expiryDatePath); // ✅ NEW
                         const batchCodeError = getIn(touched, batchCodePath) && getIn(errors, batchCodePath);
 
                         return (
@@ -1106,6 +1148,23 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
                                 {wasteError && <div className="gof-error">{wasteError}</div>}
                               </div>
 
+                              {/* ✅ NEW: Expiry Date (after Units of Waste) */}
+                              <div className="gof-field col-6">
+                                <label className="gof-label" htmlFor={`logs-${index}-expiryDate`}>
+                                  Expiry Date *
+                                </label>
+                                <input
+                                  id={`logs-${index}-expiryDate`}
+                                  name={expiryDatePath}
+                                  type="date"
+                                  className="gof-input"
+                                  onBlur={handleBlur}
+                                  onChange={handleChange}
+                                  value={log.expiryDate || ""}
+                                />
+                                {expiryError && <div className="gof-error">{expiryError}</div>}
+                              </div>
+
                               <div className="gof-field col-6">
                                 <label className="gof-label" htmlFor={`logs-${index}-batchCode`}>
                                   Batch Code *
@@ -1130,7 +1189,7 @@ export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "pr
                         <button
                           type="button"
                           className="gof-multi-add-btn"
-                          onClick={() => push({ recipe: "", batchesProduced: 1, unitsOfWaste: 0, batchCode: "" })}
+                          onClick={() => push({ recipe: "", batchesProduced: 1, unitsOfWaste: 0, expiryDate: "", batchCode: "" })}
                         >
                           + Add another batch
                         </button>
