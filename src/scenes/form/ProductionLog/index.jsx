@@ -1,10 +1,12 @@
 // src/scenes/HRP/form/ProductionLog.jsx
-// Nory-styled Production Log with Single / Multiple tabs
-// + ACTIVE-ingredient inventory precheck & soft deficit warning (can proceed)
-// ✅ Updated to pass avoidExpiredGoods flag to backend (single + batch)
-// ✅ Added user-friendly Error modal for backend errors (e.g. insufficient NON-EXPIRED stock)
+// ✅ FIX: popups/modals always render ABOVE dropdowns by:
+// 1) Rendering modals via React Portal to document.body
+// 2) Raising modal backdrop z-index (999999) + modal z-index (1000000)
+// 3) Forcing common dropdown/popover layers (MUI/Popper/etc) below modal
+// 4) On open, temporarily hide native select dropdown via blur (best-effort)
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Formik, FieldArray, getIn } from "formik";
 import * as yup from "yup";
 
@@ -152,11 +154,17 @@ const getRecipeIngredients = async (cognitoId) => {
 };
 
 const getIngredientStock = async (cognitoId) => {
-  const res = await fetch(
-    `${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`
-  );
+  const res = await fetch(`${API_BASE}/ingredient-inventory/active?cognito_id=${encodeURIComponent(cognitoId)}`);
   if (!res.ok) throw new Error("Failed to fetch ingredient stock");
   return await res.json();
+};
+
+// =====================================================================
+// PORTAL
+// =====================================================================
+const Portal = ({ children }) => {
+  if (typeof window === "undefined") return null;
+  return createPortal(children, document.body);
 };
 
 // =====================================================================
@@ -178,90 +186,78 @@ function DeficitModal({ open, info, onCancel, onProceed }) {
   const deficits = info?.deficits || [];
 
   return (
-    <div className="gof-modal-backdrop" onClick={onCancel}>
-      <div className="gof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="gof-modal-header">
-          <h3>Inventory Warning</h3>
-        </div>
-        <div className="gof-modal-body">
-          <p className="gof-warning">
-            Ingredient shortages for <strong>{recipe}</strong>.
-          </p>
+    <Portal>
+      <div className="gof-modal-backdrop" onClick={onCancel}>
+        <div className="gof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="gof-modal-header">
+            <h3>Inventory Warning</h3>
+          </div>
+          <div className="gof-modal-body">
+            <p className="gof-warning">
+              Ingredient shortages for <strong>{recipe}</strong>.
+            </p>
 
-          {deficits.length > 0 && (
-            <table className="pl-deficit-table">
-              <thead>
-                <tr>
-                  <th>Ingredient</th>
-                  <th>Required</th>
-                  <th>Available</th>
-                  <th>Missing</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deficits.map((d, i) => (
-                  <tr key={i}>
-                    <td>{d.ingredient}</td>
-                    <td>
-                      {d.required} {d.unit}
-                    </td>
-                    <td>
-                      {d.available} {d.unit}
-                    </td>
-                    <td className="pl-missing">
-                      {d.missing} {d.unit}
-                    </td>
+            {deficits.length > 0 && (
+              <table className="pl-deficit-table">
+                <thead>
+                  <tr>
+                    <th>Ingredient</th>
+                    <th>Required</th>
+                    <th>Available</th>
+                    <th>Missing</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {deficits.map((d, i) => (
+                    <tr key={i}>
+                      <td>{d.ingredient}</td>
+                      <td>
+                        {d.required} {d.unit}
+                      </td>
+                      <td>
+                        {d.available} {d.unit}
+                      </td>
+                      <td className="pl-missing">
+                        {d.missing} {d.unit}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-          <p className="gof-callout">
-            You can still record this production, but your ingredient inventory will go negative for the items above.
-          </p>
-        </div>
-        <div className="gof-modal-footer">
-          <button type="button" className="btn ghost" onClick={onCancel}>
-            Cancel
-          </button>
-          <button type="button" className="btn primary" onClick={onProceed}>
-            Proceed Anyway
-          </button>
+            <p className="gof-callout">
+              You can still record this production, but your ingredient inventory will go negative for the items above.
+            </p>
+          </div>
+          <div className="gof-modal-footer">
+            <button type="button" className="btn ghost" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="button" className="btn primary" onClick={onProceed}>
+              Proceed Anyway
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 
 const parseBackendError = (err) => {
   const raw = String(err?.message || err || "");
-
-  // JSON string from backend: {"error":"..."} or {"message":"..."}
   try {
     const obj = JSON.parse(raw);
     if (obj?.error) return String(obj.error);
     if (obj?.message) return String(obj.message);
-  } catch (_) {
-    // ignore
-  }
-
+  } catch (_) {}
   return raw.replace(/^Submission failed:\s*/i, "").trim();
 };
 
 const beautifyErrorMessage = (msg) => {
   let m = String(msg || "").trim();
-
-  // soften backend wording
   m = m.replace(/\bNON-EXPIRED\b/g, "non-expired");
   m = m.replace(/\(base units\):\s*/i, ": ");
-
-  // If it starts with "Insufficient ..." make it more user-facing
-  if (/^Insufficient/i.test(m)) {
-    return m;
-  }
-
-  // Fallback prefix
   return m || "Something went wrong while recording production.";
 };
 
@@ -269,36 +265,38 @@ function ErrorModal({ open, title, message, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="gof-modal-backdrop" onClick={onClose}>
-      <div className="gof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="gof-modal-header">
-          <h3>{title || "Couldn’t record production"}</h3>
-        </div>
-
-        <div className="gof-modal-body">
-          <div
-            className="gof-warning"
-            style={{
-              background: "#fff7ed",
-              borderColor: "#fed7aa",
-              color: "#9a3412",
-            }}
-          >
-            {message}
+    <Portal>
+      <div className="gof-modal-backdrop" onClick={onClose}>
+        <div className="gof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="gof-modal-header">
+            <h3>{title || "Couldn’t record production"}</h3>
           </div>
 
-          <p className="gof-callout">
-            Tip: Add a Goods In entry, reduce batch size, or untick “Use non-expired goods only” (if permitted).
-          </p>
-        </div>
+          <div className="gof-modal-body">
+            <div
+              className="gof-warning"
+              style={{
+                background: "#fff7ed",
+                borderColor: "#fed7aa",
+                color: "#9a3412",
+              }}
+            >
+              {message}
+            </div>
 
-        <div className="gof-modal-footer">
-          <button type="button" className="btn primary" onClick={onClose}>
-            OK
-          </button>
+            <p className="gof-callout">
+              Tip: Add a Goods In entry, reduce batch size, or untick “Use non-expired goods only” (if permitted).
+            </p>
+          </div>
+
+          <div className="gof-modal-footer">
+            <button type="button" className="btn primary" onClick={onClose}>
+              OK
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 
@@ -310,7 +308,7 @@ export default function ProductionLogForm({
   cognitoId,
   onSubmitted,
   formId = "production-log-form",
-  avoidExpiredGoods = false, // ✅ passed from ProductionLog modal checkbox
+  avoidExpiredGoods = false,
 }) {
   // 0 = Single, 1 = Multiple
   const [tabValue, setTabValue] = useState(0);
@@ -327,6 +325,16 @@ export default function ProductionLogForm({
   // Error modal state
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // ✅ If any modal is open, blur the active element (helps close native select dropdowns)
+  useEffect(() => {
+    if (!deficitOpen && !errorOpen) return;
+    try {
+      if (document?.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+    } catch (_) {}
+  }, [deficitOpen, errorOpen]);
 
   // ===== Fetch Recipes =====
   useEffect(() => {
@@ -404,10 +412,8 @@ export default function ProductionLogForm({
         if (onSubmitted) onSubmitted();
       } catch (e) {
         console.error("Submission error:", e);
-
         const parsed = parseBackendError(e);
         const pretty = beautifyErrorMessage(parsed);
-
         setErrorMsg(pretty);
         setErrorOpen(true);
       } finally {
@@ -518,11 +524,9 @@ export default function ProductionLogForm({
         submitFunc();
       } catch (error) {
         console.error("Ingredient Deficit Error:", error);
-
         const parsed = parseBackendError(error);
         const pretty = beautifyErrorMessage(parsed);
-
-        setErrorMsg(pretty || `Ingredient check failed.`);
+        setErrorMsg(pretty || "Ingredient check failed.");
         setErrorOpen(true);
       } finally {
         setLoading(false);
@@ -622,10 +626,7 @@ export default function ProductionLogForm({
           .col-6, .col-4, .col-3 { grid-column: span 12; }
         }
 
-        .gof-field {
-          display: flex;
-          flex-direction: column;
-        }
+        .gof-field { display: flex; flex-direction: column; }
         .gof-label {
           font-size: 13px;
           font-weight: 600;
@@ -641,17 +642,15 @@ export default function ProductionLogForm({
           font-size: 14px;
           outline: none;
           transition: border-color .15s ease, box-shadow .15s ease;
+          position: relative;
+          z-index: 1;
         }
         .gof-input:focus,
         .gof-select:focus {
           border-color: ${brand.primary};
           box-shadow: 0 0 0 4px ${brand.focusRing};
         }
-        .gof-error {
-          color: ${brand.danger};
-          font-size: 12px;
-          margin-top: 6px;
-        }
+        .gof-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
 
         /* Multiple rows */
         .gof-multi-row {
@@ -667,21 +666,9 @@ export default function ProductionLogForm({
           justify-content: space-between;
           margin-bottom: 8px;
         }
-        .gof-multi-index {
-          font-size: 12px;
-          font-weight: 700;
-          color: ${brand.subtext};
-        }
-        .gof-multi-remove {
-          border: none;
-          background: none;
-          color: ${brand.danger};
-          font-size: 12px;
-          cursor: pointer;
-        }
-        .gof-multi-actions {
-          margin-top: 8px;
-        }
+        .gof-multi-index { font-size: 12px; font-weight: 700; color: ${brand.subtext}; }
+        .gof-multi-remove { border: none; background: none; color: ${brand.danger}; font-size: 12px; cursor: pointer; }
+        .gof-multi-actions { margin-top: 8px; }
         .gof-multi-add-btn {
           border-radius: 999px;
           border: 1px dashed ${brand.border};
@@ -701,7 +688,7 @@ export default function ProductionLogForm({
           transform: translateY(-20px);
           opacity: 0;
           animation: gof-toast-in .2s forwards;
-          z-index: 20;
+          z-index: 999990;
         }
         .gof-toast-inner {
           background: #0f172a;
@@ -711,14 +698,9 @@ export default function ProductionLogForm({
           font-size: 13px;
           box-shadow: ${brand.shadow};
         }
-        @keyframes gof-toast-in {
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
+        @keyframes gof-toast-in { to { transform: translateY(0); opacity: 1; } }
 
-        /* Modal */
+        /* ✅ Modal – VERY high z-index so it sits above any select/poppers */
         .gof-modal-backdrop {
           position: fixed;
           inset: 0;
@@ -726,7 +708,7 @@ export default function ProductionLogForm({
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 30;
+          z-index: 999999; /* backdrop */
         }
         .gof-modal {
           width: 100%;
@@ -736,19 +718,12 @@ export default function ProductionLogForm({
           border: 1px solid ${brand.border};
           box-shadow: 0 20px 40px rgba(15,23,42,0.35);
           overflow: hidden;
+          position: relative;
+          z-index: 1000000; /* modal */
         }
-        .gof-modal-header {
-          padding: 12px 16px;
-          border-bottom: 1px solid ${brand.border};
-        }
-        .gof-modal-header h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 800;
-        }
-        .gof-modal-body {
-          padding: 16px;
-        }
+        .gof-modal-header { padding: 12px 16px; border-bottom: 1px solid ${brand.border}; }
+        .gof-modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; }
+        .gof-modal-body { padding: 16px; }
         .gof-warning {
           background: #fef2f2;
           border: 1px solid #fecaca;
@@ -759,11 +734,7 @@ export default function ProductionLogForm({
           font-weight: 600;
           margin-bottom: 12px;
         }
-        .gof-callout {
-          font-size: 13px;
-          color: ${brand.subtext};
-          margin: 12px 0 0;
-        }
+        .gof-callout { font-size: 13px; color: ${brand.subtext}; margin: 12px 0 0; }
         .gof-modal-footer {
           padding: 10px 16px 14px;
           border-top: 1px solid ${brand.border};
@@ -779,57 +750,31 @@ export default function ProductionLogForm({
           cursor: pointer;
           font-weight: 600;
         }
-        .btn.ghost {
-          background: #ffffff;
-          color: ${brand.subtext};
-          border-color: ${brand.border};
-        }
-        .btn.primary {
-          background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark});
-          color: #fff;
-          box-shadow: ${brand.shadow};
-        }
+        .btn.ghost { background: #ffffff; color: ${brand.subtext}; border-color: ${brand.border}; }
+        .btn.primary { background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); color: #fff; box-shadow: ${brand.shadow}; }
 
         /* Deficit table */
-        .pl-deficit-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 8px;
-          font-size: 13px;
-        }
-        .pl-deficit-table th,
-        .pl-deficit-table td {
-          padding: 6px 8px;
-          border-bottom: 1px solid ${brand.border};
-          text-align: left;
-        }
-        .pl-deficit-table th {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: ${brand.subtext};
-          font-weight: 700;
-        }
-        .pl-missing {
-          color: ${brand.danger};
-          font-weight: 600;
+        .pl-deficit-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+        .pl-deficit-table th, .pl-deficit-table td { padding: 6px 8px; border-bottom: 1px solid ${brand.border}; text-align: left; }
+        .pl-deficit-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: ${brand.subtext}; font-weight: 700; }
+        .pl-missing { color: ${brand.danger}; font-weight: 600; }
+
+        /* ✅ Force common popover layers below our modal (safety net) */
+        .MuiPopover-root,
+        .MuiPopper-root,
+        .MuiMenu-root,
+        .MuiAutocomplete-popper,
+        .MuiPickersPopper-root {
+          z-index: 900000 !important;
         }
       `}</style>
 
       {/* Tabs */}
       <div className="gof-tabs" role="tablist">
-        <button
-          type="button"
-          className={`gof-tab ${tabValue === 0 ? "active" : ""}`}
-          onClick={() => setTabValue(0)}
-        >
+        <button type="button" className={`gof-tab ${tabValue === 0 ? "active" : ""}`} onClick={() => setTabValue(0)}>
           Record Single Batch
         </button>
-        <button
-          type="button"
-          className={`gof-tab ${tabValue === 1 ? "active" : ""}`}
-          onClick={() => setTabValue(1)}
-        >
+        <button type="button" className={`gof-tab ${tabValue === 1 ? "active" : ""}`} onClick={() => setTabValue(1)}>
           Record Multiple Batches
         </button>
       </div>
@@ -853,7 +798,9 @@ export default function ProductionLogForm({
               >
                 <div className="gof-grid">
                   <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="recipe">Recipe *</label>
+                    <label className="gof-label" htmlFor="recipe">
+                      Recipe *
+                    </label>
                     <select
                       id="recipe"
                       name="recipe"
@@ -862,16 +809,22 @@ export default function ProductionLogForm({
                       onChange={handleChange}
                       value={values.recipe}
                     >
-                      <option value="" disabled>Select a recipe…</option>
+                      <option value="" disabled>
+                        Select a recipe…
+                      </option>
                       {recipes.map((recipe) => (
-                        <option key={recipe.name} value={recipe.name}>{recipe.name}</option>
+                        <option key={recipe.name} value={recipe.name}>
+                          {recipe.name}
+                        </option>
                       ))}
                     </select>
                     {touched.recipe && errors.recipe && <div className="gof-error">{errors.recipe}</div>}
                   </div>
 
                   <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="date">Date *</label>
+                    <label className="gof-label" htmlFor="date">
+                      Date *
+                    </label>
                     <input
                       id="date"
                       name="date"
@@ -885,7 +838,9 @@ export default function ProductionLogForm({
                   </div>
 
                   <div className="gof-field col-4">
-                    <label className="gof-label" htmlFor="batchesProduced">Batches Produced *</label>
+                    <label className="gof-label" htmlFor="batchesProduced">
+                      Batches Produced *
+                    </label>
                     <input
                       id="batchesProduced"
                       name="batchesProduced"
@@ -896,11 +851,15 @@ export default function ProductionLogForm({
                       value={values.batchesProduced}
                       min="1"
                     />
-                    {touched.batchesProduced && errors.batchesProduced && <div className="gof-error">{errors.batchesProduced}</div>}
+                    {touched.batchesProduced && errors.batchesProduced && (
+                      <div className="gof-error">{errors.batchesProduced}</div>
+                    )}
                   </div>
 
                   <div className="gof-field col-4">
-                    <label className="gof-label" htmlFor="unitsOfWaste">Units of Waste *</label>
+                    <label className="gof-label" htmlFor="unitsOfWaste">
+                      Units of Waste *
+                    </label>
                     <input
                       id="unitsOfWaste"
                       name="unitsOfWaste"
@@ -911,11 +870,15 @@ export default function ProductionLogForm({
                       value={values.unitsOfWaste}
                       min="0"
                     />
-                    {touched.unitsOfWaste && errors.unitsOfWaste && <div className="gof-error">{errors.unitsOfWaste}</div>}
+                    {touched.unitsOfWaste && errors.unitsOfWaste && (
+                      <div className="gof-error">{errors.unitsOfWaste}</div>
+                    )}
                   </div>
 
                   <div className="gof-field col-4">
-                    <label className="gof-label" htmlFor="producerName">Produced By (Name)</label>
+                    <label className="gof-label" htmlFor="producerName">
+                      Produced By (Name)
+                    </label>
                     <input
                       id="producerName"
                       name="producerName"
@@ -925,11 +888,15 @@ export default function ProductionLogForm({
                       onChange={handleChange}
                       value={values.producerName}
                     />
-                    {touched.producerName && errors.producerName && <div className="gof-error">{errors.producerName}</div>}
+                    {touched.producerName && errors.producerName && (
+                      <div className="gof-error">{errors.producerName}</div>
+                    )}
                   </div>
 
                   <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="batchCode">Batch Code *</label>
+                    <label className="gof-label" htmlFor="batchCode">
+                      Batch Code *
+                    </label>
                     <input
                       id="batchCode"
                       name="batchCode"
@@ -954,7 +921,9 @@ export default function ProductionLogForm({
               >
                 <div className="gof-grid" style={{ marginBottom: 16 }}>
                   <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="date">Date *</label>
+                    <label className="gof-label" htmlFor="date">
+                      Date *
+                    </label>
                     <input
                       id="date"
                       name="date"
@@ -968,7 +937,9 @@ export default function ProductionLogForm({
                   </div>
 
                   <div className="gof-field col-6">
-                    <label className="gof-label" htmlFor="producerName">Produced By (Name)</label>
+                    <label className="gof-label" htmlFor="producerName">
+                      Produced By (Name)
+                    </label>
                     <input
                       id="producerName"
                       name="producerName"
@@ -978,7 +949,9 @@ export default function ProductionLogForm({
                       onChange={handleChange}
                       value={values.producerName}
                     />
-                    {touched.producerName && errors.producerName && <div className="gof-error">{errors.producerName}</div>}
+                    {touched.producerName && errors.producerName && (
+                      <div className="gof-error">{errors.producerName}</div>
+                    )}
                   </div>
                 </div>
 
@@ -988,7 +961,9 @@ export default function ProductionLogForm({
                   {({ push, remove }) => (
                     <>
                       {!!(touched.logs && errors.logs) && typeof errors.logs === "string" && (
-                        <div className="gof-error" style={{ marginBottom: 8 }}>{errors.logs}</div>
+                        <div className="gof-error" style={{ marginBottom: 8 }}>
+                          {errors.logs}
+                        </div>
                       )}
 
                       {(values.logs ?? []).map((log, index) => {
@@ -1015,7 +990,9 @@ export default function ProductionLogForm({
 
                             <div className="gof-grid">
                               <div className="gof-field col-6">
-                                <label className="gof-label" htmlFor={`logs-${index}-recipe`}>Recipe *</label>
+                                <label className="gof-label" htmlFor={`logs-${index}-recipe`}>
+                                  Recipe *
+                                </label>
                                 <select
                                   id={`logs-${index}-recipe`}
                                   name={recipePath}
@@ -1024,16 +1001,22 @@ export default function ProductionLogForm({
                                   onChange={handleChange}
                                   value={log.recipe || ""}
                                 >
-                                  <option value="" disabled>Select a recipe…</option>
+                                  <option value="" disabled>
+                                    Select a recipe…
+                                  </option>
                                   {recipes.map((recipe) => (
-                                    <option key={recipe.name} value={recipe.name}>{recipe.name}</option>
+                                    <option key={recipe.name} value={recipe.name}>
+                                      {recipe.name}
+                                    </option>
                                   ))}
                                 </select>
                                 {recipeError && <div className="gof-error">{recipeError}</div>}
                               </div>
 
                               <div className="gof-field col-3">
-                                <label className="gof-label" htmlFor={`logs-${index}-batchesProduced`}>Batches Produced *</label>
+                                <label className="gof-label" htmlFor={`logs-${index}-batchesProduced`}>
+                                  Batches Produced *
+                                </label>
                                 <input
                                   id={`logs-${index}-batchesProduced`}
                                   name={batchesProducedPath}
@@ -1048,7 +1031,9 @@ export default function ProductionLogForm({
                               </div>
 
                               <div className="gof-field col-3">
-                                <label className="gof-label" htmlFor={`logs-${index}-unitsOfWaste`}>Units of Waste *</label>
+                                <label className="gof-label" htmlFor={`logs-${index}-unitsOfWaste`}>
+                                  Units of Waste *
+                                </label>
                                 <input
                                   id={`logs-${index}-unitsOfWaste`}
                                   name={unitsOfWastePath}
@@ -1063,7 +1048,9 @@ export default function ProductionLogForm({
                               </div>
 
                               <div className="gof-field col-6">
-                                <label className="gof-label" htmlFor={`logs-${index}-batchCode`}>Batch Code *</label>
+                                <label className="gof-label" htmlFor={`logs-${index}-batchCode`}>
+                                  Batch Code *
+                                </label>
                                 <input
                                   id={`logs-${index}-batchCode`}
                                   name={batchCodePath}
@@ -1098,7 +1085,7 @@ export default function ProductionLogForm({
         )}
       </Formik>
 
-      {/* Soft Deficit Warning Modal (can proceed) */}
+      {/* Soft Deficit Warning Modal */}
       <DeficitModal
         open={deficitOpen}
         info={deficitInfoRef.current}
@@ -1106,7 +1093,7 @@ export default function ProductionLogForm({
         onProceed={handleDeficitProceed}
       />
 
-      {/* ✅ Friendly backend error modal */}
+      {/* Friendly backend error modal */}
       <ErrorModal
         open={errorOpen}
         title="Can’t record production"
