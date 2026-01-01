@@ -870,7 +870,11 @@ export default function GoodsOut() {
         body: JSON.stringify(payload),
       })
 
-      if (!res.ok) throw new Error("Submit failed")
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "")
+        console.error("[add-goods-out] failed:", res.status, txt)
+        throw new Error(txt || "Submit failed")
+      }
 
       helpers.resetForm()
       setFormOpen(false)

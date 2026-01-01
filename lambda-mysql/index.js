@@ -2342,325 +2342,264 @@ app.post("/api/add-goods-out", async (req, res) => {
     stockAmount,
     recipients,
     cognito_id,
+    avoidExpiredGoods, // accepted but ignored (frontend-only)
+  } = req.body;
 
-    // ✅ NEW: accept both cases
-    avoidExpiredGoods,
-    avoid_expired_goods,
-  } = req.body
+  console.log("Received /add-goods-out request with:", req.body);
 
-  console.log("Received /add-goods-out request with:", req.body)
+  // ✅ safer validation (allows 0 but still rejects undefined/null/"")
+  const missing = [];
+  if (!date) missing.push("date");
+  if (!recipe) missing.push("recipe");
+  if (stockAmount === undefined || stockAmount === null || stockAmount === "") missing.push("stockAmount");
+  if (!recipients) missing.push("recipients");
+  if (!cognito_id) missing.push("cognito_id");
 
-  if (!date || !recipe || stockAmount === undefined || stockAmount === null || !recipients || !cognito_id) {
-    console.error("Missing fields in request:", req.body)
-    return res.status(400).json({ error: "All fields are required, including cognito_id" })
+  if (missing.length) {
+    console.error("Missing fields:", missing, "body:", req.body);
+    return res.status(400).json({ error: "All fields are required", missing });
   }
 
-  const avoidExpired = Boolean(avoidExpiredGoods ?? avoid_expired_goods ?? false) === true
-
-  const connection = await db.promise().getConnection()
+  const connection = await db.promise().getConnection();
   try {
-    console.log("Starting database transaction...")
-    await connection.beginTransaction()
+    console.log("Starting database transaction...");
+    await connection.beginTransaction();
 
     // 0) Look up units_per_batch for this recipe (scoped to this user)
     const [recipeRows] = await connection.execute(
-      `SELECT units_per_batch
-         FROM recipes
-        WHERE recipe_name = ?
-          AND user_id = ?`,
-      [recipe, cognito_id],
-    )
+      `SELECT units_per_batch 
+         FROM recipes 
+        WHERE recipe_name = ? 
+          AND user_id = ?
+        LIMIT 1`,
+      [recipe, cognito_id]
+    );
 
-    if (recipeRows.length === 0) {
-      throw new Error(`Recipe '${recipe}' not found for user ${cognito_id}`)
+    if (!Array.isArray(recipeRows) || recipeRows.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Recipe '${recipe}' not found for this user`,
+        recipe,
+      });
     }
 
-    const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1
-    console.log(`Units per batch for '${recipe}':`, unitsPerBatch)
+    const unitsPerBatch = Number(recipeRows[0].units_per_batch) || 1;
+    console.log(`Units per batch for '${recipe}':`, unitsPerBatch);
 
-    // If stockAmount is actually UNITS, use the next line instead:
-    // const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
-    const batchesToDeduct = Math.ceil(Number(stockAmount))
-    console.log(`Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`)
+    // NOTE: your current logic treats stockAmount as "batches".
+    // If stockAmount is UNITS, you likely want: Math.ceil(Number(stockAmount) / unitsPerBatch)
+    const batchesToDeduct = Math.ceil(Number(stockAmount));
+    console.log(`Stock amount ${stockAmount} => ${batchesToDeduct} batch(es) to deduct`);
 
-    // 1) Insert goods_out record (NO flag stored)
+    // 1) Insert goods_out record
     const goodsOutQuery = `
       INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
       VALUES (?, ?, ?, ?, ?)
-    `
+    `;
     const [goodsOutResult] = await connection.execute(goodsOutQuery, [
       date,
       recipe,
       stockAmount,
       recipients,
       cognito_id,
-    ])
-    const goodsOutId = goodsOutResult.insertId
-    console.log("Inserted into goods_out. ID:", goodsOutId)
+    ]);
 
-    // 2) Deduct from ACTIVE production_log rows (deleted_at IS NULL) for this user, FIFO by id
-    // ✅ expiryDate filter uses GOODS-OUT DATE (not CURDATE)
-    const expiryClause = avoidExpired ? `AND (pl.expiryDate IS NULL OR DATE(pl.expiryDate) >= DATE(?))` : ``
-    const params = avoidExpired ? [recipe, cognito_id, date] : [recipe, cognito_id]
+    const goodsOutId = goodsOutResult.insertId;
+    console.log("Inserted into goods_out. ID:", goodsOutId);
+
+    // 2) Deduct from ACTIVE production_log rows (FIFO by id)
+    let remainingToDeduct = batchesToDeduct;
 
     const [productionRows] = await connection.execute(
-      `
-      SELECT pl.id, pl.batchRemaining, pl.batchCode, pl.expiryDate
-        FROM production_log pl
-       WHERE pl.recipe = ?
-         AND pl.user_id = ?
-         AND pl.batchRemaining > 0
-         AND pl.deleted_at IS NULL
-         ${expiryClause}
-       ORDER BY pl.id ASC
-    `,
-      params,
-    )
-
-    let remainingToDeduct = batchesToDeduct
+      `SELECT id, batchRemaining, batchCode
+         FROM production_log
+        WHERE recipe = ?
+          AND user_id = ?
+          AND batchRemaining > 0
+          AND deleted_at IS NULL
+        ORDER BY id ASC`,
+      [recipe, cognito_id]
+    );
 
     for (const row of productionRows) {
-      if (remainingToDeduct <= 0) break
+      if (remainingToDeduct <= 0) break;
 
-      const deductAmount = Math.min(Number(row.batchRemaining || 0), remainingToDeduct)
+      const deductAmount = Math.min(Number(row.batchRemaining || 0), remainingToDeduct);
 
-      // a) Update production_log
       await connection.execute(
         `UPDATE production_log
             SET batchRemaining = batchRemaining - ?
           WHERE id = ?`,
-        [deductAmount, row.id],
-      )
+        [deductAmount, row.id]
+      );
 
-      // b) Track deduction against this batch
       await connection.execute(
-        `INSERT INTO goods_out_batches
-           (goods_out_id, production_log_id, quantity_used)
+        `INSERT INTO goods_out_batches (goods_out_id, production_log_id, quantity_used)
          VALUES (?, ?, ?)`,
-        [goodsOutId, row.id, deductAmount],
-      )
+        [goodsOutId, row.id, deductAmount]
+      );
 
-      console.log(`Deducted ${deductAmount} batch(es) from production_log ID ${row.id} (batchCode: ${row.batchCode})`)
-
-      remainingToDeduct -= deductAmount
+      console.log(`Deducted ${deductAmount} from production_log ID ${row.id} (batchCode: ${row.batchCode})`);
+      remainingToDeduct -= deductAmount;
     }
 
     if (remainingToDeduct > 0) {
-      const msg = `Not enough ${avoidExpired ? "NON-EXPIRED " : ""}active batches to cover stockAmount; ${remainingToDeduct} batch(es) short.`
-      console.warn(msg)
-
-      // ✅ hard block if checkbox ON
-      if (avoidExpired) throw new Error(msg)
-      // else: keep old behaviour (commit partial)
+      console.warn(`Not enough active batches; ${remainingToDeduct} short.`);
+      // keep current behaviour: commit partial.
     }
 
-    await connection.commit()
+    await connection.commit();
+
     return res.status(200).json({
-      message: "Goods out added; deducted from ACTIVE production_log rows (deleted_at IS NULL).",
-      goodsOutId,
-      avoidExpiredGoods: avoidExpired,
-    })
+      success: true,
+      message: "Goods out added; deducted from ACTIVE production_log rows.",
+      ignored: { avoidExpiredGoods: !!avoidExpiredGoods }, // FYI only, not stored
+    });
   } catch (err) {
-    await connection.rollback()
-    console.error("Error processing transaction:", err)
-    return res.status(500).json({ error: err.message })
+    await connection.rollback();
+    console.error("Error processing transaction:", err);
+    return res.status(500).json({ error: "Internal Server Error", details: err.message });
   } finally {
-    connection.release()
+    connection.release();
   }
-})
+});
 
-// =========================
-// GOODS OUT — BATCH
-// ✅ Reads avoidExpiredGoods (top-level + per-entry override)
-// ✅ When avoidExpiredGoods=true:
-//    - Only deduct from production_log rows where expiryDate IS NULL OR expiryDate >= entry.date
-//    - If not enough stock, THROW + ROLLBACK (hard block)
-// ✅ Does NOT store flag in DB
-// =========================
 app.post("/api/add-goods-out-batch", async (req, res) => {
-  const {
-    entries,
-    cognito_id,
+  const { entries, cognito_id, avoidExpiredGoods } = req.body;
 
-    // ✅ NEW: top-level flag
-    avoidExpiredGoods,
-    avoid_expired_goods,
-  } = req.body
-
-  res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com")
-  res.setHeader("Access-Control-Allow-Credentials", "true")
+  res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (!Array.isArray(entries) || entries.length === 0) {
-    return res.status(400).json({ success: false, error: "entries must be a non-empty array" })
+    return res.status(400).json({ success: false, error: "entries must be a non-empty array" });
   }
-
   if (!cognito_id) {
-    return res.status(400).json({ success: false, error: "cognito_id is required" })
+    return res.status(400).json({ success: false, error: "cognito_id is required" });
   }
 
-  const avoidExpiredBatch = Boolean(avoidExpiredGoods ?? avoid_expired_goods ?? false) === true
-
-  // Quick validation for each entry
   const invalid = entries
     .map((e, i) => {
-      const missing = []
-      if (!e.date) missing.push("date")
-      if (!e.recipe) missing.push("recipe")
-      if (e.stockAmount === undefined || e.stockAmount === null) missing.push("stockAmount")
-      if (!e.recipients) missing.push("recipients")
-      return missing.length ? { index: i, missing } : null
+      const missing = [];
+      if (!e.date) missing.push("date");
+      if (!e.recipe) missing.push("recipe");
+      if (e.stockAmount === undefined || e.stockAmount === null || e.stockAmount === "") missing.push("stockAmount");
+      if (!e.recipients) missing.push("recipients");
+      return missing.length ? { index: i, missing } : null;
     })
-    .filter(Boolean)
+    .filter(Boolean);
 
   if (invalid.length) {
     return res.status(400).json({
       success: false,
       error: "Validation failed for some entries",
       details: invalid,
-    })
+    });
   }
 
-  const connection = await db.promise().getConnection()
+  const connection = await db.promise().getConnection();
 
   try {
-    console.log("Starting /add-goods-out-batch transaction...")
-    await connection.beginTransaction()
+    console.log("Starting /add-goods-out-batch transaction...");
+    await connection.beginTransaction();
 
-    // 0) Preload recipe info (units_per_batch) for all recipes in this batch
-    const uniqueRecipes = [...new Set(entries.map((e) => e.recipe).filter(Boolean))]
-    if (uniqueRecipes.length === 0) throw new Error("No recipe values provided in entries")
+    const uniqueRecipes = [...new Set(entries.map((e) => e.recipe).filter(Boolean))];
+    if (uniqueRecipes.length === 0) throw new Error("No recipe values provided in entries");
 
-    const placeholders = uniqueRecipes.map(() => "?").join(",")
+    const placeholders = uniqueRecipes.map(() => "?").join(",");
     const [recipeRows] = await connection.execute(
-      `
-      SELECT recipe_name, units_per_batch
-        FROM recipes
-       WHERE user_id = ?
-         AND recipe_name IN (${placeholders})
-    `,
-      [cognito_id, ...uniqueRecipes],
-    )
+      `SELECT recipe_name, units_per_batch
+         FROM recipes
+        WHERE user_id = ?
+          AND recipe_name IN (${placeholders})`,
+      [cognito_id, ...uniqueRecipes]
+    );
 
-    const recipeMap = new Map()
-    recipeRows.forEach((r) => recipeMap.set(r.recipe_name, r))
+    const recipeMap = new Map();
+    recipeRows.forEach((r) => recipeMap.set(r.recipe_name, r));
 
-    const missingRecipes = uniqueRecipes.filter((r) => !recipeMap.has(r))
-    if (missingRecipes.length > 0) {
-      throw new Error(`Recipe(s) not found for user ${cognito_id}: ${missingRecipes.join(", ")}`)
+    const missingRecipes = uniqueRecipes.filter((r) => !recipeMap.has(r));
+    if (missingRecipes.length) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: `Recipe(s) not found for this user: ${missingRecipes.join(", ")}`,
+        missingRecipes,
+      });
     }
 
-    const insertedIds = []
+    const insertedIds = [];
 
     for (const entry of entries) {
-      const {
-        date,
-        recipe,
-        stockAmount,
-        recipients,
+      const { date, recipe, stockAmount, recipients } = entry;
 
-        // ✅ optional per-entry override
-        avoidExpiredGoods: entryAvoidExpiredGoods,
-        avoid_expired_goods: entryAvoidExpiredGoodsSnake,
-      } = entry
+      const unitsPerBatch = Number(recipeMap.get(recipe).units_per_batch) || 1;
 
-      const recipeRow = recipeMap.get(recipe)
-      const unitsPerBatch = Number(recipeRow.units_per_batch) || 1
+      const batchesToDeduct = Math.ceil(Number(stockAmount));
 
-      // If stockAmount is actually UNITS, you could do:
-      // const batchesToDeduct = Math.ceil(Number(stockAmount) / unitsPerBatch);
-      const batchesToDeduct = Math.ceil(Number(stockAmount))
+      const [goodsOutResult] = await connection.execute(
+        `INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [date, recipe, stockAmount, recipients, cognito_id]
+      );
 
-      // entry override > batch flag
-      const avoidExpiredEntry =
-        Boolean(entryAvoidExpiredGoods ?? entryAvoidExpiredGoodsSnake ?? avoidExpiredBatch ?? false) === true
+      const goodsOutId = goodsOutResult.insertId;
+      insertedIds.push(goodsOutId);
 
-      // 1a) Insert goods_out record (NO flag stored)
-      const goodsOutQuery = `
-        INSERT INTO goods_out (date, recipe, stockAmount, recipients, user_id)
-        VALUES (?, ?, ?, ?, ?)
-      `
-      const [goodsOutResult] = await connection.execute(goodsOutQuery, [
-        date,
-        recipe,
-        stockAmount,
-        recipients,
-        cognito_id,
-      ])
-
-      const goodsOutId = goodsOutResult.insertId
-      insertedIds.push(goodsOutId)
-
-      // 1b) Deduct from production_log FIFO
-      const expiryClause = avoidExpiredEntry ? `AND (pl.expiryDate IS NULL OR DATE(pl.expiryDate) >= DATE(?))` : ``
-      const params = avoidExpiredEntry ? [recipe, cognito_id, date] : [recipe, cognito_id]
+      let remainingToDeduct = batchesToDeduct;
 
       const [productionRows] = await connection.execute(
-        `
-        SELECT pl.id, pl.batchRemaining, pl.batchCode, pl.expiryDate
-          FROM production_log pl
-         WHERE pl.recipe = ?
-           AND pl.user_id = ?
-           AND pl.batchRemaining > 0
-           AND pl.deleted_at IS NULL
-           ${expiryClause}
-         ORDER BY pl.id ASC
-      `,
-        params,
-      )
-
-      let remainingToDeduct = batchesToDeduct
+        `SELECT id, batchRemaining, batchCode
+           FROM production_log
+          WHERE recipe = ?
+            AND user_id = ?
+            AND batchRemaining > 0
+            AND deleted_at IS NULL
+          ORDER BY id ASC`,
+        [recipe, cognito_id]
+      );
 
       for (const row of productionRows) {
-        if (remainingToDeduct <= 0) break
+        if (remainingToDeduct <= 0) break;
 
-        const deductAmount = Math.min(Number(row.batchRemaining || 0), remainingToDeduct)
+        const deductAmount = Math.min(Number(row.batchRemaining || 0), remainingToDeduct);
 
         await connection.execute(
           `UPDATE production_log
               SET batchRemaining = batchRemaining - ?
             WHERE id = ?`,
-          [deductAmount, row.id],
-        )
+          [deductAmount, row.id]
+        );
 
         await connection.execute(
-          `INSERT INTO goods_out_batches
-            (goods_out_id, production_log_id, quantity_used)
+          `INSERT INTO goods_out_batches (goods_out_id, production_log_id, quantity_used)
            VALUES (?, ?, ?)`,
-          [goodsOutId, row.id, deductAmount],
-        )
+          [goodsOutId, row.id, deductAmount]
+        );
 
-        remainingToDeduct -= deductAmount
+        remainingToDeduct -= deductAmount;
       }
 
       if (remainingToDeduct > 0) {
-        const msg = `Not enough ${avoidExpiredEntry ? "NON-EXPIRED " : ""}active batches to cover stockAmount for recipe '${recipe}'; ${remainingToDeduct} batch(es) short.`
-        console.warn(msg)
-
-        // ✅ hard block if checkbox ON
-        if (avoidExpiredEntry) throw new Error(msg)
-        // else: keep old behaviour (commit partial)
+        console.warn(`[BATCH] Not enough active batches for '${recipe}'; ${remainingToDeduct} short.`);
       }
     }
 
-    await connection.commit()
+    await connection.commit();
 
     return res.status(200).json({
       success: true,
-      message: `Goods out batch added; deducted from ACTIVE production_log rows (deleted_at IS NULL).`,
+      message: "Goods out batch added; deducted from ACTIVE production_log rows.",
       insertedIds,
-      avoidExpiredGoods: avoidExpiredBatch,
-    })
+      ignored: { avoidExpiredGoods: !!avoidExpiredGoods }, // FYI only, not stored
+    });
   } catch (err) {
-    await connection.rollback()
-    console.error("Error processing /add-goods-out-batch:", err)
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    })
+    await connection.rollback();
+    console.error("Error processing /add-goods-out-batch:", err);
+    return res.status(500).json({ success: false, error: "Internal Server Error", details: err.message });
   } finally {
-    connection.release()
+    connection.release();
   }
-})
+});
 
 // =========================
 // GET: goods-out-with-batches
