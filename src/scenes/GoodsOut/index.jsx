@@ -22,6 +22,7 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded"
 import DeleteIcon from "@mui/icons-material/Delete"
 import CloseIcon from "@mui/icons-material/Close"
 import AddIcon from "@mui/icons-material/Add"
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded"
 import { useAuth } from "../../contexts/AuthContext"
 import * as yup from "yup"
 import { Formik, FieldArray } from "formik"
@@ -30,6 +31,7 @@ import { Formik, FieldArray } from "formik"
    Brand Styles (Light + Dark) — matches GoodsIn styling
    - Reads localStorage('theme-mode') + listens for window 'themeChanged'
    - ✅ NEW: checkbox styling (r-check) to match Production Log
+   - ✅ NEW: Friendly error modal styling (gof-*) to match ProductionLog modal style
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
@@ -61,6 +63,13 @@ const BrandStyles = ({ isDark }) => (
     --shadow-sm: ${isDark ? "0 1px 2px rgba(0,0,0,0.3)" : "0 1px 2px rgba(0,0,0,0.04)"};
     --shadow: ${isDark ? "0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -1px rgba(0,0,0,0.2)" : "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04)"};
     --shadow-lg: ${isDark ? "0 20px 25px -5px rgba(0,0,0,0.4), 0 10px 10px -5px rgba(0,0,0,0.3)" : "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"};
+
+    /* Friendly modal vars (ProductionLog-like) */
+    --go-backdrop: rgba(15,23,42,${isDark ? 0.62 : 0.4});
+    --go-modal-bg: ${isDark ? "#151b2e" : "#ffffff"};
+    --go-warn-bg: ${isDark ? "rgba(245,158,11,0.16)" : "#fff7ed"};
+    --go-warn-border: ${isDark ? "rgba(245,158,11,0.28)" : "#fed7aa"};
+    --go-warn-text: ${isDark ? "#fde68a" : "#9a3412"};
   }
 
   * { transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
@@ -482,6 +491,105 @@ const BrandStyles = ({ isDark }) => (
   }
 
   .go-drawer-meta { opacity: 0.95; }
+
+  /* ==========================================================
+     ✅ Friendly Error Modal (ProductionLog-like, gof-*)
+     ========================================================== */
+  .gof-modal-backdrop{
+    position: fixed;
+    inset: 0;
+    background: var(--go-backdrop);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    backdrop-filter: blur(6px);
+    padding: 20px;
+  }
+  .gof-modal{
+    width: 100%;
+    max-width: 520px;
+    background: var(--go-modal-bg);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 40px rgba(0,0,0,${isDark ? 0.55 : 0.35});
+    overflow: hidden;
+    position: relative;
+    z-index: 1000000;
+    color: var(--text);
+  }
+  .gof-modal-header{
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .gof-modal-header h3{
+    margin: 0;
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .gof-modal-body{ padding: 16px; color: var(--text2); }
+  .gof-warning{
+    background: var(--go-warn-bg);
+    border: 1px solid var(--go-warn-border);
+    color: var(--go-warn-text);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    line-height: 1.45;
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+  }
+  .gof-callout{
+    font-size: 13px;
+    color: var(--text2);
+    margin: 12px 0 0;
+    font-weight: 600;
+  }
+  .gof-modal-footer{
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: ${isDark ? "rgba(255,255,255,0.02)" : "transparent"};
+  }
+  .btn{
+    font-size: 13px;
+    border-radius: 999px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: 900;
+  }
+  .btn.primary{
+    background: linear-gradient(180deg, var(--primary), var(--primary2));
+    color: #fff;
+    box-shadow: var(--shadow);
+  }
+  .btn.ghost{
+    background: var(--card);
+    color: var(--text2);
+    border-color: var(--border);
+  }
+  .btn.ghost:hover{ background: var(--hover); }
+
+  /* ✅ Force common popover layers below our modal (safety net) */
+  .MuiPopover-root,
+  .MuiPopper-root,
+  .MuiMenu-root,
+  .MuiAutocomplete-popper,
+  .MuiPickersPopper-root {
+    z-index: 900000 !important;
+  }
   `}</style>
 )
 
@@ -609,6 +717,83 @@ const buildDrawerItems = (row) =>
 const Portal = ({ children }) => (typeof window === "undefined" ? null : createPortal(children, document.body))
 
 /* =========================================================================================
+   FRIENDLY ERROR MODAL (ProductionLog-style)
+   ========================================================================================= */
+const parseBackendError = (rawTextOrErr) => {
+  const raw = String(rawTextOrErr?.message || rawTextOrErr || "").trim()
+  // If backend returned JSON (common in your APIs), prefer its error/message
+  try {
+    const obj = JSON.parse(raw)
+    if (obj?.error) return String(obj.error)
+    if (obj?.message) return String(obj.message)
+  } catch (_) {}
+  return raw
+}
+
+const beautifyGoodsOutError = (msg) => {
+  let m = String(msg || "").trim()
+  if (!m) return "Something went wrong while recording goods out."
+
+  // Make common backend phrasing friendlier
+  m = m.replace(/insufficient non-expired stock/gi, "Not enough non-expired stock")
+  m = m.replace(/goods out/gi, "goods-out")
+  m = m.replace(/\s+/g, " ").trim()
+
+  return m
+}
+
+const isLikelyExpiryError = (msg) => {
+  const m = String(msg || "").toLowerCase()
+  return m.includes("non-expired") || m.includes("expired") || m.includes("expiry")
+}
+
+const FriendlyErrorModal = ({ open, title, message, contextLines = [], onClose }) => {
+  if (!open) return null
+
+  return createPortal(
+    <div className="gof-modal-backdrop" onClick={onClose}>
+      <div className="gof-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="gof-modal-header">
+          <h3>{title || "Couldn’t record goods out"}</h3>
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <div className="gof-modal-body">
+          <div className="gof-warning">
+            <WarningAmberRoundedIcon fontSize="small" style={{ marginTop: 1 }} />
+            <div>
+              {message}
+              {contextLines?.length > 0 && (
+                <div style={{ marginTop: 8, fontWeight: 700, color: "inherit", opacity: 0.95 }}>
+                  {contextLines.map((line, i) => (
+                    <div key={i} style={{ fontWeight: 700 }}>
+                      • {line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p className="gof-callout">
+            Tip: Produce more units, adjust the quantity, or untick “Use non-expired goods only” (if your process allows it).
+          </p>
+        </div>
+
+        <div className="gof-modal-footer">
+          <button type="button" className="btn primary" onClick={onClose}>
+            OK
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/* =========================================================================================
    HARD BLOCK MODAL (NO PROCEED) — styled like GoodsIn modal
    ========================================================================================= */
 const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
@@ -674,8 +859,6 @@ const HardBlockModal = ({ open, recipe, need, have, onClose, isDark }) => {
 
 /* =========================================================================================
    EXPIRY NOTICE MODAL (frontend-only)
-   - Shows when "Use non-expired goods only" is ON
-   - Backend will enforce later; this is a clear user-facing warning
    ========================================================================================= */
 const ExpiryNoticeModal = ({ open, onClose, isDark }) => {
   if (!open) return null
@@ -757,9 +940,15 @@ export default function GoodsOut() {
   const [blockOpen, setBlockOpen] = useState(false)
   const [blockInfo, setBlockInfo] = useState({ recipe: "", need: 0, have: 0 })
 
-  // ✅ NEW: expiry checkbox state (frontend only)
+  // ✅ expiry checkbox state
   const [avoidExpiredGoods, setAvoidExpiredGoods] = useState(true)
   const [expiryNoticeOpen, setExpiryNoticeOpen] = useState(false)
+
+  // ✅ NEW: friendly error modal state
+  const [errorOpen, setErrorOpen] = useState(false)
+  const [errorTitle, setErrorTitle] = useState("")
+  const [errorMsg, setErrorMsg] = useState("")
+  const [errorContext, setErrorContext] = useState([])
 
   const fetchAvailableUnits = useAvailableUnitsFetcher(cognitoId)
 
@@ -779,6 +968,16 @@ export default function GoodsOut() {
   const [sortBy, setSortBy] = useState({ field: "date", dir: "desc" })
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  // ✅ If any modal is open, blur active element (helps native select popovers)
+  useEffect(() => {
+    if (!errorOpen && !blockOpen && !expiryNoticeOpen) return
+    try {
+      if (document?.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur()
+      }
+    } catch (_) {}
+  }, [errorOpen, blockOpen, expiryNoticeOpen])
 
   /* Fetch recipes for select dropdown */
   useEffect(() => {
@@ -847,6 +1046,13 @@ export default function GoodsOut() {
     fetchGoodsOut()
   }, [fetchGoodsOut])
 
+  const openFriendlyError = ({ title, message, contextLines }) => {
+    setErrorTitle(title || "Couldn’t record goods out")
+    setErrorMsg(message || "Something went wrong while recording goods out.")
+    setErrorContext(Array.isArray(contextLines) ? contextLines : [])
+    setErrorOpen(true)
+  }
+
   /* ===============================
      Submit — SINGLE
   =============================== */
@@ -861,7 +1067,6 @@ export default function GoodsOut() {
     }
 
     try {
-      // ✅ send flag (backend will enforce later)
       const payload = { ...values, cognito_id: cognitoId, avoidExpiredGoods }
 
       const res = await fetch(`${API_BASE}/add-goods-out`, {
@@ -872,8 +1077,25 @@ export default function GoodsOut() {
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "")
-        console.error("[add-goods-out] failed:", res.status, txt)
-        throw new Error(txt || "Submit failed")
+        const parsed = parseBackendError(txt || `Server returned ${res.status}`)
+        const pretty = beautifyGoodsOutError(parsed)
+
+        const ctx = [
+          values?.recipe ? `Recipe: ${values.recipe}` : null,
+          values?.date ? `Goods-out date: ${formatToYYYYMMDD(values.date)}` : null,
+          Number(values?.stockAmount) ? `Units requested: ${Number(values.stockAmount)}` : null,
+          avoidExpiredGoods ? "Mode: Non-expired batches only" : "Mode: FIFO (any batch)",
+        ].filter(Boolean)
+
+        openFriendlyError({
+          title: isLikelyExpiryError(pretty) ? "Can’t use expired stock" : "Couldn’t record goods out",
+          message: isLikelyExpiryError(pretty)
+            ? `This goods-out can’t be recorded because the system can’t allocate enough non-expired batches for this date.`
+            : pretty,
+          contextLines: ctx,
+        })
+
+        return
       }
 
       helpers.resetForm()
@@ -881,8 +1103,14 @@ export default function GoodsOut() {
       setToastOpen(true)
       await fetchGoodsOut()
     } catch (err) {
-      alert("Submission failed. Check console.")
       console.error(err)
+      const parsed = parseBackendError(err)
+      const pretty = beautifyGoodsOutError(parsed)
+      openFriendlyError({
+        title: "Couldn’t record goods out",
+        message: pretty,
+        contextLines: [],
+      })
     }
   }
 
@@ -900,7 +1128,7 @@ export default function GoodsOut() {
       needMap[r] = (needMap[r] || 0) + Number(item.stockAmount || 0)
     })
 
-    // HARD precheck (total available units; expiry filtering will be backend later)
+    // HARD precheck (total available units)
     for (const [recipe, need] of Object.entries(needMap)) {
       const have = await fetchAvailableUnits(recipe)
       if (need > have) {
@@ -919,8 +1147,6 @@ export default function GoodsOut() {
           recipients: i.recipients,
         })),
         cognito_id: cognitoId,
-
-        // ✅ send top-level flag (backend later)
         avoidExpiredGoods,
       }
 
@@ -930,7 +1156,26 @@ export default function GoodsOut() {
         body: JSON.stringify(payload),
       })
 
-      if (!res.ok) throw new Error("Batch submit failed")
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "")
+        const parsed = parseBackendError(txt || `Server returned ${res.status}`)
+        const pretty = beautifyGoodsOutError(parsed)
+
+        const ctx = [
+          `Rows: ${items.length}`,
+          avoidExpiredGoods ? "Mode: Non-expired batches only" : "Mode: FIFO (any batch)",
+        ]
+
+        openFriendlyError({
+          title: isLikelyExpiryError(pretty) ? "Can’t use expired stock" : "Couldn’t record goods out",
+          message: isLikelyExpiryError(pretty)
+            ? `One or more rows can’t be recorded because the system can’t allocate enough non-expired batches for their dates.`
+            : pretty,
+          contextLines: ctx,
+        })
+
+        return
+      }
 
       helpers.resetForm()
       setFormOpen(false)
@@ -938,7 +1183,13 @@ export default function GoodsOut() {
       await fetchGoodsOut()
     } catch (err) {
       console.error(err)
-      alert("Batch submission failed.")
+      const parsed = parseBackendError(err)
+      const pretty = beautifyGoodsOutError(parsed)
+      openFriendlyError({
+        title: "Couldn’t record goods out",
+        message: pretty,
+        contextLines: [],
+      })
     }
   }
 
@@ -987,7 +1238,7 @@ export default function GoodsOut() {
 
           {/* BODY */}
           <div className="r-mbody">
-            {/* ✅ NEW: expiry checkbox (shared across single & multiple) */}
+            {/* expiry checkbox (shared across single & multiple) */}
             <label className="r-check" style={{ marginBottom: 16 }}>
               <input
                 type="checkbox"
@@ -995,7 +1246,7 @@ export default function GoodsOut() {
                 onChange={(e) => {
                   const next = e.target.checked
                   setAvoidExpiredGoods(next)
-                  if (next) setExpiryNoticeOpen(true) // show info popup like Production Log
+                  if (next) setExpiryNoticeOpen(true)
                 }}
               />
               <div>
@@ -1378,7 +1629,7 @@ export default function GoodsOut() {
       {/* Form modal */}
       {renderFormModal()}
 
-      {/* ✅ NEW: expiry notice popup */}
+      {/* expiry notice popup */}
       <ExpiryNoticeModal open={expiryNoticeOpen} onClose={() => setExpiryNoticeOpen(false)} isDark={isDark} />
 
       {/* Hard block modal */}
@@ -1389,6 +1640,15 @@ export default function GoodsOut() {
         have={blockInfo.have}
         onClose={() => setBlockOpen(false)}
         isDark={isDark}
+      />
+
+      {/* ✅ Friendly error modal (expired / backend) */}
+      <FriendlyErrorModal
+        open={errorOpen}
+        title={errorTitle}
+        message={errorMsg}
+        contextLines={errorContext}
+        onClose={() => setErrorOpen(false)}
       />
 
       {/* Toast */}
