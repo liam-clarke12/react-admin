@@ -1,9 +1,8 @@
 // src/scenes/HRP/form/ProductionLog.jsx
-// ✅ FIX: popups/modals always render ABOVE dropdowns by:
-// 1) Rendering modals via React Portal to document.body
-// 2) Raising modal backdrop z-index (999999) + modal z-index (1000000)
-// 3) Forcing common dropdown/popover layers (MUI/Popper/etc) below modal
-// 4) On open, temporarily hide native select dropdown via blur (best-effort)
+// ✅ Dark mode added:
+// - Reads localStorage('theme-mode') + listens for window 'themeChanged'
+// - Uses CSS variables for light/dark palettes (inputs, tabs, rows, toast, modals)
+// - Keeps your existing logic + portals + z-index protections
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +12,7 @@ import * as yup from "yup";
 const API_BASE = "https://z08auzr2ce.execute-api.eu-west-1.amazonaws.com/dev/api";
 
 const brand = {
+  // Light defaults (dark is handled via CSS vars in <style>)
   text: "#0f172a",
   subtext: "#334155",
   border: "#e5e7eb",
@@ -273,16 +273,7 @@ function ErrorModal({ open, title, message, onClose }) {
           </div>
 
           <div className="gof-modal-body">
-            <div
-              className="gof-warning"
-              style={{
-                background: "#fff7ed",
-                borderColor: "#fed7aa",
-                color: "#9a3412",
-              }}
-            >
-              {message}
-            </div>
+            <div className="gof-warning gof-warning-amber">{message}</div>
 
             <p className="gof-callout">
               Tip: Add a Goods In entry, reduce batch size, or untick “Use non-expired goods only” (if permitted).
@@ -304,12 +295,15 @@ function ErrorModal({ open, title, message, onClose }) {
 // MAIN COMPONENT
 // =====================================================================
 
-export default function ProductionLogForm({
-  cognitoId,
-  onSubmitted,
-  formId = "production-log-form",
-  avoidExpiredGoods = false,
-}) {
+export default function ProductionLogForm({ cognitoId, onSubmitted, formId = "production-log-form", avoidExpiredGoods = false }) {
+  // Theme (sync with Topbar)
+  const [isDark, setIsDark] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("theme-mode") === "dark" : false));
+  useEffect(() => {
+    const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
+    window.addEventListener("themeChanged", onThemeChanged);
+    return () => window.removeEventListener("themeChanged", onThemeChanged);
+  }, []);
+
   // 0 = Single, 1 = Multiple
   const [tabValue, setTabValue] = useState(0);
   const [openSnackbar, setOpenSnackbar] = useState(false);
@@ -326,7 +320,7 @@ export default function ProductionLogForm({
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // ✅ If any modal is open, blur the active element (helps close native select dropdowns)
+  // ✅ If any modal is open, blur the active element (best-effort for native select dropdowns)
   useEffect(() => {
     if (!deficitOpen && !errorOpen) return;
     try {
@@ -400,12 +394,7 @@ export default function ProductionLogForm({
             }));
 
       try {
-        await postProductionLog(
-          tabValue === 0 ? logsToPost[0] : logsToPost,
-          cognitoId,
-          tabValue === 1,
-          avoidExpiredGoods
-        );
+        await postProductionLog(tabValue === 0 ? logsToPost[0] : logsToPost, cognitoId, tabValue === 1, avoidExpiredGoods);
 
         setOpenSnackbar(true);
         resetForm({ values: tabValue === 0 ? defaultSingleLog : defaultMultipleLog });
@@ -571,21 +560,61 @@ export default function ProductionLogForm({
 
   return (
     <div className="gof-wrap">
-      {/* Scoped CSS */}
+      {/* Scoped CSS (Light + Dark via vars) */}
       <style>{`
+        :root {
+          --pl-bg: ${isDark ? "#0a0f1e" : brand.surfaceMuted};
+          --pl-surface: ${isDark ? "#151b2e" : brand.surface};
+          --pl-surface2: ${isDark ? "#1a2033" : brand.surfaceMuted};
+          --pl-border: ${isDark ? "#1e2942" : brand.border};
+          --pl-text: ${isDark ? "#f1f5f9" : brand.text};
+          --pl-subtext: ${isDark ? "#cbd5e1" : brand.subtext};
+          --pl-muted: ${isDark ? "#94a3b8" : "#64748b"};
+
+          --pl-primary: ${brand.primary};
+          --pl-primary2: ${brand.primaryDark};
+          --pl-ring: ${isDark ? "rgba(124,58,237,0.30)" : brand.focusRing};
+
+          --pl-danger: ${brand.danger};
+
+          --pl-shadow: ${isDark
+            ? "0 1px 2px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25)"
+            : brand.shadow};
+
+          --pl-hover: ${isDark ? "rgba(99,102,241,0.10)" : "#eef2ff"};
+
+          --pl-modal-bg: ${isDark ? "#151b2e" : "#ffffff"};
+          --pl-backdrop: rgba(15,23,42,${isDark ? 0.62 : 0.40});
+
+          --pl-warn-bg: ${isDark ? "rgba(220,38,38,0.16)" : "#fef2f2"};
+          --pl-warn-border: ${isDark ? "rgba(239,68,68,0.28)" : "#fecaca"};
+          --pl-warn-text: ${isDark ? "#fecaca" : "#b91c1c"};
+
+          --pl-amber-bg: ${isDark ? "rgba(245,158,11,0.16)" : "#fff7ed"};
+          --pl-amber-border: ${isDark ? "rgba(245,158,11,0.28)" : "#fed7aa"};
+          --pl-amber-text: ${isDark ? "#fde68a" : "#9a3412"};
+
+          --pl-toast-bg: ${isDark ? "#0b1222" : "#0f172a"};
+          --pl-toast-text: #e5e7eb;
+        }
+
+        * { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+
         .gof-wrap {
           padding: 20px;
-          color: ${brand.text};
-          background: ${brand.surfaceMuted};
+          color: var(--pl-text);
+          background: var(--pl-bg);
           height: 100%;
           max-height: 100%;
           overflow-y: auto;
           box-sizing: border-box;
         }
+
         .gof-sub {
-          color: ${brand.subtext};
+          color: var(--pl-muted);
           margin: 0 0 18px;
           font-size: 13px;
+          font-weight: 500;
         }
 
         /* Tabs */
@@ -593,24 +622,27 @@ export default function ProductionLogForm({
           display: inline-flex;
           padding: 4px;
           border-radius: 999px;
-          background: #e2e8f0;
+          background: ${isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"};
           margin-bottom: 18px;
           gap: 4px;
+          border: 1px solid var(--pl-border);
+          box-shadow: var(--pl-shadow);
         }
         .gof-tab {
           border-radius: 999px;
           border: none;
           padding: 6px 14px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
           background: transparent;
-          color: ${brand.subtext};
+          color: var(--pl-subtext);
         }
         .gof-tab.active {
-          background: #ffffff;
-          color: ${brand.primary};
-          box-shadow: ${brand.shadow};
+          background: var(--pl-surface);
+          color: var(--pl-primary);
+          box-shadow: var(--pl-shadow);
+          border: 1px solid var(--pl-border);
         }
 
         .gof-grid {
@@ -629,36 +661,40 @@ export default function ProductionLogForm({
         .gof-field { display: flex; flex-direction: column; }
         .gof-label {
           font-size: 13px;
-          font-weight: 600;
-          color: ${brand.subtext};
+          font-weight: 700;
+          color: var(--pl-subtext);
           margin-bottom: 6px;
         }
         .gof-input,
         .gof-select {
-          background: ${brand.surfaceMuted};
-          border: 1px solid ${brand.border};
+          background: var(--pl-surface2);
+          border: 1px solid var(--pl-border);
           border-radius: 12px;
           padding: 12px 14px;
           font-size: 14px;
           outline: none;
           transition: border-color .15s ease, box-shadow .15s ease;
+          color: var(--pl-text);
           position: relative;
           z-index: 1;
         }
+        .gof-input::placeholder { color: var(--pl-muted); }
         .gof-input:focus,
         .gof-select:focus {
-          border-color: ${brand.primary};
-          box-shadow: 0 0 0 4px ${brand.focusRing};
+          border-color: var(--pl-primary);
+          box-shadow: 0 0 0 4px var(--pl-ring);
+          background: var(--pl-surface);
         }
-        .gof-error { color: ${brand.danger}; font-size: 12px; margin-top: 6px; }
+        .gof-error { color: ${isDark ? "#fda4af" : brand.danger}; font-size: 12px; margin-top: 6px; font-weight: 600; }
 
         /* Multiple rows */
         .gof-multi-row {
-          border: 1px solid ${brand.border};
+          border: 1px solid var(--pl-border);
           border-radius: 12px;
           padding: 12px;
           margin-bottom: 12px;
-          background: ${brand.surfaceMuted};
+          background: var(--pl-surface2);
+          box-shadow: var(--pl-shadow);
         }
         .gof-multi-row-header {
           display: flex;
@@ -666,18 +702,22 @@ export default function ProductionLogForm({
           justify-content: space-between;
           margin-bottom: 8px;
         }
-        .gof-multi-index { font-size: 12px; font-weight: 700; color: ${brand.subtext}; }
-        .gof-multi-remove { border: none; background: none; color: ${brand.danger}; font-size: 12px; cursor: pointer; }
+        .gof-multi-index { font-size: 12px; font-weight: 800; color: var(--pl-muted); }
+        .gof-multi-remove { border: none; background: none; color: ${isDark ? "#fecaca" : brand.danger}; font-size: 12px; cursor: pointer; font-weight: 700; }
         .gof-multi-actions { margin-top: 8px; }
         .gof-multi-add-btn {
           border-radius: 999px;
-          border: 1px dashed ${brand.border};
-          background: #f1f5f9;
+          border: 1px dashed var(--pl-border);
+          background: ${isDark ? "rgba(255,255,255,0.05)" : "#f1f5f9"};
           padding: 6px 12px;
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
-          color: ${brand.subtext};
+          color: var(--pl-subtext);
+        }
+        .gof-multi-add-btn:hover {
+          background: var(--pl-hover);
+          border-color: rgba(124,58,237,0.35);
         }
 
         /* Toast */
@@ -691,12 +731,13 @@ export default function ProductionLogForm({
           z-index: 999990;
         }
         .gof-toast-inner {
-          background: #0f172a;
-          color: #e5e7eb;
+          background: var(--pl-toast-bg);
+          color: var(--pl-toast-text);
           padding: 10px 14px;
           border-radius: 999px;
           font-size: 13px;
-          box-shadow: ${brand.shadow};
+          box-shadow: var(--pl-shadow);
+          border: 1px solid rgba(255,255,255,${isDark ? 0.08 : 0.0});
         }
         @keyframes gof-toast-in { to { transform: translateY(0); opacity: 1; } }
 
@@ -704,60 +745,78 @@ export default function ProductionLogForm({
         .gof-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(15,23,42,0.4);
+          background: var(--pl-backdrop);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 999999; /* backdrop */
+          backdrop-filter: blur(6px);
         }
         .gof-modal {
           width: 100%;
           max-width: 480px;
-          background: #fff;
+          background: var(--pl-modal-bg);
           border-radius: 16px;
-          border: 1px solid ${brand.border};
-          box-shadow: 0 20px 40px rgba(15,23,42,0.35);
+          border: 1px solid var(--pl-border);
+          box-shadow: 0 20px 40px rgba(0,0,0,${isDark ? 0.55 : 0.35});
           overflow: hidden;
           position: relative;
           z-index: 1000000; /* modal */
+          color: var(--pl-text);
         }
-        .gof-modal-header { padding: 12px 16px; border-bottom: 1px solid ${brand.border}; }
-        .gof-modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; }
+        .gof-modal-header { padding: 12px 16px; border-bottom: 1px solid var(--pl-border); }
+        .gof-modal-header h3 { margin: 0; font-size: 16px; font-weight: 900; color: var(--pl-text); }
         .gof-modal-body { padding: 16px; }
         .gof-warning {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #b91c1c;
+          background: var(--pl-warn-bg);
+          border: 1px solid var(--pl-warn-border);
+          color: var(--pl-warn-text);
           border-radius: 12px;
           padding: 10px 12px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 700;
           margin-bottom: 12px;
         }
-        .gof-callout { font-size: 13px; color: ${brand.subtext}; margin: 12px 0 0; }
+        .gof-warning-amber {
+          background: var(--pl-amber-bg);
+          border: 1px solid var(--pl-amber-border);
+          color: var(--pl-amber-text);
+        }
+        .gof-callout { font-size: 13px; color: var(--pl-subtext); margin: 12px 0 0; font-weight: 500; }
         .gof-modal-footer {
           padding: 10px 16px 14px;
-          border-top: 1px solid ${brand.border};
+          border-top: 1px solid var(--pl-border);
           display: flex;
           justify-content: flex-end;
           gap: 8px;
+          background: ${isDark ? "rgba(255,255,255,0.02)" : "transparent"};
         }
         .btn {
           font-size: 13px;
           border-radius: 999px;
-          padding: 6px 12px;
+          padding: 8px 14px;
           border: 1px solid transparent;
           cursor: pointer;
-          font-weight: 600;
+          font-weight: 800;
         }
-        .btn.ghost { background: #ffffff; color: ${brand.subtext}; border-color: ${brand.border}; }
-        .btn.primary { background: linear-gradient(180deg, ${brand.primary}, ${brand.primaryDark}); color: #fff; box-shadow: ${brand.shadow}; }
+        .btn.ghost {
+          background: var(--pl-surface);
+          color: var(--pl-subtext);
+          border-color: var(--pl-border);
+        }
+        .btn.ghost:hover { background: var(--pl-hover); }
+        .btn.primary {
+          background: linear-gradient(180deg, var(--pl-primary), var(--pl-primary2));
+          color: #fff;
+          box-shadow: var(--pl-shadow);
+        }
 
         /* Deficit table */
         .pl-deficit-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-        .pl-deficit-table th, .pl-deficit-table td { padding: 6px 8px; border-bottom: 1px solid ${brand.border}; text-align: left; }
-        .pl-deficit-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: ${brand.subtext}; font-weight: 700; }
-        .pl-missing { color: ${brand.danger}; font-weight: 600; }
+        .pl-deficit-table th, .pl-deficit-table td { padding: 6px 8px; border-bottom: 1px solid var(--pl-border); text-align: left; }
+        .pl-deficit-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pl-muted); font-weight: 900; }
+        .pl-deficit-table td { color: var(--pl-subtext); }
+        .pl-missing { color: ${isDark ? "#fda4af" : brand.danger}; font-weight: 900; }
 
         /* ✅ Force common popover layers below our modal (safety net) */
         .MuiPopover-root,
@@ -1086,20 +1145,10 @@ export default function ProductionLogForm({
       </Formik>
 
       {/* Soft Deficit Warning Modal */}
-      <DeficitModal
-        open={deficitOpen}
-        info={deficitInfoRef.current}
-        onCancel={handleDeficitCancel}
-        onProceed={handleDeficitProceed}
-      />
+      <DeficitModal open={deficitOpen} info={deficitInfoRef.current} onCancel={handleDeficitCancel} onProceed={handleDeficitProceed} />
 
       {/* Friendly backend error modal */}
-      <ErrorModal
-        open={errorOpen}
-        title="Can’t record production"
-        message={errorMsg}
-        onClose={() => setErrorOpen(false)}
-      />
+      <ErrorModal open={errorOpen} title="Can’t record production" message={errorMsg} onClose={() => setErrorOpen(false)} />
 
       {/* Success Toast */}
       <Toast open={openSnackbar} onClose={() => setOpenSnackbar(false)}>
