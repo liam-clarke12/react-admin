@@ -1236,6 +1236,12 @@ app.get("/api/recipes/:id", async (req, res) => {
   }
 });
 
+// =========================
+// SINGLE: /api/add-production-log
+// - Adds support for avoidExpiredGoods flag
+// - When avoidExpiredGoods=true, lots must have expiryDate >= production date
+// - When avoidExpiredGoods=true and stock cannot be satisfied, throws + rolls back (hard block)
+// =========================
 app.post("/api/add-production-log", async (req, res) => {
   const {
     date,
@@ -1250,27 +1256,24 @@ app.post("/api/add-production-log", async (req, res) => {
     producer_name: producerNameSnake,
 
     // ✅ NEW: checkbox flag (frontend)
-    // accept a few common names
     avoidExpiredGoods,
     avoid_expired_goods,
-    useNonExpiredGoods,
-    use_non_expired_goods,
   } = req.body
 
   // prefer camelCase if provided, otherwise snake_case; fall back to null
   const producerName = producerNameFromBody ?? producerNameSnake ?? null
 
-  // ✅ NEW: normalize checkbox flag
-  const avoidExpired =
-    Boolean(
-      avoidExpiredGoods ??
-        avoid_expired_goods ??
-        useNonExpiredGoods ??
-        use_non_expired_goods ??
-        false,
-    ) === true
+  // ✅ normalize checkbox flag
+  const avoidExpired = Boolean(avoidExpiredGoods ?? avoid_expired_goods ?? false) === true
 
-  console.log("📥 Received /add-production-log request:", req.body, {
+  console.log("📥 Received /add-production-log request:", {
+    date,
+    recipe,
+    batchesProduced,
+    batchCode,
+    unitsOfWaste,
+    cognito_id,
+    producerName,
     avoidExpired,
   })
 
@@ -1283,9 +1286,7 @@ app.post("/api/add-production-log", async (req, res) => {
     cognito_id == null
   ) {
     console.error("❌ Missing fields in request:", req.body)
-    return res
-      .status(400)
-      .json({ error: "All fields are required, including cognito_id" })
+    return res.status(400).json({ error: "All fields are required, including cognito_id" })
   }
 
   const connection = await db.promise().getConnection()
@@ -1319,44 +1320,15 @@ app.post("/api/add-production-log", async (req, res) => {
     return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals)
   }
 
-  // ✅ NEW: detect expiry column on goods_in safely (won't break if column doesn't exist)
-  const resolveGoodsInExpiryColumn = async () => {
-    // common names we might have used over time
-    const candidates = [
-      "expiry_date",
-      "expiryDate",
-      "expiration_date",
-      "expirationDate",
-      "expires_at",
-      "expiresAt",
-      "use_by",
-      "useBy",
-      "best_before",
-      "bestBefore",
-    ]
-
-    const [rows] = await connection.execute(
-      `
-      SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = 'goods_in'
-         AND COLUMN_NAME IN (${candidates.map(() => "?").join(",")})
-       LIMIT 1
-      `,
-      candidates,
-    )
-
-    return rows?.[0]?.COLUMN_NAME || null
-  }
+  const isYmd = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
 
   try {
     console.log("🔄 Starting database transaction...")
     await connection.beginTransaction()
 
-    // ✅ NEW: determine expiry column once per request
-    const expiryCol = await resolveGoodsInExpiryColumn()
-    const hasExpiryCol = Boolean(expiryCol)
+    if (!isYmd(date)) {
+      throw new Error(`Invalid production date format (expected YYYY-MM-DD): ${date}`)
+    }
 
     // fetch recipe + units_per_batch
     const [recipeRows] = await connection.execute(
@@ -1387,7 +1359,6 @@ app.post("/api/add-production-log", async (req, res) => {
       units_of_waste: finalUnitsOfWaste,
       producer_name: producerName,
       avoidExpired,
-      expiryCol: expiryCol || "(none)",
     })
 
     // Insert into production_log including producer_name (nullable)
@@ -1429,8 +1400,7 @@ app.post("/api/add-production-log", async (req, res) => {
 
     if (ingredients.length === 0) {
       console.error("❌ No ingredients found for recipe ID:", recipeId)
-      await connection.rollback()
-      return res.status(400).json({ error: "No ingredients found for this recipe" })
+      throw new Error("No ingredients found for this recipe")
     }
 
     console.log("🔁 Deducting stock from goods_in (FIFO, active lots; unit-aware conversion)...")
@@ -1447,17 +1417,15 @@ app.post("/api/add-production-log", async (req, res) => {
 
       console.log(`▶ ${ingName} (${ingUnitCanon || "no-unit"}): need ${amountNeeded} (${amountNeededBase} base)`)
 
+      // loop until we've satisfied the need (in base units) or run out of lots
       while (amountNeededBase > 0) {
-        // ✅ NEW: optionally exclude expired lots (only if column exists)
-        const expiryClause =
-          avoidExpired && hasExpiryCol
-            ? `AND (gi.\`${expiryCol}\` IS NULL OR DATE(gi.\`${expiryCol}\`) >= CURDATE())`
-            : ""
+        // ✅ IMPORTANT FIX: compare expiryDate to PRODUCTION DATE, not CURDATE()
+        const expiryClause = avoidExpired
+          ? `AND (gi.expiryDate IS NULL OR DATE(gi.expiryDate) >= DATE(?))`
+          : ``
 
-        // fetch earliest active lot for this ingredient (any unit) — FIFO
-        const [stockRows] = await connection.execute(
-          `
-          SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit
+        const sql = `
+          SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit, gi.expiryDate
             FROM goods_in gi
            WHERE gi.user_id = ?
              AND gi.ingredient = ?
@@ -1466,17 +1434,19 @@ app.post("/api/add-production-log", async (req, res) => {
              ${expiryClause}
            ORDER BY gi.date ASC, gi.id ASC
            LIMIT 1
-          `,
-          [cognito_id, ingName],
-        )
+        `
+
+        const params = avoidExpired ? [cognito_id, ingName, date] : [cognito_id, ingName]
+        const [stockRows] = await connection.execute(sql, params)
 
         if (stockRows.length === 0) {
-          console.warn(
-            `⚠ Not enough ${
-              avoidExpired ? "NON-EXPIRED " : ""
-            }stock for ${ingName}. Remaining shortfall (base units): ${amountNeededBase}`,
-          )
-          break
+          const msg = `Insufficient ${avoidExpired ? "NON-EXPIRED " : ""}stock for ${ingName}. Remaining shortfall (base units): ${amountNeededBase}`
+          console.warn(`⚠ ${msg}`)
+
+          // ✅ hard block if checkbox ON
+          if (avoidExpired) throw new Error(msg)
+
+          break // old behavior if checkbox off
         }
 
         const { id: goodsInId, stockRemaining: lotStockRaw, unit: lotUnitRaw } = stockRows[0]
@@ -1493,12 +1463,9 @@ app.post("/api/add-production-log", async (req, res) => {
         const newLotRemaining = toFixedSafe(newLotBase / (lotFactor || 1), 6)
 
         // Update the lot's stockRemaining in its original unit
-        await connection.execute(
-          `UPDATE goods_in SET stockRemaining = ? WHERE id = ?`,
-          [newLotRemaining, goodsInId],
-        )
+        await connection.execute(`UPDATE goods_in SET stockRemaining = ? WHERE id = ?`, [newLotRemaining, goodsInId])
 
-        // Record usage
+        // Record usage (existing schema)
         await connection.execute(
           `
           INSERT INTO stock_usage (production_log_id, goods_in_id, user_id)
@@ -1511,8 +1478,8 @@ app.post("/api/add-production-log", async (req, res) => {
         console.log(
           `   • Used ${deductionBase} base units from goods_in.id=${goodsInId} (lot unit ${lotUnitCanon} => lotBase ${lotBase}). New lot remaining in lot unit: ${newLotRemaining}`,
         )
-      }
-    }
+      } // end while per ingredient
+    } // end for each ingredient
 
     await connection.commit()
     console.log("✅ Transaction committed.")
@@ -1521,7 +1488,6 @@ app.post("/api/add-production-log", async (req, res) => {
       id: productionLogId,
       producer_name: producerName,
       avoidExpiredGoods: avoidExpired,
-      expiryColumnUsed: avoidExpired ? expiryCol : null,
     })
   } catch (err) {
     await connection.rollback()
@@ -1532,22 +1498,23 @@ app.post("/api/add-production-log", async (req, res) => {
   }
 })
 
+
 // =========================
 // BATCH: /api/add-production-log/batch
+// - Adds support for avoidExpiredGoods flag (top-level + per-entry override)
+// - When avoidExpiredGoods=true, lots must have expiryDate >= entry.date
+// - When avoidExpiredGoods=true and stock cannot be satisfied, throws + rolls back (hard block)
 // =========================
 app.post("/api/add-production-log/batch", async (req, res) => {
   const {
     entries,
     cognito_id,
 
-    // ✅ NEW: allow top-level flag for entire batch request
+    // ✅ NEW: top-level checkbox flag
     avoidExpiredGoods,
     avoid_expired_goods,
-    useNonExpiredGoods,
-    use_non_expired_goods,
   } = req.body
 
-  // (Optional) Allow your frontend origin, mirroring your goods-in batch route
   res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com")
   res.setHeader("Access-Control-Allow-Credentials", "true")
 
@@ -1558,15 +1525,7 @@ app.post("/api/add-production-log/batch", async (req, res) => {
     return res.status(400).json({ success: false, error: "cognito_id is required" })
   }
 
-  // ✅ NEW: normalize batch-level flag (entry-level can override)
-  const avoidExpiredBatch =
-    Boolean(
-      avoidExpiredGoods ??
-        avoid_expired_goods ??
-        useNonExpiredGoods ??
-        use_non_expired_goods ??
-        false,
-    ) === true
+  const avoidExpiredBatch = Boolean(avoidExpiredGoods ?? avoid_expired_goods ?? false) === true
 
   // quick validation of each entry
   const invalid = entries
@@ -1582,11 +1541,7 @@ app.post("/api/add-production-log/batch", async (req, res) => {
     .filter(Boolean)
 
   if (invalid.length) {
-    return res.status(400).json({
-      success: false,
-      error: "Validation failed for some entries",
-      details: invalid,
-    })
+    return res.status(400).json({ success: false, error: "Validation failed for some entries", details: invalid })
   }
 
   const connection = await db.promise().getConnection()
@@ -1602,6 +1557,7 @@ app.post("/api/add-production-log/batch", async (req, res) => {
     if (["unit", "units", "pcs", "pc", "piece", "pieces"].includes(raw)) return "unit"
     return raw
   }
+
   const unitFactorToBase = (canonUnit) => {
     const u = (canonUnit || "").toString().toLowerCase()
     if (!u) return 1
@@ -1612,44 +1568,13 @@ app.post("/api/add-production-log/batch", async (req, res) => {
     if (u === "unit") return 1
     return 1
   }
-  const toFixedSafe = (num, decimals = 6) =>
-    Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals)
 
-  // ✅ NEW: detect expiry column once
-  const resolveGoodsInExpiryColumn = async () => {
-    const candidates = [
-      "expiry_date",
-      "expiryDate",
-      "expiration_date",
-      "expirationDate",
-      "expires_at",
-      "expiresAt",
-      "use_by",
-      "useBy",
-      "best_before",
-      "bestBefore",
-    ]
+  const toFixedSafe = (num, decimals = 6) => Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals)
 
-    const [rows] = await connection.execute(
-      `
-      SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = 'goods_in'
-         AND COLUMN_NAME IN (${candidates.map(() => "?").join(",")})
-       LIMIT 1
-      `,
-      candidates,
-    )
-
-    return rows?.[0]?.COLUMN_NAME || null
-  }
+  const isYmd = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
 
   try {
     await connection.beginTransaction()
-
-    const expiryCol = await resolveGoodsInExpiryColumn()
-    const hasExpiryCol = Boolean(expiryCol)
 
     const insertedIds = []
 
@@ -1664,24 +1589,19 @@ app.post("/api/add-production-log/batch", async (req, res) => {
         producerName: producerNameFromBody,
         producer_name: producerNameSnake,
 
-        // ✅ NEW: per-entry override (optional)
+        // ✅ optional per-entry override
         avoidExpiredGoods: entryAvoidExpiredGoods,
         avoid_expired_goods: entryAvoidExpiredGoodsSnake,
-        useNonExpiredGoods: entryUseNonExpiredGoods,
-        use_non_expired_goods: entryUseNonExpiredGoodsSnake,
       } = entry
+
+      if (!isYmd(date)) {
+        throw new Error(`Invalid production date format (expected YYYY-MM-DD): ${date}`)
+      }
 
       const producerName = producerNameFromBody ?? producerNameSnake ?? null
 
-      const avoidExpiredEntry =
-        Boolean(
-          entryAvoidExpiredGoods ??
-            entryAvoidExpiredGoodsSnake ??
-            entryUseNonExpiredGoods ??
-            entryUseNonExpiredGoodsSnake ??
-            avoidExpiredBatch ??
-            false,
-        ) === true
+      // entry override > batch flag
+      const avoidExpiredEntry = Boolean(entryAvoidExpiredGoods ?? entryAvoidExpiredGoodsSnake ?? avoidExpiredBatch ?? false) === true
 
       // fetch recipe + units_per_batch
       const [recipeRows] = await connection.execute(
@@ -1689,8 +1609,7 @@ app.post("/api/add-production-log/batch", async (req, res) => {
         [recipe, cognito_id],
       )
       if (recipeRows.length === 0) {
-        await connection.rollback()
-        return res.status(400).json({ success: false, error: `Recipe not found: ${recipe}` })
+        throw new Error(`Recipe not found: ${recipe}`)
       }
 
       const recipeId = recipeRows[0].id
@@ -1705,17 +1624,9 @@ app.post("/api/add-production-log/batch", async (req, res) => {
             (date, recipe, batchesProduced, batchRemaining, batchCode, user_id, units_of_waste, producer_name)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        [
-          date,
-          recipe,
-          batchesProduced,
-          batchRemaining,
-          batchCode,
-          cognito_id,
-          finalUnitsOfWaste,
-          producerName,
-        ],
+        [date, recipe, batchesProduced, batchRemaining, batchCode, cognito_id, finalUnitsOfWaste, producerName],
       )
+
       const productionLogId = productionLogResult.insertId
       insertedIds.push(productionLogId)
 
@@ -1743,29 +1654,34 @@ app.post("/api/add-production-log/batch", async (req, res) => {
         let amountNeededBase = amountNeeded * needBasePerUnit
 
         while (amountNeededBase > 0) {
-          const expiryClause =
-            avoidExpiredEntry && hasExpiryCol
-              ? `AND (gi.\`${expiryCol}\` IS NULL OR DATE(gi.\`${expiryCol}\`) >= CURDATE())`
-              : ""
+          // ✅ IMPORTANT FIX: compare expiryDate to ENTRY DATE, not CURDATE()
+          const expiryClause = avoidExpiredEntry
+            ? `AND (gi.expiryDate IS NULL OR DATE(gi.expiryDate) >= DATE(?))`
+            : ``
 
-          const [stockRows] = await connection.execute(
-            `
-              SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit
-              FROM goods_in gi
-              WHERE gi.user_id = ?
-                AND gi.ingredient = ?
-                AND gi.deleted_at IS NULL
-                AND gi.stockRemaining > 0
-                ${expiryClause}
-              ORDER BY gi.date ASC, gi.id ASC
-              LIMIT 1
-            `,
-            [cognito_id, ingName],
-          )
+          const sql = `
+            SELECT gi.id, gi.stockRemaining, gi.barCode, gi.date, gi.unit, gi.expiryDate
+            FROM goods_in gi
+            WHERE gi.user_id = ?
+              AND gi.ingredient = ?
+              AND gi.deleted_at IS NULL
+              AND gi.stockRemaining > 0
+              ${expiryClause}
+            ORDER BY gi.date ASC, gi.id ASC
+            LIMIT 1
+          `
+
+          const params = avoidExpiredEntry ? [cognito_id, ingName, date] : [cognito_id, ingName]
+          const [stockRows] = await connection.execute(sql, params)
 
           if (stockRows.length === 0) {
-            // not enough stock — allow shortfall (same behavior as single route)
-            break
+            const msg = `Insufficient ${avoidExpiredEntry ? "NON-EXPIRED " : ""}stock for ${ingName} (batchCode=${batchCode}, date=${date}). Remaining shortfall (base units): ${amountNeededBase}`
+            console.warn(`⚠ ${msg}`)
+
+            // ✅ hard block if checkbox ON
+            if (avoidExpiredEntry) throw new Error(msg)
+
+            break // old behavior if checkbox off
           }
 
           const { id: goodsInId, stockRemaining: lotStockRaw, unit: lotUnitRaw } = stockRows[0]
@@ -1777,10 +1693,7 @@ app.post("/api/add-production-log/batch", async (req, res) => {
           const newLotBase = lotBase - deductionBase
           const newLotRemaining = toFixedSafe(newLotBase / (lotFactor || 1), 6)
 
-          await connection.execute(`UPDATE goods_in SET stockRemaining = ? WHERE id = ?`, [
-            newLotRemaining,
-            goodsInId,
-          ])
+          await connection.execute(`UPDATE goods_in SET stockRemaining = ? WHERE id = ?`, [newLotRemaining, goodsInId])
 
           await connection.execute(
             `INSERT INTO stock_usage (production_log_id, goods_in_id, user_id) VALUES (?, ?, ?)`,
@@ -1798,17 +1711,17 @@ app.post("/api/add-production-log/batch", async (req, res) => {
       message: `Inserted ${insertedIds.length} production log entries`,
       insertedIds,
       avoidExpiredGoods: avoidExpiredBatch,
-      expiryColumnUsed: avoidExpiredBatch ? expiryCol : null,
     })
   } catch (err) {
     await connection.rollback()
     console.error("Batch production DB error:", { message: err.message, stack: err.stack })
-    return res.status(500).json({ success: false, error: "Database error", details: err.message })
+    return res.status(500).json({ success: false, error: err.message })
   } finally {
     connection.release()
   }
 })
 
+// GET /api/ingredient-inventory/active?cognito_id=...
 app.get("/api/ingredient-inventory/active", async (req, res) => {
   const { cognito_id } = req.query;
   if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
