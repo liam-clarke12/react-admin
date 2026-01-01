@@ -10,6 +10,10 @@ import { useAuth } from "../../contexts/AuthContext"
    - Reads localStorage('theme-mode') + listens for window 'themeChanged'
    - Preserves all existing functionality (fetch, search/sort, pagination, edit, delete, record)
    - Keeps the original modal portal approach + ensures dropdowns render above modal
+
+   ✅ NEW (frontend only):
+   - "Use non-expired goods only" checkbox shown in Record Production modal.
+   - Value is passed into the form as prop: avoidExpiredGoods (boolean)
    ========================================================================================= */
 const BrandStyles = ({ isDark }) => (
   <style>{`
@@ -232,6 +236,37 @@ const BrandStyles = ({ isDark }) => (
     letter-spacing:-0.01em;
   }
   .gi-card strong{ color: var(--text); font-weight:700; }
+
+  /* ✅ Checkbox row (used in Record Production modal) */
+  .r-check{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--mutedCard);
+    box-shadow: var(--shadow-sm);
+  }
+  .r-check input[type="checkbox"]{
+    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+  .r-check-title{
+    font-weight: 800;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.2;
+  }
+  .r-check-sub{
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
 
   /* DataGrid container */
   .dg-wrap{
@@ -513,6 +548,9 @@ export default function ProductionLog() {
   // Delete dialog state
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [openProductionForm, setOpenProductionForm] = useState(false)
+
+  // ✅ NEW: frontend-only toggle for avoiding expired goods in allocation (backend later)
+  const [avoidExpiredGoods, setAvoidExpiredGoods] = useState(true)
 
   // ===== Recipes map =====
   useEffect(() => {
@@ -912,7 +950,8 @@ export default function ProductionLog() {
 
             <div className="r-footer">
               <span className="r-muted">
-                Showing <strong style={{ color: "var(--text)" }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
+                Showing{" "}
+                <strong style={{ color: "var(--text)" }}>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
                 <strong style={{ color: "var(--text)" }}>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
                 <strong style={{ color: "var(--text)" }}>{filteredRows.length}</strong>
               </span>
@@ -1192,8 +1231,24 @@ export default function ProductionLog() {
               </div>
 
               <div className="r-mbody">
+                {/* ✅ NEW: toggle (frontend only) */}
+                <label className="r-check" style={{ marginBottom: 16 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!avoidExpiredGoods}
+                    onChange={(e) => setAvoidExpiredGoods(e.target.checked)}
+                  />
+                  <div>
+                    <div className="r-check-title">Use non-expired goods only</div>
+                    <div className="r-check-sub">
+                      When enabled, batches should be created using stock that hasn’t expired (backend logic coming next).
+                    </div>
+                  </div>
+                </label>
+
                 <ProductionLogForm
                   cognitoId={cognitoId}
+                  avoidExpiredGoods={avoidExpiredGoods}  // ✅ pass into single + multiple batch form (frontend only for now)
                   onSubmitted={() => {
                     fetchLogs()
                     setOpenProductionForm(false)
