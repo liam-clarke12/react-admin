@@ -19,12 +19,15 @@ import awsExports from "./aws-exports";
 import { ColorModeContext, useMode } from "./themes";
 import { CssBaseline, ThemeProvider as MuiThemeProvider, CircularProgress, Box } from "@mui/material";
 
+// Billing
+import Billing from "./scenes/Billing";
+import BillingReturn from "./scenes/Billing/Return";
+
 // Public pages
 import LandingPage from "./scenes/LandingPage";
 import ContactPage from "./scenes/ContactPage";
 import FeaturesPage from "./scenes/FeaturePage";
 import AboutPage from "./scenes/AboutPage";
-
 
 // Protected app pages
 import AccountPage from "./scenes/Account/Account";
@@ -43,7 +46,7 @@ import RecipeForm from "./scenes/form/Recipes";
 import ProductionLogForm from "./scenes/form/ProductionLog";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import Employees from "./scenes/HRP/Employees/Employees";
-import { DataProvider } from "./contexts/DataContext"
+import { DataProvider } from "./contexts/DataContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import Roles from "./scenes/HRP/Roles";
 import Roster from "./scenes/HRP/Roster";
@@ -58,8 +61,8 @@ const brand = {
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
   danger: "#dc2626",
-  primary: "#7C3AED",      // Nory purple
-  primaryDark: "#5B21B6",  // darker purple
+  primary: "#7C3AED", // Nory purple
+  primaryDark: "#5B21B6", // darker purple
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
   inputBg: "#ffffff",
@@ -74,7 +77,6 @@ const noryTheme = {
       font: { primary: { value: brand.text }, secondary: { value: brand.subtext } },
       border: { primary: { value: brand.border } },
       brand: {
-        // purple palette
         primary: {
           10: { value: "#f5f3ff" },
           20: { value: "#ede9fe" },
@@ -103,7 +105,6 @@ const noryTheme = {
         borderRadius: { value: "{radii.medium}" },
         _focus: {
           borderColor: { value: "{colors.brand.primary.80}" },
-          // use our new soft purple focus ring
           boxShadow: { value: `0 0 0 4px ${brand.focusRing}` },
         },
       },
@@ -164,9 +165,35 @@ const amplifyComponents = {
     Header() {
       const { tokens } = useTheme();
       return (
-        <Heading padding={`${tokens.space.medium} 0 0 0`} level={4} style={{ textAlign: "center" }}>
-          Create your account
-        </Heading>
+        <View padding={`${tokens.space.large} ${tokens.space.large} 0 ${tokens.space.large}`} textAlign="center">
+          <Heading level={4} style={{ marginBottom: 6 }}>
+            Create your account
+          </Heading>
+
+          <Text style={{ color: brand.subtext, fontWeight: 700, marginBottom: 8 }}>
+            You’re signing up for <span style={{ color: brand.text }}>Hupes MRP Planner</span>
+          </Text>
+
+          <View
+            style={{
+              margin: "0 auto",
+              maxWidth: 360,
+              border: `1px solid ${brand.border}`,
+              background: brand.surfaceMuted,
+              borderRadius: 14,
+              padding: 12,
+            }}
+          >
+            <Text style={{ color: brand.text, fontWeight: 800, marginBottom: 4 }}>€124.99 / month</Text>
+            <Text style={{ color: brand.subtext, fontWeight: 600 }}>
+              Includes a 7-day free trial. Cancel anytime during the trial.
+            </Text>
+          </View>
+
+          <Text style={{ color: brand.subtext, marginTop: 10, fontSize: 13 }}>
+            After you create your account, you’ll be prompted to start your free trial via secure Stripe checkout.
+          </Text>
+        </View>
       );
     },
     Footer() {
@@ -184,12 +211,21 @@ const amplifyComponents = {
       return (
         <>
           <Authenticator.SignUp.FormFields />
+
           <CheckboxField
             name="acknowledgement"
             label="I agree to the Terms and Conditions"
             isRequired
             errorMessage={validationErrors.acknowledgement}
             hasError={!!validationErrors.acknowledgement}
+          />
+
+          <CheckboxField
+            name="plan_ack"
+            label="I understand Hupes MRP Planner is €124.99/month after a 7-day free trial (Stripe checkout required)."
+            isRequired
+            errorMessage={validationErrors.plan_ack}
+            hasError={!!validationErrors.plan_ack}
           />
         </>
       );
@@ -203,7 +239,16 @@ function LoginLayout({ children }) {
     <div className="auth-split">
       <div className="auth-left">
         <Link to="/" className="back-arrow-left">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke={brand.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            fill="none"
+            stroke={brand.primary}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </Link>
@@ -288,6 +333,10 @@ function MainApp() {
             <main className="content">
               <Topbar />
               <Routes>
+                {/* Billing routes (inside app shell) */}
+                <Route path="/billing" element={<Billing />} />
+                <Route path="/billing/return" element={<BillingReturn />} />
+
                 <Route path="/Roster" element={<Roster />} />
                 <Route path="/Roles" element={<Roles />} />
                 <Route path="/Employees" element={<Employees />} />
@@ -351,6 +400,11 @@ function LoginScreen() {
             if (!formData?.acknowledgement) {
               errors.acknowledgement = "You must accept the Terms and Conditions.";
             }
+
+            if (!formData?.plan_ack) {
+              errors.plan_ack = "Please confirm the plan pricing and trial terms to continue.";
+            }
+
             if (isBlank(get("given_name"))) errors["given_name"] = "First name is required.";
             if (isBlank(get("family_name"))) errors["family_name"] = "Last name is required.";
             if (isBlank(get("custom:Company"))) errors["custom:Company"] = "Company is required.";
@@ -405,9 +459,7 @@ function ProtectedApp() {
           }}
         >
           <CircularProgress />
-          <Text style={{ color: brand.subtext, fontWeight: 600 }}>
-            Preparing your workspace…
-          </Text>
+          <Text style={{ color: brand.subtext, fontWeight: 600 }}>Preparing your workspace…</Text>
         </Box>
       </Box>
     );
