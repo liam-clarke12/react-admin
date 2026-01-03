@@ -353,8 +353,10 @@ function MainApp() {
                 <Route path="/stock_usage" element={<StockUsage />} />
                 <Route path="/goods_out_form" element={<GoodsOutForm />} />
                 <Route path="/goods_out" element={<GoodsOut />} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+                {/* IMPORTANT: default landing inside protected app goes to billing (Option A) */}
+                <Route path="/" element={<Navigate to="/billing" replace />} />
+                <Route path="*" element={<Navigate to="/billing" replace />} />
               </Routes>
             </main>
           </div>
@@ -366,7 +368,9 @@ function MainApp() {
 
 function LoginScreen() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
-  if (user) return <Navigate to="/dashboard" replace />;
+
+  // IMPORTANT: after login/sign-up, send them to billing (Option A)
+  if (user) return <Navigate to="/billing" replace />;
 
   return (
     <LoginLayout>
@@ -425,7 +429,7 @@ function LoginScreen() {
 
 function PublicLanding() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
-  return user ? <Navigate to="/dashboard" replace /> : <LandingPage />;
+  return user ? <Navigate to="/billing" replace /> : <LandingPage />;
 }
 
 function ProtectedApp() {
