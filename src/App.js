@@ -1,6 +1,6 @@
 // App.jsx
 import React from "react";
-import { Routes, Route, Navigate, Link } from "react-router-dom";
+import { Routes, Route, Navigate, Link, Outlet, useLocation } from "react-router-dom";
 import { Amplify } from "aws-amplify";
 import {
   Authenticator,
@@ -46,10 +46,12 @@ import RecipeForm from "./scenes/form/Recipes";
 import ProductionLogForm from "./scenes/form/ProductionLog";
 import IngredientsInventory from "./scenes/IngredientInventory";
 import Employees from "./scenes/HRP/Employees/Employees";
-import { DataProvider } from "./contexts/DataContext";
-import { AuthProvider } from "./contexts/AuthContext";
 import Roles from "./scenes/HRP/Roles";
 import Roster from "./scenes/HRP/Roster";
+
+import { DataProvider } from "./contexts/DataContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
 
 Amplify.configure(awsExports);
 
@@ -61,14 +63,14 @@ const brand = {
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
   danger: "#dc2626",
-  primary: "#7C3AED", // Nory purple
-  primaryDark: "#5B21B6", // darker purple
+  primary: "#7C3AED",
+  primaryDark: "#5B21B6",
   focusRing: "rgba(124,58,237,0.18)",
   shadow: "0 1px 2px rgba(16,24,40,0.06), 0 1px 3px rgba(16,24,40,0.08)",
   inputBg: "#ffffff",
 };
 
-/** Amplify UI theme overrides (updated to Nory purple accents) */
+/** Amplify UI theme overrides */
 const noryTheme = {
   name: "nory",
   tokens: {
@@ -321,8 +323,62 @@ function getCognitoSub(user) {
   return user?.userId || user?.username || user?.attributes?.sub || null;
 }
 
-function MainApp() {
+/** Shared loading screen while billing status is being determined */
+function BillingLoadingScreen() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        background: `linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
+      }}
+    >
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 2,
+          border: `1px solid ${brand.border}`,
+          background: brand.surface,
+          boxShadow: brand.shadow,
+          display: "grid",
+          placeItems: "center",
+          gap: 1,
+        }}
+      >
+        <CircularProgress />
+        <Text style={{ color: brand.subtext, fontWeight: 600 }}>Checking your subscription…</Text>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * ✅ Gate rules:
+ * - Only show loader while billing is genuinely unresolved (loading OR status==="unknown")
+ * - If not paid (including "none"), redirect to /billing so the Stripe CTA is visible
+ * - If paid/trialing, allow the app routes
+ */
+function RequirePaid() {
+  const { billingStatus, billingLoading } = useAuth();
+  const location = useLocation();
+
+  const isPaid = billingStatus === "trialing" || billingStatus === "active";
+  const isUnknown = billingStatus === "unknown" || billingStatus === null || billingStatus === undefined || billingStatus === "";
+
+  if (billingLoading || isUnknown) return <BillingLoadingScreen />;
+  if (!isPaid) return <Navigate to="/billing" replace state={{ from: location.pathname }} />;
+
+  return <Outlet />;
+}
+
+/**
+ * ✅ App shell (Sidebar + Topbar) only for actual app pages.
+ * Billing pages render OUTSIDE this shell.
+ */
+function MainAppShell() {
   const [theme, colorMode] = useMode();
+
   return (
     <ColorModeContext.Provider value={colorMode}>
       <MuiThemeProvider theme={theme}>
@@ -332,32 +388,7 @@ function MainApp() {
             <Sidebar />
             <main className="content">
               <Topbar />
-              <Routes>
-                {/* Billing routes (inside app shell) */}
-                <Route path="/billing" element={<Billing />} />
-                <Route path="/billing/return" element={<BillingReturn />} />
-
-                <Route path="/Roster" element={<Roster />} />
-                <Route path="/Roles" element={<Roles />} />
-                <Route path="/Employees" element={<Employees />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/GoodsIn" element={<GoodsIn />} />
-                <Route path="/GoodsInForm" element={<GoodsInForm />} />
-                <Route path="/recipeform" element={<RecipeForm />} />
-                <Route path="/recipes" element={<Recipes />} />
-                <Route path="/account" element={<AccountPage />} />
-                <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
-                <Route path="/daily_production" element={<ProductionLog />} />
-                <Route path="/recipe_production" element={<ProductionLogForm />} />
-                <Route path="/stock_inventory" element={<RecipeInventory />} />
-                <Route path="/stock_usage" element={<StockUsage />} />
-                <Route path="/goods_out_form" element={<GoodsOutForm />} />
-                <Route path="/goods_out" element={<GoodsOut />} />
-
-                {/* IMPORTANT: default landing inside protected app goes to billing (Option A) */}
-                <Route path="/" element={<Navigate to="/billing" replace />} />
-                <Route path="*" element={<Navigate to="/billing" replace />} />
-              </Routes>
+              <Outlet />
             </main>
           </div>
         </DataProvider>
@@ -366,11 +397,56 @@ function MainApp() {
   );
 }
 
+/**
+ * ✅ Authenticated routing:
+ * - /billing and /billing/return are outside the paid gate AND outside the shell
+ * - everything else is inside the shell + RequirePaid
+ */
+function MainApp() {
+  return (
+    <Routes>
+      {/* Billing routes (authenticated but NOT gated) */}
+      <Route path="/billing" element={<Billing />} />
+      <Route path="/billing/return" element={<BillingReturn />} />
+
+      {/* Everything else uses the app shell */}
+      <Route element={<MainAppShell />}>
+        {/* Paid-only routes */}
+        <Route element={<RequirePaid />}>
+          <Route path="/Roster" element={<Roster />} />
+          <Route path="/Roles" element={<Roles />} />
+          <Route path="/Employees" element={<Employees />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/GoodsIn" element={<GoodsIn />} />
+          <Route path="/GoodsInForm" element={<GoodsInForm />} />
+          <Route path="/recipeform" element={<RecipeForm />} />
+          <Route path="/recipes" element={<Recipes />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/IngredientsInventory" element={<IngredientsInventory />} />
+          <Route path="/daily_production" element={<ProductionLog />} />
+          <Route path="/recipe_production" element={<ProductionLogForm />} />
+          <Route path="/stock_inventory" element={<RecipeInventory />} />
+          <Route path="/stock_usage" element={<StockUsage />} />
+          <Route path="/goods_out_form" element={<GoodsOutForm />} />
+          <Route path="/goods_out" element={<GoodsOut />} />
+
+          {/* Default when inside paid app */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+      </Route>
+
+      {/* Safety fallback */}
+      <Route path="*" element={<Navigate to="/billing" replace />} />
+    </Routes>
+  );
+}
+
 function LoginScreen() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
 
-  // IMPORTANT: after login/sign-up, send them to billing (Option A)
-  if (user) return <Navigate to="/billing" replace />;
+  // After login/sign-up: go dashboard (RequirePaid will redirect to billing if needed)
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <LoginLayout>
@@ -401,13 +477,8 @@ function LoginScreen() {
 
             const isBlank = (v) => !v || String(v).trim() === "";
 
-            if (!formData?.acknowledgement) {
-              errors.acknowledgement = "You must accept the Terms and Conditions.";
-            }
-
-            if (!formData?.plan_ack) {
-              errors.plan_ack = "Please confirm the plan pricing and trial terms to continue.";
-            }
+            if (!formData?.acknowledgement) errors.acknowledgement = "You must accept the Terms and Conditions.";
+            if (!formData?.plan_ack) errors.plan_ack = "Please confirm the plan pricing and trial terms to continue.";
 
             if (isBlank(get("given_name"))) errors["given_name"] = "First name is required.";
             if (isBlank(get("family_name"))) errors["family_name"] = "Last name is required.";
@@ -429,15 +500,13 @@ function LoginScreen() {
 
 function PublicLanding() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
-  return user ? <Navigate to="/billing" replace /> : <LandingPage />;
+  return user ? <Navigate to="/dashboard" replace /> : <LandingPage />;
 }
 
 function ProtectedApp() {
   const { user } = useAuthenticator((ctx) => [ctx.user]);
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
   const sub = getCognitoSub(user);
   if (!sub) {
@@ -470,7 +539,7 @@ function ProtectedApp() {
   }
 
   return (
-    <AuthProvider key={sub} initialCognitoId={sub}>
+    <AuthProvider initialCognitoId={sub}>
       <MainApp />
     </AuthProvider>
   );
