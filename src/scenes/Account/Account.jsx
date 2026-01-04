@@ -1,7 +1,7 @@
 // src/scenes/account/AccountPage.jsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -32,9 +32,27 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 
 // Amplify v6 modular APIs
-import { fetchUserAttributes, updateUserAttributes, updatePassword } from "aws-amplify/auth";
+import {
+  fetchUserAttributes,
+  updateUserAttributes,
+  updatePassword,
+  fetchAuthSession,
+} from "aws-amplify/auth";
+
+/**
+ * ✅ IMPORTANT
+ * Set this in your frontend env:
+ * - CRA:    REACT_APP_API_BASE_URL=https://xxxx.execute-api.eu-west-1.amazonaws.com
+ * - Vite:   VITE_API_BASE_URL=...
+ */
+const API_BASE =
+  process.env.REACT_APP_API_BASE_URL ||
+  process.env.VITE_API_BASE_URL ||
+  "";
 
 /* =====================
    Indigo SaaS theme (match IngredientInventory style)
@@ -215,7 +233,7 @@ const Styles = ({ isDark }) => (
 
     .card-b{ padding: 16px; }
 
-    /* ✅ NEW: Identity header block (replaces avatar) */
+    /* ✅ Identity header block */
     .id-hero{
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -395,10 +413,123 @@ function joinName(first = "", last = "") {
   return [first, last].filter(Boolean).join(" ").trim();
 }
 
+function normalizeStatus(raw) {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s) return "none";
+  // normalize common variants
+  if (s === "trialling") return "trialing";
+  if (s === "canceled") return "cancelled";
+  return s;
+}
+
+function statusLabel(status) {
+  const s = normalizeStatus(status);
+  if (s === "trialing") return "Trialing";
+  if (s === "active") return "Active";
+  if (s === "cancelling") return "Cancelling";
+  if (s === "cancelled" || s === "canceled") return "Cancelled";
+  if (s === "past_due") return "Past due";
+  if (s === "unpaid") return "Unpaid";
+  if (s === "incomplete") return "Incomplete";
+  if (s === "incomplete_expired") return "Incomplete (expired)";
+  if (s === "paused") return "Paused";
+  if (s === "none") return "No subscription";
+  if (s === "unknown") return "Unknown";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function statusChipStyles(status) {
+  const s = normalizeStatus(status);
+  const base = {
+    fontWeight: 800,
+    borderRadius: 999,
+    border: "1px solid var(--border)",
+  };
+
+  if (s === "active") {
+    return {
+      ...base,
+      background: "rgba(34,197,94,0.10)",
+      color: "var(--text)",
+    };
+  }
+  if (s === "trialing") {
+    return {
+      ...base,
+      background: "rgba(99,102,241,0.12)",
+      color: "var(--primary-dark)",
+    };
+  }
+  if (s === "cancelling") {
+    return {
+      ...base,
+      background: "rgba(245,158,11,0.12)",
+      color: "var(--text)",
+    };
+  }
+  if (s === "cancelled") {
+    return {
+      ...base,
+      background: "rgba(239,68,68,0.10)",
+      color: "var(--text)",
+    };
+  }
+  return {
+    ...base,
+    background: "transparent",
+    color: "var(--text-muted)",
+  };
+}
+
+/**
+ * ✅ Improved fetch helper:
+ * - Always reads text body
+ * - Parses JSON when possible
+ * - Throws with status + body for better debugging
+ */
+async function fetchJSON(url, opts = {}) {
+  const res = await fetch(url, opts);
+  const text = await res.text().catch(() => "");
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson
+    ? (() => {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  if (!res.ok) {
+    const msg = (data && (data.message || data.error)) || text || `Request failed (${res.status})`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.body = text;
+    err.url = url;
+    throw err;
+  }
+
+  return isJson ? data : text;
+}
+
+/**
+ * ✅ Adds Authorization header for API Gateway JWT authorizer.
+ * Prefer idToken then fall back to accessToken.
+ */
+async function getAuthHeaders() {
+  const session = await fetchAuthSession();
+  const token =
+    session.tokens?.idToken?.toString() ||
+    session.tokens?.accessToken?.toString() ||
+    "";
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function AccountPage() {
   const [loading, setLoading] = useState(true);
 
-  // Theme sync with Topbar (same pattern as other pages)
   const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   useEffect(() => {
     const onThemeChanged = () => setIsDark(localStorage.getItem("theme-mode") === "dark");
@@ -408,7 +539,6 @@ export default function AccountPage() {
 
   const [form, setForm] = useState({ firstName: "", lastName: "", company: "", jobTitle: "" });
   const [email, setEmail] = useState("");
-
   const [editMode, setEditMode] = useState(false);
 
   const [pwOpen, setPwOpen] = useState(false);
@@ -417,10 +547,78 @@ export default function AccountPage() {
 
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
+  const [subscription, setSubscription] = useState({
+    plan: "—",
+    status: "—",
+    renewsOn: "",
+    currentPeriodEndRaw: null,
+    updatedAt: "",
+  });
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState("");
+
   const fullName = useMemo(
     () => joinName(form.firstName, form.lastName) || "Your profile",
     [form.firstName, form.lastName]
   );
+
+  // ✅ Prevent stale subscription responses overwriting newer ones
+  const subReqIdRef = useRef(0);
+  const subAbortRef = useRef(null);
+
+  const loadSubscription = useCallback(async () => {
+    if (!API_BASE) {
+      console.warn("[Billing] API_BASE is empty - billing routes disabled");
+      return;
+    }
+
+    // bump request id
+    const reqId = ++subReqIdRef.current;
+
+    // cancel any previous in-flight request
+    if (subAbortRef.current) {
+      try {
+        subAbortRef.current.abort();
+      } catch {}
+    }
+    const controller = new AbortController();
+    subAbortRef.current = controller;
+
+    try {
+      const auth = await getAuthHeaders();
+      console.log("[Billing] loading subscription", { API_BASE, hasAuth: !!auth.Authorization, reqId });
+
+      const data = await fetchJSON(`${API_BASE}/billing/subscription`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json", ...auth },
+        signal: controller.signal,
+      });
+
+      console.log("[Billing] subscription loaded:", data, { reqId });
+
+      // ✅ ignore stale responses
+      if (reqId !== subReqIdRef.current) {
+        console.warn("[Billing] stale response ignored", { reqId, latest: subReqIdRef.current });
+        return;
+      }
+
+      setSubscription({
+        plan: data?.plan ?? "—",
+        status: data?.status ?? "—",
+        renewsOn: data?.renewsOn ?? "",
+        currentPeriodEndRaw: data?.currentPeriodEndRaw ?? null,
+        updatedAt: data?.updatedAt ?? "",
+      });
+    } catch (e) {
+      if (e?.name === "AbortError") {
+        console.warn("[Billing] subscription request aborted", { reqId });
+        return;
+      }
+      console.warn("[Billing] failed to load subscription:", e?.status, e?.message, { reqId });
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -436,6 +634,8 @@ export default function AccountPage() {
           jobTitle: attrs?.["custom:jobTitle"] || "",
         });
         setEmail(attrs?.email || "");
+
+        await loadSubscription();
       } catch (err) {
         console.error("[AccountPage] Failed to fetch user attributes:", err);
         setSnack({ open: true, severity: "error", message: "Failed to load profile." });
@@ -443,7 +643,16 @@ export default function AccountPage() {
         setLoading(false);
       }
     })();
-  }, []);
+
+    return () => {
+      // cleanup on unmount
+      if (subAbortRef.current) {
+        try {
+          subAbortRef.current.abort();
+        } catch {}
+      }
+    };
+  }, [loadSubscription]);
 
   const onChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -506,13 +715,21 @@ export default function AccountPage() {
   const onChangePassword = async () => {
     const { current, next, confirm } = pwForm;
     if (!current || !next || !confirm) {
-      return setSnack({ open: true, severity: "warning", message: "Please fill in all password fields." });
+      return setSnack({
+        open: true,
+        severity: "warning",
+        message: "Please fill in all password fields.",
+      });
     }
     if (next !== confirm) {
       return setSnack({ open: true, severity: "warning", message: "New passwords do not match." });
     }
     if (next.length < 8) {
-      return setSnack({ open: true, severity: "warning", message: "New password must be at least 8 characters." });
+      return setSnack({
+        open: true,
+        severity: "warning",
+        message: "New password must be at least 8 characters.",
+      });
     }
 
     setPwBusy(true);
@@ -524,14 +741,84 @@ export default function AccountPage() {
     } catch (err) {
       console.error("[AccountPage] Change password failed:", err);
       setPwBusy(false);
-      const message = err?.message || "Failed to change password. Check your current password and try again.";
+      const message =
+        err?.message || "Failed to change password. Check your current password and try again.";
       setSnack({ open: true, severity: "error", message });
     }
   };
 
+  const openCancelDialog = () => {
+    console.log("[Cancel] open dialog");
+    setCancelConfirm("");
+    setCancelOpen(true);
+  };
+  const closeCancelDialog = () => {
+    if (!cancelBusy) setCancelOpen(false);
+  };
+
+  const doCancelSubscription = async () => {
+    console.log("[Cancel] clicked", { cancelConfirm, API_BASE });
+
+    if (cancelConfirm.trim().toUpperCase() !== "CANCEL") {
+      console.log("[Cancel] blocked: confirm text mismatch");
+      return setSnack({ open: true, severity: "warning", message: 'Type "CANCEL" to confirm.' });
+    }
+
+    if (!API_BASE) {
+      console.log("[Cancel] blocked: API_BASE missing");
+      return setSnack({
+        open: true,
+        severity: "error",
+        message: "Billing API is not configured. Set REACT_APP_API_BASE_URL.",
+      });
+    }
+
+    setCancelBusy(true);
+    try {
+      const auth = await getAuthHeaders();
+      console.log("[Cancel] auth header present:", !!auth.Authorization);
+
+      console.log("[Cancel] POST", `${API_BASE}/billing/cancel`);
+      const resp = await fetchJSON(`${API_BASE}/billing/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ reason: "user_initiated" }),
+      });
+
+      console.log("[Cancel] response:", resp);
+
+      if (!resp || typeof resp !== "object" || resp.ok !== true) {
+        throw new Error("Cancel endpoint returned an unexpected response.");
+      }
+
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Subscription cancelled. Access until ${resp.currentPeriodEnd || "end of term"}.`,
+      });
+      setCancelOpen(false);
+
+      // ✅ Reload subscription safely (stale responses ignored now)
+      await loadSubscription();
+    } catch (err) {
+      console.error("[AccountPage] Cancel subscription failed (full):", err);
+      const fallback = err?.message || "Failed to cancel subscription. Please try again.";
+      const extra = err?.status ? ` (HTTP ${err.status})` : "";
+      setSnack({
+        open: true,
+        severity: "error",
+        message: `${fallback}${extra}`,
+      });
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const displayStatus = useMemo(() => normalizeStatus(subscription.status), [subscription.status]);
+
   if (loading) {
     return (
-      <Box p={4} display="grid" placeItems="center">
+      <Box p={4} sx={{ display: "grid", placeItems: "center" }}>
         <CircularProgress />
       </Box>
     );
@@ -584,7 +871,7 @@ export default function AccountPage() {
 
         {/* Main content */}
         <Box className="acct-grid">
-          {/* Left: Identity card (no avatar) */}
+          {/* Left: Identity card */}
           <Box className="card">
             <Box className="card-h">
               <Box>
@@ -606,7 +893,6 @@ export default function AccountPage() {
             </Box>
 
             <Box className="card-b">
-              {/* ✅ Replaces avatar block */}
               <Box className="id-hero">
                 <Box className="id-badge">
                   <PersonOutlineIcon sx={{ fontSize: 22 }} />
@@ -653,8 +939,8 @@ export default function AccountPage() {
 
                 <Box className="hint">
                   <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
-                  Your email is read-only because it’s linked to your login method. Update your name, company, and job
-                  title using <b>Edit Profile</b>.
+                  Your email is read-only because it’s linked to your login method. Update your name,
+                  company, and job title using <b>Edit Profile</b>.
                 </Box>
               </Box>
             </Box>
@@ -683,6 +969,7 @@ export default function AccountPage() {
 
             <Box className="card-b">
               <Grid container spacing={2}>
+                {/* Contact */}
                 <Grid item xs={12}>
                   <Box className="section">
                     <Box className="section-h">
@@ -718,6 +1005,7 @@ export default function AccountPage() {
                   </Box>
                 </Grid>
 
+                {/* Personal */}
                 <Grid item xs={12}>
                   <Box className="section">
                     <Box className="section-h">
@@ -776,6 +1064,7 @@ export default function AccountPage() {
                   </Box>
                 </Grid>
 
+                {/* Work */}
                 <Grid item xs={12}>
                   <Box className="section">
                     <Box className="section-h">
@@ -834,12 +1123,13 @@ export default function AccountPage() {
 
                     <Box mt={2} className="hint">
                       <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
-                      Tip: Keep job titles consistent (e.g. “Operations Manager”) so your activity logs and exports stay
-                      tidy.
+                      Tip: Keep job titles consistent (e.g. “Operations Manager”) so your activity logs and
+                      exports stay tidy.
                     </Box>
                   </Box>
                 </Grid>
 
+                {/* Security */}
                 <Grid item xs={12}>
                   <Box className="section">
                     <Box className="section-h">
@@ -869,8 +1159,110 @@ export default function AccountPage() {
 
                     <Box mt={2} className="hint">
                       <ShieldOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
-                      Use a unique password and rotate it regularly. If you use Google sign-in, password changes may not
-                      apply.
+                      Use a unique password and rotate it regularly. If you use Google sign-in, password
+                      changes may not apply.
+                    </Box>
+                  </Box>
+                </Grid>
+
+                {/* Subscription */}
+                <Grid item xs={12}>
+                  <Box className="section">
+                    <Box className="section-h">
+                      <Box className="kicker">
+                        <Box className="k-icon">
+                          <CreditCardOutlinedIcon sx={{ fontSize: 18 }} />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontWeight: 900, color: "var(--text)", letterSpacing: -0.01 }}>
+                            Subscription
+                          </Typography>
+                          <Typography sx={{ color: "var(--text-muted)", fontWeight: 600, fontSize: 13 }}>
+                            Shows your current subscription state
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Chip
+                        label={statusLabel(displayStatus)}
+                        size="small"
+                        sx={statusChipStyles(displayStatus)}
+                      />
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      {/* ✅ Status */}
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          label="Status"
+                          fullWidth
+                          value={statusLabel(displayStatus)}
+                          InputProps={{ readOnly: true }}
+                          className="input"
+                        />
+                      </Grid>
+
+                      {/* ✅ Plan name */}
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          label="Plan"
+                          fullWidth
+                          value={subscription.plan || "—"}
+                          InputProps={{
+                            readOnly: true,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <CreditCardOutlinedIcon sx={{ color: "var(--text-muted)" }} />
+                              </InputAdornment>
+                            ),
+                          }}
+                          className="input"
+                        />
+                      </Grid>
+
+                      {/* ✅ Renews / Access until */}
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          label={displayStatus === "cancelling" ? "Access Until" : "Renews On"}
+                          fullWidth
+                          value={subscription.renewsOn || "—"}
+                          InputProps={{ readOnly: true }}
+                          className="input"
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Box mt={2} sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <Button
+                        onClick={openCancelDialog}
+                        startIcon={<WarningAmberOutlinedIcon />}
+                        className="btn-ghost"
+                        disabled={displayStatus === "cancelling" || displayStatus === "cancelled"}
+                        sx={{
+                          borderRadius: 14,
+                          fontWeight: 900,
+                          borderColor: "rgba(239,68,68,0.35)",
+                          color: isDark ? "rgba(248,113,113,0.92)" : "rgba(185,28,28,0.92)",
+                          opacity: displayStatus === "cancelling" || displayStatus === "cancelled" ? 0.6 : 1,
+                        }}
+                      >
+                        Cancel subscription
+                      </Button>
+
+                      <Button
+                        onClick={loadSubscription}
+                        className="btn-ghost"
+                        sx={{ borderRadius: 14, fontWeight: 900 }}
+                      >
+                        Refresh
+                      </Button>
+                    </Box>
+
+                    <Box mt={2} className="hint">
+                      <InfoOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "var(--primary-dark)" }} />
+                      {displayStatus === "cancelling"
+                        ? "Your subscription will not renew. You keep access until the date above."
+                        : "Your current billing status is shown above. If it looks wrong, hit Refresh."}
                     </Box>
                   </Box>
                 </Grid>
@@ -947,6 +1339,69 @@ export default function AccountPage() {
           </DialogActions>
         </Dialog>
 
+        {/* Cancel Subscription Dialog */}
+        <Dialog
+          open={cancelOpen}
+          onClose={closeCancelDialog}
+          PaperProps={{
+            sx: {
+              borderRadius: 16,
+              border: "1px solid var(--border)",
+              boxShadow: "var(--shadow-lg)",
+              overflow: "hidden",
+              background: "var(--bg-card)",
+              color: "var(--text)",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 900,
+              color: "var(--text)",
+              background: isDark ? "rgba(239,68,68,0.06)" : "var(--bg-card)",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            Cancel subscription
+          </DialogTitle>
+
+          <DialogContent sx={{ pt: 2 }}>
+            <Box className="hint" sx={{ borderStyle: "solid", borderColor: "rgba(239,68,68,0.30)" }}>
+              <WarningAmberOutlinedIcon sx={{ fontSize: 18, mt: "1px", color: "rgba(239,68,68,0.95)" }} />
+              This will stop your plan from renewing. You’ll keep access until the end of your billing period.
+            </Box>
+
+            <Box mt={2} sx={{ display: "grid", gap: 2, minWidth: { xs: 280, sm: 420 } }}>
+              <TextField
+                label='Type "CANCEL" to confirm'
+                value={cancelConfirm}
+                onChange={(e) => setCancelConfirm(e.target.value)}
+                className="input"
+                autoFocus
+              />
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button onClick={closeCancelDialog} disabled={cancelBusy} className="btn-ghost" sx={{ borderRadius: 14 }}>
+              Keep subscription
+            </Button>
+
+            <Button
+              onClick={doCancelSubscription}
+              disabled={cancelBusy}
+              className="btn-solid"
+              sx={{
+                borderRadius: 14,
+                minWidth: 200,
+                background: "linear-gradient(135deg, rgba(239,68,68,0.95), rgba(185,28,28,0.95))",
+              }}
+            >
+              {cancelBusy ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Confirm cancellation"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Snackbars */}
         <Snackbar
           open={snack.open}
@@ -954,7 +1409,11 @@ export default function AccountPage() {
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
-          <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))} variant="filled">
+          <Alert
+            severity={snack.severity}
+            onClose={() => setSnack((s) => ({ ...s, open: false }))}
+            variant="filled"
+          >
             {snack.message}
           </Alert>
         </Snackbar>

@@ -1,43 +1,50 @@
-// index.js (AWS Lambda - getBillingStatus) - CommonJS
+// index.js (AWS Lambda - billing/subscription)
 // Runtime: Node.js 20.x
 // Handler: index.handler
-//
-// Env vars:
-// - USERS_TABLE = Users (optional)
 
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
 
 const USERS_TABLE = process.env.USERS_TABLE || "Users";
-
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // tighten later
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type,Authorization",
   "Access-Control-Allow-Methods": "GET,OPTIONS",
 };
 
-exports.handler = async (event) => {
-  // CORS preflight
-  const method =
-    event.requestContext?.http?.method ||
-    event.httpMethod ||
-    "GET";
+function formatRenewsOn(currentPeriodEnd) {
+  if (currentPeriodEnd === null || currentPeriodEnd === undefined || currentPeriodEnd === "") return "";
+  const n = Number(currentPeriodEnd);
+  if (!Number.isFinite(n)) return "";
+  const ms = n > 10_000_000_000 ? n : n * 1000; // handles ms or seconds
+  return new Date(ms).toISOString().slice(0, 10); // YYYY-MM-DD
+}
 
-  if (method === "OPTIONS") {
-    return { statusCode: 200, headers: corsHeaders, body: "" };
-  }
+function normalizeStatus(s) {
+  if (!s) return "none";
+  return String(s).trim().toLowerCase();
+}
+
+exports.handler = async (event) => {
+  const method = event.requestContext?.http?.method || event.httpMethod || "GET";
+  if (method === "OPTIONS") return { statusCode: 200, headers: corsHeaders, body: "" };
+  if (method !== "GET") return { statusCode: 405, headers: corsHeaders, body: "Method Not Allowed" };
 
   try {
-    const qs = event.queryStringParameters || {};
-    const cognitoSub = qs.cognitoSub;
+    const claims =
+      event.requestContext?.authorizer?.jwt?.claims ||
+      event.requestContext?.authorizer?.claims ||
+      null;
+
+    const cognitoSub = claims?.sub;
 
     if (!cognitoSub) {
       return {
-        statusCode: 400,
+        statusCode: 401,
         headers: corsHeaders,
-        body: JSON.stringify({ ok: false, error: "Missing cognitoSub" }),
+        body: JSON.stringify({ ok: false, error: "Unauthorized (missing user sub)" }),
       };
     }
 
@@ -45,46 +52,30 @@ exports.handler = async (event) => {
       new GetCommand({
         TableName: USERS_TABLE,
         Key: { cognitoSub },
+        ConsistentRead: true, // ✅ important after cancel/update
       })
     );
 
-    const item = res.Item || null;
+    const item = res.Item || {};
 
-    // If no record yet, they are not paid (webhook hasn't written)
-    if (!item) {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          ok: true,
-          user: {
-            cognitoSub,
-            billingStatus: "none",
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-            currentPeriodEnd: null,
-          },
-        }),
-      };
-    }
+    const status = normalizeStatus(item.billingStatus);
+    const renewsOn = formatRenewsOn(item.currentPeriodEnd);
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         ok: true,
-        user: {
-          cognitoSub: item.cognitoSub,
-          billingStatus: item.billingStatus || "none",
-          stripeCustomerId: item.stripeCustomerId || null,
-          stripeSubscriptionId: item.stripeSubscriptionId || null,
-          currentPeriodEnd: item.currentPeriodEnd || null,
-          updatedAt: item.updatedAt || null,
-        },
+        plan: item.plan || "—",
+        status,
+        renewsOn,
+        // debug-friendly fields (safe to remove later)
+        currentPeriodEndRaw: item.currentPeriodEnd ?? null,
+        updatedAt: item.updatedAt ?? null,
       }),
     };
   } catch (err) {
-    console.log("getBillingStatus error:", err);
+    console.log("billing/subscription error:", err);
     return {
       statusCode: 500,
       headers: corsHeaders,

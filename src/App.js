@@ -376,12 +376,22 @@ function RequirePaid() {
   const { billingStatus, billingLoading } = useAuth();
   const location = useLocation();
 
-  const isPaid = billingStatus === "trialing" || billingStatus === "active";
+  const status = (billingStatus || "").toLowerCase();
+
+  // ✅ Allow access while cancelling (cancel_at_period_end)
+  // Optional: add "past_due" / "unpaid" depending on how strict you want to be.
+  const isPaid =
+    status === "trialing" ||
+    status === "active" ||
+    status === "cancelling";
+    // || status === "past_due"
+    // || status === "unpaid";
+
   const isUnknown =
-    billingStatus === "unknown" ||
+    status === "unknown" ||
+    status === "" ||
     billingStatus === null ||
-    billingStatus === undefined ||
-    billingStatus === "";
+    billingStatus === undefined;
 
   if (billingLoading || isUnknown) return <BillingLoadingScreen />;
   if (!isPaid) return <Navigate to="/billing" replace state={{ from: location.pathname }} />;

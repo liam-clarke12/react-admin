@@ -9,38 +9,88 @@
 
 const Stripe = require("stripe");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, PutCommand, ScanCommand } = require("@aws-sdk/lib-dynamodb");
+const {
+  DynamoDBDocumentClient,
+  UpdateCommand,
+  ScanCommand,
+} = require("@aws-sdk/lib-dynamodb");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
 const USERS_TABLE = process.env.USERS_TABLE || "Users";
 
-// DynamoDB v3 client
-const ddbClient = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(ddbClient);
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-async function upsertUserBilling({
+function deriveBillingStatus(sub) {
+  // Stripe status can remain "trialing"/"active" even if cancellation is scheduled.
+  const stripeStatus = sub?.status || "unknown";
+  const cancelAtPeriodEnd = !!sub?.cancel_at_period_end;
+
+  // ✅ Your app-level "cancelling" state
+  if (cancelAtPeriodEnd) return "cancelling";
+
+  // If Stripe actually cancelled immediately, it'll be "canceled"
+  return stripeStatus;
+}
+
+async function updateUserBilling({
   cognitoSub,
-  billingStatus,
   stripeCustomerId,
   stripeSubscriptionId,
+  stripeStatus,
+  billingStatus,
+  cancelAtPeriodEnd,
   currentPeriodEnd,
 }) {
+  // ✅ Update (not Put) to avoid wiping other user fields
   await ddb.send(
-    new PutCommand({
+    new UpdateCommand({
       TableName: USERS_TABLE,
-      Item: {
-        cognitoSub,
-        billingStatus,
-        stripeCustomerId,
-        stripeSubscriptionId,
-        currentPeriodEnd,
-        updatedAt: new Date().toISOString(),
+      Key: { cognitoSub },
+      UpdateExpression: `
+        SET
+          billingStatus = :bs,
+          stripeCustomerId = :scid,
+          stripeSubscriptionId = :ssid,
+          stripeStatus = :ss,
+          cancelAtPeriodEnd = :cape,
+          currentPeriodEnd = :cpe,
+          updatedAt = :u
+      `,
+      ExpressionAttributeValues: {
+        ":bs": billingStatus || "unknown",
+        ":scid": stripeCustomerId || "",
+        ":ssid": stripeSubscriptionId || "",
+        ":ss": stripeStatus || "unknown",
+        ":cape": !!cancelAtPeriodEnd,
+        // store Stripe seconds as NUMBER (or null)
+        ":cpe": typeof currentPeriodEnd === "number" ? currentPeriodEnd : null,
+        ":u": new Date().toISOString(),
       },
     })
   );
 
-  console.log("✅ Billing updated:", { cognitoSub, billingStatus });
+  console.log("✅ Billing updated:", {
+    cognitoSub,
+    billingStatus,
+    stripeStatus,
+    cancelAtPeriodEnd: !!cancelAtPeriodEnd,
+    currentPeriodEnd,
+  });
+}
+
+async function findCognitoSubBySubscriptionId(stripeSubscriptionId) {
+  // For testing only (scan). Later add a GSI on stripeSubscriptionId.
+  const scanRes = await ddb.send(
+    new ScanCommand({
+      TableName: USERS_TABLE,
+      FilterExpression: "stripeSubscriptionId = :sid",
+      ExpressionAttributeValues: { ":sid": stripeSubscriptionId },
+      Limit: 1,
+      ProjectionExpression: "cognitoSub",
+    })
+  );
+
+  return scanRes.Items?.[0]?.cognitoSub || null;
 }
 
 exports.handler = async (event) => {
@@ -53,7 +103,11 @@ exports.handler = async (event) => {
 
   let stripeEvent;
   try {
-    stripeEvent = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    stripeEvent = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
   } catch (err) {
     console.log("❌ Signature verification failed:", err.message);
     return { statusCode: 400, body: `Webhook Error: ${err.message}` };
@@ -70,18 +124,29 @@ exports.handler = async (event) => {
         const stripeCustomerId = session.customer;
         const stripeSubscriptionId = session.subscription;
 
-        console.log("✅ Checkout completed:", { cognitoSub, stripeCustomerId, stripeSubscriptionId });
+        console.log("✅ Checkout completed:", {
+          cognitoSubPresent: !!cognitoSub,
+          stripeCustomerIdPresent: !!stripeCustomerId,
+          stripeSubscriptionIdPresent: !!stripeSubscriptionId,
+        });
 
         if (!cognitoSub || !stripeSubscriptionId) break;
 
         const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
-        await upsertUserBilling({
+        const stripeStatus = subscription.status || "unknown";
+        const cancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+        const billingStatus = deriveBillingStatus(subscription);
+        const currentPeriodEnd = subscription.current_period_end || null; // seconds
+
+        await updateUserBilling({
           cognitoSub,
-          billingStatus: subscription.status,
           stripeCustomerId,
           stripeSubscriptionId,
-          currentPeriodEnd: subscription.current_period_end || null,
+          stripeStatus,
+          billingStatus,
+          cancelAtPeriodEnd,
+          currentPeriodEnd,
         });
 
         break;
@@ -94,30 +159,32 @@ exports.handler = async (event) => {
 
         const stripeSubscriptionId = sub.id;
         const stripeCustomerId = sub.customer;
-        const billingStatus = sub.status;
-        const currentPeriodEnd = sub.current_period_end || null;
 
-        // For testing only (scan). Later add a GSI on stripeSubscriptionId.
-        const scanRes = await ddb.send(
-          new ScanCommand({
-            TableName: USERS_TABLE,
-            FilterExpression: "stripeSubscriptionId = :sid",
-            ExpressionAttributeValues: { ":sid": stripeSubscriptionId },
-            Limit: 1,
-          })
-        );
+        // ✅ IMPORTANT: derive "cancelling" from cancel_at_period_end
+        const stripeStatus = sub.status || "unknown";
+        const cancelAtPeriodEnd = !!sub.cancel_at_period_end;
+        const billingStatus = deriveBillingStatus(sub);
+        const currentPeriodEnd = sub.current_period_end || null; // seconds
 
-        const cognitoSub = scanRes.Items?.[0]?.cognitoSub;
+        const cognitoSub = await findCognitoSubBySubscriptionId(stripeSubscriptionId);
 
-        console.log("🔁 Subscription event:", { stripeSubscriptionId, billingStatus, cognitoSub });
+        console.log("🔁 Subscription event:", {
+          stripeSubscriptionId,
+          stripeStatus,
+          cancelAtPeriodEnd,
+          derivedBillingStatus: billingStatus,
+          cognitoSubFound: !!cognitoSub,
+        });
 
         if (!cognitoSub) break;
 
-        await upsertUserBilling({
+        await updateUserBilling({
           cognitoSub,
-          billingStatus,
           stripeCustomerId,
           stripeSubscriptionId,
+          stripeStatus,
+          billingStatus,
+          cancelAtPeriodEnd,
           currentPeriodEnd,
         });
 
@@ -129,6 +196,7 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.log("❌ Webhook handler error:", err);
+    // You can return 500 here if you want Stripe to retry, but for now keep 200.
   }
 
   return { statusCode: 200, body: "ok" };

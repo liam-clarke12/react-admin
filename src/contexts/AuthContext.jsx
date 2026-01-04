@@ -11,15 +11,11 @@ const userPool = new CognitoUserPool(poolData);
 
 const AuthContext = createContext();
 
-// ✅ Set in env
-const BILLING_STATUS_ENDPOINT =
-  import.meta?.env?.VITE_BILLING_STATUS_ENDPOINT ||
-  process.env.REACT_APP_BILLING_STATUS_ENDPOINT ||
-  "";
+// ✅ CRA env only (remove Vite import.meta to avoid ambiguity)
+const BILLING_STATUS_ENDPOINT = process.env.REACT_APP_BILLING_STATUS_ENDPOINT || "";
 
 /**
- * ✅ Always get the REAL Cognito sub from the session token payload
- * (user.getUsername() is often email/username, NOT sub)
+ * ✅ Get the REAL Cognito sub from the *ID token* payload (stable UUID)
  */
 function getCognitoSubFromSession(session) {
   try {
@@ -30,9 +26,16 @@ function getCognitoSubFromSession(session) {
   }
 }
 
-function getJwtFromSession(session) {
+/**
+ * ✅ For API Gateway JWT authorizer:
+ * Prefer the ID token for "who is the user" claims (sub),
+ * and it tends to match common audience/issuer setups cleanly.
+ *
+ * If your authorizer is explicitly set up for access tokens, switch back.
+ */
+function getApiJwtFromSession(session) {
   try {
-    return session?.getIdToken?.()?.getJwtToken?.() || null;
+    return session?.getIdToken?.()?.getJwtToken?.() || null; // ✅ ID token
   } catch (e) {
     return null;
   }
@@ -46,6 +49,8 @@ function getSessionAsync(user) {
     if (!user) return reject(new Error("No user"));
     user.getSession((err, session) => {
       if (err) return reject(err);
+      // session.isValid() checks exp vs now
+      if (!session?.isValid?.()) return reject(new Error("Session invalid/expired"));
       resolve(session);
     });
   });
@@ -65,27 +70,26 @@ function getUserAttributesAsync(user) {
 }
 
 export const AuthProvider = ({ children, initialCognitoId }) => {
-  // ✅ If you pass initialCognitoId from App.jsx, start with it
   const [cognitoId, setCognitoId] = useState(initialCognitoId || null);
-
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [idToken, setIdToken] = useState(null);
+
+  // ✅ token you use for API calls
+  const [apiToken, setApiToken] = useState(null);
 
   // ✅ billing
-  const [billingStatus, setBillingStatus] = useState("unknown"); // unknown | none | trialing | active | past_due | canceled
+  const [billingStatus, setBillingStatus] = useState("unknown"); // unknown | none | trialing | active | past_due | canceled | cancelling
   const [billingLoading, setBillingLoading] = useState(true);
 
-  const fetchBillingStatus = useCallback(async (cognitoSub, token) => {
-    // NOTE: cognitoSub must be the TRUE token sub (UUID)
-    if (!cognitoSub) {
+  const fetchBillingStatus = useCallback(async (token) => {
+    if (!BILLING_STATUS_ENDPOINT) {
+      console.warn("[AuthContext] Missing REACT_APP_BILLING_STATUS_ENDPOINT");
       setBillingStatus("none");
       setBillingLoading(false);
       return;
     }
 
-    if (!BILLING_STATUS_ENDPOINT) {
-      console.warn("[AuthContext] Missing BILLING_STATUS_ENDPOINT env var");
+    if (!token) {
       setBillingStatus("none");
       setBillingLoading(false);
       return;
@@ -93,32 +97,34 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
 
     setBillingLoading(true);
     try {
-      const url = `${BILLING_STATUS_ENDPOINT}?cognitoSub=${encodeURIComponent(cognitoSub)}`;
-
-      const res = await fetch(url, {
+      const res = await fetch(BILLING_STATUS_ENDPOINT, {
         method: "GET",
         headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      // If backend returns non-200, handle it cleanly
+      // Some gateway errors are not JSON; handle both.
       let data = null;
+      const text = await res.text();
       try {
-        data = await res.json();
-      } catch (e) {
+        data = text ? JSON.parse(text) : null;
+      } catch {
         data = null;
       }
 
       if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || `Billing status request failed (${res.status})`);
+        const msg = data?.error || `Billing status request failed (${res.status})`;
+        throw new Error(msg);
       }
 
-      const s = data?.user?.billingStatus || "none";
-      setBillingStatus(s);
+      // Supports:
+      // { ok:true, user:{ billingStatus:"active" } }
+      // { ok:true, status:"active" }
+      const s = data?.user?.billingStatus || data?.status || "none";
+      setBillingStatus(String(s).toLowerCase());
     } catch (e) {
-      console.warn("[AuthContext] fetchBillingStatus error:", e);
+      console.warn("[AuthContext] fetchBillingStatus error:", e?.message || e);
       setBillingStatus("none");
     } finally {
       setBillingLoading(false);
@@ -126,42 +132,40 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
   }, []);
 
   /**
-   * ✅ Single "bootstrap" that:
-   * - gets session
-   * - extracts TRUE cognito sub from token payload
-   * - sets idToken
-   * - fetches billing
-   * - fetches attributes/profile
+   * ✅ Single bootstrap:
+   * - get session
+   * - extract sub from ID token payload
+   * - get token for API calls
+   * - fetch billing
+   * - fetch attributes/profile
    */
   const bootstrap = useCallback(async () => {
     const user = userPool.getCurrentUser();
 
     if (!user) {
-      setLoading(false);
       setCognitoId(null);
       setUserProfile(null);
-      setIdToken(null);
+      setApiToken(null);
 
       setBillingStatus("none");
       setBillingLoading(false);
+      setLoading(false);
       return;
     }
 
     try {
       const session = await getSessionAsync(user);
 
-      const token = getJwtFromSession(session);
-      setIdToken(token);
+      const token = getApiJwtFromSession(session);
+      setApiToken(token);
 
       const realSub = getCognitoSubFromSession(session);
-
-      // ✅ Important: this is the ID your Dynamo + Stripe should be keyed on
       setCognitoId(realSub);
 
-      // ✅ Fetch billing ASAP
-      await fetchBillingStatus(realSub, token);
+      // ✅ Billing ASAP
+      await fetchBillingStatus(token);
 
-      // Fetch attributes/profile (not required for billing, but useful)
+      // Attributes/profile
       try {
         const attrs = await getUserAttributesAsync(user);
         const profile = attrs.reduce((acc, a) => {
@@ -170,14 +174,14 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
         }, {});
         setUserProfile(profile);
       } catch (attrErr) {
-        console.warn("[AuthContext] Attributes error:", attrErr);
+        console.warn("[AuthContext] Attributes error:", attrErr?.message || attrErr);
       }
     } catch (err) {
-      console.error("[AuthContext] Session error:", err);
+      console.error("[AuthContext] bootstrap error:", err?.message || err);
 
       setCognitoId(null);
       setUserProfile(null);
-      setIdToken(null);
+      setApiToken(null);
 
       setBillingStatus("none");
       setBillingLoading(false);
@@ -186,11 +190,15 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
     }
   }, [fetchBillingStatus]);
 
-  // ✅ on mount (and when initialCognitoId changes, we still bootstrap)
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!mounted) return;
+      // helpful one-time debug line
+      if (BILLING_STATUS_ENDPOINT) {
+        // eslint-disable-next-line no-console
+        console.log("[AuthContext] Billing endpoint:", BILLING_STATUS_ENDPOINT);
+      }
       await bootstrap();
     })();
     return () => {
@@ -211,16 +219,15 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
     setBillingLoading(true);
     try {
       const session = await getSessionAsync(user);
-      const token = getJwtFromSession(session);
+      const token = getApiJwtFromSession(session);
       const realSub = getCognitoSubFromSession(session);
 
-      // keep state consistent
-      setIdToken(token);
+      setApiToken(token);
       setCognitoId(realSub);
 
-      await fetchBillingStatus(realSub, token);
+      await fetchBillingStatus(token);
     } catch (e) {
-      console.warn("[AuthContext] refreshBilling error:", e);
+      console.warn("[AuthContext] refreshBilling error:", e?.message || e);
       setBillingStatus("none");
       setBillingLoading(false);
     }
@@ -231,9 +238,15 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
     new Promise((resolve, reject) => {
       const user = userPool.getCurrentUser();
       if (!user) return reject(new Error("No user to update"));
-      user.getSession((e1) => {
+
+      user.getSession((e1, session) => {
         if (e1) return reject(e1);
-        const attributeList = Object.entries(updates).map(([Name, Value]) => new CognitoUserAttribute({ Name, Value }));
+        if (!session?.isValid?.()) return reject(new Error("Session invalid/expired"));
+
+        const attributeList = Object.entries(updates).map(([Name, Value]) => {
+          return new CognitoUserAttribute({ Name, Value });
+        });
+
         user.updateAttributes(attributeList, (err, result) => {
           if (err) return reject(err);
           setUserProfile((prev) => ({ ...(prev || {}), ...updates }));
@@ -258,6 +271,7 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
       console.warn("[AuthContext] signOut error:", err);
     }
 
+    // local storage cleanup (best-effort)
     try {
       const prefixes = [
         "CognitoIdentityServiceProvider",
@@ -276,12 +290,12 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
       console.warn("[AuthContext] localStorage cleanup error", e);
     }
 
+    // cookie cleanup (best-effort)
     try {
       document.cookie.split(";").forEach((c) => {
         const name = c.split("=")[0].trim();
-        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax";
-        document.cookie =
-          name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
       });
     } catch (e) {
       console.warn("[AuthContext] cookie cleanup error", e);
@@ -289,7 +303,7 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
 
     setCognitoId(null);
     setUserProfile(null);
-    setIdToken(null);
+    setApiToken(null);
 
     setBillingStatus("none");
     setBillingLoading(false);
@@ -306,9 +320,9 @@ export const AuthProvider = ({ children, initialCognitoId }) => {
         updateProfile,
         loading,
         signOut,
-        idToken,
 
-        // billing
+        apiToken,
+
         billingStatus,
         billingLoading,
         refreshBilling,

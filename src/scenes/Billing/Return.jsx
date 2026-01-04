@@ -13,14 +13,24 @@ export default function BillingReturn() {
 
   const timerRef = useRef(null);
 
-  const isPaid = billingStatus === "trialing" || billingStatus === "active";
-  const isKnownNotPaid =
-    billingStatus === "none" ||
-    billingStatus === "canceled" ||
-    billingStatus === "past_due";
+  // ✅ normalize once (avoids case mismatches)
+  const status = (billingStatus || "").toLowerCase();
 
-  const isUnknown =
-    billingStatus === "unknown" || billingStatus === null || billingStatus === undefined || billingStatus === "";
+  // ✅ Treat "cancelling" as still paid (cancel_at_period_end)
+  const isPaid = status === "trialing" || status === "active" || status === "cancelling";
+
+  // Decide what "not paid" means in your product:
+  // - "past_due" can be blocked (strict) or allowed (grace). Keeping strict here.
+  const isKnownNotPaid =
+    status === "none" ||
+    status === "canceled" ||
+    status === "cancelled" ||
+    status === "incomplete" ||
+    status === "incomplete_expired" ||
+    status === "unpaid" ||
+    status === "past_due";
+
+  const isUnknown = status === "unknown" || status === "";
 
   // ✅ Always clear any pending timer on unmount
   useEffect(() => {
@@ -98,7 +108,8 @@ export default function BillingReturn() {
       {showSpinner ? <CircularProgress /> : null}
 
       <Typography sx={{ color: "text.secondary", mt: 2, fontSize: 13 }}>
-        Status: <b>{billingLoading ? "checking…" : String(billingStatus)}</b> • Attempt {Math.min(tries + 1, 15)} of 15
+        Status: <b>{billingLoading ? "checking…" : String(status || "unknown")}</b> • Attempt{" "}
+        {Math.min(tries + 1, 15)} of 15
       </Typography>
 
       {error ? (
@@ -120,11 +131,7 @@ export default function BillingReturn() {
             Check again
           </Button>
 
-          <Button
-            sx={{ ml: 1 }}
-            variant="outlined"
-            onClick={() => nav("/billing", { replace: true })}
-          >
+          <Button sx={{ ml: 1 }} variant="outlined" onClick={() => nav("/billing", { replace: true })}>
             Back to billing
           </Button>
         </Box>
