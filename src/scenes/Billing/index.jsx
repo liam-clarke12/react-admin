@@ -168,8 +168,7 @@ export default function Billing() {
             {[
               "Inventory, recipes & production planning",
               "Batch traceability & compliance logs",
-              "Waste reduction & stock usage tracking",
-              "HR, roles & rostering",
+              "Waste reduction & stock usage tracking"
             ].map((t) => (
               <Box key={t} sx={{ display: "flex", gap: 1.25 }}>
                 <Box sx={{ color: brand.primary, fontWeight: 900 }}>✓</Box>

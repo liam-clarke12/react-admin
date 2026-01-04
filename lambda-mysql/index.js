@@ -1,8 +1,10 @@
+import "dotenv/config";
 const serverless = require('serverless-http');
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const morgan = require('morgan');
+
 
 // ... (previous code)
 
@@ -16,13 +18,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ✅ MySQL connection pool
-const db = mysql.createPool({
-  host: "database-2.clk2kak2yxlo.eu-west-1.rds.amazonaws.com",
-  user: "admin",
-  password: "Incorrect_123",
-  database: "hupes_database"
-});
-
+const db = mysql
+  .createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: Number(process.env.DB_PORT || 3306),
+    waitForConnections: true,
+    connectionLimit: 5,       // IMPORTANT for Lambda
+    queueLimit: 0
+  })
+  .promise();
 const pool = db.promise();
 
 // ✅ Test database connection
