@@ -318,13 +318,12 @@ function LoginLayout({ children }) {
   );
 }
 
-/** Extract Cognito sub from Amplify user object */
 function getCognitoSub(user) {
   return user?.userId || user?.username || user?.attributes?.sub || null;
 }
 
-/** Shared loading screen while billing status is being determined */
-function BillingLoadingScreen() {
+/** Blocker screen (prevents any intermediate flashes) */
+function FullscreenBlocker({ label = "Loading…" }) {
   return (
     <Box
       sx={{
@@ -347,24 +346,42 @@ function BillingLoadingScreen() {
         }}
       >
         <CircularProgress />
-        <Text style={{ color: brand.subtext, fontWeight: 600 }}>Checking your subscription…</Text>
+        <Text style={{ color: brand.subtext, fontWeight: 600 }}>{label}</Text>
       </Box>
     </Box>
   );
 }
 
 /**
- * ✅ Gate rules:
- * - Only show loader while billing is genuinely unresolved (loading OR status==="unknown")
- * - If not paid (including "none"), redirect to /billing so the Stripe CTA is visible
- * - If paid/trialing, allow the app routes
+ * ✅ Very important:
+ * Only allow protected content to render when authStatus === "authenticated".
+ * This kills the “logout flash” completely.
  */
+function RequireAuthenticated({ children }) {
+  const { authStatus } = useAuthenticator((ctx) => [ctx.authStatus]);
+
+  if (authStatus === "configuring") return <FullscreenBlocker label="Loading…" />;
+  if (authStatus !== "authenticated") return <Navigate to="/login" replace />;
+
+  return children;
+}
+
+/** Shared loading screen while billing status is being determined */
+function BillingLoadingScreen() {
+  return <FullscreenBlocker label="Checking your subscription…" />;
+}
+
+/** Paid gate */
 function RequirePaid() {
   const { billingStatus, billingLoading } = useAuth();
   const location = useLocation();
 
   const isPaid = billingStatus === "trialing" || billingStatus === "active";
-  const isUnknown = billingStatus === "unknown" || billingStatus === null || billingStatus === undefined || billingStatus === "";
+  const isUnknown =
+    billingStatus === "unknown" ||
+    billingStatus === null ||
+    billingStatus === undefined ||
+    billingStatus === "";
 
   if (billingLoading || isUnknown) return <BillingLoadingScreen />;
   if (!isPaid) return <Navigate to="/billing" replace state={{ from: location.pathname }} />;
@@ -372,10 +389,7 @@ function RequirePaid() {
   return <Outlet />;
 }
 
-/**
- * ✅ App shell (Sidebar + Topbar) only for actual app pages.
- * Billing pages render OUTSIDE this shell.
- */
+/** App shell */
 function MainAppShell() {
   const [theme, colorMode] = useMode();
 
@@ -399,19 +413,38 @@ function MainAppShell() {
 
 /**
  * ✅ Authenticated routing:
- * - /billing and /billing/return are outside the paid gate AND outside the shell
- * - everything else is inside the shell + RequirePaid
+ * Billing routes still require auth (to avoid rendering during sign-out),
+ * but are outside the paid gate and outside the shell.
  */
 function MainApp() {
   return (
     <Routes>
-      {/* Billing routes (authenticated but NOT gated) */}
-      <Route path="/billing" element={<Billing />} />
-      <Route path="/billing/return" element={<BillingReturn />} />
+      {/* Billing routes (AUTHENTICATED but NOT paid-gated) */}
+      <Route
+        path="/billing"
+        element={
+          <RequireAuthenticated>
+            <Billing />
+          </RequireAuthenticated>
+        }
+      />
+      <Route
+        path="/billing/return"
+        element={
+          <RequireAuthenticated>
+            <BillingReturn />
+          </RequireAuthenticated>
+        }
+      />
 
       {/* Everything else uses the app shell */}
-      <Route element={<MainAppShell />}>
-        {/* Paid-only routes */}
+      <Route
+        element={
+          <RequireAuthenticated>
+            <MainAppShell />
+          </RequireAuthenticated>
+        }
+      >
         <Route element={<RequirePaid />}>
           <Route path="/Roster" element={<Roster />} />
           <Route path="/Roles" element={<Roles />} />
@@ -430,23 +463,22 @@ function MainApp() {
           <Route path="/goods_out_form" element={<GoodsOutForm />} />
           <Route path="/goods_out" element={<GoodsOut />} />
 
-          {/* Default when inside paid app */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>
 
-      {/* Safety fallback */}
       <Route path="*" element={<Navigate to="/billing" replace />} />
     </Routes>
   );
 }
 
 function LoginScreen() {
-  const { user } = useAuthenticator((ctx) => [ctx.user]);
+  const { user, authStatus } = useAuthenticator((ctx) => [ctx.user, ctx.authStatus]);
 
-  // After login/sign-up: go dashboard (RequirePaid will redirect to billing if needed)
-  if (user) return <Navigate to="/dashboard" replace />;
+  // ✅ do NOT redirect off a stale user; only when authenticated
+  if (authStatus === "configuring") return <FullscreenBlocker label="Loading…" />;
+  if (authStatus === "authenticated" && user) return <Navigate to="/dashboard" replace />;
 
   return (
     <LoginLayout>
@@ -499,44 +531,24 @@ function LoginScreen() {
 }
 
 function PublicLanding() {
-  const { user } = useAuthenticator((ctx) => [ctx.user]);
-  return user ? <Navigate to="/dashboard" replace /> : <LandingPage />;
+  const { user, authStatus } = useAuthenticator((ctx) => [ctx.user, ctx.authStatus]);
+
+  // ✅ do NOT redirect based on stale user; only when authenticated
+  if (authStatus === "configuring") return <FullscreenBlocker label="Loading…" />;
+  if (authStatus === "authenticated" && user) return <Navigate to="/dashboard" replace />;
+
+  return <LandingPage />;
 }
 
 function ProtectedApp() {
-  const { user } = useAuthenticator((ctx) => [ctx.user]);
+  const { user, authStatus } = useAuthenticator((ctx) => [ctx.user, ctx.authStatus]);
 
-  if (!user) return <Navigate to="/login" replace />;
+  // ✅ During logout/config transitions, never render billing/app; go straight to /login.
+  if (authStatus === "configuring") return <FullscreenBlocker label="Loading…" />;
+  if (authStatus !== "authenticated" || !user) return <Navigate to="/login" replace />;
 
   const sub = getCognitoSub(user);
-  if (!sub) {
-    return (
-      <Box
-        sx={{
-          minHeight: "100dvh",
-          display: "grid",
-          placeItems: "center",
-          background: `linear-gradient(180deg, ${brand.surface} 0%, ${brand.surfaceMuted} 100%)`,
-        }}
-      >
-        <Box
-          sx={{
-            p: 3,
-            borderRadius: 2,
-            border: `1px solid ${brand.border}`,
-            background: brand.surface,
-            boxShadow: brand.shadow,
-            display: "grid",
-            placeItems: "center",
-            gap: 1,
-          }}
-        >
-          <CircularProgress />
-          <Text style={{ color: brand.subtext, fontWeight: 600 }}>Preparing your workspace…</Text>
-        </Box>
-      </Box>
-    );
-  }
+  if (!sub) return <FullscreenBlocker label="Preparing your workspace…" />;
 
   return (
     <AuthProvider initialCognitoId={sub}>

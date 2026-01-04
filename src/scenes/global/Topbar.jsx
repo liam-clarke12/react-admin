@@ -41,6 +41,7 @@ import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAuthenticator } from "@aws-amplify/ui-react";
 
 const getBrand = (isDark) => ({
   text: isDark ? "#f1f5f9" : "#1e293b",
@@ -80,7 +81,12 @@ const pageOptions = [
 
 export default function Topbar() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+
+  // Your custom cleanup (localStorage/cookies + context reset)
+  const { signOut: appSignOut } = useAuth();
+
+  // Amplify/Authenticator signOut (this is the one controlling the session in UI)
+  const { signOut: amplifySignOut } = useAuthenticator((ctx) => [ctx.signOut]);
 
   const [isDark, setIsDark] = useState(() => localStorage.getItem("theme-mode") === "dark");
   const brand = useMemo(() => getBrand(isDark), [isDark]);
@@ -118,28 +124,34 @@ export default function Topbar() {
   const profileOpen = Boolean(profileAnchor);
 
   /**
-   * ✅ Logout + redirect that does NOT require manual refresh
+   * ✅ Logout + redirect with NO flash:
+   * - redirect to a REAL public route (/login)
+   * - use window.location.replace to avoid routing through protected fallbacks
+   * - sign out both custom context AND Amplify Authenticator
    */
   const handleLogout = async () => {
     setLogoutOpen(false);
     setProfileAnchor(null);
     setNotifAnchor(null);
 
-    const targetAuthRoute = "/auth"; // <-- change if your auth route is different
+    const targetAuthRoute = "/login"; // ✅ must exist
 
     try {
-      await Promise.resolve(signOut?.());
+      // 1) Your cleanup (tokens/localStorage/cookies, billing state etc.)
+      await Promise.resolve(appSignOut?.());
     } catch (e) {
-      console.error("signOut error:", e);
-    } finally {
-      navigate(targetAuthRoute, { replace: true });
-
-      window.setTimeout(() => {
-        if (window.location.pathname !== targetAuthRoute) {
-          window.location.assign(targetAuthRoute);
-        }
-      }, 150);
+      console.warn("appSignOut error:", e);
     }
+
+    try {
+      // 2) Amplify/Authenticator sign-out (authoritative for UI session)
+      await Promise.resolve(amplifySignOut?.());
+    } catch (e) {
+      console.warn("amplifySignOut error:", e);
+    }
+
+    // 3) Hard replace to public route (prevents brief /billing redirect)
+    window.location.replace(targetAuthRoute);
   };
 
   return (
@@ -157,7 +169,7 @@ export default function Topbar() {
       }}
     >
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        {/* ✅ Brand (bigger + logo beside it, like LandingPage) */}
+        {/* Brand */}
         <Box
           onClick={() => navigate("/dashboard")}
           role="button"
@@ -213,7 +225,6 @@ export default function Topbar() {
                   <Typography sx={{ color: brand.text, fontWeight: 700, fontSize: "0.85rem" }}>
                     {option.label}
                   </Typography>
-                  {/* ✅ removed path display */}
                 </Box>
               </li>
             )}
@@ -303,7 +314,6 @@ export default function Topbar() {
       >
         <Box sx={{ p: 1.5 }}>
           <Typography sx={{ fontWeight: 900, color: brand.text, mb: 1 }}>Notifications</Typography>
-
           <Box
             sx={{
               p: 1.5,
