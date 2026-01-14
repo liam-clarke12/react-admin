@@ -446,58 +446,6 @@ const Sidebar = () => {
                   />
                 </Box>
               )}
-
-              <SectionHeader
-                label="HRP"
-                icon={<GroupWorkOutlinedIcon sx={{ fontSize: 18 }} />}
-                open={hrpOpen}
-                onToggle={() => setHrpOpen((v) => !v)}
-              />
-
-              {showHrpItems && (
-                <Box>
-                  <LockedItem
-                    title="Roster"
-                    to="/Roster"
-                    icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                    brand={brand}
-                  />
-                  <LockedItem
-                    title="Employees"
-                    to="/Employees"
-                    icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                    brand={brand}
-                  />
-                  <LockedItem
-                    title="Roles"
-                    to="/Roles"
-                    icon={<BadgeOutlinedIcon sx={{ fontSize: 18 }} />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                    brand={brand}
-                  />
-                  <LockedItem
-                    title="Leave Requests"
-                    to="/hrp/leave"
-                    icon={<EventNoteOutlinedIcon sx={{ fontSize: 18 }} />}
-                    selected={selected}
-                    setSelected={setSelected}
-                    unlocked={hrpUnlocked}
-                    requestUnlock={requestHrpUnlock}
-                    brand={brand}
-                  />
-                </Box>
-              )}
             </Menu>
           </ProSidebar>
 

@@ -156,6 +156,13 @@ const BrandStyles = ({ isDark }) => (
   .r-btn-primary:active {
     transform: translateY(0);
   }
+
+  .r-btn-primary[disabled],
+  .r-btn-ghost[disabled]{
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+  }
   
   .r-btn-danger { 
     background: linear-gradient(135deg, var(--danger) 0%, var(--danger2) 100%);
@@ -409,7 +416,7 @@ const BrandStyles = ({ isDark }) => (
     background: var(--card); 
     border-radius: 16px; 
     width: 100%; 
-    max-width: 920px; 
+    max-width: 920920px; 
     max-height: 90vh; 
     overflow: hidden; 
     box-shadow: var(--shadow-lg);
@@ -592,42 +599,18 @@ const BrandStyles = ({ isDark }) => (
 /* Icons */
 const Svg = (p) => <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" {...p} />
 const EditIcon = (props) => (
-  <Svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Svg>
 )
 const DeleteIcon = (props) => (
-  <Svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+  <Svg width="20" height="20" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </Svg>
 )
 const PlusIcon = (props) => (
-  <Svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
+  <Svg width="18" height="18" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M12 5v14M5 12h14" />
   </Svg>
 )
@@ -692,17 +675,8 @@ const SmallBarList = ({ data = [], isDark }) => {
         const pct = (Number(d.baseAmount) / maxBase) * 100
         return (
           <div key={d.ingredient}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569" }}>
-                {d.ingredient}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569" }}>{d.ingredient}</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#f1f5f9" : "#0f172a" }}>
                 {d.amount} {d.unit}
               </span>
@@ -784,6 +758,9 @@ export default function GoodsIn() {
   // ADD GOODS POPUP
   const [addOpen, setAddOpen] = useState(false)
   const [addTab, setAddTab] = useState(0) // 0 single, 1 multiple
+
+  // ✅ FIX #1: Submit lock (prevents double click + impatient tapping)
+  const [submitting, setSubmitting] = useState(false)
 
   // single entry state
   const [single, setSingle] = useState({
@@ -1176,23 +1153,37 @@ export default function GoodsIn() {
       invoiceNumber: it.invoiceNumber || null,
       supplier: it.supplier || null,
     }))
+
     const res = await fetch(`${API_BASE}/submit/batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entries, cognito_id: cognitoId }),
     })
+
     if (res.ok) return
-    for (const e of entries) {
-      const r = await fetch(`${API_BASE}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...e, cognito_id: cognitoId }),
-      })
-      if (!r.ok) console.warn("submit fallback failed:", await r.text().catch(() => r.status))
+
+    // ✅ FIX #2: avoid accidental double-writes
+    // Only do per-item fallback on 4xx (validation/client errors).
+    // If batch partially succeeded but returned 5xx/timeout, fallback would DUPLICATE.
+    if (res.status >= 400 && res.status < 500) {
+      for (const e of entries) {
+        const r = await fetch(`${API_BASE}/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...e, cognito_id: cognitoId }),
+        })
+        if (!r.ok) console.warn("submit fallback failed:", await r.text().catch(() => r.status))
+      }
+      return
     }
+
+    throw new Error(await res.text().catch(() => `Batch submit failed (${res.status})`))
   }
 
   const handleAddSubmit = async () => {
+    // ✅ FIX #1: submit lock
+    if (submitting) return
+    setSubmitting(true)
     try {
       if (!cognitoId) throw new Error("Missing cognito id")
       if (addTab === 0) await submitSingle()
@@ -1219,6 +1210,8 @@ export default function GoodsIn() {
     } catch (e) {
       console.error("Add Good(s) submit error:", e)
       alert(String(e?.message || e))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -1285,8 +1278,7 @@ export default function GoodsIn() {
       {/* Errors / Missing Cognito */}
       {!cognitoId && (
         <div className="gi-card" style={dangerCardStyle}>
-          <strong>Can’t load data:</strong> No cognito_id detected. Ensure your auth provider sets{" "}
-          <code>cognitoId</code>.
+          <strong>Can’t load data:</strong> No cognito_id detected. Ensure your auth provider sets <code>cognitoId</code>.
         </div>
       )}
       {fatalMsg && (
@@ -1448,11 +1440,7 @@ export default function GoodsIn() {
                             <span className="r-badge-mono">{row.barCode || "-"}</span>
                           </td>
                           <td className="r-td r-actions">
-                            <button
-                              className="r-btn-ghost"
-                              onClick={() => handleEditRow(row)}
-                              aria-label={`Edit ${row.barCode || ingredientDisplay}`}
-                            >
+                            <button className="r-btn-ghost" onClick={() => handleEditRow(row)} aria-label={`Edit ${row.barCode || ingredientDisplay}`}>
                               <EditIcon /> Edit
                             </button>
                           </td>
@@ -1468,15 +1456,10 @@ export default function GoodsIn() {
             <div className="r-footer">
               <span className="r-muted">
                 Showing <strong>{filteredRows.length === 0 ? 0 : page * rowsPerPage + 1}</strong>–
-                <strong>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of{" "}
-                <strong>{filteredRows.length}</strong>
+                <strong>{Math.min((page + 1) * rowsPerPage, filteredRows.length)}</strong> of <strong>{filteredRows.length}</strong>
               </span>
               <div className="r-flex">
-                <button
-                  className="r-btn-ghost"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
+                <button className="r-btn-ghost" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
                   Prev
                 </button>
                 <span className="r-muted">Page {page + 1}</span>
@@ -1517,40 +1500,19 @@ export default function GoodsIn() {
 
           <div className="gi-card">
             <h3>Total Remaining</h3>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">Grams Group</span>
               <strong>
                 {displayTotalsByGroup.gramsGroup.amount} {displayTotalsByGroup.gramsGroup.unit}
               </strong>
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">ml Group</span>
               <strong>
                 {displayTotalsByGroup.mlGroup.amount} {displayTotalsByGroup.mlGroup.unit}
               </strong>
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                padding: "6px 0",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "6px 0" }}>
               <span className="r-muted">Units Group</span>
               <strong>
                 {displayTotalsByGroup.unitsGroup.amount} {displayTotalsByGroup.unitsGroup.unit}
@@ -1583,56 +1545,27 @@ export default function GoodsIn() {
                 <div className="ag-grid">
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Ingredient</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.ingredient || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })}
-                    />
+                    <input className="ag-input" type="text" value={editingRow.ingredient || ""} onChange={(e) => setEditingRow({ ...editingRow, ingredient: e.target.value })} />
                   </div>
                   <div className="ag-field">
                     <label className="ag-label">Date</label>
-                    <input
-                      className="ag-input"
-                      type="date"
-                      value={editingRow.date || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}
-                    />
+                    <input className="ag-input" type="date" value={editingRow.date || ""} onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })} />
                   </div>
                   <div className="ag-field">
                     <label className="ag-label">Temperature (℃)</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.temperature || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })}
-                    />
+                    <input className="ag-input" type="text" value={editingRow.temperature || ""} onChange={(e) => setEditingRow({ ...editingRow, temperature: e.target.value })} />
                   </div>
                   <div className="ag-field-1">
                     <label className="ag-label">Stock Received</label>
-                    <input
-                      className="ag-input"
-                      type="number"
-                      value={editingRow.stockReceived || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })}
-                    />
+                    <input className="ag-input" type="number" value={editingRow.stockReceived || ""} onChange={(e) => setEditingRow({ ...editingRow, stockReceived: Number(e.target.value) })} />
                   </div>
                   <div className="ag-field-1">
                     <label className="ag-label">Stock Remaining</label>
-                    <input
-                      className="ag-input"
-                      type="number"
-                      value={editingRow.stockRemaining || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })}
-                    />
+                    <input className="ag-input" type="number" value={editingRow.stockRemaining || ""} onChange={(e) => setEditingRow({ ...editingRow, stockRemaining: Number(e.target.value) })} />
                   </div>
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Unit</label>
-                    <select
-                      className="ag-select"
-                      value={editingRow.unit || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}
-                    >
+                    <select className="ag-select" value={editingRow.unit || ""} onChange={(e) => setEditingRow({ ...editingRow, unit: e.target.value })}>
                       {unitOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
@@ -1642,39 +1575,19 @@ export default function GoodsIn() {
                   </div>
                   <div className="ag-field">
                     <label className="ag-label">Batch Code</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.barCode || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })}
-                    />
+                    <input className="ag-input" type="text" value={editingRow.barCode || ""} onChange={(e) => setEditingRow({ ...editingRow, barCode: e.target.value })} />
                   </div>
                   <div className="ag-field">
                     <label className="ag-label">Invoice Number</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.invoiceNumber || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })}
-                    />
+                    <input className="ag-input" type="text" value={editingRow.invoiceNumber || ""} onChange={(e) => setEditingRow({ ...editingRow, invoiceNumber: e.target.value })} />
                   </div>
                   <div className="ag-field">
                     <label className="ag-label">Supplier</label>
-                    <input
-                      className="ag-input"
-                      type="text"
-                      value={editingRow.supplier || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, supplier: e.target.value })}
-                    />
+                    <input className="ag-input" type="text" value={editingRow.supplier || ""} onChange={(e) => setEditingRow({ ...editingRow, supplier: e.target.value })} />
                   </div>
                   <div className="ag-field ag-field-4">
                     <label className="ag-label">Expiry Date</label>
-                    <input
-                      className="ag-input"
-                      type="date"
-                      value={editingRow.expiryDate || ""}
-                      onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })}
-                    />
+                    <input className="ag-input" type="date" value={editingRow.expiryDate || ""} onChange={(e) => setEditingRow({ ...editingRow, expiryDate: e.target.value })} />
                   </div>
                 </div>
               </div>
@@ -1728,14 +1641,7 @@ export default function GoodsIn() {
                 >
                   <DeleteIcon />
                 </div>
-                <h3
-                  style={{
-                    fontWeight: 900,
-                    color: isDark ? "#e5e7eb" : "#0f172a",
-                    marginTop: 10,
-                    fontSize: 18,
-                  }}
-                >
+                <h3 style={{ fontWeight: 900, color: isDark ? "#e5e7eb" : "#0f172a", marginTop: 10, fontSize: 18 }}>
                   Delete {numSelected} record{numSelected > 1 ? "s" : ""}?
                 </h3>
                 <p className="r-muted" style={{ marginTop: 6 }}>
@@ -1765,20 +1671,10 @@ export default function GoodsIn() {
                   Add Good(s)
                 </h3>
                 <div className="seg" role="tablist" aria-label="Add goods mode">
-                  <button
-                    role="tab"
-                    aria-selected={addTab === 0}
-                    className={addTab === 0 ? "active" : ""}
-                    onClick={() => setAddTab(0)}
-                  >
+                  <button role="tab" aria-selected={addTab === 0} className={addTab === 0 ? "active" : ""} onClick={() => setAddTab(0)} disabled={submitting}>
                     Single
                   </button>
-                  <button
-                    role="tab"
-                    aria-selected={addTab === 1}
-                    className={addTab === 1 ? "active" : ""}
-                    onClick={() => setAddTab(1)}
-                  >
+                  <button role="tab" aria-selected={addTab === 1} className={addTab === 1 ? "active" : ""} onClick={() => setAddTab(1)} disabled={submitting}>
                     Multiple ({multi.length})
                   </button>
                 </div>
@@ -1789,12 +1685,7 @@ export default function GoodsIn() {
                   <div className="ag-grid">
                     <div className="ag-field">
                       <label className="ag-label">Date</label>
-                      <input
-                        className="ag-input"
-                        type="date"
-                        value={single.date}
-                        onChange={(e) => setSingle((s) => ({ ...s, date: e.target.value }))}
-                      />
+                      <input className="ag-input" type="date" value={single.date} onChange={(e) => setSingle((s) => ({ ...s, date: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field">
@@ -1803,7 +1694,7 @@ export default function GoodsIn() {
                         options={ingredients}
                         value={ingredients.find((i) => String(i.id) === String(single.ingredient)) || null}
                         onChange={(_, val) => setSingle((s) => ({ ...s, ingredient: val ? val.id : "" }))}
-                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : (opt?.name ?? ""))}
+                        getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
                         isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                         loading={loadingMaster || loadingCustom}
                         slotProps={{ popper: { sx: { zIndex: 10020 } } }}
@@ -1823,9 +1714,10 @@ export default function GoodsIn() {
                             }}
                           />
                         )}
+                        disabled={submitting}
                       />
                       <div style={{ textAlign: "right", marginTop: 8 }}>
-                        <button className="r-btn-ghost" onClick={() => handleOpenAddIngredient({ mode: "single" })}>
+                        <button className="r-btn-ghost" onClick={() => handleOpenAddIngredient({ mode: "single" })} disabled={submitting}>
                           Add Ingredient +
                         </button>
                       </div>
@@ -1833,41 +1725,22 @@ export default function GoodsIn() {
 
                     <div className="ag-field">
                       <label className="ag-label">Invoice Number</label>
-                      <input
-                        className="ag-input"
-                        type="text"
-                        value={single.invoiceNumber}
-                        onChange={(e) => setSingle((s) => ({ ...s, invoiceNumber: e.target.value }))}
-                      />
+                      <input className="ag-input" type="text" value={single.invoiceNumber} onChange={(e) => setSingle((s) => ({ ...s, invoiceNumber: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field">
                       <label className="ag-label">Supplier</label>
-                      <input
-                        className="ag-input"
-                        type="text"
-                        value={single.supplier}
-                        onChange={(e) => setSingle((s) => ({ ...s, supplier: e.target.value }))}
-                      />
+                      <input className="ag-input" type="text" value={single.supplier} onChange={(e) => setSingle((s) => ({ ...s, supplier: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field-1">
                       <label className="ag-label">Stock Received</label>
-                      <input
-                        className="ag-input"
-                        type="number"
-                        value={single.stockReceived}
-                        onChange={(e) => setSingle((s) => ({ ...s, stockReceived: e.target.value }))}
-                      />
+                      <input className="ag-input" type="number" value={single.stockReceived} onChange={(e) => setSingle((s) => ({ ...s, stockReceived: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field-1">
                       <label className="ag-label">Unit</label>
-                      <select
-                        className="ag-select"
-                        value={single.unit}
-                        onChange={(e) => setSingle((s) => ({ ...s, unit: e.target.value }))}
-                      >
+                      <select className="ag-select" value={single.unit} onChange={(e) => setSingle((s) => ({ ...s, unit: e.target.value }))} disabled={submitting}>
                         {unitOptions.map((u) => (
                           <option key={u.value} value={u.value}>
                             {u.label}
@@ -1878,62 +1751,33 @@ export default function GoodsIn() {
 
                     <div className="ag-field">
                       <label className="ag-label">Batch Code</label>
-                      <input
-                        className="ag-input"
-                        type="text"
-                        value={single.barCode}
-                        onChange={(e) => setSingle((s) => ({ ...s, barCode: e.target.value }))}
-                      />
+                      <input className="ag-input" type="text" value={single.barCode} onChange={(e) => setSingle((s) => ({ ...s, barCode: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field">
                       <label className="ag-label">Expiry Date</label>
-                      <input
-                        className="ag-input"
-                        type="date"
-                        value={single.expiryDate}
-                        onChange={(e) => setSingle((s) => ({ ...s, expiryDate: e.target.value }))}
-                      />
+                      <input className="ag-input" type="date" value={single.expiryDate} onChange={(e) => setSingle((s) => ({ ...s, expiryDate: e.target.value }))} disabled={submitting} />
                     </div>
 
                     <div className="ag-field">
                       <label className="ag-label">Temperature (℃)</label>
-                      <input
-                        className="ag-input"
-                        type="text"
-                        value={single.temperature}
-                        onChange={(e) => setSingle((s) => ({ ...s, temperature: e.target.value }))}
-                      />
+                      <input className="ag-input" type="text" value={single.temperature} onChange={(e) => setSingle((s) => ({ ...s, temperature: e.target.value }))} disabled={submitting} />
                     </div>
                   </div>
                 ) : (
                   <div style={{ display: "grid", gap: 12 }}>
                     {multi.map((it, idx) => (
                       <div key={idx} className="ag-row">
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 8,
-                          }}
-                        >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                           <strong style={{ color: isDark ? "#e5e7eb" : "#0f172a" }}>Good {idx + 1}</strong>
-                          <IconButton size="small" onClick={() => removeMultiRow(idx)}>
+                          <IconButton size="small" onClick={() => removeMultiRow(idx)} disabled={submitting}>
                             <DeleteIcon />
                           </IconButton>
                         </div>
                         <div className="ag-grid">
                           <div className="ag-field">
                             <label className="ag-label">Date</label>
-                            <input
-                              className="ag-input"
-                              type="date"
-                              value={it.date}
-                              onChange={(e) =>
-                                setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, date: e.target.value } : v)))
-                              }
-                            />
+                            <input className="ag-input" type="date" value={it.date} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, date: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field">
@@ -1941,12 +1785,8 @@ export default function GoodsIn() {
                             <Autocomplete
                               options={ingredients}
                               value={ingredients.find((i) => String(i.id) === String(it.ingredient)) || null}
-                              onChange={(_, val) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, ingredient: val ? val.id : "" } : v)),
-                                )
-                              }
-                              getOptionLabel={(opt) => (typeof opt === "string" ? opt : (opt?.name ?? ""))}
+                              onChange={(_, val) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, ingredient: val ? val.id : "" } : v)))}
+                              getOptionLabel={(opt) => (typeof opt === "string" ? opt : opt?.name ?? "")}
                               isOptionEqualToValue={(opt, val) => (opt?.id ?? opt) === (val?.id ?? val)}
                               loading={loadingMaster || loadingCustom}
                               slotProps={{ popper: { sx: { zIndex: 10020 } } }}
@@ -1966,12 +1806,10 @@ export default function GoodsIn() {
                                   }}
                                 />
                               )}
+                              disabled={submitting}
                             />
                             <div style={{ textAlign: "right", marginTop: 8 }}>
-                              <button
-                                className="r-btn-ghost"
-                                onClick={() => handleOpenAddIngredient({ mode: "multi", index: idx })}
-                              >
+                              <button className="r-btn-ghost" onClick={() => handleOpenAddIngredient({ mode: "multi", index: idx })} disabled={submitting}>
                                 Add Ingredient +
                               </button>
                             </div>
@@ -1979,55 +1817,22 @@ export default function GoodsIn() {
 
                           <div className="ag-field">
                             <label className="ag-label">Invoice Number</label>
-                            <input
-                              className="ag-input"
-                              type="text"
-                              value={it.invoiceNumber}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, invoiceNumber: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="text" value={it.invoiceNumber} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, invoiceNumber: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field">
                             <label className="ag-label">Supplier</label>
-                            <input
-                              className="ag-input"
-                              type="text"
-                              value={it.supplier}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, supplier: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="text" value={it.supplier} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, supplier: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field-1">
                             <label className="ag-label">Stock Received</label>
-                            <input
-                              className="ag-input"
-                              type="number"
-                              value={it.stockReceived}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, stockReceived: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="number" value={it.stockReceived} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, stockReceived: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field-1">
                             <label className="ag-label">Unit</label>
-                            <select
-                              className="ag-select"
-                              value={it.unit}
-                              onChange={(e) =>
-                                setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, unit: e.target.value } : v)))
-                              }
-                            >
+                            <select className="ag-select" value={it.unit} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, unit: e.target.value } : v)))} disabled={submitting}>
                               {unitOptions.map((u) => (
                                 <option key={u.value} value={u.value}>
                                   {u.label}
@@ -2038,50 +1843,23 @@ export default function GoodsIn() {
 
                           <div className="ag-field">
                             <label className="ag-label">Batch Code</label>
-                            <input
-                              className="ag-input"
-                              type="text"
-                              value={it.barCode}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, barCode: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="text" value={it.barCode} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, barCode: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field">
                             <label className="ag-label">Expiry Date</label>
-                            <input
-                              className="ag-input"
-                              type="date"
-                              value={it.expiryDate}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, expiryDate: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="date" value={it.expiryDate} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, expiryDate: e.target.value } : v)))} disabled={submitting} />
                           </div>
 
                           <div className="ag-field">
                             <label className="ag-label">Temperature (℃)</label>
-                            <input
-                              className="ag-input"
-                              type="text"
-                              value={it.temperature}
-                              onChange={(e) =>
-                                setMulti((arr) =>
-                                  arr.map((v, i) => (i === idx ? { ...v, temperature: e.target.value } : v)),
-                                )
-                              }
-                            />
+                            <input className="ag-input" type="text" value={it.temperature} onChange={(e) => setMulti((arr) => arr.map((v, i) => (i === idx ? { ...v, temperature: e.target.value } : v)))} disabled={submitting} />
                           </div>
                         </div>
                       </div>
                     ))}
                     <div>
-                      <button className="r-btn-ghost" onClick={addMultiRow}>
+                      <button className="r-btn-ghost" onClick={addMultiRow} disabled={submitting}>
                         <PlusIcon /> Add another
                       </button>
                     </div>
@@ -2090,11 +1868,11 @@ export default function GoodsIn() {
               </div>
 
               <div className="r-mfooter">
-                <button className="r-btn-ghost" onClick={() => setAddOpen(false)}>
+                <button className="r-btn-ghost" onClick={() => setAddOpen(false)} disabled={submitting}>
                   Cancel
                 </button>
-                <button className="r-btn-primary" onClick={handleAddSubmit}>
-                  {addTab === 0 ? "Add Good" : `Add ${multi.length} Good(s)`}
+                <button className="r-btn-primary" onClick={handleAddSubmit} disabled={submitting}>
+                  {submitting ? "Saving..." : addTab === 0 ? "Add Good" : `Add ${multi.length} Good(s)`}
                 </button>
               </div>
             </div>
@@ -2110,6 +1888,13 @@ export default function GoodsIn() {
           setIngTarget(null)
         }}
         fullWidth
+        // ✅ FIX: Ensure MUI Dialog sits ABOVE the portaled custom modal (z-index 9999/10000)
+        sx={{
+          zIndex: 20000,
+          "& .MuiBackdrop-root": { zIndex: 20000 },
+          "& .MuiDialog-container": { zIndex: 20001 },
+          "& .MuiPaper-root": { zIndex: 20002 },
+        }}
         PaperProps={{
           sx: {
             borderRadius: 14,
@@ -2165,12 +1950,7 @@ export default function GoodsIn() {
       </Dialog>
 
       {/* Toast */}
-      <Snackbar
-        open={toastOpen}
-        autoHideDuration={2500}
-        onClose={() => setToastOpen(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
+      <Snackbar open={toastOpen} autoHideDuration={2500} onClose={() => setToastOpen(false)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
         <Alert
           onClose={() => setToastOpen(false)}
           severity="success"

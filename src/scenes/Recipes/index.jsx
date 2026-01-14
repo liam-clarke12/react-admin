@@ -948,19 +948,29 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   }, [open]);
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          border: "1px solid var(--border)",
-          backgroundColor: "var(--card)",
+  <Dialog
+  open={open}
+  onClose={onClose}
+  fullWidth
+
+  // ✅ FIX: force MUI Dialog above our portaled overlay/modal (9999)
+  sx={{
+    zIndex: 20000,
+    "& .MuiBackdrop-root": { zIndex: 20000 },
+    "& .MuiDialog-container": { zIndex: 20001 },
+    "& .MuiPaper-root": { zIndex: 20002 },
+  }}
+
+  PaperProps={{
+    sx: {
+        borderRadius: 2,
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--card)",
           color: "var(--text)",
         },
       }}
     >
+
       <DialogTitle sx={{ fontWeight: 800, color: "var(--text)" }}>
         Add New Ingredient
       </DialogTitle>
