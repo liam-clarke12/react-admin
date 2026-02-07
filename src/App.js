@@ -176,24 +176,9 @@ const amplifyComponents = {
             You’re signing up for <span style={{ color: brand.text }}>Hupes MRP Planner</span>
           </Text>
 
-          <View
-            style={{
-              margin: "0 auto",
-              maxWidth: 360,
-              border: `1px solid ${brand.border}`,
-              background: brand.surfaceMuted,
-              borderRadius: 14,
-              padding: 12,
-            }}
-          >
-            <Text style={{ color: brand.text, fontWeight: 800, marginBottom: 4 }}>€124.99 / month</Text>
-            <Text style={{ color: brand.subtext, fontWeight: 600 }}>
-              Includes a 7-day free trial. Cancel anytime during the trial.
-            </Text>
-          </View>
-
+          {/* ✅ Price/plan callout removed */}
           <Text style={{ color: brand.subtext, marginTop: 10, fontSize: 13 }}>
-            After you create your account, you’ll be prompted to start your free trial via secure Stripe checkout.
+            After you create your account, you’ll be prompted to start your trial via secure Stripe checkout.
           </Text>
         </View>
       );
@@ -222,13 +207,7 @@ const amplifyComponents = {
             hasError={!!validationErrors.acknowledgement}
           />
 
-          <CheckboxField
-            name="plan_ack"
-            label="I understand Hupes MRP Planner is €124.99/month after a 7-day free trial (Stripe checkout required)."
-            isRequired
-            errorMessage={validationErrors.plan_ack}
-            hasError={!!validationErrors.plan_ack}
-          />
+          {/* ✅ Stripe/trial acknowledgement removed */}
         </>
       );
     },
@@ -380,18 +359,12 @@ function RequirePaid() {
 
   // ✅ Allow access while cancelling (cancel_at_period_end)
   // Optional: add "past_due" / "unpaid" depending on how strict you want to be.
-  const isPaid =
-    status === "trialing" ||
-    status === "active" ||
-    status === "cancelling";
-    // || status === "past_due"
-    // || status === "unpaid";
+  const isPaid = status === "trialing" || status === "active" || status === "cancelling";
+  // || status === "past_due"
+  // || status === "unpaid";
 
   const isUnknown =
-    status === "unknown" ||
-    status === "" ||
-    billingStatus === null ||
-    billingStatus === undefined;
+    status === "unknown" || status === "" || billingStatus === null || billingStatus === undefined;
 
   if (billingLoading || isUnknown) return <BillingLoadingScreen />;
   if (!isPaid) return <Navigate to="/billing" replace state={{ from: location.pathname }} />;
@@ -520,7 +493,7 @@ function LoginScreen() {
             const isBlank = (v) => !v || String(v).trim() === "";
 
             if (!formData?.acknowledgement) errors.acknowledgement = "You must accept the Terms and Conditions.";
-            if (!formData?.plan_ack) errors.plan_ack = "Please confirm the plan pricing and trial terms to continue.";
+            // ✅ plan_ack removed entirely
 
             if (isBlank(get("given_name"))) errors["given_name"] = "First name is required.";
             if (isBlank(get("family_name"))) errors["family_name"] = "Last name is required.";
