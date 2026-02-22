@@ -1,84 +1,103 @@
-import "dotenv/config";
-const serverless = require('serverless-http');
-const express = require('express');
-const mysql = require('mysql2');
-const cors = require('cors');
-const morgan = require('morgan');
-
+require("dotenv").config();
+const serverless = require("serverless-http");
+const express = require("express");
+const mysql = require("mysql2");
+const cors = require("cors");
+const morgan = require("morgan");
 
 // ... (previous code)
 
 const app = express();
 
 // ✅ Enhanced request logging
-app.use(morgan(':method :url :status :res[content-length] - :response-time ms\nHeaders: :req[headers]\nBody: :req[body]'));
+app.use(
+  morgan(
+    ":method :url :status :res[content-length] - :response-time ms\nHeaders: :req[headers]\nBody: :req[body]"
+  )
+);
 
 // ✅ Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ✅ MySQL connection pool
-const db = mysql
-  .createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: Number(process.env.DB_PORT || 3306),
-    waitForConnections: true,
-    connectionLimit: 5,       // IMPORTANT for Lambda
-    queueLimit: 0
-  })
-  .promise();
-const pool = db.promise();
+/* =============================================================================
+   ✅ FIX A (Recommended): keep a real Pool, create a PromisePool wrapper once
+   - pool: callback-style pool (rarely used directly)
+   - db: promise wrapper (use this for async/await queries + getConnection)
+   ========================================================================== */
 
-// ✅ Test database connection
-db.getConnection((err, conn) => {
-  if (err) {
-    console.error('DB connection failed:', err);
-    return;
-  }
-  console.log('DB connected successfully');
-  conn.release();
+// ✅ MySQL connection pool (callback pool)
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: Number(process.env.DB_PORT || 3306),
+  waitForConnections: true,
+  connectionLimit: 5, // IMPORTANT for Lambda
+  queueLimit: 0,
 });
 
+// ✅ Promise wrapper (use THIS everywhere for async/await)
+const db = pool.promise();
+
+// ✅ Test database connection (promise style)
+(async () => {
+  try {
+    const conn = await db.getConnection();
+    console.log("DB connected successfully");
+    conn.release();
+  } catch (err) {
+    console.error("DB connection failed:", err);
+  }
+})();
+
 // ✅ CORS Configuration (THIS IS THE ONE TO KEEP)
-app.use(cors({
-  origin: function (origin, callback) {
-    console.log(`CORS Origin Check: ${origin}`);
-    const allowedOrigins = [
-      'https://master.d2fdrxobxyr2je.amplifyapp.com',
-      'http://localhost:3000' // For local development
-    ];
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
-  credentials: true,
-  maxAge: 86400,
-  preflightContinue: false, // This is usually false, meaning the cors middleware handles the preflight.
-  optionsSuccessStatus: 204
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      console.log(`CORS Origin Check: ${origin}`);
+      const allowedOrigins = [
+        "https://master.d2fdrxobxyr2je.amplifyapp.com",
+        "http://localhost:3000", // For local development
+      ];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Origin",
+      "Accept",
+    ],
+    credentials: true,
+    maxAge: 86400,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
 
 app.options(/(.*)/, cors()); // Allow preflight requests globally
 
 app.use((req, res, next) => {
-  if (typeof req.body === 'string') {
+  if (typeof req.body === "string") {
     try {
       req.body = JSON.parse(req.body);
     } catch (err) {
-      console.error('Error parsing JSON body:', err.message);
+      console.error("Error parsing JSON body:", err.message);
     }
   }
   next();
 });
 
+// ✅ Use db (PromisePool) here
 async function withConn(fn) {
-  const conn = await pool.getConnection();
+  const conn = await db.getConnection();
   try {
     return await fn(conn);
   } finally {
@@ -88,17 +107,21 @@ async function withConn(fn) {
 
 function addCorsHeaders(res, req) {
   try {
-    const FRONTEND_ORIGIN = 'https://master.d2fdrxobxyr2je.amplifyapp.com';
-    // If req is provided and has an Origin header, echo it when allowed (optional)
+    const FRONTEND_ORIGIN = "https://master.d2fdrxobxyr2je.amplifyapp.com";
     const origin = (req && req.headers && req.headers.origin) || FRONTEND_ORIGIN;
-    // Always set these headers so client receives them even on error responses
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Origin, Accept');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Origin, Accept"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS"
+    );
   } catch (err) {
-    // defensive: if res is already finished, don't let this blow up the request
-    console.warn('addCorsHeaders failed:', err && err.message);
+    console.warn("addCorsHeaders failed:", err && err.message);
   }
 }
 
@@ -849,16 +872,16 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
   }
 });
 
-// **New API Endpoint to Add a Recipe**
 app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
 
-  const { recipe, upb, ingredients, quantities, units, cognito_id } = req.body;
+  const { recipe, upb, notes, ingredients, quantities, units, cognito_id } = req.body;
 
   // Basic validation
   if (
     !recipe ||
-    !upb ||
+    upb === undefined ||
+    upb === null ||
     !cognito_id ||
     !Array.isArray(ingredients) ||
     !Array.isArray(quantities) ||
@@ -875,22 +898,26 @@ app.post("/api/add-recipe", async (req, res) => {
     await connection.beginTransaction();
     console.log("Transaction started");
 
-    // Insert into recipes
+    // Insert into recipes (✅ now includes notes)
     const [recipeResult] = await connection.execute(
       `INSERT INTO recipes 
-         (recipe_name, units_per_batch, user_id) 
-       VALUES (?, ?, ?)`,
-      [recipe, upb, cognito_id]
+         (recipe_name, units_per_batch, notes, user_id) 
+       VALUES (?, ?, ?, ?)`,
+      [recipe, upb, (notes && String(notes).trim()) ? String(notes).trim() : null, cognito_id]
     );
+
     const recipeId = recipeResult.insertId;
     console.log("Inserted recipe with ID:", recipeId);
 
     // For each ingredient, link (with quantity + unit)
     for (let i = 0; i < ingredients.length; i++) {
       const name = ingredients[i];
-      const qty  = quantities[i];
+      const qty = quantities[i];
       const unit = units[i];
       console.log(`Processing ${name}: ${qty} ${unit}`);
+
+      // Skip empty ingredient rows safely (optional but prevents junk rows)
+      if (!name || !String(name).trim()) continue;
 
       // Find or create ingredient
       const [ingRows] = await connection.execute(
@@ -898,7 +925,7 @@ app.post("/api/add-recipe", async (req, res) => {
            FROM ingredients 
           WHERE ingredient_name = ? 
             AND user_id = ?`,
-        [name, cognito_id]
+        [String(name).trim(), cognito_id]
       );
 
       let ingredientId;
@@ -909,7 +936,7 @@ app.post("/api/add-recipe", async (req, res) => {
           `INSERT INTO ingredients 
              (ingredient_name, user_id) 
            VALUES (?, ?)`,
-          [name, cognito_id]
+          [String(name).trim(), cognito_id]
         );
         ingredientId = ingRes.insertId;
       }
@@ -919,26 +946,37 @@ app.post("/api/add-recipe", async (req, res) => {
         `INSERT INTO recipe_ingredients 
            (recipe_id, ingredient_id, quantity, unit, user_id) 
          VALUES (?, ?, ?, ?, ?)`,
-        [recipeId, ingredientId, qty, unit, cognito_id]
+        [
+          recipeId,
+          ingredientId,
+          qty === undefined || qty === null || qty === "" ? 0 : qty,
+          unit ? String(unit) : "",
+          cognito_id,
+        ]
       );
+
       console.log(`Linked ingredient ${ingredientId} → recipe ${recipeId}`);
     }
 
     await connection.commit();
     console.log("Transaction committed");
-    res.status(200).json({ message: "Recipe added successfully!" });
+    res.status(200).json({ message: "Recipe added successfully!", recipe_id: recipeId });
   } catch (err) {
     await connection.rollback();
     console.error("Error, rolled back:", err);
-    res.status(500).json({ error: "Database transaction failed", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Database transaction failed", details: err.message });
   } finally {
     connection.release();
     console.log("Connection released");
   }
 });
 
-// **Fetch all recipes**
-// server route: GET /api/recipes
+
+// ==============================
+// ✅ GET /api/recipes (updated to include notes)
+// ==============================
 app.get("/api/recipes", async (req, res) => {
   const { cognito_id } = req.query;
 
@@ -954,6 +992,7 @@ app.get("/api/recipes", async (req, res) => {
         r.id AS recipe_id,
         r.recipe_name AS recipe,
         r.units_per_batch,
+        IFNULL(r.notes, '') AS notes,
         i.ingredient_name AS ingredient,
         ri.quantity,
         IFNULL(ri.unit, '') AS unit
@@ -966,7 +1005,6 @@ app.get("/api/recipes", async (req, res) => {
       [cognito_id]
     );
 
-    // results will now include a "unit" property for each ingredient row
     res.json(results);
   } catch (err) {
     console.error("Failed to fetch recipes:", err);
@@ -1027,26 +1065,44 @@ app.post("/api/delete-recipe", async (req, res) => {
 });
 
 // Endpoint to fetch unique recipe names for a given cognito_id
-app.get('/dev/get-recipes', (req, res) => {
-  const { cognito_id } = req.query;  // Extract cognito_id from query parameters
+// ==============================
+// ✅ GET /dev/get-recipes (updated to include notes)
+// Returns: [{ recipe_name, notes }]
+// ==============================
+app.get("/dev/get-recipes", (req, res) => {
+  const { cognito_id } = req.query;
+
+  if (!cognito_id) {
+    return res.status(400).json({ message: "cognito_id is required" });
+  }
+
   const query = `
-    SELECT DISTINCT recipe_name
+    SELECT DISTINCT
+      recipe_name,
+      IFNULL(notes, '') AS notes
     FROM recipes
-    WHERE user_id = ?;
+    WHERE user_id = ?
+    ORDER BY recipe_name ASC;
   `;
-  
-  db.query(query, [cognito_id], (error, results) => {  // Use cognito_id from query parameters
+
+  db.query(query, [cognito_id], (error, results) => {
     if (error) {
-      return res.status(500).json({ message: 'Error fetching recipes', error });
+      return res.status(500).json({ message: "Error fetching recipes", error });
     }
-    res.json(results); // Send back the recipe names
+    res.json(results);
   });
 });
 
+
+// ==============================
+// ✅ PUT /api/recipes/:id (updated to accept + store notes)
+// Expects body: { recipe, upb, notes, ingredients[], quantities[], units[], cognito_id }
+// ==============================
 app.put("/api/recipes/:id", async (req, res) => {
   const recipeId = req.params.id;
   const FRONTEND_ORIGIN = "https://master.d2fdrxobxyr2je.amplifyapp.com";
-  const { recipe, upb, ingredients, quantities, units, cognito_id } = req.body;
+
+  const { recipe, upb, notes, ingredients, quantities, units, cognito_id } = req.body;
 
   res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -1054,70 +1110,121 @@ app.put("/api/recipes/:id", async (req, res) => {
   if (!recipeId) return res.status(400).json({ error: "recipe id required in path" });
   if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
   if (!recipe) return res.status(400).json({ error: "recipe name is required" });
-  if (!Array.isArray(ingredients) || !Array.isArray(quantities) || !Array.isArray(units) || ingredients.length !== quantities.length || ingredients.length !== units.length) {
-    return res.status(400).json({ error: "ingredients, quantities, units arrays must be same length" });
+
+  if (
+    !Array.isArray(ingredients) ||
+    !Array.isArray(quantities) ||
+    !Array.isArray(units) ||
+    ingredients.length !== quantities.length ||
+    ingredients.length !== units.length
+  ) {
+    return res
+      .status(400)
+      .json({ error: "ingredients, quantities, units arrays must be same length" });
   }
 
   const conn = await db.promise().getConnection();
   try {
-    console.info(`[PUT.recipes] Starting transaction for recipe=${recipeId} user=${cognito_id}`);
+    console.info(
+      `[PUT.recipes] Starting transaction for recipe=${recipeId} user=${cognito_id}`
+    );
     await conn.beginTransaction();
 
     // Verify ownership
-    const [found] = await conn.execute(`SELECT id, user_id FROM recipes WHERE id = ? LIMIT 1`, [recipeId]);
+    const [found] = await conn.execute(
+      `SELECT id, user_id FROM recipes WHERE id = ? LIMIT 1`,
+      [recipeId]
+    );
+
     if (!found || found.length === 0 || String(found[0].user_id) !== String(cognito_id)) {
       await conn.rollback();
-      console.warn(`[PUT.recipes] recipe not found or not owned: recipe=${recipeId}, user=${cognito_id}`);
+      console.warn(
+        `[PUT.recipes] recipe not found or not owned: recipe=${recipeId}, user=${cognito_id}`
+      );
       return res.status(404).json({ error: "Recipe not found or not owned by user" });
     }
 
-    // Update recipe meta
-    await conn.execute(`UPDATE recipes SET recipe_name = ?, units_per_batch = ? WHERE id = ?`, [recipe, upb, recipeId]);
+    // ✅ Update recipe meta (now includes notes)
+    await conn.execute(
+      `UPDATE recipes 
+         SET recipe_name = ?, units_per_batch = ?, notes = ?
+       WHERE id = ?`,
+      [
+        recipe,
+        upb,
+        (notes && String(notes).trim()) ? String(notes).trim() : null,
+        recipeId,
+      ]
+    );
 
     // Delete existing recipe_ingredients for this recipe and user
-    await conn.execute(`DELETE FROM recipe_ingredients WHERE recipe_id = ? AND user_id = ?`, [recipeId, cognito_id]);
+    await conn.execute(
+      `DELETE FROM recipe_ingredients WHERE recipe_id = ? AND user_id = ?`,
+      [recipeId, cognito_id]
+    );
 
-    // For each provided ingredient name, ensure an ingredient row exists for the user (find or create), then insert into recipe_ingredients
+    // Re-insert recipe_ingredients
     for (let i = 0; i < ingredients.length; i++) {
-      const ingName = String(ingredients[i]).trim();
+      const ingName = String(ingredients[i] ?? "").trim();
       const qty = quantities[i];
       const unitVal = units[i];
 
       if (!ingName) {
-        // skip blank names but log this unusual case
-        console.warn(`[PUT.recipes] Skipping empty ingredient at index ${i} for recipe ${recipeId}`);
+        console.warn(
+          `[PUT.recipes] Skipping empty ingredient at index ${i} for recipe ${recipeId}`
+        );
         continue;
       }
 
-      // find ingredient for user
-      const [ingRows] = await conn.execute(`SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ? LIMIT 1`, [ingName, cognito_id]);
+      // Find ingredient for user
+      const [ingRows] = await conn.execute(
+        `SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ? LIMIT 1`,
+        [ingName, cognito_id]
+      );
+
       let ingredientId;
       if (ingRows && ingRows.length) {
         ingredientId = ingRows[0].id;
       } else {
-        const [ins] = await conn.execute(`INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)`, [ingName, cognito_id]);
+        const [ins] = await conn.execute(
+          `INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)`,
+          [ingName, cognito_id]
+        );
         ingredientId = ins.insertId;
       }
 
-      // insert recipe_ingredient
+      // Insert recipe_ingredient
       await conn.execute(
-        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, user_id) VALUES (?, ?, ?, ?, ?)`,
-        [recipeId, ingredientId, qty, unitVal, cognito_id]
+        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, user_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          recipeId,
+          ingredientId,
+          qty === undefined || qty === null || qty === "" ? 0 : qty,
+          unitVal ? String(unitVal) : "",
+          cognito_id,
+        ]
       );
     }
 
     await conn.commit();
     console.info(`[PUT.recipes] Commit successful recipe=${recipeId} user=${cognito_id}`);
 
-    // Return updated recipe (reselect)
+    // Return updated recipe (reselect) ✅ include notes
     const [updatedRows] = await db.promise().execute(
-      `SELECT r.id as recipe_id, r.recipe_name, r.units_per_batch,
-              i.ingredient_name, ri.quantity, ri.unit
+      `SELECT 
+          r.id AS recipe_id,
+          r.recipe_name,
+          r.units_per_batch,
+          IFNULL(r.notes,'') AS notes,
+          i.ingredient_name,
+          ri.quantity,
+          IFNULL(ri.unit,'') AS unit
        FROM recipes r
        JOIN recipe_ingredients ri ON ri.recipe_id = r.id
        JOIN ingredients i ON i.id = ri.ingredient_id
        WHERE r.id = ? AND r.user_id = ?
-    `,
+       ORDER BY ri.id ASC`,
       [recipeId, cognito_id]
     );
 
@@ -1175,10 +1282,17 @@ app.get("/api/recipes/:id", async (req, res) => {
   const start = Date.now();
 
   // set CORS to match other routes you have
-  res.setHeader("Access-Control-Allow-Origin", "https://master.d2fdrxobxyr2je.amplifyapp.com");
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://master.d2fdrxobxyr2je.amplifyapp.com"
+  );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  console.info(`[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(req.query)} headers=${JSON.stringify(req.headers)}`);
+  console.info(
+    `[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(
+      req.query
+    )} headers=${JSON.stringify(req.headers)}`
+  );
 
   if (!recipeId) {
     console.warn("[GET.recipes.id] missing recipeId in params");
@@ -1190,34 +1304,49 @@ app.get("/api/recipes/:id", async (req, res) => {
   }
 
   try {
-    // Query recipe + its ingredients
+    // ✅ Query recipe + its ingredients (now includes notes)
     const sql = `
-      SELECT r.id as recipe_id,
-             r.recipe_name,
-             r.units_per_batch,
-             ri.id as recipe_ingredient_id,
-             ri.quantity,
-             ri.unit,
-             i.id as ingredient_id,
-             i.ingredient_name
+      SELECT 
+        r.id as recipe_id,
+        r.recipe_name,
+        r.units_per_batch,
+        IFNULL(r.notes,'') AS notes,
+        ri.id as recipe_ingredient_id,
+        ri.quantity,
+        IFNULL(ri.unit,'') AS unit,
+        i.id as ingredient_id,
+        i.ingredient_name
       FROM recipes r
-      LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.user_id = r.user_id
-      LEFT JOIN ingredients i ON i.id = ri.ingredient_id AND i.user_id = r.user_id
+      LEFT JOIN recipe_ingredients ri 
+        ON ri.recipe_id = r.id 
+       AND ri.user_id = r.user_id
+      LEFT JOIN ingredients i 
+        ON i.id = ri.ingredient_id 
+       AND i.user_id = r.user_id
       WHERE r.id = ? AND r.user_id = ?
+      ORDER BY ri.id ASC
     `;
-    console.info(`[GET.recipes.id] Executing query: ${sql.trim()} -- params: [${recipeId}, ${cognito_id}]`);
+
+    console.info(
+      `[GET.recipes.id] Executing query: ${sql.trim()} -- params: [${recipeId}, ${cognito_id}]`
+    );
 
     const [rows] = await db.promise().execute(sql, [recipeId, cognito_id]);
 
-    console.info(`[GET.recipes.id] Query returned rows.length=${rows && rows.length}`);
+    console.info(
+      `[GET.recipes.id] Query returned rows.length=${rows && rows.length}`
+    );
 
     if (!rows || rows.length === 0) {
-      console.warn(`[GET.recipes.id] Not found or not owned by user: recipe=${recipeId} user=${cognito_id}`);
+      console.warn(
+        `[GET.recipes.id] Not found or not owned by user: recipe=${recipeId} user=${cognito_id}`
+      );
       return res.status(404).json({ error: "Recipe not found or not owned by user" });
     }
 
     // build response shape
     const recipeMeta = rows[0];
+
     const ingredients = rows
       .filter((r) => r.ingredient_name !== null)
       .map((r) => ({
@@ -1232,13 +1361,19 @@ app.get("/api/recipes/:id", async (req, res) => {
       recipe_id: recipeMeta.recipe_id,
       recipe_name: recipeMeta.recipe_name,
       units_per_batch: recipeMeta.units_per_batch,
+      notes: recipeMeta.notes, // ✅ NEW
       ingredients,
     };
 
-    console.info(`[GET.recipes.id] Responding (${Date.now() - start}ms) payload.items=${ingredients.length}`);
+    console.info(
+      `[GET.recipes.id] Responding (${Date.now() - start}ms) payload.items=${ingredients.length}`
+    );
     return res.json(payload);
   } catch (err) {
-    console.error("[GET.recipes.id] DB error:", { message: err.message, stack: err.stack });
+    console.error("[GET.recipes.id] DB error:", {
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: "Database error", details: err.message });
   }
 });

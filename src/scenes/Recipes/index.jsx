@@ -277,6 +277,7 @@ const BrandStyles = ({ isDark }) => (
     border: 0;
     cursor: pointer;
     padding: 0;
+    text-align: left;
   }
   .r-link:hover { text-decoration: underline; color: var(--primary-dark); }
 
@@ -313,10 +314,41 @@ const BrandStyles = ({ isDark }) => (
     text-overflow: ellipsis;
     white-space: nowrap;
     border-bottom: 1px solid var(--border);
+    vertical-align: middle;
   }
   .r-td--name { font-weight: 700; color: var(--text); }
   .r-actions { text-align: right; }
   .r-chk { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+
+  /* Notes preview chip */
+  .r-note-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 320px;
+  }
+  .r-note-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: ${isDark ? "rgba(255,255,255,0.03)" : "#f1f5f9"};
+    box-shadow: var(--shadow-sm);
+    color: var(--text2);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    max-width: 100%;
+  }
+  .r-note-pill:hover { background: var(--hover); border-color: var(--primary-light); }
+  .r-note-pill span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 250px;
+  }
 
   /* Toolbar (search) */
   .r-toolbar {
@@ -576,11 +608,71 @@ const BrandStyles = ({ isDark }) => (
 );
 
 /* =========================================================================================
-   Portal helper (fixes z-index issues like your previous popup-behind-form bug)
+   Portal helper
    ========================================================================================= */
 const Portal = ({ children }) => {
   if (typeof window === "undefined") return null;
   return createPortal(children, document.body);
+};
+
+/* ---------------- Notes Modal (table click -> popup) ---------------- */
+const NotesModal = ({ open, onClose, recipeName, notes }) => {
+  if (!open) return null;
+  const safeNotes = (notes || "").trim();
+
+  return (
+    <Portal>
+      <div className="r-modal-dim" onClick={onClose}>
+        <div
+          className="r-modal"
+          style={{ maxWidth: 760 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="r-mhdr">
+            <div>
+              <h2 className="r-title" style={{ fontSize: 18 }}>
+                Notes / Method
+              </h2>
+              <p className="r-sub" style={{ marginTop: 2 }}>
+                {recipeName || "Recipe"}
+              </p>
+            </div>
+            <button className="r-btn-ghost" onClick={onClose}>
+              <CloseIcon /> Close
+            </button>
+          </div>
+
+          <div className="r-mbody">
+            {safeNotes ? (
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  background: "var(--mutedCard)",
+                  padding: 16,
+                  lineHeight: 1.6,
+                  color: "var(--text)",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {safeNotes}
+              </div>
+            ) : (
+              <div className="r-muted" style={{ textAlign: "center", padding: 24 }}>
+                No notes saved for this recipe.
+              </div>
+            )}
+          </div>
+
+          <div className="r-mfooter">
+            <button className="r-btn-primary" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
 };
 
 /* ---------------- Recipe Table ---------------- */
@@ -595,6 +687,7 @@ const RecipeTable = ({
   searchQuery,
   setSearchQuery,
   isDark,
+  onOpenNotes, // ✅ NEW
 }) => {
   const checkboxRef = useRef(null);
 
@@ -618,6 +711,13 @@ const RecipeTable = ({
         numSelected > 0 && numSelected < rowCount;
     }
   }, [numSelected, rowCount]);
+
+  const noteLabel = (txt) => {
+    const t = String(txt || "").trim();
+    if (!t) return "See Notes";
+    // short preview
+    return t.length > 34 ? `${t.slice(0, 34)}…` : t;
+  };
 
   return (
     <div className="r-card">
@@ -668,7 +768,7 @@ const RecipeTable = ({
         <input
           className="r-input"
           type="text"
-          placeholder="Search by recipe name or ingredient..."
+          placeholder="Search by recipe name, ingredient, or notes..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -691,6 +791,10 @@ const RecipeTable = ({
               <th className="r-td">Units per Batch</th>
               <th className="r-td">Ingredients</th>
               <th className="r-td">Quantities</th>
+
+              {/* ✅ NEW COLUMN */}
+              <th className="r-td">Notes</th>
+
               <th className="r-td r-actions">Actions</th>
             </tr>
           </thead>
@@ -723,6 +827,18 @@ const RecipeTable = ({
                     View Quantities
                   </button>
                 </td>
+
+                {/* ✅ Notes cell: click -> popup */}
+                <td className="r-td">
+                  <button
+                    className="r-note-pill"
+                    onClick={() => onOpenNotes(r)}
+                    title={String(r.notes || "").trim() ? "View notes" : "No notes yet"}
+                  >
+                    <span>{noteLabel(r.notes)}</span>
+                  </button>
+                </td>
+
                 <td className="r-td r-actions">
                   <button
                     className="r-btn-ghost"
@@ -738,7 +854,7 @@ const RecipeTable = ({
               <tr className="r-row">
                 <td
                   className="r-td"
-                  colSpan={6}
+                  colSpan={7}
                   style={{ textAlign: "center" }}
                 >
                   <span className="r-muted">No recipes found.</span>
@@ -754,7 +870,9 @@ const RecipeTable = ({
           Showing <strong>{recipes.length}</strong> recipe
           {recipes.length === 1 ? "" : "s"}
         </span>
-        <span className="r-muted">Tip: Use “Combine Recipes” when building sub-mixes.</span>
+        <span className="r-muted">
+          Tip: Use “Combine Recipes” when building sub-mixes.
+        </span>
       </div>
     </div>
   );
@@ -812,7 +930,9 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
               <h3 className="r-dhdr-title">
                 {type === "ingredients" ? "Ingredients" : "Quantities"}
               </h3>
-              <p className="r-dhdr-sub">{recipe?.name || "No recipe selected"}</p>
+              <p className="r-dhdr-sub">
+                {recipe?.name || "No recipe selected"}
+              </p>
             </div>
           </div>
           <button className="r-btn-ghost" onClick={onClose}>
@@ -844,7 +964,10 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
               >
                 Items
               </div>
-              <div className="r-strong" style={{ color: "#6366f1", fontSize: 24 }}>
+              <div
+                className="r-strong"
+                style={{ color: "#6366f1", fontSize: 24 }}
+              >
                 {filtered.length}
               </div>
             </div>
@@ -871,7 +994,9 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
                     {it.name}
                   </span>
                 </div>
-                {type === "quantities" && <span className="r-chip">{it.details}</span>}
+                {type === "quantities" && (
+                  <span className="r-chip">{it.details}</span>
+                )}
               </li>
             ))}
             {filtered.length === 0 && (
@@ -948,29 +1073,26 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
   }, [open]);
 
   return (
-  <Dialog
-  open={open}
-  onClose={onClose}
-  fullWidth
-
-  // ✅ FIX: force MUI Dialog above our portaled overlay/modal (9999)
-  sx={{
-    zIndex: 20000,
-    "& .MuiBackdrop-root": { zIndex: 20000 },
-    "& .MuiDialog-container": { zIndex: 20001 },
-    "& .MuiPaper-root": { zIndex: 20002 },
-  }}
-
-  PaperProps={{
-    sx: {
-        borderRadius: 2,
-        border: "1px solid var(--border)",
-        backgroundColor: "var(--card)",
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      // ✅ FIX: force MUI Dialog above our portaled overlay/modal (9999)
+      sx={{
+        zIndex: 20000,
+        "& .MuiBackdrop-root": { zIndex: 20000 },
+        "& .MuiDialog-container": { zIndex: 20001 },
+        "& .MuiPaper-root": { zIndex: 20002 },
+      }}
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          border: "1px solid var(--border)",
+          backgroundColor: "var(--card)",
           color: "var(--text)",
         },
       }}
     >
-
       <DialogTitle sx={{ fontWeight: 800, color: "var(--text)" }}>
         Add New Ingredient
       </DialogTitle>
@@ -993,7 +1115,11 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
         />
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} disabled={adding} sx={{ textTransform: "none", fontWeight: 700 }}>
+        <Button
+          onClick={onClose}
+          disabled={adding}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
           Cancel
         </Button>
         <Button
@@ -1008,7 +1134,9 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
             background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
             "&:hover": { background: "#5B21B6" },
           }}
-          startIcon={adding ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : null}
+          startIcon={
+            adding ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : null
+          }
         >
           {adding ? "Adding…" : "Add"}
         </Button>
@@ -1091,6 +1219,19 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                   onChange={(e) =>
                     handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))
                   }
+                />
+              </div>
+
+              {/* ✅ Notes */}
+              <div className="gof-field col-12" style={{ gridColumn: "span 4" }}>
+                <label className="gof-label">Notes / Method</label>
+                <textarea
+                  className="gof-input"
+                  rows={5}
+                  value={draft.notes || ""}
+                  onChange={(e) => handleField("notes", e.target.value)}
+                  placeholder="e.g., blend 3 min → pasteurise → rest overnight → freeze. Any special method notes, allergens, CCPs..."
+                  style={{ resize: "vertical", lineHeight: 1.4 }}
                 />
               </div>
             </div>
@@ -1242,7 +1383,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
       if (!resp.ok) throw new Error("Failed to add ingredient");
       await reload();
 
-      // NOTE: ingredients state updates async; best effort:
       const just = (ingredients || []).find(
         (i) => i.name?.toLowerCase() === name.trim().toLowerCase()
       );
@@ -1289,7 +1429,22 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                   type="number"
                   className="gof-input"
                   value={edited?.unitsPerBatch ?? 0}
-                  onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
+                  onChange={(e) =>
+                    handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))
+                  }
+                />
+              </div>
+
+              {/* ✅ Notes */}
+              <div className="gof-field col-12" style={{ gridColumn: "span 4" }}>
+                <label className="gof-label">Notes / Method</label>
+                <textarea
+                  className="gof-input"
+                  rows={5}
+                  value={edited?.notes || ""}
+                  onChange={(e) => handleField("notes", e.target.value)}
+                  placeholder="Method steps, key parameters (pH/Brix), holding times, QC notes..."
+                  style={{ resize: "vertical", lineHeight: 1.4 }}
                 />
               </div>
             </div>
@@ -1324,7 +1479,11 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                           disableClearable={false}
                         />
                         <div style={{ marginTop: 8 }}>
-                          <button type="button" className="r-btn-ghost" onClick={() => openAddCustom(idx)}>
+                          <button
+                            type="button"
+                            className="r-btn-ghost"
+                            onClick={() => openAddCustom(idx)}
+                          >
                             Add Ingredient +
                           </button>
                         </div>
@@ -1337,7 +1496,9 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                           className="gof-input"
                           placeholder="Quantity"
                           value={ing.quantity}
-                          onChange={(e) => handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            handleIngredient(idx, "quantity", parseFloat(e.target.value) || 0)
+                          }
                         />
                       </div>
 
@@ -1376,7 +1537,12 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                 ))}
               </div>
 
-              <button type="button" className="gof-multi-add-btn" style={{ marginTop: 10 }} onClick={addIngredientRow}>
+              <button
+                type="button"
+                className="gof-multi-add-btn"
+                style={{ marginTop: 10 }}
+                onClick={addIngredientRow}
+              >
                 + Add Ingredient
               </button>
             </div>
@@ -1416,6 +1582,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     unitsPerBatch: 1,
+    notes: "",
     ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
   });
 
@@ -1437,6 +1604,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       setNewRecipe({
         name: "",
         unitsPerBatch: 1,
+        notes: "",
         ingredients: [{ id: `new_${Date.now()}`, name: "", quantity: 0, unit: UNIT_OPTIONS[0].value }],
       });
       setSelectedRecipeIdsLocal([]);
@@ -1579,6 +1747,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     const candidate = {
       name: newRecipe.name,
       unitsPerBatch: newRecipe.unitsPerBatch || 0,
+      notes: newRecipe.notes || "",
       ingredients: candidateIngredients,
     };
 
@@ -1888,6 +2057,18 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
                   onChange={(e) => handleField("unitsPerBatch", parseInt(e.target.value || "0", 10))}
                 />
               </div>
+
+              <div className="gof-field col-12" style={{ gridColumn: "span 4" }}>
+                <label className="gof-label">Notes / Method</label>
+                <textarea
+                  className="gof-input"
+                  rows={5}
+                  value={newRecipe.notes || ""}
+                  onChange={(e) => handleField("notes", e.target.value)}
+                  placeholder="Method steps, batch notes, QC targets, hold times, etc."
+                  style={{ resize: "vertical", lineHeight: 1.4 }}
+                />
+              </div>
             </div>
 
             {mode === "manual" ? renderManualIngredients() : renderCombineMode()}
@@ -2014,6 +2195,10 @@ const Recipes = () => {
 
   const [addOpen, setAddOpen] = useState(false);
 
+  // Notes popup state
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesRecipe, setNotesRecipe] = useState(null);
+
   // Search state for Recipes list
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -2037,6 +2222,7 @@ const Recipes = () => {
             id: row.recipe_id,
             recipe: row.recipe,
             upb: row.units_per_batch,
+            notes: row.notes || "", // ✅ if backend adds notes to list route, it will populate
             ingredients: [row.ingredient],
             quantities: [row.quantity],
             units: [row.unit],
@@ -2050,6 +2236,7 @@ const Recipes = () => {
         id: g.id,
         name: g.recipe,
         unitsPerBatch: g.upb,
+        notes: g.notes || "",
         ingredients: (g.ingredients || []).map((ing, i) => ({
           id: `${g.id}_${i}`,
           name: ing,
@@ -2074,7 +2261,7 @@ const Recipes = () => {
     if (!q) return recipes;
 
     return recipes.filter((r) => {
-      const fields = [r.name, r.unitsPerBatch, ...(r.ingredients || []).map((i) => i.name)];
+      const fields = [r.name, r.unitsPerBatch, ...(r.ingredients || []).map((i) => i.name), r.notes];
       return fields.some((val) => String(val ?? "").toLowerCase().includes(q));
     });
   }, [recipes, searchQuery]);
@@ -2087,6 +2274,42 @@ const Recipes = () => {
   };
   const handleCloseDrawer = () => setDrawerOpen(false);
 
+  const handleOpenNotes = async (recipe) => {
+    if (!recipe) return;
+
+    // If notes already present in list -> show immediately
+    const has = String(recipe.notes || "").trim();
+    if (has) {
+      setNotesRecipe(recipe);
+      setNotesOpen(true);
+      return;
+    }
+
+    // Otherwise fetch single recipe (your /api/recipes/:id now returns notes)
+    try {
+      const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("Failed to fetch recipe notes");
+      const payload = await resp.json();
+
+      const withNotes = {
+        ...recipe,
+        notes: payload.notes || payload.recipe_notes || "",
+      };
+
+      // update local list cache so you don't re-fetch next click
+      setRecipes((prev) => prev.map((r) => (r.id === recipe.id ? withNotes : r)));
+
+      setNotesRecipe(withNotes);
+      setNotesOpen(true);
+    } catch (e) {
+      console.error("Failed to load notes:", e);
+      // still open modal with empty state
+      setNotesRecipe(recipe);
+      setNotesOpen(true);
+    }
+  };
+
   const handleEdit = async (recipe) => {
     try {
       const url = `${API_BASE}/recipes/${encodeURIComponent(recipe.id)}?cognito_id=${encodeURIComponent(cognitoId)}`;
@@ -2097,6 +2320,7 @@ const Recipes = () => {
         id: payload.recipe_id,
         name: payload.recipe_name,
         unitsPerBatch: payload.units_per_batch,
+        notes: payload.notes || payload.recipe_notes || "",
         ingredients: (payload.ingredients || []).map((it, i) => ({
           id: it.id ?? `${payload.recipe_id}_${i}`,
           name: it.ingredient_name,
@@ -2118,6 +2342,7 @@ const Recipes = () => {
       const payload = {
         recipe: edited.name,
         upb: edited.unitsPerBatch,
+        notes: edited.notes || "",
         ingredients: edited.ingredients.map((i) => i.name),
         quantities: edited.ingredients.map((i) => i.quantity),
         units: edited.ingredients.map((i) => i.unit),
@@ -2174,6 +2399,7 @@ const Recipes = () => {
       const payload = {
         recipe: newRecipe.name,
         upb: newRecipe.unitsPerBatch,
+        notes: newRecipe.notes || "",
         ingredients: newRecipe.ingredients.map((i) => i.name),
         quantities: newRecipe.ingredients.map((i) => i.quantity),
         units: newRecipe.ingredients.map((i) => i.unit),
@@ -2209,11 +2435,12 @@ const Recipes = () => {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isDark={isDark}
+        onOpenNotes={handleOpenNotes} // ✅ NEW
       />
 
       <RecipeDrawer
         isOpen={drawerOpen}
-        onClose={handleCloseDrawer}
+        onClose={() => setDrawerOpen(false)}
         recipe={drawerRecipe}
         type={drawerType}
       />
@@ -2241,6 +2468,17 @@ const Recipes = () => {
         onClose={() => setAddOpen(false)}
         onSave={handleCreateRecipe}
         existingRecipes={recipes}
+      />
+
+      {/* ✅ Notes popup */}
+      <NotesModal
+        open={notesOpen}
+        onClose={() => {
+          setNotesOpen(false);
+          setNotesRecipe(null);
+        }}
+        recipeName={notesRecipe?.name}
+        notes={notesRecipe?.notes}
       />
     </div>
   );
