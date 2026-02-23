@@ -419,7 +419,7 @@ const BrandStyles = ({ isDark }) => (
   .r-dbody { padding:14px; background: ${isDark ? "rgba(255,255,255,0.03)" : "#f1f5f9"}; overflow:auto; flex:1; }
   .r-summary { background: var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; box-shadow: var(--shadow-sm); margin-bottom:10px; }
   .r-stat { text-align:right; }
-  .r-filter { position:sticky; top:0; padding:8px 0; background: ${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; }
+  .r-filter { position:sticky; top:0; padding:8px 0; background: ${isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9"}; z-index: 2; }
   .r-list { list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px; }
   .r-item { display:flex; align-items:center; justify-content:space-between; background: var(--card); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
   .r-chip { font-size:12px; font-weight:800; background: var(--chip); color: var(--primary); padding:4px 10px; border-radius: 6px; border:1px solid var(--border); }
@@ -431,6 +431,51 @@ const BrandStyles = ({ isDark }) => (
     border-radius: 999px; 
     padding: 4px; 
     display: inline-flex; 
+  }
+
+  /* Drawer groups (combined recipe contribution view) */
+  .r-groups { display: grid; gap: 10px; margin-top: 10px; }
+  .r-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .r-group-hdr {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: ${isDark ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.05)"};
+    border-bottom: 1px solid var(--border);
+  }
+  .r-group-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .r-group-title span {
+    font-weight: 900;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .r-group-meta {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .r-group-body { padding: 10px 12px; }
+  .r-group-note {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
   }
 
   /* Modals */
@@ -878,30 +923,215 @@ const RecipeTable = ({
   );
 };
 
+/* =========================================================================================
+   Combined Recipe Meta Normaliser (frontend-only)
+   We support a couple of likely backend shapes so you can wire it easily later.
+
+   Expected (recommended) shape on recipe:
+   recipe.combined = {
+     sources: [
+       { id, name, unitsPerBatch, ingredients: [{ name, quantity, unit }] }
+     ],
+     extras: [{ name, quantity, unit }]
+   }
+
+   We ALSO tolerate:
+   recipe.composition / recipe.meta / recipe.combined_meta with similar keys.
+   ========================================================================================= */
+const getCombinedMeta = (recipe) => {
+  if (!recipe) return null;
+
+  const meta =
+    recipe.combined ||
+    recipe.composition ||
+    recipe.meta ||
+    recipe.combined_meta ||
+    recipe.recipe_meta ||
+    null;
+
+  if (!meta || typeof meta !== "object") return null;
+
+  const sources =
+    meta.sources ||
+    meta.source_recipes ||
+    meta.sourceRecipes ||
+    meta.recipes ||
+    meta.combinedFrom ||
+    [];
+
+  const extras =
+    meta.extras ||
+    meta.extra ||
+    meta.extra_ingredients ||
+    meta.extraIngredients ||
+    [];
+
+  const normSources = Array.isArray(sources)
+    ? sources
+        .filter(Boolean)
+        .map((s) => ({
+          id: s.id ?? s.recipe_id ?? s.recipeId ?? s.source_id ?? null,
+          name: s.name ?? s.recipe_name ?? s.recipeName ?? s.title ?? "Source recipe",
+          unitsPerBatch:
+            s.unitsPerBatch ?? s.units_per_batch ?? s.upb ?? s.units ?? null,
+          ingredients: Array.isArray(s.ingredients)
+            ? s.ingredients
+                .filter(Boolean)
+                .map((i) => ({
+                  name: i.name ?? i.ingredient ?? i.ingredient_name ?? "",
+                  quantity: Number(i.quantity ?? i.qty ?? 0) || 0,
+                  unit: i.unit ?? i.uom ?? "",
+                }))
+            : [],
+        }))
+        .filter((s) => s.ingredients.length > 0)
+    : [];
+
+  const normExtras = Array.isArray(extras)
+    ? extras
+        .filter(Boolean)
+        .map((i) => ({
+          name: i.name ?? i.ingredient ?? i.ingredient_name ?? "",
+          quantity: Number(i.quantity ?? i.qty ?? 0) || 0,
+          unit: i.unit ?? i.uom ?? "",
+        }))
+        .filter((i) => i.name)
+    : [];
+
+  if (normSources.length === 0 && normExtras.length === 0) return null;
+
+  return {
+    sources: normSources,
+    extras: normExtras,
+  };
+};
+
 /* ---------------- Drawer ---------------- */
 const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
+  // ✅ detect combined recipe meta (if present)
+  const combined = useMemo(() => getCombinedMeta(recipe), [recipe]);
+  const isCombined = !!combined;
+
+  // Normal flat list (unchanged behaviour)
   const displayItems = useMemo(() => {
     if (!recipe) return [];
-    return recipe.ingredients.map((ing) => ({
+    return (recipe.ingredients || []).map((ing) => ({
       name: ing.name,
-      details:
-        type === "quantities" ? `${ing.quantity} ${ing.unit}` : ing.name,
+      details: type === "quantities" ? `${ing.quantity} ${ing.unit}` : ing.name,
       fullText: `${ing.name} ${ing.quantity} ${ing.unit}`.toLowerCase(),
     }));
   }, [recipe, type]);
 
-  const filtered = useMemo(() => {
+  const filteredFlat = useMemo(() => {
     const q = (searchTerm || "").toLowerCase();
     return displayItems.filter((it) => it.fullText.includes(q));
   }, [displayItems, searchTerm]);
 
+  // Combined grouped view
+  const grouped = useMemo(() => {
+    if (!isCombined || !combined) return null;
+
+    const q = (searchTerm || "").toLowerCase();
+    const groups = [];
+
+    (combined.sources || []).forEach((src, idx) => {
+      const items = (src.ingredients || [])
+        .map((ing) => ({
+          name: ing.name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          fullText: `${ing.name} ${ing.quantity} ${ing.unit}`.toLowerCase(),
+        }))
+        .filter((it) => it.fullText.includes(q));
+
+      groups.push({
+        key: `src_${src.id ?? idx}`,
+        title: src.name || `Recipe ${src.id ?? idx + 1}`,
+        subtitle:
+          src.unitsPerBatch != null ? `Units/batch: ${src.unitsPerBatch}` : "",
+        items,
+      });
+    });
+
+    if ((combined.extras || []).length) {
+      const items = combined.extras
+        .map((ing) => ({
+          name: ing.name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          fullText: `${ing.name} ${ing.quantity} ${ing.unit}`.toLowerCase(),
+        }))
+        .filter((it) => it.fullText.includes(q));
+
+      groups.push({
+        key: "extras",
+        title: "Extra ingredients",
+        subtitle: "",
+        items,
+      });
+    }
+
+    // Remove empty groups (after filtering)
+    return groups.filter((g) => (g.items || []).length > 0);
+  }, [combined, isCombined, searchTerm]);
+
+  const totalCount = useMemo(() => {
+    if (!recipe) return 0;
+    if (!isCombined) return filteredFlat.length;
+
+    const count =
+      (grouped || []).reduce((acc, g) => acc + (g.items?.length || 0), 0) || 0;
+
+    return count;
+  }, [filteredFlat.length, grouped, isCombined, recipe]);
+
   const exportCsv = () => {
     if (!recipe) return;
+
+    const safeName = (recipe?.name || "recipe").replace(/\s+/g, "_");
+
+    // ✅ if combined, export includes Source column
+    if (isCombined && combined) {
+      const headers = ["Source", "Ingredient", "Quantity", "Unit"];
+      const rows = [];
+
+      (combined.sources || []).forEach((src) => {
+        (src.ingredients || []).forEach((ing) => {
+          rows.push([
+            (src.name || "Source").replace(/,/g, " "),
+            (ing.name || "").replace(/,/g, " "),
+            String(ing.quantity ?? ""),
+            String(ing.unit ?? "").replace(/,/g, " "),
+          ]);
+        });
+      });
+
+      (combined.extras || []).forEach((ing) => {
+        rows.push([
+          "Extra ingredients",
+          (ing.name || "").replace(/,/g, " "),
+          String(ing.quantity ?? ""),
+          String(ing.unit ?? "").replace(/,/g, " "),
+        ]);
+      });
+
+      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeName}_contributions_${type}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Default export (existing behaviour)
     const headers =
       type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
-    const rows = recipe.ingredients.map((ing) =>
+    const rows = (recipe.ingredients || []).map((ing) =>
       type === "quantities"
         ? [ing.name, String(ing.quantity), ing.unit]
         : [ing.name]
@@ -911,8 +1141,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(recipe?.name || "recipe")
-      .replace(/\s+/g, "_")}_${type}.csv`;
+    a.download = `${safeName}_${type}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -956,6 +1185,13 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
               <div className="r-muted">
                 Units per batch: {recipe?.unitsPerBatch ?? "N/A"}
               </div>
+
+              {/* ✅ show a tiny hint if combined */}
+              {isCombined && (
+                <div className="r-muted" style={{ marginTop: 6 }}>
+                  Contribution view: grouped by source recipe
+                </div>
+              )}
             </div>
             <div className="r-stat">
               <div
@@ -968,7 +1204,7 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
                 className="r-strong"
                 style={{ color: "#6366f1", fontSize: 24 }}
               >
-                {filtered.length}
+                {totalCount}
               </div>
             </div>
           </div>
@@ -983,28 +1219,86 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
             />
           </div>
 
-          <ul className="r-list">
-            {filtered.map((it, i) => (
-              <li key={i} className="r-item">
-                <div className="r-flex">
-                  <span className="r-badge">
-                    <CheckIcon />
-                  </span>
-                  <span className="r-strong" style={{ fontWeight: 700 }}>
-                    {it.name}
-                  </span>
+          {/* ✅ If combined: render grouped contributions. If not: keep existing list */}
+          {isCombined ? (
+            <div className="r-groups">
+              {(grouped || []).map((g) => (
+                <div className="r-group" key={g.key}>
+                  <div className="r-group-hdr">
+                    <div className="r-group-title">
+                      <span className="r-badge">
+                        <CheckIcon />
+                      </span>
+                      <span title={g.title}>{g.title}</span>
+                    </div>
+                    <div className="r-group-meta">
+                      {g.subtitle ? (
+                        <>
+                          {g.subtitle} · {g.items.length} item{g.items.length === 1 ? "" : "s"}
+                        </>
+                      ) : (
+                        <>
+                          {g.items.length} item{g.items.length === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="r-group-body">
+                    <ul className="r-list" style={{ marginTop: 0 }}>
+                      {g.items.map((it, i) => (
+                        <li key={`${g.key}_${i}`} className="r-item">
+                          <div className="r-flex">
+                            <span className="r-badge">
+                              <CheckIcon />
+                            </span>
+                            <span className="r-strong" style={{ fontWeight: 700 }}>
+                              {it.name}
+                            </span>
+                          </div>
+                          {type === "quantities" && (
+                            <span className="r-chip">
+                              {it.quantity} {it.unit}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                {type === "quantities" && (
-                  <span className="r-chip">{it.details}</span>
-                )}
-              </li>
-            ))}
-            {filtered.length === 0 && (
-              <li className="r-item" style={{ justifyContent: "center" }}>
-                <span className="r-muted">No items found.</span>
-              </li>
-            )}
-          </ul>
+              ))}
+
+              {/* empty state */}
+              {(grouped || []).length === 0 && (
+                <div className="r-summary" style={{ textAlign: "center" }}>
+                  <div className="r-muted">No items found.</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <ul className="r-list">
+              {filteredFlat.map((it, i) => (
+                <li key={i} className="r-item">
+                  <div className="r-flex">
+                    <span className="r-badge">
+                      <CheckIcon />
+                    </span>
+                    <span className="r-strong" style={{ fontWeight: 700 }}>
+                      {it.name}
+                    </span>
+                  </div>
+                  {type === "quantities" && (
+                    <span className="r-chip">{it.details}</span>
+                  )}
+                </li>
+              ))}
+              {filteredFlat.length === 0 && (
+                <li className="r-item" style={{ justifyContent: "center" }}>
+                  <span className="r-muted">No items found.</span>
+                </li>
+              )}
+            </ul>
+          )}
         </div>
 
         <div className="r-footer">
@@ -1744,6 +2038,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       return;
     }
 
+    // NOTE: Frontend summary stays as-is. Backend work next will attach combined meta.
     const candidate = {
       name: newRecipe.name,
       unitsPerBatch: newRecipe.unitsPerBatch || 0,
@@ -2223,6 +2518,8 @@ const Recipes = () => {
             recipe: row.recipe,
             upb: row.units_per_batch,
             notes: row.notes || "", // ✅ if backend adds notes to list route, it will populate
+            // ✅ if backend adds combined meta to list route, it will populate
+            combined: row.combined || row.combined_meta || row.recipe_meta || null,
             ingredients: [row.ingredient],
             quantities: [row.quantity],
             units: [row.unit],
@@ -2237,6 +2534,8 @@ const Recipes = () => {
         name: g.recipe,
         unitsPerBatch: g.upb,
         notes: g.notes || "",
+        // ✅ carry combined meta through if present (backend next)
+        combined: g.combined || null,
         ingredients: (g.ingredients || []).map((ing, i) => ({
           id: `${g.id}_${i}`,
           name: ing,
@@ -2295,6 +2594,13 @@ const Recipes = () => {
       const withNotes = {
         ...recipe,
         notes: payload.notes || payload.recipe_notes || "",
+        // ✅ if backend returns combined meta in detail route, store it
+        combined:
+          payload.combined ||
+          payload.combined_meta ||
+          payload.recipe_meta ||
+          recipe.combined ||
+          null,
       };
 
       // update local list cache so you don't re-fetch next click
@@ -2316,11 +2622,15 @@ const Recipes = () => {
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipe.id}`);
       const payload = await resp.json();
+
       const r = {
         id: payload.recipe_id,
         name: payload.recipe_name,
         unitsPerBatch: payload.units_per_batch,
         notes: payload.notes || payload.recipe_notes || "",
+        // ✅ keep combined meta if detail route returns it (backend next)
+        combined:
+          payload.combined || payload.combined_meta || payload.recipe_meta || null,
         ingredients: (payload.ingredients || []).map((it, i) => ({
           id: it.id ?? `${payload.recipe_id}_${i}`,
           name: it.ingredient_name,
@@ -2346,6 +2656,7 @@ const Recipes = () => {
         ingredients: edited.ingredients.map((i) => i.name),
         quantities: edited.ingredients.map((i) => i.quantity),
         units: edited.ingredients.map((i) => i.unit),
+        // ✅ in backend phase, you'll add combined meta here (e.g., recipe_meta)
         cognito_id: cognitoId,
       };
       const resp = await fetch(`${API_BASE}/recipes/${encodeURIComponent(edited.id)}`, {
@@ -2403,6 +2714,7 @@ const Recipes = () => {
         ingredients: newRecipe.ingredients.map((i) => i.name),
         quantities: newRecipe.ingredients.map((i) => i.quantity),
         units: newRecipe.ingredients.map((i) => i.unit),
+        // ✅ in backend phase, you'll add combined meta here (e.g., recipe_meta)
         cognito_id: cognitoId,
       };
       const res = await fetch(`${API_BASE}/add-recipe`, {

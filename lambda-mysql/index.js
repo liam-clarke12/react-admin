@@ -41,6 +41,10 @@ const pool = mysql.createPool({
 // ✅ Promise wrapper (use THIS everywhere for async/await)
 const db = pool.promise();
 
+if (typeof db.promise !== "function") {
+  db.promise = () => db;
+}
+
 // ✅ Test database connection (promise style)
 (async () => {
   try {
@@ -1281,7 +1285,7 @@ app.get("/api/recipes/:id", async (req, res) => {
   const cognito_id = req.query.cognito_id;
   const start = Date.now();
 
-  // set CORS to match other routes you have
+  // CORS (match your other routes)
   res.setHeader(
     "Access-Control-Allow-Origin",
     "https://master.d2fdrxobxyr2je.amplifyapp.com"
@@ -1304,16 +1308,19 @@ app.get("/api/recipes/:id", async (req, res) => {
   }
 
   try {
-    // ✅ Query recipe + its ingredients (now includes notes)
+    // ✅ Query recipe meta + ingredients + is_combined
     const sql = `
       SELECT 
         r.id as recipe_id,
         r.recipe_name,
         r.units_per_batch,
         IFNULL(r.notes,'') AS notes,
+        IFNULL(r.is_combined,0) AS is_combined,
+
         ri.id as recipe_ingredient_id,
         ri.quantity,
         IFNULL(ri.unit,'') AS unit,
+
         i.id as ingredient_id,
         i.ingredient_name
       FROM recipes r
@@ -1341,14 +1348,16 @@ app.get("/api/recipes/:id", async (req, res) => {
       console.warn(
         `[GET.recipes.id] Not found or not owned by user: recipe=${recipeId} user=${cognito_id}`
       );
-      return res.status(404).json({ error: "Recipe not found or not owned by user" });
+      return res
+        .status(404)
+        .json({ error: "Recipe not found or not owned by user" });
     }
 
-    // build response shape
     const recipeMeta = rows[0];
 
+    // ✅ Ingredients list
     const ingredients = rows
-      .filter((r) => r.ingredient_name !== null)
+      .filter((r) => r.ingredient_name !== null && r.ingredient_id !== null)
       .map((r) => ({
         recipe_ingredient_id: r.recipe_ingredient_id,
         ingredient_id: r.ingredient_id,
@@ -1357,24 +1366,63 @@ app.get("/api/recipes/:id", async (req, res) => {
         unit: r.unit,
       }));
 
+    // ✅ If combined, include the component recipes used to create it (optional, but needed for frontend “combined” drawers)
+    let components = [];
+    if (Number(recipeMeta.is_combined) === 1) {
+      const compSql = `
+        SELECT
+          rc.id,
+          rc.combined_recipe_id,
+          rc.source_recipe_id,
+          rc.multiplier,
+          r2.recipe_name AS source_recipe_name,
+          r2.units_per_batch AS source_units_per_batch
+        FROM recipe_components rc
+        JOIN recipes r2
+          ON r2.id = rc.source_recipe_id
+         AND r2.user_id = rc.user_id
+        WHERE rc.combined_recipe_id = ?
+          AND rc.user_id = ?
+        ORDER BY rc.id ASC
+      `;
+
+      const [compRows] = await db
+        .promise()
+        .execute(compSql, [recipeId, cognito_id]);
+
+      components = (compRows || []).map((c) => ({
+        id: c.id,
+        combined_recipe_id: c.combined_recipe_id,
+        source_recipe_id: c.source_recipe_id,
+        multiplier: c.multiplier,
+        source_recipe_name: c.source_recipe_name,
+        source_units_per_batch: c.source_units_per_batch,
+      }));
+    }
+
     const payload = {
       recipe_id: recipeMeta.recipe_id,
       recipe_name: recipeMeta.recipe_name,
       units_per_batch: recipeMeta.units_per_batch,
-      notes: recipeMeta.notes, // ✅ NEW
+      notes: recipeMeta.notes,
+      is_combined: Number(recipeMeta.is_combined) === 1 ? 1 : 0,
+      components, // ✅ NEW (empty [] if not combined)
       ingredients,
     };
 
     console.info(
-      `[GET.recipes.id] Responding (${Date.now() - start}ms) payload.items=${ingredients.length}`
+      `[GET.recipes.id] Responding (${Date.now() - start}ms) ingredients=${ingredients.length} is_combined=${payload.is_combined} components=${components.length}`
     );
+
     return res.json(payload);
   } catch (err) {
     console.error("[GET.recipes.id] DB error:", {
       message: err.message,
       stack: err.stack,
     });
-    return res.status(500).json({ error: "Database error", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Database error", details: err.message });
   }
 });
 
