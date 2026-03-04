@@ -876,12 +876,225 @@ app.put("/api/goods-in/:barcode", async (req, res) => {
   }
 });
 
+const safeTrim = (v) => {
+  const s = String(v ?? "").trim();
+  return s.length ? s : "";
+};
+
+const normalizeNotes = (notes) => {
+  const t = String(notes ?? "").trim();
+  return t.length ? t : null;
+};
+
+// Accepts frontend keys: combined OR recipe_meta OR combined_meta
+// Shape we support (flexible):
+// {
+//   sources: [{ id|recipe_id|source_recipe_id, multiplier? }],
+//   extras:  [{ name, quantity, unit }]
+// }
+const normalizeCombinedMeta = (body) => {
+  const raw = body?.combined || body?.recipe_meta || body?.combined_meta || null;
+  if (!raw || typeof raw !== "object") return null;
+
+  const sourcesRaw =
+    raw.sources || raw.source_recipes || raw.sourceRecipes || raw.recipes || [];
+  const extrasRaw =
+    raw.extras || raw.extra_ingredients || raw.extraIngredients || [];
+
+  const sources = Array.isArray(sourcesRaw)
+    ? sourcesRaw
+        .filter(Boolean)
+        .map((s) => {
+          const id = s.id ?? s.recipe_id ?? s.recipeId ?? s.source_recipe_id ?? null;
+          const mult = s.multiplier ?? s.mult ?? 1;
+          return {
+            source_recipe_id: id != null ? Number(id) : null,
+            multiplier:
+              mult === "" || mult == null || Number.isNaN(Number(mult))
+                ? 1.0
+                : Number(mult),
+          };
+        })
+        .filter((s) => Number.isFinite(s.source_recipe_id))
+    : [];
+
+  const extras = Array.isArray(extrasRaw)
+    ? extrasRaw
+        .filter(Boolean)
+        .map((i) => ({
+          name: safeTrim(i.name ?? i.ingredient ?? i.ingredient_name),
+          quantity:
+            i.quantity === "" || i.quantity == null || Number.isNaN(Number(i.quantity))
+              ? 0
+              : Number(i.quantity),
+          unit: safeTrim(i.unit ?? i.uom),
+        }))
+        .filter((x) => x.name)
+    : [];
+
+  if (!sources.length && !extras.length) return null;
+  return { sources, extras };
+};
+
+// Builds combined meta for frontend drawer from recipe_components + recipe_ingredients
+// - sources: each source recipe with its own (scaled) ingredient list
+// - extras: attempt to infer "extra" by subtracting scaled source totals from combined totals
+const buildCombinedMetaFromDb = async (conn, combinedRecipeId, userId) => {
+  // fetch recipe_components
+  const [compRows] = await conn.execute(
+    `
+    SELECT combined_recipe_id, source_recipe_id, multiplier, user_id, created_at
+    FROM recipe_components
+    WHERE combined_recipe_id = ? AND user_id = ?
+    ORDER BY created_at ASC, source_recipe_id ASC
+    `,
+    [combinedRecipeId, userId]
+  );
+
+  if (!compRows || compRows.length === 0) return null;
+
+  // fetch each source recipe + ingredients
+  const sourceIds = compRows.map((r) => r.source_recipe_id);
+  const multMap = new Map(compRows.map((r) => [Number(r.source_recipe_id), Number(r.multiplier)]));
+
+  // source recipe meta
+  const [srcMeta] = await conn.execute(
+    `
+    SELECT id, recipe_name, units_per_batch
+    FROM recipes
+    WHERE user_id = ? AND id IN (${sourceIds.map(() => "?").join(",")})
+    `,
+    [userId, ...sourceIds]
+  );
+
+  // source ingredients
+  const [srcIngRows] = await conn.execute(
+    `
+    SELECT
+      r.id AS recipe_id,
+      r.recipe_name,
+      r.units_per_batch,
+      i.ingredient_name,
+      ri.quantity,
+      IFNULL(ri.unit,'') AS unit
+    FROM recipes r
+    JOIN recipe_ingredients ri
+      ON ri.recipe_id = r.id AND ri.user_id = r.user_id
+    JOIN ingredients i
+      ON i.id = ri.ingredient_id AND i.user_id = r.user_id
+    WHERE r.user_id = ?
+      AND r.id IN (${sourceIds.map(() => "?").join(",")})
+    ORDER BY r.id ASC, ri.id ASC
+    `,
+    [userId, ...sourceIds]
+  );
+
+  // combined recipe ingredients (for extras inference)
+  const [combinedIngRows] = await conn.execute(
+    `
+    SELECT
+      i.ingredient_name,
+      ri.quantity,
+      IFNULL(ri.unit,'') AS unit
+    FROM recipe_ingredients ri
+    JOIN ingredients i
+      ON i.id = ri.ingredient_id AND i.user_id = ri.user_id
+    WHERE ri.recipe_id = ? AND ri.user_id = ?
+    ORDER BY ri.id ASC
+    `,
+    [combinedRecipeId, userId]
+  );
+
+  // group source rows
+  const srcById = new Map();
+  for (const m of srcMeta || []) {
+    srcById.set(Number(m.id), {
+      id: Number(m.id),
+      name: m.recipe_name,
+      unitsPerBatch: m.units_per_batch,
+      ingredients: [],
+    });
+  }
+
+  for (const row of srcIngRows || []) {
+    const rid = Number(row.recipe_id);
+    if (!srcById.has(rid)) {
+      srcById.set(rid, {
+        id: rid,
+        name: row.recipe_name,
+        unitsPerBatch: row.units_per_batch,
+        ingredients: [],
+      });
+    }
+    const multiplier = multMap.get(rid) ?? 1;
+    srcById.get(rid).ingredients.push({
+      name: row.ingredient_name,
+      quantity: Number(row.quantity ?? 0) * Number(multiplier),
+      unit: row.unit ?? "",
+    });
+  }
+
+  // calculate inferred extras
+  // totals from combined
+  const combinedTotals = new Map(); // key name::unit => qty
+  for (const r of combinedIngRows || []) {
+    const name = safeTrim(r.ingredient_name);
+    const unit = safeTrim(r.unit);
+    const key = `${name}::${unit}`;
+    const prev = combinedTotals.get(key) || 0;
+    combinedTotals.set(key, prev + Number(r.quantity ?? 0));
+  }
+
+  // totals from sources (scaled)
+  const sourceTotals = new Map();
+  for (const src of srcById.values()) {
+    for (const ing of src.ingredients || []) {
+      const name = safeTrim(ing.name);
+      const unit = safeTrim(ing.unit);
+      const key = `${name}::${unit}`;
+      const prev = sourceTotals.get(key) || 0;
+      sourceTotals.set(key, prev + Number(ing.quantity ?? 0));
+    }
+  }
+
+  const EPS = 1e-6;
+  const extras = [];
+  for (const [key, combinedQty] of combinedTotals.entries()) {
+    const srcQty = sourceTotals.get(key) || 0;
+    const diff = Number(combinedQty) - Number(srcQty);
+    if (diff > EPS) {
+      const [name, unit] = key.split("::");
+      extras.push({ name, unit: unit ?? "", quantity: diff });
+    }
+  }
+
+  const sources = Array.from(srcById.values()).filter((s) => (s.ingredients || []).length);
+
+  return { sources, extras };
+};
+
+// ==============================
+// POST /api/add-recipe (UPDATED: supports combined recipes + recipe_components + is_combined)
+// ==============================
 app.post("/api/add-recipe", async (req, res) => {
   console.log("Received request body:", req.body);
 
-  const { recipe, upb, notes, ingredients, quantities, units, cognito_id } = req.body;
+  const {
+    recipe,
+    upb,
+    notes,
+    ingredients,
+    quantities,
+    units,
+    cognito_id,
+    combined, // optional
+    recipe_meta, // optional
+    combined_meta, // optional
+  } = req.body;
 
-  // Basic validation
+  const combinedMeta = normalizeCombinedMeta({ combined, recipe_meta, combined_meta });
+
+  // Basic validation (kept strict)
   if (
     !recipe ||
     upb === undefined ||
@@ -902,16 +1115,47 @@ app.post("/api/add-recipe", async (req, res) => {
     await connection.beginTransaction();
     console.log("Transaction started");
 
-    // Insert into recipes (✅ now includes notes)
+    const isCombined = combinedMeta && (combinedMeta.sources?.length || combinedMeta.extras?.length) ? 1 : 0;
+
+    // Insert into recipes (now includes notes + is_combined)
     const [recipeResult] = await connection.execute(
-      `INSERT INTO recipes 
-         (recipe_name, units_per_batch, notes, user_id) 
-       VALUES (?, ?, ?, ?)`,
-      [recipe, upb, (notes && String(notes).trim()) ? String(notes).trim() : null, cognito_id]
+      `INSERT INTO recipes (recipe_name, units_per_batch, notes, user_id, is_combined)
+       VALUES (?, ?, ?, ?, ?)`,
+      [recipe, upb, normalizeNotes(notes), cognito_id, isCombined]
     );
 
     const recipeId = recipeResult.insertId;
     console.log("Inserted recipe with ID:", recipeId);
+
+    // If combined: store recipe_components
+    if (isCombined) {
+      // clear just-in-case (should be empty on create)
+      await connection.execute(
+        `DELETE FROM recipe_components WHERE combined_recipe_id = ? AND user_id = ?`,
+        [recipeId, cognito_id]
+      );
+
+      const sources = combinedMeta?.sources || [];
+      for (const s of sources) {
+        // sanity: source recipe must belong to same user
+        const [check] = await connection.execute(
+          `SELECT id FROM recipes WHERE id = ? AND user_id = ? LIMIT 1`,
+          [s.source_recipe_id, cognito_id]
+        );
+        if (!check || check.length === 0) {
+          console.warn(
+            `[add-recipe] skipping source_recipe_id=${s.source_recipe_id} (not owned by user)`
+          );
+          continue;
+        }
+
+        await connection.execute(
+          `INSERT INTO recipe_components (combined_recipe_id, source_recipe_id, multiplier, user_id)
+           VALUES (?, ?, ?, ?)`,
+          [recipeId, s.source_recipe_id, s.multiplier ?? 1.0, cognito_id]
+        );
+      }
+    }
 
     // For each ingredient, link (with quantity + unit)
     for (let i = 0; i < ingredients.length; i++) {
@@ -920,15 +1164,11 @@ app.post("/api/add-recipe", async (req, res) => {
       const unit = units[i];
       console.log(`Processing ${name}: ${qty} ${unit}`);
 
-      // Skip empty ingredient rows safely (optional but prevents junk rows)
       if (!name || !String(name).trim()) continue;
 
-      // Find or create ingredient
+      // Find or create ingredient (user-scoped)
       const [ingRows] = await connection.execute(
-        `SELECT id 
-           FROM ingredients 
-          WHERE ingredient_name = ? 
-            AND user_id = ?`,
+        `SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ?`,
         [String(name).trim(), cognito_id]
       );
 
@@ -937,9 +1177,7 @@ app.post("/api/add-recipe", async (req, res) => {
         ingredientId = ingRows[0].id;
       } else {
         const [ingRes] = await connection.execute(
-          `INSERT INTO ingredients 
-             (ingredient_name, user_id) 
-           VALUES (?, ?)`,
+          `INSERT INTO ingredients (ingredient_name, user_id) VALUES (?, ?)`,
           [String(name).trim(), cognito_id]
         );
         ingredientId = ingRes.insertId;
@@ -947,8 +1185,7 @@ app.post("/api/add-recipe", async (req, res) => {
 
       // Link in recipe_ingredients (with unit)
       await connection.execute(
-        `INSERT INTO recipe_ingredients 
-           (recipe_id, ingredient_id, quantity, unit, user_id) 
+        `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, user_id)
          VALUES (?, ?, ?, ?, ?)`,
         [
           recipeId,
@@ -964,22 +1201,24 @@ app.post("/api/add-recipe", async (req, res) => {
 
     await connection.commit();
     console.log("Transaction committed");
-    res.status(200).json({ message: "Recipe added successfully!", recipe_id: recipeId });
+
+    res.status(200).json({
+      message: "Recipe added successfully!",
+      recipe_id: recipeId,
+      is_combined: isCombined,
+    });
   } catch (err) {
     await connection.rollback();
     console.error("Error, rolled back:", err);
-    res
-      .status(500)
-      .json({ error: "Database transaction failed", details: err.message });
+    res.status(500).json({ error: "Database transaction failed", details: err.message });
   } finally {
     connection.release();
     console.log("Connection released");
   }
 });
 
-
 // ==============================
-// ✅ GET /api/recipes (updated to include notes)
+// GET /api/recipes (UPDATED: include notes + is_combined)
 // ==============================
 app.get("/api/recipes", async (req, res) => {
   const { cognito_id } = req.query;
@@ -997,12 +1236,13 @@ app.get("/api/recipes", async (req, res) => {
         r.recipe_name AS recipe,
         r.units_per_batch,
         IFNULL(r.notes, '') AS notes,
+        IFNULL(r.is_combined, 0) AS is_combined,
         i.ingredient_name AS ingredient,
         ri.quantity,
         IFNULL(ri.unit, '') AS unit
       FROM recipes r
-      JOIN recipe_ingredients ri ON r.id = ri.recipe_id
-      JOIN ingredients i ON ri.ingredient_id = i.id
+      JOIN recipe_ingredients ri ON r.id = ri.recipe_id AND ri.user_id = r.user_id
+      JOIN ingredients i ON ri.ingredient_id = i.id AND i.user_id = r.user_id
       WHERE r.user_id = ?
       ORDER BY r.id, ri.id
       `,
@@ -1016,11 +1256,12 @@ app.get("/api/recipes", async (req, res) => {
   }
 });
 
-// **Delete Recipe by Name**
+// ==============================
+// POST /api/delete-recipe (UPDATED: also deletes recipe_components rows)
+// ==============================
 app.post("/api/delete-recipe", async (req, res) => {
   const { recipeName, cognito_id } = req.body;
 
-  // Validate input
   if (!recipeName || !cognito_id) {
     return res.status(400).json({ error: "recipeName and cognito_id are required" });
   }
@@ -1029,34 +1270,38 @@ app.post("/api/delete-recipe", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Log the incoming request data
     console.log("Received delete-recipe request:", { recipeName, cognito_id });
 
-    // Check if the recipe exists and belongs to the user
     const [recipeCheck] = await connection.execute(
-      "SELECT id FROM recipes WHERE recipe_name = ? AND user_id = ?",
+      "SELECT id FROM recipes WHERE recipe_name = ? AND user_id = ? LIMIT 1",
       [recipeName, cognito_id]
     );
 
     if (recipeCheck.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: "Recipe not found or does not belong to this user" });
     }
 
     const recipeId = recipeCheck[0].id;
 
-    // Delete associated records from recipe_ingredients table
+    // Remove recipe_components referencing this recipe (as combined OR source)
     await connection.execute(
-      "DELETE FROM recipe_ingredients WHERE recipe_id = ?",
-      [recipeId]
+      "DELETE FROM recipe_components WHERE user_id = ? AND (combined_recipe_id = ? OR source_recipe_id = ?)",
+      [cognito_id, recipeId, recipeId]
     );
 
-    // Delete the recipe itself
+    // Delete associated recipe_ingredients
+    await connection.execute(
+      "DELETE FROM recipe_ingredients WHERE recipe_id = ? AND user_id = ?",
+      [recipeId, cognito_id]
+    );
+
+    // Delete the recipe
     await connection.execute(
       "DELETE FROM recipes WHERE id = ? AND user_id = ?",
       [recipeId, cognito_id]
     );
 
-    // Commit the transaction
     await connection.commit();
     res.status(200).json({ message: "Recipe deleted successfully" });
   } catch (err) {
@@ -1068,10 +1313,8 @@ app.post("/api/delete-recipe", async (req, res) => {
   }
 });
 
-// Endpoint to fetch unique recipe names for a given cognito_id
 // ==============================
-// ✅ GET /dev/get-recipes (updated to include notes)
-// Returns: [{ recipe_name, notes }]
+// GET /dev/get-recipes (unchanged but fine)
 // ==============================
 app.get("/dev/get-recipes", (req, res) => {
   const { cognito_id } = req.query;
@@ -1097,16 +1340,26 @@ app.get("/dev/get-recipes", (req, res) => {
   });
 });
 
-
 // ==============================
-// ✅ PUT /api/recipes/:id (updated to accept + store notes)
-// Expects body: { recipe, upb, notes, ingredients[], quantities[], units[], cognito_id }
+// PUT /api/recipes/:id (UPDATED: supports notes + combined recipe_components + is_combined)
 // ==============================
 app.put("/api/recipes/:id", async (req, res) => {
   const recipeId = req.params.id;
-  const FRONTEND_ORIGIN = "https://master.d2fdrxobxyr2je.amplifyapp.com";
 
-  const { recipe, upb, notes, ingredients, quantities, units, cognito_id } = req.body;
+  const {
+    recipe,
+    upb,
+    notes,
+    ingredients,
+    quantities,
+    units,
+    cognito_id,
+    combined,
+    recipe_meta,
+    combined_meta,
+  } = req.body;
+
+  const combinedMeta = normalizeCombinedMeta({ combined, recipe_meta, combined_meta });
 
   res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -1122,16 +1375,14 @@ app.put("/api/recipes/:id", async (req, res) => {
     ingredients.length !== quantities.length ||
     ingredients.length !== units.length
   ) {
-    return res
-      .status(400)
-      .json({ error: "ingredients, quantities, units arrays must be same length" });
+    return res.status(400).json({
+      error: "ingredients, quantities, units arrays must be same length",
+    });
   }
 
   const conn = await db.promise().getConnection();
   try {
-    console.info(
-      `[PUT.recipes] Starting transaction for recipe=${recipeId} user=${cognito_id}`
-    );
+    console.info(`[PUT.recipes] Starting transaction for recipe=${recipeId} user=${cognito_id}`);
     await conn.beginTransaction();
 
     // Verify ownership
@@ -1142,26 +1393,48 @@ app.put("/api/recipes/:id", async (req, res) => {
 
     if (!found || found.length === 0 || String(found[0].user_id) !== String(cognito_id)) {
       await conn.rollback();
-      console.warn(
-        `[PUT.recipes] recipe not found or not owned: recipe=${recipeId}, user=${cognito_id}`
-      );
+      console.warn(`[PUT.recipes] recipe not found or not owned: recipe=${recipeId}, user=${cognito_id}`);
       return res.status(404).json({ error: "Recipe not found or not owned by user" });
     }
 
-    // ✅ Update recipe meta (now includes notes)
+    const isCombined =
+      combinedMeta && (combinedMeta.sources?.length || combinedMeta.extras?.length) ? 1 : 0;
+
+    // Update recipes meta (includes notes + is_combined)
     await conn.execute(
-      `UPDATE recipes 
-         SET recipe_name = ?, units_per_batch = ?, notes = ?
-       WHERE id = ?`,
-      [
-        recipe,
-        upb,
-        (notes && String(notes).trim()) ? String(notes).trim() : null,
-        recipeId,
-      ]
+      `UPDATE recipes
+         SET recipe_name = ?, units_per_batch = ?, notes = ?, is_combined = ?
+       WHERE id = ? AND user_id = ?`,
+      [recipe, upb, normalizeNotes(notes), isCombined, recipeId, cognito_id]
     );
 
-    // Delete existing recipe_ingredients for this recipe and user
+    // Update recipe_components for combined recipes
+    // Strategy: delete & reinsert for this combined recipe
+    await conn.execute(
+      `DELETE FROM recipe_components WHERE combined_recipe_id = ? AND user_id = ?`,
+      [recipeId, cognito_id]
+    );
+
+    if (isCombined) {
+      const sources = combinedMeta?.sources || [];
+      for (const s of sources) {
+        const [check] = await conn.execute(
+          `SELECT id FROM recipes WHERE id = ? AND user_id = ? LIMIT 1`,
+          [s.source_recipe_id, cognito_id]
+        );
+        if (!check || check.length === 0) {
+          console.warn(`[PUT.recipes] skipping source_recipe_id=${s.source_recipe_id} (not owned)`);
+          continue;
+        }
+        await conn.execute(
+          `INSERT INTO recipe_components (combined_recipe_id, source_recipe_id, multiplier, user_id)
+           VALUES (?, ?, ?, ?)`,
+          [recipeId, s.source_recipe_id, s.multiplier ?? 1.0, cognito_id]
+        );
+      }
+    }
+
+    // Delete existing recipe_ingredients for this recipe & user
     await conn.execute(
       `DELETE FROM recipe_ingredients WHERE recipe_id = ? AND user_id = ?`,
       [recipeId, cognito_id]
@@ -1173,14 +1446,8 @@ app.put("/api/recipes/:id", async (req, res) => {
       const qty = quantities[i];
       const unitVal = units[i];
 
-      if (!ingName) {
-        console.warn(
-          `[PUT.recipes] Skipping empty ingredient at index ${i} for recipe ${recipeId}`
-        );
-        continue;
-      }
+      if (!ingName) continue;
 
-      // Find ingredient for user
       const [ingRows] = await conn.execute(
         `SELECT id FROM ingredients WHERE ingredient_name = ? AND user_id = ? LIMIT 1`,
         [ingName, cognito_id]
@@ -1197,7 +1464,6 @@ app.put("/api/recipes/:id", async (req, res) => {
         ingredientId = ins.insertId;
       }
 
-      // Insert recipe_ingredient
       await conn.execute(
         `INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, user_id)
          VALUES (?, ?, ?, ?, ?)`,
@@ -1214,19 +1480,20 @@ app.put("/api/recipes/:id", async (req, res) => {
     await conn.commit();
     console.info(`[PUT.recipes] Commit successful recipe=${recipeId} user=${cognito_id}`);
 
-    // Return updated recipe (reselect) ✅ include notes
+    // Return updated recipe rows (same style as before)
     const [updatedRows] = await db.promise().execute(
-      `SELECT 
+      `SELECT
           r.id AS recipe_id,
           r.recipe_name,
           r.units_per_batch,
           IFNULL(r.notes,'') AS notes,
+          IFNULL(r.is_combined,0) AS is_combined,
           i.ingredient_name,
           ri.quantity,
           IFNULL(ri.unit,'') AS unit
        FROM recipes r
-       JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-       JOIN ingredients i ON i.id = ri.ingredient_id
+       JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.user_id = r.user_id
+       JOIN ingredients i ON i.id = ri.ingredient_id AND i.user_id = r.user_id
        WHERE r.id = ? AND r.user_id = ?
        ORDER BY ri.id ASC`,
       [recipeId, cognito_id]
@@ -1242,7 +1509,119 @@ app.put("/api/recipes/:id", async (req, res) => {
   }
 });
 
-// **Add user to the database**
+// ==============================
+// GET /api/recipes/:id (UPDATED: fixes recipe_components schema + returns combined meta for frontend)
+// ==============================
+app.get("/api/recipes/:id", async (req, res) => {
+  const recipeId = req.params.id;
+  const cognito_id = req.query.cognito_id;
+  const start = Date.now();
+
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  console.info(
+    `[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(req.query)}`
+  );
+
+  if (!recipeId) return res.status(400).json({ error: "recipe id required in path" });
+  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+
+  const conn = await db.promise().getConnection();
+  try {
+    const sql = `
+      SELECT 
+        r.id as recipe_id,
+        r.recipe_name,
+        r.units_per_batch,
+        IFNULL(r.notes,'') AS notes,
+        IFNULL(r.is_combined,0) AS is_combined,
+
+        ri.id as recipe_ingredient_id,
+        ri.quantity,
+        IFNULL(ri.unit,'') AS unit,
+
+        i.id as ingredient_id,
+        i.ingredient_name
+      FROM recipes r
+      LEFT JOIN recipe_ingredients ri 
+        ON ri.recipe_id = r.id 
+       AND ri.user_id = r.user_id
+      LEFT JOIN ingredients i 
+        ON i.id = ri.ingredient_id 
+       AND i.user_id = r.user_id
+      WHERE r.id = ? AND r.user_id = ?
+      ORDER BY ri.id ASC
+    `;
+
+    const [rows] = await conn.execute(sql, [recipeId, cognito_id]);
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "Recipe not found or not owned by user" });
+    }
+
+    const recipeMeta = rows[0];
+
+    const ingredients = rows
+      .filter((r) => r.ingredient_name !== null && r.ingredient_id !== null)
+      .map((r) => ({
+        recipe_ingredient_id: r.recipe_ingredient_id,
+        ingredient_id: r.ingredient_id,
+        ingredient_name: r.ingredient_name,
+        quantity: r.quantity,
+        unit: r.unit,
+      }));
+
+    // If combined: return components + combined meta (for drawer grouping)
+    let components = [];
+    let combined_meta = null;
+
+    if (Number(recipeMeta.is_combined) === 1) {
+      const [compRows] = await conn.execute(
+        `
+        SELECT combined_recipe_id, source_recipe_id, multiplier, created_at
+        FROM recipe_components
+        WHERE combined_recipe_id = ? AND user_id = ?
+        ORDER BY created_at ASC, source_recipe_id ASC
+        `,
+        [recipeId, cognito_id]
+      );
+
+      components = (compRows || []).map((c) => ({
+        combined_recipe_id: c.combined_recipe_id,
+        source_recipe_id: c.source_recipe_id,
+        multiplier: c.multiplier,
+        created_at: c.created_at,
+      }));
+
+      // Build the exact shape your frontend Drawer normaliser can read
+      combined_meta = await buildCombinedMetaFromDb(conn, Number(recipeId), cognito_id);
+    }
+
+    const payload = {
+      recipe_id: recipeMeta.recipe_id,
+      recipe_name: recipeMeta.recipe_name,
+      units_per_batch: recipeMeta.units_per_batch,
+      notes: recipeMeta.notes,
+      is_combined: Number(recipeMeta.is_combined) === 1 ? 1 : 0,
+      components,
+      combined_meta, // ✅ Drawer can use this to group by source recipe
+      ingredients,
+    };
+
+    console.info(
+      `[GET.recipes.id] Responding (${Date.now() - start}ms) ingredients=${ingredients.length} is_combined=${payload.is_combined} components=${components.length}`
+    );
+
+    return res.json(payload);
+  } catch (err) {
+    console.error("[GET.recipes.id] DB error:", { message: err.message, stack: err.stack });
+    return res.status(500).json({ error: "Database error", details: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 app.post('/dev/api/add-user', async (req, res) => {
   try {
     const { cognito_id, email } = req.body;
@@ -1279,152 +1658,6 @@ app.post('/dev/api/add-user', async (req, res) => {
   }
 });
 
-// GET /api/recipes/:id - detailed logging
-app.get("/api/recipes/:id", async (req, res) => {
-  const recipeId = req.params.id;
-  const cognito_id = req.query.cognito_id;
-  const start = Date.now();
-
-  // CORS (match your other routes)
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://master.d2fdrxobxyr2je.amplifyapp.com"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
-  console.info(
-    `[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(
-      req.query
-    )} headers=${JSON.stringify(req.headers)}`
-  );
-
-  if (!recipeId) {
-    console.warn("[GET.recipes.id] missing recipeId in params");
-    return res.status(400).json({ error: "recipe id required in path" });
-  }
-  if (!cognito_id) {
-    console.warn("[GET.recipes.id] missing cognito_id in query");
-    return res.status(400).json({ error: "cognito_id is required" });
-  }
-
-  try {
-    // ✅ Query recipe meta + ingredients + is_combined
-    const sql = `
-      SELECT 
-        r.id as recipe_id,
-        r.recipe_name,
-        r.units_per_batch,
-        IFNULL(r.notes,'') AS notes,
-        IFNULL(r.is_combined,0) AS is_combined,
-
-        ri.id as recipe_ingredient_id,
-        ri.quantity,
-        IFNULL(ri.unit,'') AS unit,
-
-        i.id as ingredient_id,
-        i.ingredient_name
-      FROM recipes r
-      LEFT JOIN recipe_ingredients ri 
-        ON ri.recipe_id = r.id 
-       AND ri.user_id = r.user_id
-      LEFT JOIN ingredients i 
-        ON i.id = ri.ingredient_id 
-       AND i.user_id = r.user_id
-      WHERE r.id = ? AND r.user_id = ?
-      ORDER BY ri.id ASC
-    `;
-
-    console.info(
-      `[GET.recipes.id] Executing query: ${sql.trim()} -- params: [${recipeId}, ${cognito_id}]`
-    );
-
-    const [rows] = await db.promise().execute(sql, [recipeId, cognito_id]);
-
-    console.info(
-      `[GET.recipes.id] Query returned rows.length=${rows && rows.length}`
-    );
-
-    if (!rows || rows.length === 0) {
-      console.warn(
-        `[GET.recipes.id] Not found or not owned by user: recipe=${recipeId} user=${cognito_id}`
-      );
-      return res
-        .status(404)
-        .json({ error: "Recipe not found or not owned by user" });
-    }
-
-    const recipeMeta = rows[0];
-
-    // ✅ Ingredients list
-    const ingredients = rows
-      .filter((r) => r.ingredient_name !== null && r.ingredient_id !== null)
-      .map((r) => ({
-        recipe_ingredient_id: r.recipe_ingredient_id,
-        ingredient_id: r.ingredient_id,
-        ingredient_name: r.ingredient_name,
-        quantity: r.quantity,
-        unit: r.unit,
-      }));
-
-    // ✅ If combined, include the component recipes used to create it (optional, but needed for frontend “combined” drawers)
-    let components = [];
-    if (Number(recipeMeta.is_combined) === 1) {
-      const compSql = `
-        SELECT
-          rc.id,
-          rc.combined_recipe_id,
-          rc.source_recipe_id,
-          rc.multiplier,
-          r2.recipe_name AS source_recipe_name,
-          r2.units_per_batch AS source_units_per_batch
-        FROM recipe_components rc
-        JOIN recipes r2
-          ON r2.id = rc.source_recipe_id
-         AND r2.user_id = rc.user_id
-        WHERE rc.combined_recipe_id = ?
-          AND rc.user_id = ?
-        ORDER BY rc.id ASC
-      `;
-
-      const [compRows] = await db
-        .promise()
-        .execute(compSql, [recipeId, cognito_id]);
-
-      components = (compRows || []).map((c) => ({
-        id: c.id,
-        combined_recipe_id: c.combined_recipe_id,
-        source_recipe_id: c.source_recipe_id,
-        multiplier: c.multiplier,
-        source_recipe_name: c.source_recipe_name,
-        source_units_per_batch: c.source_units_per_batch,
-      }));
-    }
-
-    const payload = {
-      recipe_id: recipeMeta.recipe_id,
-      recipe_name: recipeMeta.recipe_name,
-      units_per_batch: recipeMeta.units_per_batch,
-      notes: recipeMeta.notes,
-      is_combined: Number(recipeMeta.is_combined) === 1 ? 1 : 0,
-      components, // ✅ NEW (empty [] if not combined)
-      ingredients,
-    };
-
-    console.info(
-      `[GET.recipes.id] Responding (${Date.now() - start}ms) ingredients=${ingredients.length} is_combined=${payload.is_combined} components=${components.length}`
-    );
-
-    return res.json(payload);
-  } catch (err) {
-    console.error("[GET.recipes.id] DB error:", {
-      message: err.message,
-      stack: err.stack,
-    });
-    return res
-      .status(500)
-      .json({ error: "Database error", details: err.message });
-  }
-});
 
 app.post("/api/add-production-log", async (req, res) => {
   const {
