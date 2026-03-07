@@ -1524,11 +1524,19 @@ app.get("/api/recipes/:id", async (req, res) => {
     `[GET.recipes.id] incoming request recipeId=${recipeId} query=${JSON.stringify(req.query)}`
   );
 
-  if (!recipeId) return res.status(400).json({ error: "recipe id required in path" });
-  if (!cognito_id) return res.status(400).json({ error: "cognito_id is required" });
+  if (!recipeId) {
+    return res.status(400).json({ error: "recipe id required in path" });
+  }
 
-  const conn = await db.promise().getConnection();
+  if (!cognito_id) {
+    return res.status(400).json({ error: "cognito_id is required" });
+  }
+
+  let conn;
+
   try {
+    conn = await db.promise().getConnection();
+
     const sql = `
       SELECT 
         r.id as recipe_id,
@@ -1556,6 +1564,8 @@ app.get("/api/recipes/:id", async (req, res) => {
 
     const [rows] = await conn.execute(sql, [recipeId, cognito_id]);
 
+    console.info("[GET.recipes.id] base rows:", rows);
+
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: "Recipe not found or not owned by user" });
     }
@@ -1572,11 +1582,12 @@ app.get("/api/recipes/:id", async (req, res) => {
         unit: r.unit,
       }));
 
-    // If combined: return components + combined meta (for drawer grouping)
     let components = [];
     let combined_meta = null;
 
     if (Number(recipeMeta.is_combined) === 1) {
+      console.info(`[GET.recipes.id] recipe ${recipeId} is combined, loading components`);
+
       const [compRows] = await conn.execute(
         `
         SELECT combined_recipe_id, source_recipe_id, multiplier, created_at
@@ -1587,6 +1598,8 @@ app.get("/api/recipes/:id", async (req, res) => {
         [recipeId, cognito_id]
       );
 
+      console.info("[GET.recipes.id] component rows:", compRows);
+
       components = (compRows || []).map((c) => ({
         combined_recipe_id: c.combined_recipe_id,
         source_recipe_id: c.source_recipe_id,
@@ -1594,8 +1607,26 @@ app.get("/api/recipes/:id", async (req, res) => {
         created_at: c.created_at,
       }));
 
-      // Build the exact shape your frontend Drawer normaliser can read
-      combined_meta = await buildCombinedMetaFromDb(conn, Number(recipeId), cognito_id);
+      try {
+        combined_meta = await buildCombinedMetaFromDb(
+          conn,
+          Number(recipeId),
+          cognito_id
+        );
+        console.info("[GET.recipes.id] combined_meta:", combined_meta);
+      } catch (metaErr) {
+        console.error("[GET.recipes.id] buildCombinedMetaFromDb failed:", {
+          message: metaErr.message,
+          stack: metaErr.stack,
+          recipeId,
+          cognito_id,
+        });
+
+        return res.status(500).json({
+          error: "Failed to build combined recipe metadata",
+          details: metaErr.message,
+        });
+      }
     }
 
     const payload = {
@@ -1605,20 +1636,30 @@ app.get("/api/recipes/:id", async (req, res) => {
       notes: recipeMeta.notes,
       is_combined: Number(recipeMeta.is_combined) === 1 ? 1 : 0,
       components,
-      combined_meta, // ✅ Drawer can use this to group by source recipe
+      combined_meta,
       ingredients,
     };
 
+    console.info("[GET.recipes.id] payload:", payload);
     console.info(
       `[GET.recipes.id] Responding (${Date.now() - start}ms) ingredients=${ingredients.length} is_combined=${payload.is_combined} components=${components.length}`
     );
 
     return res.json(payload);
   } catch (err) {
-    console.error("[GET.recipes.id] DB error:", { message: err.message, stack: err.stack });
-    return res.status(500).json({ error: "Database error", details: err.message });
+    console.error("[GET.recipes.id] DB error:", {
+      message: err.message,
+      stack: err.stack,
+      recipeId,
+      cognito_id,
+    });
+
+    return res.status(500).json({
+      error: "Database error",
+      details: err.message,
+    });
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 

@@ -735,7 +735,7 @@ const RecipeTable = ({
   searchQuery,
   setSearchQuery,
   isDark,
-  onOpenNotes, // ✅ NEW
+  onOpenNotes,
 }) => {
   const checkboxRef = useRef(null);
 
@@ -763,7 +763,6 @@ const RecipeTable = ({
   const noteLabel = (txt) => {
     const t = String(txt || "").trim();
     if (!t) return "See Notes";
-    // short preview
     return t.length > 34 ? `${t.slice(0, 34)}…` : t;
   };
 
@@ -811,7 +810,6 @@ const RecipeTable = ({
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="r-toolbar">
         <input
           className="r-input"
@@ -839,10 +837,7 @@ const RecipeTable = ({
               <th className="r-td">Units per Batch</th>
               <th className="r-td">Ingredients</th>
               <th className="r-td">Quantities</th>
-
-              {/* ✅ NEW COLUMN */}
               <th className="r-td">Notes</th>
-
               <th className="r-td r-actions">Actions</th>
             </tr>
           </thead>
@@ -876,7 +871,6 @@ const RecipeTable = ({
                   </button>
                 </td>
 
-                {/* ✅ Notes cell: click -> popup */}
                 <td className="r-td">
                   <button
                     className="r-note-pill"
@@ -1004,11 +998,9 @@ const getCombinedMeta = (recipe) => {
 const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ✅ detect combined recipe meta (if present)
   const combined = useMemo(() => getCombinedMeta(recipe), [recipe]);
   const isCombined = !!combined;
 
-  // Normal flat list (unchanged behaviour)
   const displayItems = useMemo(() => {
     if (!recipe) return [];
     return (recipe.ingredients || []).map((ing) => ({
@@ -1023,7 +1015,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
     return displayItems.filter((it) => it.fullText.includes(q));
   }, [displayItems, searchTerm]);
 
-  // Combined grouped view
   const grouped = useMemo(() => {
     if (!isCombined || !combined) return null;
 
@@ -1067,7 +1058,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
       });
     }
 
-    // Remove empty groups (after filtering)
     return groups.filter((g) => (g.items || []).length > 0);
   }, [combined, isCombined, searchTerm]);
 
@@ -1086,7 +1076,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
 
     const safeName = (recipe?.name || "recipe").replace(/\s+/g, "_");
 
-    // ✅ if combined, export includes Source column
     if (isCombined && combined) {
       const headers = ["Source", "Ingredient", "Quantity", "Unit"];
       const rows = [];
@@ -1124,7 +1113,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
       return;
     }
 
-    // Default export (existing behaviour)
     const headers =
       type === "quantities" ? ["Ingredient", "Quantity", "Unit"] : ["Ingredient"];
     const rows = (recipe.ingredients || []).map((ing) =>
@@ -1182,7 +1170,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
                 Units per batch: {recipe?.unitsPerBatch ?? "N/A"}
               </div>
 
-              {/* ✅ show a tiny hint if combined */}
               {isCombined && (
                 <div className="r-muted" style={{ marginTop: 6 }}>
                   Contribution view: grouped by source recipe
@@ -1215,7 +1202,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
             />
           </div>
 
-          {/* ✅ If combined: render grouped contributions. If not: keep existing list */}
           {isCombined ? (
             <div className="r-groups">
               {(grouped || []).map((g) => (
@@ -1269,7 +1255,6 @@ const RecipeDrawer = ({ isOpen, onClose, recipe, type }) => {
                 </div>
               ))}
 
-              {/* empty state */}
               {(grouped || []).length === 0 && (
                 <div className="r-summary" style={{ textAlign: "center" }}>
                   <div className="r-muted">No items found.</div>
@@ -1378,7 +1363,6 @@ const AddIngredientDialog = ({ open, onClose, onAdd, adding }) => {
       open={open}
       onClose={onClose}
       fullWidth
-      // ✅ FIX: force MUI Dialog above our portaled overlay/modal (9999)
       sx={{
         zIndex: 20000,
         "& .MuiBackdrop-root": { zIndex: 20000 },
@@ -1531,7 +1515,6 @@ const RecipeSummaryModal = ({ open, onClose, onConfirm, initialRecipe }) => {
                 />
               </div>
 
-              {/* ✅ Notes */}
               <div className="gof-field col-12" style={{ gridColumn: "span 4" }}>
                 <label className="gof-label">Notes / Method</label>
                 <textarea
@@ -1752,7 +1735,6 @@ const EditRecipeModal = ({ isOpen, onClose, onSave, recipe }) => {
                 />
               </div>
 
-              {/* ✅ Notes */}
               <div className="gof-field col-12" style={{ gridColumn: "span 4" }}>
                 <label className="gof-label">Notes / Method</label>
                 <textarea
@@ -1906,7 +1888,7 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
   const { cognitoId } = useAuth();
   const { ingredients, reload } = useIngredientOptions(cognitoId, isOpen ? 1 : 0);
 
-  const [mode, setMode] = useState("manual"); // "manual" | "combine"
+  const [mode, setMode] = useState("manual");
 
   const [newRecipe, setNewRecipe] = useState({
     name: "",
@@ -2022,7 +2004,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     }
   };
 
-  // ✅ helper to merge by name+unit
   const mergeIngredients = (arrays) => {
     const map = new Map();
     arrays
@@ -2044,7 +2025,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     return Array.from(map.values());
   };
 
-  // ✅ for previewing combined totals in UI
   const combinedBaseIngredients = (() => {
     const selectedSet = new Set(selectedRecipeIdsLocal);
     const map = new Map();
@@ -2071,7 +2051,6 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     );
   };
 
-  // ✅ NEW: build the exact combined meta shape the Drawer expects
   const buildCombinedMeta = () => {
     const selectedSet = new Set(selectedRecipeIdsLocal);
 
@@ -2102,14 +2081,13 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
     return { sources, extras: extrasMerged };
   };
 
-  // ✅ NEW: build components payload for DB recipe_components
   const buildComponentsPayload = () => {
     const selectedSet = new Set(selectedRecipeIdsLocal);
     return (existingRecipes || [])
       .filter((r) => selectedSet.has(r.id))
       .map((r) => ({
         source_recipe_id: r.id,
-        multiplier: 1, // default (you can add UI later)
+        multiplier: 1,
       }));
   };
 
@@ -2142,12 +2120,8 @@ const AddRecipeModal = ({ isOpen, onClose, onSave, existingRecipes }) => {
       unitsPerBatch: newRecipe.unitsPerBatch || 0,
       notes: newRecipe.notes || "",
       ingredients: candidateIngredients,
-
-      // ✅ for Drawer contribution view (frontend + backend can share this shape)
       combined: combinedMeta,
       recipe_meta: combinedMeta,
-
-      // ✅ for DB persistence (recipe_components)
       is_combined,
       components,
     };
@@ -2627,7 +2601,6 @@ const Recipes = () => {
   const { cognitoId } = useAuth();
   const { setRows } = useData();
 
-  // theme sync with Topbar (same as Dashboard/GoodsIn)
   const [isDark, setIsDark] = useState(
     () => localStorage.getItem("theme-mode") === "dark"
   );
@@ -2646,7 +2619,7 @@ const Recipes = () => {
   const [drawerType, setDrawerType] = useState("ingredients");
   const [drawerRecipe, setDrawerRecipe] = useState(null);
 
-  const drawerRequestRef = useRef({ id: null }); // ✅ prevent stale detail fetch overwrite
+  const drawerRequestRef = useRef({ id: null });
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -2654,21 +2627,23 @@ const Recipes = () => {
 
   const [addOpen, setAddOpen] = useState(false);
 
-  // Notes popup state
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesRecipe, setNotesRecipe] = useState(null);
 
-  // Search state for Recipes list
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchRecipeData = useCallback(async () => {
     if (!cognitoId) return;
     try {
-      const res = await fetch(
-        `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`
-      );
+      const url = `${API_BASE}/recipes?cognito_id=${encodeURIComponent(cognitoId)}`;
+      console.log("[Recipes GET] Requesting recipes list:", url);
+
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch Recipe data");
+
       const data = await res.json();
+
+      console.log("[Recipes GET] Raw recipes list response from DB:", data);
 
       const grouped = data.reduce((acc, row) => {
         let entry = acc.find((r) => r.id === row.recipe_id);
@@ -2682,9 +2657,7 @@ const Recipes = () => {
             recipe: row.recipe,
             upb: row.units_per_batch,
             notes: row.notes || "",
-            // ✅ if backend includes combined meta on list route, it will populate
             combined: row.combined || row.combined_meta || row.recipe_meta || null,
-            // ✅ if backend includes is_combined
             is_combined: row.is_combined ?? 0,
             ingredients: [row.ingredient],
             quantities: [row.quantity],
@@ -2693,6 +2666,9 @@ const Recipes = () => {
         }
         return acc;
       }, []);
+
+      console.log("[Recipes GET] Grouped recipe rows for UI:", grouped);
+
       setRows(grouped);
 
       const asRecipes = grouped.map((g) => ({
@@ -2709,6 +2685,9 @@ const Recipes = () => {
           unit: g.units?.[i] ?? "",
         })),
       }));
+
+      console.log("[Recipes GET] Final mapped recipes state:", asRecipes);
+
       setRecipes(asRecipes);
     } catch (err) {
       console.error("Error fetching recipes:", err);
@@ -2736,21 +2715,31 @@ const Recipes = () => {
     });
   }, [recipes, searchQuery]);
 
-  // ✅ helper: fetch detail route to retrieve combined meta (and notes) if missing
   const fetchRecipeDetail = useCallback(
     async (recipeId) => {
       if (!cognitoId || !recipeId) return null;
+
       const url = `${API_BASE}/recipes/${encodeURIComponent(
         recipeId
       )}?cognito_id=${encodeURIComponent(cognitoId)}`;
+
+      console.log("[Recipes GET] Requesting single recipe detail:", {
+        recipeId,
+        url,
+      });
+
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`Failed to fetch recipe ${recipeId}`);
-      return await resp.json();
+
+      const payload = await resp.json();
+
+      console.log("[Recipes GET] Raw single recipe detail response from DB:", payload);
+
+      return payload;
     },
     [cognitoId]
   );
 
-  // ✅ FIX: Drawer now fetches detail when combined meta isn't in list cache
   const handleOpenDrawer = async (recipeId, type) => {
     const base = recipes.find((x) => x.id === recipeId) || null;
 
@@ -2760,14 +2749,11 @@ const Recipes = () => {
 
     drawerRequestRef.current = { id: recipeId };
 
-    // If we already have combined meta, nothing else to do
     if (base && (base.combined || base.combined_meta || base.recipe_meta)) return;
 
-    // Otherwise fetch detail (where your backend can return combined meta)
     try {
       const payload = await fetchRecipeDetail(recipeId);
 
-      // Ignore stale response
       if (drawerRequestRef.current.id !== recipeId) return;
 
       const withDetail = {
@@ -2787,7 +2773,6 @@ const Recipes = () => {
           payload.recipe_meta ||
           base?.combined ||
           null,
-        // Prefer full ingredient list from payload if provided
         ingredients: Array.isArray(payload.ingredients)
           ? payload.ingredients.map((it, i) => ({
               id: it.id ?? `${recipeId}_${i}`,
@@ -2798,7 +2783,8 @@ const Recipes = () => {
           : base?.ingredients || [],
       };
 
-      // Update local cache
+      console.log("[Recipes GET] Normalised single recipe detail for drawer:", withDetail);
+
       setRecipes((prev) => prev.map((r) => (r.id === recipeId ? withDetail : r)));
       setDrawerRecipe(withDetail);
     } catch (e) {
@@ -2809,7 +2795,6 @@ const Recipes = () => {
   const handleOpenNotes = async (recipe) => {
     if (!recipe) return;
 
-    // If notes already present in list -> show immediately
     const has = String(recipe.notes || "").trim();
     if (has) {
       setNotesRecipe(recipe);
@@ -2817,7 +2802,6 @@ const Recipes = () => {
       return;
     }
 
-    // Otherwise fetch single recipe (your /api/recipes/:id returns notes)
     try {
       const payload = await fetchRecipeDetail(recipe.id);
 
@@ -2837,14 +2821,14 @@ const Recipes = () => {
           0,
       };
 
-      // update local list cache so you don't re-fetch next click
+      console.log("[Recipes GET] Normalised single recipe detail for notes:", withNotes);
+
       setRecipes((prev) => prev.map((r) => (r.id === recipe.id ? withNotes : r)));
 
       setNotesRecipe(withNotes);
       setNotesOpen(true);
     } catch (e) {
       console.error("Failed to load notes:", e);
-      // still open modal with empty state
       setNotesRecipe(recipe);
       setNotesOpen(true);
     }
@@ -2864,7 +2848,7 @@ const Recipes = () => {
           payload.is_combined ??
           (Array.isArray(payload.components) && payload.components.length ? 1 : 0) ??
           0,
-        components: Array.isArray(payload.components) ? payload.components : [], // optional
+        components: Array.isArray(payload.components) ? payload.components : [],
         ingredients: (payload.ingredients || []).map((it, i) => ({
           id: it.id ?? `${payload.recipe_id}_${i}`,
           name: it.ingredient_name,
@@ -2872,6 +2856,9 @@ const Recipes = () => {
           unit: it.unit,
         })),
       };
+
+      console.log("[Recipes GET] Normalised single recipe detail for edit modal:", r);
+
       setEditingRecipe(r);
       setEditOpen(true);
     } catch (e) {
@@ -2890,15 +2877,10 @@ const Recipes = () => {
         ingredients: edited.ingredients.map((i) => i.name),
         quantities: edited.ingredients.map((i) => i.quantity),
         units: edited.ingredients.map((i) => i.unit),
-
-        // ✅ Combined support (DB will use these once backend is updated)
         is_combined: edited.is_combined ? 1 : 0,
         components: Array.isArray(edited.components) ? edited.components : [],
-
-        // ✅ Keep existing meta keys for contribution drawer
         recipe_meta: edited.combined || edited.recipe_meta || null,
         combined: edited.combined || null,
-
         cognito_id: cognitoId,
       };
 
@@ -2959,15 +2941,10 @@ const Recipes = () => {
         ingredients: newRecipe.ingredients.map((i) => i.name),
         quantities: newRecipe.ingredients.map((i) => i.quantity),
         units: newRecipe.ingredients.map((i) => i.unit),
-
-        // ✅ Combined support (DB will use these once backend is updated)
         is_combined: newRecipe.is_combined ? 1 : 0,
         components: Array.isArray(newRecipe.components) ? newRecipe.components : [],
-
-        // ✅ Contribution-view meta (optional; backend may ignore)
         recipe_meta: newRecipe.combined || newRecipe.recipe_meta || null,
         combined: newRecipe.combined || null,
-
         cognito_id: cognitoId,
       };
 
@@ -3037,7 +3014,6 @@ const Recipes = () => {
         existingRecipes={recipes}
       />
 
-      {/* ✅ Notes popup */}
       <NotesModal
         open={notesOpen}
         onClose={() => {
